@@ -1,3 +1,4 @@
+open Alpha
 open Base
 open Utils
 open Trees
@@ -5,48 +6,34 @@ open Trees
 module Tree = Trees
 module IM = Map.M(Int)
 
-type value =
-  | VInt of int
-  | VBool of bool
-  | VString of string
 
-type generator = unit -> value
-
-let empty_gen _ = VString "{}"
-
-let gens (k : int) =
-  match k with
-  | -1 -> (fun () -> VInt (Random.int 20))
-  | -2 -> (fun () -> VBool (Random.int 20 > 10))
-  | _ -> empty_gen
-
-module Symbol =
+module Terminal =
 struct
-  type t = { name : string; arity : int }
-  let equal s1 s2 = String.equal s1.name s2.name && s1.arity = s2.arity
-  let mk name arity : t = { name; arity }
-  let of_gen (g : generator) : t =
-    match g () with
-    | VInt i ->  mk (Int.to_string i) (-1)
-    | VBool b -> mk (Bool.to_string b) (-2)
-    | VString k -> mk k (-3)
+  type t = { name : string; id : int; arity : int; otype : typ list }
+  let compare t1 t2 = Base.compare t1.id t2.id
+  let equal t1 t2 = Base.equal t1.id t2.id
+
+  let mk ?(id = (-1)) (name : string) (arity : int) (otype : typ list) : t =
+    mk_with_id id name (fun id -> { name; id; arity; otype })
+
+  let mk_many (info : (string * int * typ list) list) : t list =
+    let f acc (s, i, t) =
+      (mk s i t) :: acc
+    in List.fold ~f ~init:[] info
 end
 
 type tdfta = {
   states : int list;
   initial : int;
-  final : (int * int) list;
-  sigma : (int, Symbol.t) List.Assoc.t;
+  final : int list;
+  sigma : (int, Terminal.t) List.Assoc.t;
   transitions : ((int * int list) list) IM.t ;
 }
 
-let is_final (a : tdfta) s =  List.Assoc.mem ~equal a.final s
-
-let final_state (a : tdfta) s =
-  List.Assoc.find a.final ~equal s
+let is_final (a : tdfta) s =  List.mem ~equal a.final s
 
 
-let itree_to_stree (sigma : (int, Symbol.t) List.Assoc.t) (it : int tree) : Symbol.t tree =
+let itree_to_stree (sigma : (int, Terminal.t) List.Assoc.t) (it : int tree) : Terminal.t tree =
   let to_symbol i =
     List.Assoc.find ~equal sigma i
   in
@@ -58,35 +45,35 @@ let itree_to_stree (sigma : (int, Symbol.t) List.Assoc.t) (it : int tree) : Symb
       let l' = List.map ~f l in
       match to_symbol x with
       | Some symb -> Node(symb, l')
-      | None -> Node(Symbol.of_gen (gens x), l')
+      | None -> Nil
   in f it
 
-let generate ~(depth : int) (a : tdfta) : (Symbol.t tree) list =
+let generate ~(depth : int) (a : tdfta) : (Terminal.t tree) list =
   let rec gen k s_in =
-    match final_state a s_in with
-    | Some i -> if i < 0 then [Node(i, [])] else [Nil]
-    | None ->
+    match is_final a s_in with
+    | true -> [Nil]
+    | false ->
       (match Map.find a.transitions s_in with
        | Some transitions -> List.concat (List.map ~f:(take_t k) transitions)
        | None -> [])
-  and take_t k (x, s_l) : int tree list =
+  and take_t k (alpha, states) : int tree list =
     if k > 0 then
-      let chs = product (List.map ~f:(gen (k - 1)) s_l) in
-      List.map ~f:(fun ch -> Node(x, ch)) chs
+      let chs = product (List.map ~f:(gen (k - 1)) states) in
+      List.map ~f:(fun ch -> Node(alpha, ch)) chs
     else
       let f _ = Cont in
-      [Node(x, (List.init (List.length s_l) ~f))]
+      [Node(alpha, (List.init (List.length states) ~f))]
   in
   List.map ~f:(itree_to_stree a.sigma) (gen depth a.initial)
 
-let recognize ?(cont_ok = true) (autom : tdfta) (symb_tree : Symbol.t tree) : bool =
+let recognize ?(cont_ok = true) (autom : tdfta) (symb_tree : Terminal.t tree) : bool =
   let symbol_to_id = List.Assoc.inverse autom.sigma in
   let rec take_t s x l =
     if is_final autom s then true else
       begin
         match Map.find autom.transitions s with
         | Some ts ->
-          (match List.Assoc.find ~equal:Symbol.equal symbol_to_id x with
+          (match List.Assoc.find ~equal:Terminal.equal symbol_to_id x with
            | Some xid ->
              let with_x = List.filter ~f:(fun (x', _) -> xid = x') ts in
              List.fold_left

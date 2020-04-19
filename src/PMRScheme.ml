@@ -1,28 +1,10 @@
+open Alpha
 open Automata
 open Base
 open Trees
 open Utils
 
 open Result.Let_syntax
-
-type typ = string * int
-
-let _IDS = Hashtbl.create (module Int) ~size:20
-let _MAX_ID = ref 0
-
-let new_id () =
-  let i = !_MAX_ID in
-  _MAX_ID := !_MAX_ID + 1;
-  i
-
-let mk_with_id (i : int) (s : string) (f : int -> 'a) : 'a =
-  if i > 0 then f i
-  else
-    let id = new_id () in
-    match Hashtbl.add _IDS ~key:id ~data:s with
-    | _ -> ();
-      f id
-
 
 (* ============================================================================================= *)
 (*                      TYPE DEFINITIONS AND UTILS                                               *)
@@ -35,16 +17,6 @@ struct
 
   let mk ?(id = (-1)) (name : string) (arity : int) : t =
     mk_with_id id name (fun id -> { name; id; arity })
-end
-
-module Terminal =
-struct
-  type t = { name : string; id : int; arity : int; otype : typ list }
-  let compare t1 t2 = Base.compare t1.id t2.id
-  let equal t1 t2 = Base.equal t1.id t2.id
-
-  let mk ?(id = (-1)) (name : string) (arity : int) (otype : typ list) : t =
-    mk_with_id id name (fun id -> { name; id; arity; otype })
 end
 
 module Variable =
@@ -75,9 +47,15 @@ type pattern = terminal * variable list
 
 type rewrite_rule = non_terminal * variable list * pattern option * term
 
-type pmrs = rewrite_rule list
+type pmrs = {
+  main_id : int;
+  rules : (rewrite_rule list) Map.M(Int).t;
+  non_terminals : non_terminal list;
+}
+
 (* Type shortcuts *)
 type 'a xresult = ('a, (string * Sexp.t) list) Result.t
+type 'a sresult = ('a, (string * term) list) Result.t
 type variables = variable Map.M(String).t
 
 (* ============================================================================================= *)
@@ -103,8 +81,9 @@ let pp_rewrite_rule (frmt : Formatter.t) (nt, vargs, pat, t : rewrite_rule) : un
 
 let pp_pmrs (frmt : Formatter.t) (pmrs : pmrs) : unit =
   List.iter
-    ~f:(fun r -> Fmt.(pf frmt "%a@." (box pp_rewrite_rule) r))
-    pmrs
+    ~f:(fun (_, r) ->
+        Fmt.(pf frmt "%a@." (list (box pp_rewrite_rule)) r))
+    (Map.to_alist pmrs.rules)
 
 (* ============================================================================================= *)
 (*                                 PARSING, READING                                              *)
@@ -147,19 +126,20 @@ let parse_rules (sigma : terminal Map.M(String).t) (rules : Sexp.t) : pmrs xresu
     | _ -> Error ["Rules should be a list of s-expressions.", rules]
   in
   let gather_nonterms rules =
-    let f nts (nt_name, args, _pat, _) =
-      nts >>=!
-      (fun nts ->
-         if Map.mem nts nt_name then Ok nts
+    let f acc (nt_name, args, _pat, _) =
+      acc >>=!
+      (fun (iid, nts) ->
+         if Map.mem nts nt_name then Ok (iid, nts)
          else
            let arity = List.length args + (if Option.is_some _pat then 1 else 0) in
            let new_nt = NonTerminal.mk nt_name arity in
-           Ok (Map.add_exn nts ~key:nt_name ~data:new_nt))
+           let iid' = if iid < 0 then new_nt.NonTerminal.id else iid in
+           Ok (iid', Map.add_exn nts ~key:nt_name ~data:new_nt))
     in
-    (List.fold ~init:(Ok (Map.empty (module String))) ~f rules) >>=!
+    (List.fold ~init:(Ok (-1, Map.empty (module String))) ~f rules) >>=!
     (fun x -> Ok(x, rules))
   in
-  let parse_terms (nts, rules) : pmrs xresult =
+  let parse_terms ((iid, nts), rules) : pmrs xresult =
     let f (nt_name, vargs, pat, t) =
       let nt : non_terminal option = Map.find nts nt_name in
       let vars lv =
@@ -209,26 +189,41 @@ let parse_rules (sigma : terminal Map.M(String).t) (rules : Sexp.t) : pmrs xresu
                (match pat' with
                 | Error errs -> errs | _ -> []))
     in
-    blast (List.map ~f rules)
-  in
-  rules >>=! gather_nonterms >>=! parse_terms
+    let%bind rules = blast (List.map ~f rules) in
+    let rules_mapped =
+      let f m (nt, x, y, z) =
+        Map.update m nt.NonTerminal.id
+          ~f:(function
+              | None -> [(nt, x, y, z)]
+              | Some l -> (nt, x, y, z)::l)
+      in List.fold ~f ~init:(Map.empty (module Int)) rules
+    in
+    let nonterminals = List.map ~f:snd (Map.to_alist nts) in
+    Ok({main_id = iid; rules = rules_mapped; non_terminals = nonterminals })
+  in rules >>=! gather_nonterms >>=! parse_terms
 
 
-let term_of_symbol_tree
+let term_of_terminal_tree
     (sigma : terminal Map.M(String).t)
-    (t : Symbol.t tree) =
+    (t : Terminal.t tree) =
   let rec f t =
     match t with
     | Nil -> Error ["Incomplete term", t]
     | Cont -> Error ["Continuation", t]
     | Node(a, args) ->
       let%bind appf =
-        match Map.find sigma a.Symbol.name with
+        match Map.find sigma a.Terminal.name with
         | Some trl -> Ok (TTerm trl)
         | None -> Error ["Unrecognized symbol", t]
       in
-      let%bind app_args = blast (List.map ~f args) in
-      Ok (TApp (appf, app_args))
+      let%bind app_args =
+        match args with
+        | [Nil] -> Ok []
+        | _ ->  blast (List.map ~f args)
+      in
+      if List.length app_args > 0 then
+        Ok (TApp (appf, app_args))
+      else Ok appf
   in f t
 
 
@@ -246,33 +241,46 @@ let apply_substs (t : term) (bindings : (int, term) List.Assoc.t) : term =
     | _ -> t
   in replace t
 
-let match_pattern (c : terminal) (vargs : variable list) (t : term) : ((int * term) list, string) Result.t =
+let match_pattern (c : terminal) (vargs : variable list) (t : term) : ((int * term) list) sresult =
   match t with
   | TApp(TTerm c', targs) when c'.id = c.id ->
     (match List.map2 ~f:(fun t v -> (v.id, t)) targs vargs with
      | Ok l -> Ok l
-     | Unequal_lengths -> Error "Pattern does not match (args).")
-  | _ -> Error "Pattern does not match."
+     | Unequal_lengths -> Error ["Pattern does not match (args).", t])
 
-let rec eval_term (p : pmrs) (t : term) : term =
+  | TTerm c' when c'.id = c.id -> Ok []
+
+  | _ -> Error ["Pattern does not match.", t]
+
+let rec eval_term_worker (rs : pmrs) (t : term) : term sresult =
   match t with
   | TApp (TNTerm f, args) ->
-    let args = List.map ~f:(eval_term p) args in
-    (match find_and_apply_rule p f args with
-     | Some t -> eval_term p t
-     | None -> failwith "Failed reduction")
-  | _ -> t
+    let%bind args = blast (List.map ~f:(eval_term_worker rs) args) in
+    (match find_and_apply_rule rs f args with
+     | Some (Ok t) -> eval_term_worker rs t
+     | Some (Error s) -> Error s
+     | None -> Error ["Failed reduction", t])
 
-and find_and_apply_rule (p : pmrs) (f : non_terminal) (args : term list) : term option =
+  | TApp(TTerm t0, args) ->
+    let%bind args' = blast (List.map ~f:(eval_term_worker rs) args) in
+    Ok (TApp(TTerm t0, args'))
+
+  | _ -> Ok t
+
+and find_and_apply_rule (p : pmrs) (f : non_terminal) (args : term list) : (term sresult) option =
   let rules_with_f =
-    List.filter ~f:(fun (f', _, _, _) -> f'.id = f.id) p
+    match Map.find p.rules f.NonTerminal.id with
+    | Some rules -> rules
+    | None -> []
   in
   let rules_applied =
     List.filter ~f:Result.is_ok
       (List.map ~f:(fun rwr -> apply_rule rwr args) rules_with_f)
-  in List.hd rules_applied >>?| Result.ok_or_failwith
+  in match rules_applied with
+  | [] -> None
+  | hd :: _ -> Some hd
 
-and apply_rule (_, args, p, t : rewrite_rule) (terms : term list) : (term, string) Result.t =
+and apply_rule (_, args, p, t : rewrite_rule) (terms : term list) : term sresult =
   let rec fargs bindings l terms =
     match l, terms with
     | [], _ ->
@@ -282,12 +290,31 @@ and apply_rule (_, args, p, t : rewrite_rule) (terms : term list) : (term, strin
          let%bind okb = bindings in
          Ok(okb @ x)
        | None, [] -> bindings
-       | _ -> Error "Missing argument.")
+       | _ -> Error ["Missing argument.", t])
 
     | hd_v :: tl, hd_t :: tl_terms ->
       let%bind okb = bindings in
       fargs (Ok (okb @ [hd_v.Variable.id, hd_t])) tl tl_terms
 
-    | _, _ -> Error "Number of arguments does not match"
+    | _, _ -> Error ["Number of arguments does not match", t]
   in
   fargs (Ok []) args terms >>!| apply_substs t
+
+
+(* ============================================================================================= *)
+(*                                 EVALUATING : MAIN ENTRY POINT                                 *)
+(* ============================================================================================= *)
+let reduce_term (t : term) ~(with_pmrs : pmrs) : term =
+  match
+    List.find ~f:(fun nt -> NonTerminal.(nt.id = with_pmrs.main_id))
+      with_pmrs.non_terminals
+  with
+  | Some maint ->
+    (match eval_term_worker with_pmrs (TApp (TNTerm maint, [t])) with
+     | Ok t -> t
+     | Error errors ->
+       List.iter
+         ~f:(fun (s, t) -> Fmt.(pf stderr "ERROR %s for %a@." s (box pp_term) t)) errors;
+       failwith "Failed to eval term.")
+
+  | None -> failwith "Non Main symbol in PMRS."

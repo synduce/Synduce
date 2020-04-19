@@ -8,13 +8,14 @@ type 'a tree =
 
 let rec print_tree (p : Formatter.t -> 'a -> unit) (f : Formatter.t) (t : 'a tree) : unit =
   match t with
-  | Nil -> ()
+  | Nil -> Fmt.(pf f"!")
   | Cont -> Fmt.(pf f "_")
   | Node (x, l) ->
-    if List.length l > 0 then
+    match l with
+    | [Nil] | [] ->   Fmt.(pf f "%a" p x)
+    | _ ->
       Fmt.(pf f "%a(%a)" p x (box ~indent:0 (list ~sep:comma (print_tree p))) l)
-    else
-      Fmt.(pf f "%a" p x)
+
 
 (**
    Perfectly balanced trees.

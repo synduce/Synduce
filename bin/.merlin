@@ -19,6 +19,7 @@ B /home/victorn/.opam/ocaml-base-compiler/lib/ppxlib/print_diff
 B /home/victorn/.opam/ocaml-base-compiler/lib/ppxlib/traverse_builtins
 B /home/victorn/.opam/ocaml-base-compiler/lib/result
 B /home/victorn/.opam/ocaml-base-compiler/lib/seq
+B /home/victorn/.opam/ocaml-base-compiler/lib/sexplib
 B /home/victorn/.opam/ocaml-base-compiler/lib/sexplib0
 B /home/victorn/.opam/ocaml-base-compiler/lib/stdio
 B /home/victorn/.opam/ocaml-base-compiler/lib/stdlib-shims
@@ -44,9 +45,10 @@ S /home/victorn/.opam/ocaml-base-compiler/lib/ppxlib/print_diff
 S /home/victorn/.opam/ocaml-base-compiler/lib/ppxlib/traverse_builtins
 S /home/victorn/.opam/ocaml-base-compiler/lib/result
 S /home/victorn/.opam/ocaml-base-compiler/lib/seq
+S /home/victorn/.opam/ocaml-base-compiler/lib/sexplib
 S /home/victorn/.opam/ocaml-base-compiler/lib/sexplib0
 S /home/victorn/.opam/ocaml-base-compiler/lib/stdio
 S /home/victorn/.opam/ocaml-base-compiler/lib/stdlib-shims
 S .
 S ../src
-FLG -open Dune__exe -w @1..3@5..28@30..39@43@46..47@49..57@61..62-40 -strict-sequence -strict-formats -short-paths -keep-locs
+FLG -w @1..3@5..28@30..39@43@46..47@49..57@61..62-40 -strict-sequence -strict-formats -short-paths -keep-locs

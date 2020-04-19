@@ -1,3 +1,6 @@
-(Main (t) (F t))
+((Main (t) (F t))
 (F () (Nil) 0)
-(F () (Node a l r) (+ a (F l) (F r)))
+(F () (Node a l r) (+ a (F l) (G r)))
+(G () (Nil) 1)
+(G () (Node a l r) (* a (G l) (F r)))
+)

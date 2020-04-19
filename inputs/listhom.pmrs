@@ -1,0 +1,6 @@
+(
+    (Main (t) (F t))
+    (F () (Nil) x_0)
+    (F () (Single a) (f_0 a))
+    (F () (Concat x y) (odot (F x) (F y)))
+)
