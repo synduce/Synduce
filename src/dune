@@ -1,0 +1,4 @@
+(library
+ (name lib)
+ (libraries base fmt unix ppx_let)
+ (preprocess (pps ppx_let)))

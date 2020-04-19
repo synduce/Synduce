@@ -1,0 +1,3 @@
+(Main (t) (F t))
+(F () (Nil) 0)
+(F () (Node a l r) (+ a (F l) (F r)))
