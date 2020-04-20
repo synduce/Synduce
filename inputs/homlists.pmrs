@@ -1,0 +1,6 @@
+(
+    (G () Nil)
+    (G () (Single Int))
+    (G () (Concat G G))
+    (Int () 0)
+)

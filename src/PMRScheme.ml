@@ -9,9 +9,11 @@ open Result.Let_syntax
 (* ============================================================================================= *)
 (*                      TYPE DEFINITIONS AND UTILS                                               *)
 (* ============================================================================================= *)
+type non_terminal = { name : string; id : int; arity : int; }
+
 module NonTerminal =
 struct
-  type t = { name : string; id : int; arity : int; }
+  type t = non_terminal
   let compare t1 t2 = Base.compare t1.id t2.id
   let equal t1 t2 = Base.equal t1.id t2.id
 
@@ -19,9 +21,11 @@ struct
     mk_with_id id name (fun id -> { name; id; arity })
 end
 
+type variable = { name : string; id : int; }
+
 module Variable =
 struct
-  type t =  { name : string; id : int; }
+  type t = variable
   let compare t1 t2 = Base.compare t1.id t2.id
   let equal t1 t2 = Base.equal t1.id t2.id
 
@@ -31,17 +35,30 @@ struct
     mk_with_id id name (fun id -> { name; id })
 end
 
-type non_terminal = NonTerminal.t
 
 type terminal = Terminal.t
 
-type variable = Variable.t
 
 type term =
   | TApp of term * term list
   | TVar of variable
   | TTerm of terminal
   | TNTerm of non_terminal
+
+module Term =
+struct
+  type t = term
+  let rec equal t1 t2 =
+    match t1, t2 with
+    | TVar v1, TVar v2 -> Variable.equal v1 v2
+    | TTerm tt1, TTerm tt2 -> Terminal.equal tt1 tt2
+    | TNTerm tn1, TNTerm tn2 -> NonTerminal.equal tn1 tn2
+    | TApp(f1, args1), TApp (f2, args2) ->
+      if equal f1 f2 then
+        List.equal equal args1 args2 else false
+    | _ , _ -> false
+
+end
 
 type pattern = terminal * variable list
 
@@ -51,12 +68,27 @@ type pmrs = {
   main_id : int;
   rules : (rewrite_rule list) Map.M(Int).t;
   non_terminals : non_terminal list;
+  order : int;
 }
 
 (* Type shortcuts *)
 type 'a xresult = ('a, (string * Sexp.t) list) Result.t
 type 'a sresult = ('a, (string * term) list) Result.t
 type variables = variable Map.M(String).t
+
+(* ============================================================================================= *)
+(*                                 BASIC PROPETIES                                               *)
+(* ============================================================================================= *)
+(* Update the order of the pmrs. *)
+let update_order (p : pmrs) : pmrs =
+  let all_rules = List.concat (List.map ~f:snd (Map.to_alist p.rules)) in
+  let order =
+    let f m (_, args, p, _) =
+      max m (List.length args + if Option.is_some p then 1 else 0)
+    in
+    List.fold ~f ~init:0 all_rules
+  in { p with order = order }
+
 
 (* ============================================================================================= *)
 (*                                 PRETTY PRINTING                                               *)
@@ -133,7 +165,7 @@ let parse_rules (sigma : terminal Map.M(String).t) (rules : Sexp.t) : pmrs xresu
          else
            let arity = List.length args + (if Option.is_some _pat then 1 else 0) in
            let new_nt = NonTerminal.mk nt_name arity in
-           let iid' = if iid < 0 then new_nt.NonTerminal.id else iid in
+           let iid' = if iid < 0 then new_nt.id else iid in
            Ok (iid', Map.add_exn nts ~key:nt_name ~data:new_nt))
     in
     (List.fold ~init:(Ok (-1, Map.empty (module String))) ~f rules) >>=!
@@ -191,15 +223,16 @@ let parse_rules (sigma : terminal Map.M(String).t) (rules : Sexp.t) : pmrs xresu
     in
     let%bind rules = blast (List.map ~f rules) in
     let rules_mapped =
-      let f m (nt, x, y, z) =
-        Map.update m nt.NonTerminal.id
+      let f m (nt, x, y, z : rewrite_rule) =
+        Map.update m nt.id
           ~f:(function
               | None -> [(nt, x, y, z)]
               | Some l -> (nt, x, y, z)::l)
       in List.fold ~f ~init:(Map.empty (module Int)) rules
     in
     let nonterminals = List.map ~f:snd (Map.to_alist nts) in
-    Ok({main_id = iid; rules = rules_mapped; non_terminals = nonterminals })
+    let rec_scheme = {main_id = iid; rules = rules_mapped; non_terminals = nonterminals; order = -1 } in
+    Ok(update_order rec_scheme)
   in rules >>=! gather_nonterms >>=! parse_terms
 
 
@@ -225,6 +258,12 @@ let term_of_terminal_tree
         Ok (TApp (appf, app_args))
       else Ok appf
   in f t
+
+
+(* ============================================================================================= *)
+(*                                 GRAMMARS                                                      *)
+(* ============================================================================================= *)
+
 
 
 (* ============================================================================================= *)
@@ -269,7 +308,7 @@ let rec eval_term_worker (rs : pmrs) (t : term) : term sresult =
 
 and find_and_apply_rule (p : pmrs) (f : non_terminal) (args : term list) : (term sresult) option =
   let rules_with_f =
-    match Map.find p.rules f.NonTerminal.id with
+    match Map.find p.rules f.id with
     | Some rules -> rules
     | None -> []
   in
@@ -294,12 +333,36 @@ and apply_rule (_, args, p, t : rewrite_rule) (terms : term list) : term sresult
 
     | hd_v :: tl, hd_t :: tl_terms ->
       let%bind okb = bindings in
-      fargs (Ok (okb @ [hd_v.Variable.id, hd_t])) tl tl_terms
+      fargs (Ok (okb @ [hd_v.id, hd_t])) tl tl_terms
 
     | _, _ -> Error ["Number of arguments does not match", t]
   in
   fargs (Ok []) args terms >>!| apply_substs t
 
+(* ============================================================================================= *)
+(*                                 CONSTRUCTING AN ABSTRACTION                                   *)
+(* ============================================================================================= *)
+
+type binding = variable * term
+type bindings = (term list) Map.M(Int).t
+
+let heads (rs : pmrs) (s : bindings) (t : term) : term list =
+  let hs k x =
+    match k with
+    | TNTerm _ | TTerm _ -> [k]
+    | TVar v ->
+      if List.mem ~equal:Term.equal x k then []
+      else
+        let f terms =
+
+        in
+        (match Map.find s v.id with
+         | Some rhss -> rhss
+         | None -> [])
+
+    | TApp _ -> failwith "<>"
+  in
+  ()
 
 (* ============================================================================================= *)
 (*                                 EVALUATING : MAIN ENTRY POINT                                 *)

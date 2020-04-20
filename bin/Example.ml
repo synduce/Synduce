@@ -3,6 +3,7 @@ open Lib.Automata
 open Lib.PMRS
 open Lib.Utils
 open Sexplib
+open TestUtils
 
 let test_depth = 3
 
@@ -113,10 +114,18 @@ let test_pmrs pmrs tcomp =
       end
     | Error sl ->
       Fmt.(pf stdout "%a@." (list (pair ~sep:comma  string Sexp.pp_hum)) sl)
-  end;
+  end
+
+let test_grammar () =
+  let s = Sexp.load_sexp "inputs/homlists.pmrs" in
+  test_result "Grammar"
+    (parse_rules sigma s >>!|
+     (fun g -> g.order = 0))
+
 
 ;;
 test_automaton a1 t1 ();;
 test_automaton a2 t2 ();;
 test_pmrs pmrs1 t1_complete;;
 test_pmrs pmrs2 t2_complete;;
+test_grammar ()
