@@ -1,0 +1,24 @@
+// Type alias
+type r = int
+// Basic parametric type
+type 'a x = 'a
+// Basic sum type
+type oneortwo = One | Two
+// Parametric recursive type
+type 'a option = None | Some of 'a
+// List
+type 'a list = Nil | Cons of 'a * 'a list
+// Option list
+type 'a olist = Nil | Cons of 'a option * 'a option list
+
+
+// Functions declarations
+let f x y = x + y
+let g x y z = x + y * z % 3
+let h x y = x + y % 2 = 0 ? x : max y 2
+
+// Pattern matching recursion scheme declaration
+pmrs (f0) test x =
+    f x -> g x
+    | g Nil -> f0
+    | g Cons(hd, tl) -> g tl

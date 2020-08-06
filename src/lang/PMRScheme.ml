@@ -346,30 +346,13 @@ and apply_rule (_, args, p, t : rewrite_rule) (terms : term list) : term sresult
 type binding = variable * term
 type bindings = (term list) Map.M(Int).t
 
-let heads (rs : pmrs) (s : bindings) (t : term) : term list =
-  let hs k x =
-    match k with
-    | TNTerm _ | TTerm _ -> [k]
-    | TVar v ->
-      if List.mem ~equal:Term.equal x k then []
-      else
-        let f terms =
-
-        in
-        (match Map.find s v.id with
-         | Some rhss -> rhss
-         | None -> [])
-
-    | TApp _ -> failwith "<>"
-  in
-  ()
 
 (* ============================================================================================= *)
 (*                                 EVALUATING : MAIN ENTRY POINT                                 *)
 (* ============================================================================================= *)
 let reduce_term (t : term) ~(with_pmrs : pmrs) : term =
   match
-    List.find ~f:(fun nt -> NonTerminal.(nt.id = with_pmrs.main_id))
+    List.find ~f:(fun nt -> nt.id = with_pmrs.main_id)
       with_pmrs.non_terminals
   with
   | Some maint ->

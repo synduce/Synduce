@@ -1,0 +1,701 @@
+main: LET IDENT EQ LPAR TRUE VBAR
+##
+## Ends in an error in state: 97.
+##
+## term -> term . QUESTION term COLON term [ TIMES RPAR QUESTION PLUS OR NEQ MOD MINUS LT LE GT GE EQ DIV AND ]
+## term -> term . binop term [ TIMES RPAR QUESTION PLUS OR NEQ MOD MINUS LT LE GT GE EQ DIV AND ]
+## term0 -> LPAR term . RPAR [ VBAR TYPE TRUE TIMES RPAR RIGHTARROW QUESTION PLUS OR NEQ MOD MINUS MIN MAX LT LPAR LETPMRS LET LE INT IDENT GT GE FALSE EXCLAMATION EQ EOF DIV COLON AND ABS ]
+##
+## The known suffix of the stack is as follows:
+## LPAR term
+##
+## WARNING: This example involves spurious reductions.
+## This implies that, although the LR(1) items shown above provide an
+## accurate view of the past (what has been recognized so far), they
+## may provide an INCOMPLETE view of the future (what was expected next).
+## In state 73, spurious reduction of production term -> term0 
+##
+
+test
+
+main: LET IDENT EQ LPAR VBAR
+##
+## Ends in an error in state: 66.
+##
+## term0 -> LPAR . term RPAR [ VBAR TYPE TRUE TIMES RPAR RIGHTARROW QUESTION PLUS OR NEQ MOD MINUS MIN MAX LT LPAR LETPMRS LET LE INT IDENT GT GE FALSE EXCLAMATION EQ EOF DIV COLON AND ABS ]
+##
+## The known suffix of the stack is as follows:
+## LPAR
+##
+
+<YOUR SYNTAX ERROR MESSAGE HERE>1
+
+main: LET IDENT EQ MAX TRUE VBAR
+##
+## Ends in an error in state: 99.
+##
+## term -> MAX term . term [ VBAR TYPE TRUE TIMES RPAR RIGHTARROW QUESTION PLUS OR NEQ MOD MINUS MIN MAX LT LPAR LETPMRS LET LE INT IDENT GT GE FALSE EXCLAMATION EQ EOF DIV COLON AND ABS ]
+## term -> term . QUESTION term COLON term [ TRUE TIMES QUESTION PLUS OR NEQ MOD MINUS MIN MAX LT LPAR LE INT IDENT GT GE FALSE EXCLAMATION EQ DIV AND ABS ]
+## term -> term . binop term [ TRUE TIMES QUESTION PLUS OR NEQ MOD MINUS MIN MAX LT LPAR LE INT IDENT GT GE FALSE EXCLAMATION EQ DIV AND ABS ]
+##
+## The known suffix of the stack is as follows:
+## MAX term
+##
+## WARNING: This example involves spurious reductions.
+## This implies that, although the LR(1) items shown above provide an
+## accurate view of the past (what has been recognized so far), they
+## may provide an INCOMPLETE view of the future (what was expected next).
+## In state 73, spurious reduction of production term -> term0 
+##
+
+<YOUR SYNTAX ERROR MESSAGE HERE>2
+
+main: LET IDENT EQ MAX VBAR
+##
+## Ends in an error in state: 65.
+##
+## term -> MAX . term term [ VBAR TYPE TRUE TIMES RPAR RIGHTARROW QUESTION PLUS OR NEQ MOD MINUS MIN MAX LT LPAR LETPMRS LET LE INT IDENT GT GE FALSE EXCLAMATION EQ EOF DIV COLON AND ABS ]
+##
+## The known suffix of the stack is as follows:
+## MAX
+##
+
+<YOUR SYNTAX ERROR MESSAGE HERE>3
+
+main: LET IDENT EQ MIN TRUE VBAR
+##
+## Ends in an error in state: 102.
+##
+## term -> MIN term . term [ VBAR TYPE TRUE TIMES RPAR RIGHTARROW QUESTION PLUS OR NEQ MOD MINUS MIN MAX LT LPAR LETPMRS LET LE INT IDENT GT GE FALSE EXCLAMATION EQ EOF DIV COLON AND ABS ]
+## term -> term . QUESTION term COLON term [ TRUE TIMES QUESTION PLUS OR NEQ MOD MINUS MIN MAX LT LPAR LE INT IDENT GT GE FALSE EXCLAMATION EQ DIV AND ABS ]
+## term -> term . binop term [ TRUE TIMES QUESTION PLUS OR NEQ MOD MINUS MIN MAX LT LPAR LE INT IDENT GT GE FALSE EXCLAMATION EQ DIV AND ABS ]
+##
+## The known suffix of the stack is as follows:
+## MIN term
+##
+## WARNING: This example involves spurious reductions.
+## This implies that, although the LR(1) items shown above provide an
+## accurate view of the past (what has been recognized so far), they
+## may provide an INCOMPLETE view of the future (what was expected next).
+## In state 73, spurious reduction of production term -> term0 
+##
+
+<YOUR SYNTAX ERROR MESSAGE HERE>4
+
+main: LET IDENT EQ MIN VBAR
+##
+## Ends in an error in state: 64.
+##
+## term -> MIN . term term [ VBAR TYPE TRUE TIMES RPAR RIGHTARROW QUESTION PLUS OR NEQ MOD MINUS MIN MAX LT LPAR LETPMRS LET LE INT IDENT GT GE FALSE EXCLAMATION EQ EOF DIV COLON AND ABS ]
+##
+## The known suffix of the stack is as follows:
+## MIN
+##
+
+<YOUR SYNTAX ERROR MESSAGE HERE>5
+
+main: LET IDENT EQ MINUS VBAR
+##
+## Ends in an error in state: 72.
+##
+## term -> unop . term [ VBAR TYPE TRUE TIMES RPAR RIGHTARROW QUESTION PLUS OR NEQ MOD MINUS MIN MAX LT LPAR LETPMRS LET LE INT IDENT GT GE FALSE EXCLAMATION EQ EOF DIV COLON AND ABS ]
+##
+## The known suffix of the stack is as follows:
+## unop
+##
+
+<YOUR SYNTAX ERROR MESSAGE HERE>6
+
+main: LET IDENT EQ TRUE PIDENT
+##
+## Ends in an error in state: 73.
+##
+## term -> term0 . nonempty_list(term0) [ VBAR TYPE TRUE TIMES RPAR RIGHTARROW QUESTION PLUS OR NEQ MOD MINUS MIN MAX LT LPAR LETPMRS LET LE INT IDENT GT GE FALSE EXCLAMATION EQ EOF DIV COLON AND ABS ]
+## term -> term0 . [ VBAR TYPE TRUE TIMES RPAR RIGHTARROW QUESTION PLUS OR NEQ MOD MINUS MIN MAX LT LPAR LETPMRS LET LE INT IDENT GT GE FALSE EXCLAMATION EQ EOF DIV COLON AND ABS ]
+##
+## The known suffix of the stack is as follows:
+## term0
+##
+
+<YOUR SYNTAX ERROR MESSAGE HERE>7
+
+main: LET IDENT EQ TRUE QUESTION TRUE COLON VBAR
+##
+## Ends in an error in state: 92.
+##
+## term -> term QUESTION term COLON . term [ VBAR TYPE TRUE TIMES RPAR RIGHTARROW QUESTION PLUS OR NEQ MOD MINUS MIN MAX LT LPAR LETPMRS LET LE INT IDENT GT GE FALSE EXCLAMATION EQ EOF DIV COLON AND ABS ]
+##
+## The known suffix of the stack is as follows:
+## term QUESTION term COLON
+##
+
+<YOUR SYNTAX ERROR MESSAGE HERE>8
+
+main: LET IDENT EQ TRUE QUESTION TRUE VBAR
+##
+## Ends in an error in state: 80.
+##
+## term -> term . QUESTION term COLON term [ TIMES QUESTION PLUS OR NEQ MOD MINUS LT LE GT GE EQ DIV COLON AND ]
+## term -> term QUESTION term . COLON term [ VBAR TYPE TRUE TIMES RPAR RIGHTARROW QUESTION PLUS OR NEQ MOD MINUS MIN MAX LT LPAR LETPMRS LET LE INT IDENT GT GE FALSE EXCLAMATION EQ EOF DIV COLON AND ABS ]
+## term -> term . binop term [ TIMES QUESTION PLUS OR NEQ MOD MINUS LT LE GT GE EQ DIV COLON AND ]
+##
+## The known suffix of the stack is as follows:
+## term QUESTION term
+##
+## WARNING: This example involves spurious reductions.
+## This implies that, although the LR(1) items shown above provide an
+## accurate view of the past (what has been recognized so far), they
+## may provide an INCOMPLETE view of the future (what was expected next).
+## In state 73, spurious reduction of production term -> term0 
+##
+
+<YOUR SYNTAX ERROR MESSAGE HERE>9
+
+main: LET IDENT EQ TRUE QUESTION VBAR
+##
+## Ends in an error in state: 79.
+##
+## term -> term QUESTION . term COLON term [ VBAR TYPE TRUE TIMES RPAR RIGHTARROW QUESTION PLUS OR NEQ MOD MINUS MIN MAX LT LPAR LETPMRS LET LE INT IDENT GT GE FALSE EXCLAMATION EQ EOF DIV COLON AND ABS ]
+##
+## The known suffix of the stack is as follows:
+## term QUESTION
+##
+
+<YOUR SYNTAX ERROR MESSAGE HERE>10
+
+main: LET IDENT EQ TRUE TIMES VBAR
+##
+## Ends in an error in state: 95.
+##
+## term -> term binop . term [ VBAR TYPE TRUE TIMES RPAR RIGHTARROW QUESTION PLUS OR NEQ MOD MINUS MIN MAX LT LPAR LETPMRS LET LE INT IDENT GT GE FALSE EXCLAMATION EQ EOF DIV COLON AND ABS ]
+##
+## The known suffix of the stack is as follows:
+## term binop
+##
+
+<YOUR SYNTAX ERROR MESSAGE HERE>11
+
+main: LET IDENT EQ TRUE TRUE PIDENT
+##
+## Ends in an error in state: 74.
+##
+## nonempty_list(term0) -> term0 . [ VBAR TYPE TRUE TIMES RPAR RIGHTARROW QUESTION PLUS OR NEQ MOD MINUS MIN MAX LT LPAR LETPMRS LET LE INT IDENT GT GE FALSE EXCLAMATION EQ EOF DIV COLON AND ABS ]
+## nonempty_list(term0) -> term0 . nonempty_list(term0) [ VBAR TYPE TRUE TIMES RPAR RIGHTARROW QUESTION PLUS OR NEQ MOD MINUS MIN MAX LT LPAR LETPMRS LET LE INT IDENT GT GE FALSE EXCLAMATION EQ EOF DIV COLON AND ABS ]
+##
+## The known suffix of the stack is as follows:
+## term0
+##
+
+<YOUR SYNTAX ERROR MESSAGE HERE>12
+
+main: LET IDENT EQ TRUE VBAR
+##
+## Ends in an error in state: 120.
+##
+## decl -> LET IDENT list(IDENT) EQ term . [ TYPE LETPMRS LET EOF ]
+## term -> term . QUESTION term COLON term [ TYPE TIMES QUESTION PLUS OR NEQ MOD MINUS LT LETPMRS LET LE GT GE EQ EOF DIV AND ]
+## term -> term . binop term [ TYPE TIMES QUESTION PLUS OR NEQ MOD MINUS LT LETPMRS LET LE GT GE EQ EOF DIV AND ]
+##
+## The known suffix of the stack is as follows:
+## LET IDENT list(IDENT) EQ term
+##
+## WARNING: This example involves spurious reductions.
+## This implies that, although the LR(1) items shown above provide an
+## accurate view of the past (what has been recognized so far), they
+## may provide an INCOMPLETE view of the future (what was expected next).
+## In state 73, spurious reduction of production term -> term0 
+##
+
+<YOUR SYNTAX ERROR MESSAGE HERE>13
+
+main: LET IDENT EQ VBAR
+##
+## Ends in an error in state: 119.
+##
+## decl -> LET IDENT list(IDENT) EQ . term [ TYPE LETPMRS LET EOF ]
+##
+## The known suffix of the stack is as follows:
+## LET IDENT list(IDENT) EQ
+##
+
+<YOUR SYNTAX ERROR MESSAGE HERE>14
+
+main: LET IDENT IDENT VBAR
+##
+## Ends in an error in state: 57.
+##
+## list(IDENT) -> IDENT . list(IDENT) [ EQ ]
+##
+## The known suffix of the stack is as follows:
+## IDENT
+##
+
+<YOUR SYNTAX ERROR MESSAGE HERE>15
+
+main: LET IDENT VBAR
+##
+## Ends in an error in state: 117.
+##
+## decl -> LET IDENT . list(IDENT) EQ term [ TYPE LETPMRS LET EOF ]
+##
+## The known suffix of the stack is as follows:
+## LET IDENT
+##
+
+<YOUR SYNTAX ERROR MESSAGE HERE>16
+
+main: LET VBAR
+##
+## Ends in an error in state: 116.
+##
+## decl -> LET . IDENT list(IDENT) EQ term [ TYPE LETPMRS LET EOF ]
+##
+## The known suffix of the stack is as follows:
+## LET
+##
+
+<YOUR SYNTAX ERROR MESSAGE HERE>17
+
+main: LETPMRS LPAR IDENT COMMA VBAR
+##
+## Ends in an error in state: 51.
+##
+## separated_nonempty_list(COMMA,IDENT) -> IDENT COMMA . separated_nonempty_list(COMMA,IDENT) [ RPAR ]
+##
+## The known suffix of the stack is as follows:
+## IDENT COMMA
+##
+
+<YOUR SYNTAX ERROR MESSAGE HERE>18
+
+main: LETPMRS LPAR IDENT VBAR
+##
+## Ends in an error in state: 50.
+##
+## separated_nonempty_list(COMMA,IDENT) -> IDENT . [ RPAR ]
+## separated_nonempty_list(COMMA,IDENT) -> IDENT . COMMA separated_nonempty_list(COMMA,IDENT) [ RPAR ]
+##
+## The known suffix of the stack is as follows:
+## IDENT
+##
+
+<YOUR SYNTAX ERROR MESSAGE HERE>19
+
+main: LETPMRS LPAR RPAR IDENT EQ IDENT RIGHTARROW FALSE VBAR VBAR
+##
+## Ends in an error in state: 111.
+##
+## separated_nonempty_list(VBAR,prule) -> prule VBAR . separated_nonempty_list(VBAR,prule) [ TYPE LETPMRS LET EOF ]
+##
+## The known suffix of the stack is as follows:
+## prule VBAR
+##
+
+<YOUR SYNTAX ERROR MESSAGE HERE>20
+
+main: LETPMRS LPAR RPAR IDENT EQ IDENT RIGHTARROW TRUE RPAR
+##
+## Ends in an error in state: 108.
+##
+## prule -> IDENT list(term) RIGHTARROW term . [ VBAR TYPE LETPMRS LET EOF ]
+## term -> term . QUESTION term COLON term [ VBAR TYPE TIMES QUESTION PLUS OR NEQ MOD MINUS LT LETPMRS LET LE GT GE EQ EOF DIV AND ]
+## term -> term . binop term [ VBAR TYPE TIMES QUESTION PLUS OR NEQ MOD MINUS LT LETPMRS LET LE GT GE EQ EOF DIV AND ]
+##
+## The known suffix of the stack is as follows:
+## IDENT list(term) RIGHTARROW term
+##
+## WARNING: This example involves spurious reductions.
+## This implies that, although the LR(1) items shown above provide an
+## accurate view of the past (what has been recognized so far), they
+## may provide an INCOMPLETE view of the future (what was expected next).
+## In state 73, spurious reduction of production term -> term0 
+##
+
+<YOUR SYNTAX ERROR MESSAGE HERE>21
+
+main: LETPMRS LPAR RPAR IDENT EQ IDENT RIGHTARROW VBAR
+##
+## Ends in an error in state: 107.
+##
+## prule -> IDENT list(term) RIGHTARROW . term [ VBAR TYPE LETPMRS LET EOF ]
+##
+## The known suffix of the stack is as follows:
+## IDENT list(term) RIGHTARROW
+##
+
+<YOUR SYNTAX ERROR MESSAGE HERE>22
+
+main: LETPMRS LPAR RPAR IDENT EQ IDENT TRUE VBAR
+##
+## Ends in an error in state: 104.
+##
+## list(term) -> term . list(term) [ RIGHTARROW ]
+## term -> term . QUESTION term COLON term [ TRUE TIMES RIGHTARROW QUESTION PLUS OR NEQ MOD MINUS MIN MAX LT LPAR LE INT IDENT GT GE FALSE EXCLAMATION EQ DIV AND ABS ]
+## term -> term . binop term [ TRUE TIMES RIGHTARROW QUESTION PLUS OR NEQ MOD MINUS MIN MAX LT LPAR LE INT IDENT GT GE FALSE EXCLAMATION EQ DIV AND ABS ]
+##
+## The known suffix of the stack is as follows:
+## term
+##
+## WARNING: This example involves spurious reductions.
+## This implies that, although the LR(1) items shown above provide an
+## accurate view of the past (what has been recognized so far), they
+## may provide an INCOMPLETE view of the future (what was expected next).
+## In state 73, spurious reduction of production term -> term0 
+##
+
+<YOUR SYNTAX ERROR MESSAGE HERE>23
+
+main: LETPMRS LPAR RPAR IDENT EQ IDENT VBAR
+##
+## Ends in an error in state: 61.
+##
+## prule -> IDENT . list(term) RIGHTARROW term [ VBAR TYPE LETPMRS LET EOF ]
+##
+## The known suffix of the stack is as follows:
+## IDENT
+##
+
+<YOUR SYNTAX ERROR MESSAGE HERE>24
+
+main: LETPMRS LPAR RPAR IDENT EQ VBAR
+##
+## Ends in an error in state: 60.
+##
+## pmrsdecl -> LPAR loption(separated_nonempty_list(COMMA,IDENT)) RPAR IDENT list(IDENT) EQ . pbody [ TYPE LETPMRS LET EOF ]
+##
+## The known suffix of the stack is as follows:
+## LPAR loption(separated_nonempty_list(COMMA,IDENT)) RPAR IDENT list(IDENT) EQ
+##
+
+<YOUR SYNTAX ERROR MESSAGE HERE>25
+
+main: LETPMRS LPAR RPAR IDENT VBAR
+##
+## Ends in an error in state: 56.
+##
+## pmrsdecl -> LPAR loption(separated_nonempty_list(COMMA,IDENT)) RPAR IDENT . list(IDENT) EQ pbody [ TYPE LETPMRS LET EOF ]
+##
+## The known suffix of the stack is as follows:
+## LPAR loption(separated_nonempty_list(COMMA,IDENT)) RPAR IDENT
+##
+
+<YOUR SYNTAX ERROR MESSAGE HERE>26
+
+main: LETPMRS LPAR RPAR VBAR
+##
+## Ends in an error in state: 55.
+##
+## pmrsdecl -> LPAR loption(separated_nonempty_list(COMMA,IDENT)) RPAR . IDENT list(IDENT) EQ pbody [ TYPE LETPMRS LET EOF ]
+##
+## The known suffix of the stack is as follows:
+## LPAR loption(separated_nonempty_list(COMMA,IDENT)) RPAR
+##
+
+<YOUR SYNTAX ERROR MESSAGE HERE>27
+
+main: LETPMRS LPAR VBAR
+##
+## Ends in an error in state: 49.
+##
+## pmrsdecl -> LPAR . loption(separated_nonempty_list(COMMA,IDENT)) RPAR IDENT list(IDENT) EQ pbody [ TYPE LETPMRS LET EOF ]
+##
+## The known suffix of the stack is as follows:
+## LPAR
+##
+
+<YOUR SYNTAX ERROR MESSAGE HERE>28
+
+main: LETPMRS VBAR
+##
+## Ends in an error in state: 48.
+##
+## decl -> LETPMRS . pmrsdecl [ TYPE LETPMRS LET EOF ]
+##
+## The known suffix of the stack is as follows:
+## LETPMRS
+##
+
+<YOUR SYNTAX ERROR MESSAGE HERE>29
+
+main: TYPE IDENT EQ IDENT OF PIDENT TIMES VBAR
+##
+## WARNING: This sentence does NOT end with a syntax error, as it should.
+##
+
+<YOUR SYNTAX ERROR MESSAGE HERE>30
+
+main: TYPE IDENT EQ IDENT OF PIDENT TRUE
+##
+## Ends in an error in state: 11.
+##
+## typeterm -> IDENT OF typeterm . [ VBAR TYPE TIMES RPAR LETPMRS LET IDENT EOF COMMA ]
+## typeterm -> IDENT OF typeterm . TIMES loption(separated_nonempty_list(TIMES,typeterm)) [ VBAR TYPE TIMES RPAR LETPMRS LET IDENT EOF COMMA ]
+## typeterm -> typeterm . IDENT [ VBAR TYPE TIMES RPAR LETPMRS LET IDENT EOF COMMA ]
+##
+## The known suffix of the stack is as follows:
+## IDENT OF typeterm
+##
+
+<YOUR SYNTAX ERROR MESSAGE HERE>31
+
+main: TYPE IDENT EQ IDENT OF TRUE
+##
+## Ends in an error in state: 9.
+##
+## typeterm -> IDENT OF . typeterm [ VBAR TYPE TIMES RPAR LETPMRS LET IDENT EOF COMMA ]
+## typeterm -> IDENT OF . typeterm TIMES loption(separated_nonempty_list(TIMES,typeterm)) [ VBAR TYPE TIMES RPAR LETPMRS LET IDENT EOF COMMA ]
+##
+## The known suffix of the stack is as follows:
+## IDENT OF
+##
+
+<YOUR SYNTAX ERROR MESSAGE HERE>32
+
+main: TYPE IDENT EQ IDENT TRUE
+##
+## Ends in an error in state: 8.
+##
+## typeterm -> IDENT . OF typeterm [ VBAR TYPE TIMES RPAR LETPMRS LET IDENT EOF COMMA ]
+## typeterm -> IDENT . OF typeterm TIMES loption(separated_nonempty_list(TIMES,typeterm)) [ VBAR TYPE TIMES RPAR LETPMRS LET IDENT EOF COMMA ]
+## typeterm -> IDENT . [ VBAR TYPE TIMES RPAR LETPMRS LET IDENT EOF COMMA ]
+##
+## The known suffix of the stack is as follows:
+## IDENT
+##
+
+Syntax error in type declaration: bad constructor.
+
+main: TYPE IDENT EQ LPAR PIDENT COMMA VBAR
+##
+## Ends in an error in state: 21.
+##
+## separated_nonempty_list(COMMA,typeterm) -> typeterm COMMA . separated_nonempty_list(COMMA,typeterm) [ RPAR ]
+##
+## The known suffix of the stack is as follows:
+## typeterm COMMA
+##
+
+<YOUR SYNTAX ERROR MESSAGE HERE>34
+
+main: TYPE IDENT EQ LPAR PIDENT VBAR
+##
+## Ends in an error in state: 19.
+##
+## separated_nonempty_list(COMMA,typeterm) -> typeterm . [ RPAR ]
+## separated_nonempty_list(COMMA,typeterm) -> typeterm . COMMA separated_nonempty_list(COMMA,typeterm) [ RPAR ]
+## typeterm -> typeterm . IDENT [ RPAR IDENT COMMA ]
+## typeterm -> LPAR typeterm . RPAR [ VBAR TYPE TIMES RPAR LETPMRS LET IDENT EOF COMMA ]
+##
+## The known suffix of the stack is as follows:
+## LPAR typeterm
+##
+
+<YOUR SYNTAX ERROR MESSAGE HERE>35
+
+main: TYPE IDENT EQ LPAR RPAR VBAR
+##
+## Ends in an error in state: 26.
+##
+## typeterm -> LPAR loption(separated_nonempty_list(COMMA,typeterm)) RPAR . IDENT [ VBAR TYPE TIMES RPAR LETPMRS LET IDENT EOF COMMA ]
+##
+## The known suffix of the stack is as follows:
+## LPAR loption(separated_nonempty_list(COMMA,typeterm)) RPAR
+##
+
+<YOUR SYNTAX ERROR MESSAGE HERE>36
+
+main: TYPE IDENT EQ LPAR VBAR
+##
+## Ends in an error in state: 6.
+##
+## typeterm -> LPAR . loption(separated_nonempty_list(COMMA,typeterm)) RPAR IDENT [ VBAR TYPE TIMES RPAR LETPMRS LET IDENT EOF COMMA ]
+## typeterm -> LPAR . typeterm RPAR [ VBAR TYPE TIMES RPAR LETPMRS LET IDENT EOF COMMA ]
+##
+## The known suffix of the stack is as follows:
+## LPAR
+##
+
+<YOUR SYNTAX ERROR MESSAGE HERE>37
+
+main: TYPE IDENT EQ PIDENT TRUE
+##
+## Ends in an error in state: 29.
+##
+## separated_nonempty_list(VBAR,typeterm) -> typeterm . [ TYPE LETPMRS LET EOF ]
+## separated_nonempty_list(VBAR,typeterm) -> typeterm . VBAR separated_nonempty_list(VBAR,typeterm) [ TYPE LETPMRS LET EOF ]
+## typeterm -> typeterm . IDENT [ VBAR TYPE LETPMRS LET IDENT EOF ]
+##
+## The known suffix of the stack is as follows:
+## typeterm
+##
+
+<YOUR SYNTAX ERROR MESSAGE HERE>38
+
+main: TYPE IDENT EQ PIDENT VBAR VBAR
+##
+## Ends in an error in state: 30.
+##
+## separated_nonempty_list(VBAR,typeterm) -> typeterm VBAR . separated_nonempty_list(VBAR,typeterm) [ TYPE LETPMRS LET EOF ]
+##
+## The known suffix of the stack is as follows:
+## typeterm VBAR
+##
+
+<YOUR SYNTAX ERROR MESSAGE HERE>39
+
+main: TYPE IDENT EQ VBAR
+##
+## Ends in an error in state: 45.
+##
+## typedecl -> IDENT EQ . typeterm0 [ TYPE LETPMRS LET EOF ]
+##
+## The known suffix of the stack is as follows:
+## IDENT EQ
+##
+
+<YOUR SYNTAX ERROR MESSAGE HERE>40
+
+main: TYPE IDENT VBAR
+##
+## Ends in an error in state: 44.
+##
+## typedecl -> IDENT . EQ typeterm0 [ TYPE LETPMRS LET EOF ]
+##
+## The known suffix of the stack is as follows:
+## IDENT
+##
+
+<YOUR SYNTAX ERROR MESSAGE HERE>41
+
+main: TYPE LPAR PIDENT COMMA VBAR
+##
+## Ends in an error in state: 36.
+##
+## separated_nonempty_list(COMMA,PIDENT) -> PIDENT COMMA . separated_nonempty_list(COMMA,PIDENT) [ RPAR ]
+##
+## The known suffix of the stack is as follows:
+## PIDENT COMMA
+##
+
+<YOUR SYNTAX ERROR MESSAGE HERE>42
+
+main: TYPE LPAR PIDENT VBAR
+##
+## Ends in an error in state: 35.
+##
+## separated_nonempty_list(COMMA,PIDENT) -> PIDENT . [ RPAR ]
+## separated_nonempty_list(COMMA,PIDENT) -> PIDENT . COMMA separated_nonempty_list(COMMA,PIDENT) [ RPAR ]
+##
+## The known suffix of the stack is as follows:
+## PIDENT
+##
+
+<YOUR SYNTAX ERROR MESSAGE HERE>43
+
+main: TYPE LPAR RPAR IDENT EQ VBAR
+##
+## Ends in an error in state: 42.
+##
+## typedecl -> LPAR loption(separated_nonempty_list(COMMA,PIDENT)) RPAR IDENT EQ . typeterm0 [ TYPE LETPMRS LET EOF ]
+##
+## The known suffix of the stack is as follows:
+## LPAR loption(separated_nonempty_list(COMMA,PIDENT)) RPAR IDENT EQ
+##
+
+<YOUR SYNTAX ERROR MESSAGE HERE>44
+
+main: TYPE LPAR RPAR IDENT VBAR
+##
+## Ends in an error in state: 41.
+##
+## typedecl -> LPAR loption(separated_nonempty_list(COMMA,PIDENT)) RPAR IDENT . EQ typeterm0 [ TYPE LETPMRS LET EOF ]
+##
+## The known suffix of the stack is as follows:
+## LPAR loption(separated_nonempty_list(COMMA,PIDENT)) RPAR IDENT
+##
+
+<YOUR SYNTAX ERROR MESSAGE HERE>45
+
+main: TYPE LPAR RPAR VBAR
+##
+## Ends in an error in state: 40.
+##
+## typedecl -> LPAR loption(separated_nonempty_list(COMMA,PIDENT)) RPAR . IDENT EQ typeterm0 [ TYPE LETPMRS LET EOF ]
+##
+## The known suffix of the stack is as follows:
+## LPAR loption(separated_nonempty_list(COMMA,PIDENT)) RPAR
+##
+
+<YOUR SYNTAX ERROR MESSAGE HERE>46
+
+main: TYPE LPAR VBAR
+##
+## Ends in an error in state: 34.
+##
+## typedecl -> LPAR . loption(separated_nonempty_list(COMMA,PIDENT)) RPAR IDENT EQ typeterm0 [ TYPE LETPMRS LET EOF ]
+##
+## The known suffix of the stack is as follows:
+## LPAR
+##
+
+<YOUR SYNTAX ERROR MESSAGE HERE>47
+
+main: TYPE PIDENT IDENT EQ VBAR
+##
+## Ends in an error in state: 4.
+##
+## typedecl -> PIDENT IDENT EQ . typeterm0 [ TYPE LETPMRS LET EOF ]
+##
+## The known suffix of the stack is as follows:
+## PIDENT IDENT EQ
+##
+
+<YOUR SYNTAX ERROR MESSAGE HERE>48
+
+main: TYPE PIDENT IDENT VBAR
+##
+## Ends in an error in state: 3.
+##
+## typedecl -> PIDENT IDENT . EQ typeterm0 [ TYPE LETPMRS LET EOF ]
+##
+## The known suffix of the stack is as follows:
+## PIDENT IDENT
+##
+
+<YOUR SYNTAX ERROR MESSAGE HERE>49
+
+main: TYPE PIDENT VBAR
+##
+## Ends in an error in state: 2.
+##
+## typedecl -> PIDENT . IDENT EQ typeterm0 [ TYPE LETPMRS LET EOF ]
+##
+## The known suffix of the stack is as follows:
+## PIDENT
+##
+
+<YOUR SYNTAX ERROR MESSAGE HERE>50
+
+main: TYPE VBAR
+##
+## Ends in an error in state: 1.
+##
+## decl -> TYPE . typedecl [ TYPE LETPMRS LET EOF ]
+##
+## The known suffix of the stack is as follows:
+## TYPE
+##
+
+Cannot write a type at toplevel.
+
+main: VBAR
+##
+## Ends in an error in state: 0.
+##
+## main' -> . main [ # ]
+##
+## The known suffix of the stack is as follows:
+##
+##
+
+Bad syntax,

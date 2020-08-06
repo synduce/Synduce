@@ -1,0 +1,38 @@
+(ocamllex pmrs_lexer)
+(menhir (flags --table) (modules pmrs_parser))
+
+(rule
+  (target syntax.messages)
+  (mode   promote-until-clean)
+  (deps   (:parser pmrs_parser.mly))
+  (action (with-stdout-to %{target}
+          (run menhir %{parser} --base %{parser} --list-errors)))
+)
+
+(rule
+  (target syntax_messages.ml)
+  (deps (:parser pmrs_parser.mly) (:msg syntax.messages))
+  (action (with-stdout-to %{target}
+          (run menhir %{parser} --base %{parser} --compile-errors %{msg}))))
+
+(library
+ (name      parsers)
+ (libraries str lang sexplib utils fmt menhirLib))
+
+(rule
+  (target updated.messages)
+  (mode   promote-until-clean)
+  (deps   (:parser pmrs_parser.mly)
+          (:msg syntax.messages))
+  (action (with-stdout-to %{target}
+          (run menhir %{parser} --base %{parser} --update-errors %{msg})))
+)
+
+; Additional rule to add to runtest a check that the messages file is up-to-date
+(rule
+  (alias runtest)
+  (deps   (:parser parseSmtlib.mly)
+          (:new new.messages)
+          (:msg syntax.messages))
+  (action (run menhir %{parser} --base %{parser} --compare-errors %{new} --compare-errors %{msg}))
+)

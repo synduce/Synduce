@@ -1,6 +1,7 @@
-(
-    (Main (t) (F t))
-    (F () (Nil) x_0)
-    (F () (Single a) (f_0 a))
-    (F () (Concat x y) (odot (F x) (F y)))
-)
+type 'a list = Nil | Single of 'a | Concat of 'a list * 'a list
+
+pmrs (odot,f_0,s_0) listhom t =
+    main t           -> f t
+    | f Nil          -> s_0
+    | f Single(a)    -> f_0 a
+    | f Concat(x, y) -> odot (f x) (f y)

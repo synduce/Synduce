@@ -1,5 +1,7 @@
 open Base
 
+module Config = Config
+module Log = Log
 module IntMap = Map.M(Int)
 module StringMap = Map.M(Int)
 
