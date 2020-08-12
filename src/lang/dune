@@ -1,4 +1,4 @@
 (library
  (name lang)
- (libraries base fmt unix ppx_let utils)
+ (libraries base fmt unix sexplib ppx_let utils)
  (preprocess (pps ppx_let)))

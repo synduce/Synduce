@@ -1,6 +1,7 @@
 %{
     open Front
     open Lang.Term
+    open Lang.RType
 %}
 
 %token <string> IDENT
@@ -16,6 +17,7 @@
 %token EXCLAMATION
 %token EQ
 %token FALSE
+%token FUN
 %token INTSORT
 %token LET LETPMRS
 %token LPAR RPAR
@@ -37,6 +39,7 @@
 
 %nonassoc QUESTION
 %nonassoc COLON
+%left RIGHTARROW
 
 
 %start <program> main
@@ -47,55 +50,65 @@ main: f=list(decl); EOF                                                         
 
 
 decl:
-    | TYPE t=typedecl                                                               { TypeDecl(t) }
-    | LETPMRS p=pmrsdecl                                                            { PMRSDecl(p) }
-    | LET f=IDENT args=list(IDENT) EQ body=expr                                     { FunDecl(f, args, body) }
+    | TYPE t=typedecl                                                            { TypeDecl($loc, t) }
+    | LETPMRS p=pmrsdecl                                                         { PMRSDecl(p) }
+    | LET f=IDENT args=list(IDENT) EQ body=expr                                  { FunDecl($loc, f, args, body) }
 
 
 typedecl:
-    | param=PIDENT; name=IDENT; EQ t=typeterm0                                       { TDParametric([param], name, t)}
-    | LPAR params=separated_list(COMMA, PIDENT) RPAR name=IDENT; EQ t=typeterm0      { TDParametric(params, name, t)}
-    | name=IDENT EQ t=typeterm0                                                      { TDSimple(name, t) }
+    | param=PIDENT; name=IDENT; EQ t=typeterm0                                   { TDParametric([param], name, t)}
+    | LPAR params=separated_list(COMMA, PIDENT) RPAR name=IDENT; EQ t=typeterm0  { TDParametric(params, name, t)}
+    | name=IDENT EQ t=typeterm0                                                  { TDSimple(name, t) }
 
 
 typeterm0:
-    | l=separated_nonempty_list(VBAR, typeconstr)                                     { TSum(l)}
-    | typeapp                                                                        { $1 }
+    | l=separated_nonempty_list(VBAR, typeconstr)                         { mk_t_sum $loc l}
+    | typefun                                                             { $1 }
 
 typeconstr:
-    | cname=CIDENT OF t1=typeapp                                                   { TConstr(cname, [t1])}
-    | cname=CIDENT OF t1=typeapp TIMES l=separated_list(TIMES,typeapp)           { TConstr(cname, t1 :: l)}
-    | cname=CIDENT                                                                   { TConstr(cname,[])}
+    | cname=CIDENT OF t1=typefun                                          { mk_t_variant $loc cname  [t1]}
+    | cname=CIDENT OF t1=typefun TIMES l=separated_list(TIMES,typefun)    { mk_t_variant $loc cname  (t1 :: l)}
+    | cname=CIDENT                                                        { mk_t_variant $loc cname []}
+
+
+typefun:
+    | typefun RIGHTARROW typeapp                        { mk_t_fun $loc $1 $3 }
+    | typeapp                                           { $1 }
 
 typeapp:
-    | tparam=typeapp tname=typetermb                                                { TParamTyp([tparam],tname)}
-    | tparam=typetermb tname=typetermb                                              { TParamTyp([tparam],tname)}
+    | tparam=typeapp tname=typetermb                    { mk_t_constr $loc [tparam] tname}
+    | tparam=typetermb tname=typetermb                  { mk_t_constr $loc [tparam] tname}
     | LPAR t1=typeapp COMMA tparams=separated_nonempty_list(COMMA,typeapp) RPAR tname=typetermb
-                                                                                    { TParamTyp(t1 :: tparams, tname)}
-    | typetermb                                                                     { $1 }
+                                                        { mk_t_constr $loc (t1 :: tparams) tname}
+    | typetermb                                         { $1 }
 
 
 typetermb:
-    | INTSORT                                                                       { TInt }
-    | BOOLSORT                                                                      { TBool }
-    | name=IDENT                                                                    { TTyp(name) }
-    | param=PIDENT                                                                  { TParam(param)}
-    | LPAR typeapp RPAR                                                            { $2 }
+    | INTSORT                                           { mk_t_int $loc }
+    | BOOLSORT                                          { mk_t_bool $loc }
+    | name=IDENT                                        { mk_t_typ $loc name }
+    | param=PIDENT                                      { mk_t_param $loc param }
+    | LPAR typeapp RPAR                                 { $2 }
 
 
 pmrsdecl:
-    | LPAR p=separated_list(COMMA,IDENT) RPAR n=IDENT args=list(IDENT) EQ b=pbody   { p, n, args, b}
-    | n=IDENT args=list(IDENT) EQ b=pbody   { [], n, args, b}
+    | LPAR p=separated_list(COMMA,IDENT) RPAR n=IDENT args=list(IDENT) EQ b=pbody   { $loc, p, n, args, b}
+    | n=IDENT args=list(IDENT) EQ b=pbody   { $loc, [], n, args, b}
 
 
-pbody: separated_list(VBAR, prule)                                                    { $1 }
+pbody: separated_list(VBAR, prule)                                               { $1 }
 
 
-prule: args=list(constr_e) RIGHTARROW t=expr                                    { args, t }
+prule: args=list(constr_e) RIGHTARROW t=expr                                    { $loc, args, t }
 
 
 expr:
+    | FUN args=arguments RIGHTARROW t=tuple_e                                   { mk_fun $loc args t }
     | c=expr QUESTION t=expr; COLON f=expr                                      { mk_ite $loc c t f}
+    | tuple_e                                                                   { $1 }
+
+tuple_e:
+    | t1=logical_or_e COMMA tl=separated_nonempty_list(COMMA, logical_or_e)     { mk_tup $loc (t1 :: tl) }
     | logical_or_e                                                              { $1 }
 
 logical_or_e:
@@ -145,6 +158,10 @@ primary_e:
     | TRUE                                                                      { mk_const $loc Constant.CTrue}
     | FALSE                                                                     { mk_const $loc Constant.CFalse}
     | i=INT                                                                     { mk_const $loc (Constant.of_int i)}
+
+arguments:
+    | IDENT                                                                     { [$1] }
+    | LPAR l=separated_nonempty_list(COMMA, IDENT) RPAR                         { l }
 
 %inline op_comp:
     | LT        { Binop.Lt }

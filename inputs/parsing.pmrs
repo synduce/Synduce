@@ -9,13 +9,16 @@ type 'a option = None | Some of 'a
 // List
 type 'a list = Nil | Cons of 'a * 'a list
 // Option list
-type 'a olist = Nil | Cons of 'a option * 'a option list
-
+type 'a olist = ONil | OCons of 'a option * 'a option list
+// Function type
+type 'a func = SomeF of 'a -> 'a | NoneF
 
 // Functions declarations
 let f x y = x + y
 let g x y z = x + y * z % 3
 let h x y = x + y % 2 = 0 ? x : max y 2
+
+let x = (fun x -> x + x) 1
 
 // Pattern matching recursion scheme declaration
 pmrs (f0) test x =

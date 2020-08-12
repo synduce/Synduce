@@ -1,4 +1,5 @@
 open Base
+open Sexplib
 
 module Config = Config
 module Log = Log
@@ -35,4 +36,9 @@ let (>>!|) = Result.(>>|)
 let (>>=?) = Option.(>>=)
 let (>>=!) = Result.(>>=)
 
+let satom a = Sexp.Atom a
+let slist  a = Sexp.List a
+
 let blast = fun x -> Result.map_error ~f:List.concat (Result.combine_errors x)
+
+let pair a b = (a,b)

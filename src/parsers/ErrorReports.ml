@@ -5,15 +5,6 @@ module S = MenhirLib.General
 
 
 let debug = false
-(* -------------------------------------------------------------------------- *)
-
-
-
-
-(* -------------------------------------------------------------------------- *)
-
-(* [extract text (pos1, pos2)] extracts the sub-string of [text] delimited
-   by the positions [pos1] and [pos2]. *)
 
 let extract text (pos1, pos2) : string =
   let ofs1 = pos1.pos_cnum
@@ -26,10 +17,6 @@ let extract text (pos1, pos2) : string =
        a non-fatal error. *)
     if debug then assert false else "???"
 
-(* -------------------------------------------------------------------------- *)
-
-(* [compress text] replaces every run of at least one whitespace character
-   with exactly one space character. *)
 
 let compress text =
   Str.global_replace (Str.regexp "[ \t\n\r]+") " " text
@@ -152,17 +139,6 @@ let fragments text checkpoint (message : string) : string =
     (fragment text checkpoint)
     message
 
-(* -------------------------------------------------------------------------- *)
-
-(* [report text buffer checkpoint] constructs an error message. The C source
-   code must be stored in the string [text]. The start and end positions of the
-   last two tokens that were read must be stored in [buffer]. The parser state
-   (i.e., the automaton's state and stack) must be recorded in the checkpoint
-   [checkpoint]. *)
-
-(* The start and end positions of the invalid token are [lexbuf.lex_start_p]
-   and [lexbuf.lex_curr_p], since this is the last token that was read. But
-   we need not care about that here. *)
 
 let report text checkpoint : string =
   let s : int = state checkpoint in
@@ -180,3 +156,5 @@ let report text checkpoint : string =
   in
   (* Construct the full error message. *)
   Fmt.str "Syntax error:@;%s"  message
+
+

@@ -1,5 +1,6 @@
 {
 open Pmrs_parser
+open Lexing
 exception LexError of string
 
 exception SyntaxError of string
@@ -9,6 +10,7 @@ let keywords =
         "abs", ABS;
         "boolean", BOOLSORT;
         "false", FALSE;
+        "fun", FUN;
         "int", INTSORT;
         "let", LET;
         "pmrs", LETPMRS;
@@ -22,6 +24,12 @@ let keyword_tbl = Hashtbl.create 256
 let uncurry f (a, b) = f a b
 let _ = List.iter (uncurry (Hashtbl.replace keyword_tbl)) keywords
 
+let next_line lexbuf =
+  let pos = lexbuf.lex_curr_p in
+  lexbuf.lex_curr_p <-
+    { pos with pos_bol = lexbuf.lex_curr_pos;
+               pos_lnum = pos.pos_lnum + 1
+    }
 
 }
 
@@ -62,6 +70,7 @@ rule token = parse
   | "="               { EQ }
   | "?"               { QUESTION }
   | int as int        { INT (int_of_string int) }
+  | nl                { next_line lexbuf; token lexbuf }
   | ws                { token lexbuf }
   | "//"              { comment lexbuf }
   | eof               { EOF }
@@ -77,6 +86,6 @@ and string = parse
 
 (* comments *)
 and comment = parse
-    nl               { token lexbuf }
+    nl               { next_line lexbuf; token lexbuf }
   | eof              { EOF }
   | _                { comment lexbuf }
