@@ -20,4 +20,5 @@
         (menhir (>= 20200624))
         (parsexp (>= v0.14.0))
         (ppx_let (>= v0.14.0))
+        (stdio   (>= v0.14.0))
         (sexplib (>= v0.14.0))))

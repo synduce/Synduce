@@ -17,7 +17,7 @@
 (library
  (name      parsers)
  (public_name AutoRec.Lib.Parsers)
- (libraries str lang sexplib utils fmt menhirLib))
+ (libraries str lang sexplib utils fmt menhirLib stdio))
 
 (rule
   (target updated.messages)
