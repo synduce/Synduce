@@ -51,7 +51,7 @@ main: f=list(decl); EOF                                                         
 
 decl:
     | TYPE t=typedecl                                                            { TypeDecl($loc, t) }
-    | LETPMRS p=pmrsdecl                                                         { PMRSDecl(p) }
+    | LETPMRS p=pmrsdecl                                                         { p }
     | LET f=IDENT args=list(IDENT) EQ body=expr                                  { FunDecl($loc, f, args, body) }
 
 
@@ -92,8 +92,9 @@ typetermb:
 
 
 pmrsdecl:
-    | LPAR p=separated_list(COMMA,IDENT) RPAR n=IDENT args=list(IDENT) EQ b=pbody   { $loc, p, n, args, b}
-    | n=IDENT args=list(IDENT) EQ b=pbody   { $loc, [], n, args, b}
+    | LPAR p=separated_list(COMMA,IDENT) RPAR n=IDENT args=list(IDENT) EQ b=pbody
+                                                        { PMRSDecl($loc, p, n, args, b)}
+    | n=IDENT args=list(IDENT) EQ b=pbody               { PMRSDecl($loc, [], n, args, b) }
 
 
 pbody: separated_list(VBAR, prule)                                               { $1 }

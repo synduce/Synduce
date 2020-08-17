@@ -41,13 +41,9 @@ type pmrs_rule = loc * term list * term
 
 type pmrs_body = pmrs_rule list
 
-type pmrs_decl = loc * (id list) * id * (id list) * pmrs_body
-
-type fun_decl = loc * id * (id list) * term
-
 type decl =
   | TypeDecl of loc * type_decl
-  | FunDecl of fun_decl
-  | PMRSDecl of pmrs_decl
+  | FunDecl of loc * id * (id list) * term
+  | PMRSDecl of loc * (id list) * id * (id list) * pmrs_body
 
 type program = decl list

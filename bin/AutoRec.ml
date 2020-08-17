@@ -15,6 +15,7 @@ let main () =
   set_style_renderer stdout `Ansi_tty;
   let prog = parse_pmrs !filename in
   let _ = seek_types prog in
+  let _ = translate prog in
   ()
 ;;
 main ()

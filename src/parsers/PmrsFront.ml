@@ -1,6 +1,7 @@
 open Base
 open Utils
 open Front
+open Lang.Term
 
 module P = Pmrs_parser
 module L = Pmrs_lexer
@@ -51,11 +52,28 @@ let seek_types (prog : program) =
     prog
 
 let translate (prog : program) =
-  let _ : (string, Lang.Term.variable) Hashtbl.t = Hashtbl.create (module String) in
-  let _getglob decl =
-    match decl with
-    | FunDecl (_, _, _, _) -> ()
-    | PMRSDecl(_, _, _, _, _) -> ()
-    | _ -> ()
-  in
-  List.iter ~f:_getglob prog
+  let globals : (string, variable) Hashtbl.t = Hashtbl.create (module String) in
+  (* First pass to create the global variables *)
+  List.iter prog
+    ~f:(fun decl ->
+        match decl with
+        | FunDecl (loc, fname, _,_)
+        | PMRSDecl(loc, _, fname, _, _) ->
+          (match Hashtbl.add globals ~key:fname ~data:(Variable.mk fname) with
+           | `Ok -> ()
+           | `Duplicate ->
+             Log.(error (fun f () -> log_with_excerpt f !text loc
+                            (fun f () -> Fmt.(pf f "%s already declared." fname)) ()));
+             Log.fatal ())
+
+        | _ -> ());
+  (* Second pass  *)
+  List.iter prog
+    ~f:(fun decl ->
+        match decl with
+        | PMRSDecl(loc, params, fname, args, body) ->
+          let vparams = List.map ~f:Variable.mk params in
+          let vars = List.map ~f:Variable.mk args in
+          ()
+        | _ -> ()
+      )

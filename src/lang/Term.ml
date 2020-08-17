@@ -3,11 +3,40 @@ open Lexing
 
 module O = Option
 
-type vattribute =
-  | Anonymous
-  | Builtin
+let dummy_loc : position * position = dummy_pos, dummy_pos
 
-type variable = { vname : string; vid : int; vtype : RType.t; vattrs : vattribute list }
+(* ----------------------------------------------------- *)
+(**
+   Variables have unique integer ids but two variables can have the same name.
+   Additional information can be added via variable attributes.
+   For example, a variable can be a Terminal or a NonTerminal in the context of a
+   pattern matching recursion scheme.
+*)
+module Attributes = struct
+  module Elt = struct
+    module T = struct
+      type t =
+        | Anonymous
+        | Builtin
+        | Terminal
+        | NonTerminal of int [@@deriving sexp]
+      let equal (a : t) (b : t) = Poly.equal a b
+      let compare (a : t) (b : t) = Poly.compare a b
+      let hash = Hashtbl.hash
+    end
+    include T
+    include Comparator.Make (T)
+    let is_non_terminal a = match a with NonTerminal _ -> true | _ -> false
+  end
+  module AS = Set.M (Elt)
+  include AS
+  type elt = Elt.t
+  let singleton = Set.singleton (module Elt)
+  let empty = Set.empty (module Elt)
+end
+
+
+type variable = { vname : string; vid : int; vtype : RType.t; vattrs : Attributes.t }
 
 let sexp_of_variable v =
   Sexp.(List [Atom "var"; Atom v.vname])(*  Atom (Int.to_string v.vid); sexp_of_typ v.vtype]) *)
@@ -34,17 +63,21 @@ module Variable = struct
   include T
   include Comparator.Make (T)
 
-  let is_anonymous (v : t) : bool =
-    List.mem v.vattrs Anonymous ~equal:Poly.equal
+  let mk ?(attrs = Attributes.empty) ?(t = RType.TAnon) (name : string) =
+    Alpha.mk_with_id (-1) name (fun vid -> { vname = name; vid = vid; vtype = t; vattrs = attrs })
+
+  let is_anonymous (v : t) : bool = Set.mem v.vattrs Anonymous
   let make_anonymous (v : t) : t =
-    if is_anonymous v then v else {v with vattrs = Anonymous :: v.vattrs }
+    {v with vattrs = Set.add v.vattrs Anonymous }
 
-  let is_builtin (v : t) : bool =
-    List.mem v.vattrs Builtin ~equal:Poly.equal
+  let is_builtin (v : t) : bool = Set.mem v.vattrs Builtin
+
   let make_builtin (v : t) : t =
-    if is_anonymous v then v else {v with vattrs = Builtin :: v.vattrs }
+    {v with vattrs = Set.add v.vattrs Builtin }
 
-  let has_attr (attr : vattribute) (v : t) = List.mem ~equal:Poly.equal v.vattrs attr
+  let has_attr (attr : Attributes.elt) (v : t) = Set.mem v.vattrs attr
+
+  let is_nonterminal (v : t) = Set.exists ~f:Attributes.Elt.is_non_terminal v.vattrs
 end
 
 
@@ -116,6 +149,11 @@ struct
   let of_sh sh = Hashtbl.fold ~f:(fun ~key:_ ~data:v vset -> Set.add vset v) sh ~init:(Set.empty (module Variable))
 end
 
+(* ----------------------------------------------------- *)
+(**
+   Terms.
+*)
+
 module Binop = struct
   type t =
     | Lt | Gt | Ge | Le | Eq | Neq
@@ -149,11 +187,14 @@ type termkind =
   | TBin of Binop.t * term * term
   | TUn of Unop.t * term
   | TConst of Constant.t
-  | TVar of variable 
-  | TIte of term * term * term 
+  | TVar of variable
+  | TIte of term * term * term
   | TTup of term list
-  | TFun of variable list * term 
+  | TFun of variable list * term
   | TApp of term * term
   | TData of string * term list
 
-and term = { pos: position * position; kind : termkind }
+and term = { tpos: position * position; tkind : termkind; ttyp : RType.t }
+
+let mk_var ?(pos = dummy_loc) ?(t = RType.TAnon) (v : variable) : term =
+  { tpos = pos; tkind = TVar v; ttyp = t }
