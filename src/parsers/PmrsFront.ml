@@ -51,11 +51,11 @@ let seek_types (prog : program) =
     prog
 
 let translate (prog : program) =
-  let globals : (string, Lang.Term.variable) Hashtbl.t = Hashtbl.create (module String) in
-  let _getglob accum decl =
+  let _ : (string, Lang.Term.variable) Hashtbl.t = Hashtbl.create (module String) in
+  let _getglob decl =
     match decl with
-    | FunDecl (loc, fname, _, _) -> ()
-    | PMRSDecl(loc, _, pname, _, _) -> ()
+    | FunDecl (_, _, _, _) -> ()
+    | PMRSDecl(_, _, _, _, _) -> ()
+    | _ -> ()
   in
-  List.fold_result ~f:_getglob ~init:() prog
-in
+  List.iter ~f:_getglob prog

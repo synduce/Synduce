@@ -1,4 +1,5 @@
 (library
  (name lang)
+ (public_name AutoRec.Lib.Lang)
  (libraries base fmt unix sexplib ppx_let utils)
  (preprocess (pps ppx_let)))

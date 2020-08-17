@@ -1,3 +1,4 @@
 (library
- (name lib)
+ (name Lib)
+ (public_name AutoRec.Lib)
  (libraries base fmt unix ppx_let utils lang parsers))

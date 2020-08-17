@@ -24,7 +24,7 @@ B /home/victorn/.opam/4.10.0/lib/sexplib
 B /home/victorn/.opam/4.10.0/lib/sexplib0
 B /home/victorn/.opam/4.10.0/lib/stdio
 B /home/victorn/.opam/4.10.0/lib/stdlib-shims
-B ../_build/default/src/.lib.objs/byte
+B ../_build/default/src/.Lib.objs/byte
 B ../_build/default/src/lang/.lang.objs/byte
 B ../_build/default/src/parsers/.parsers.objs/byte
 B ../_build/default/src/utils/.utils.objs/byte
