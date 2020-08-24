@@ -1,11 +1,5 @@
-open Alpha
-open Automata
 open Base
 open Term
-open Trees
-open Utils
-
-open Result.Let_syntax
 
 (* ============================================================================================= *)
 (*                      TYPE DEFINITIONS AND UTILS                                               *)
@@ -17,10 +11,12 @@ type pattern = variable * variable list
 type rewrite_rule = variable * variable list * pattern option * term
 
 type pmrs = {
-  main_id : int;
-  rules : (rewrite_rule list) Map.M(Int).t;
-  non_terminals : VarSet.t;
-  order : int;
+  pargs : VarSet.t;
+  pparams : VarSet.t;
+  pmain_id : int;
+  prules : (rewrite_rule list) Map.M(Int).t;
+  pnon_terminals : VarSet.t;
+  porder : int;
 }
 
 (* Type shortcuts *)
@@ -33,13 +29,13 @@ type variables = variable Map.M(String).t
 (* ============================================================================================= *)
 (* Update the order of the pmrs. *)
 let update_order (p : pmrs) : pmrs =
-  let all_rules = List.concat (List.map ~f:snd (Map.to_alist p.rules)) in
+  let all_rules = List.concat (List.map ~f:snd (Map.to_alist p.prules)) in
   let order =
     let f m (_, args, p, _) =
       max m (List.length args + if Option.is_some p then 1 else 0)
     in
     List.fold ~f ~init:0 all_rules
-  in { p with order = order }
+  in { p with porder = order }
 
 
 (* ============================================================================================= *)

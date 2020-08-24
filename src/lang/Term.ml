@@ -78,6 +78,8 @@ module Variable = struct
   let has_attr (attr : Attributes.elt) (v : t) = Set.mem v.vattrs attr
 
   let is_nonterminal (v : t) = Set.exists ~f:Attributes.Elt.is_non_terminal v.vattrs
+
+  let same_name (v : t) (v2 : t) : bool = String.equal v.vname v2.vname
 end
 
 
@@ -91,6 +93,8 @@ struct
   let empty = Set.empty (module Variable)
 
   let singleton = Set.singleton (module Variable)
+
+  let union_list = Set.union_list (module Variable)
 
   let elements vs =
     Set.elements vs

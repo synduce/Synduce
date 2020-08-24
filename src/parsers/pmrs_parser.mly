@@ -1,6 +1,6 @@
 %{
     open Front
-    open Lang.Term
+    open Lang
     open Lang.RType
 %}
 
@@ -113,16 +113,16 @@ tuple_e:
     | logical_or_e                                                              { $1 }
 
 logical_or_e:
-    | a=logical_and_e OR b=logical_or_e                                         { mk_bin $loc Binop.Or a b}
+    | a=logical_and_e OR b=logical_or_e                                         { mk_bin $loc Term.Binop.Or a b}
     | logical_and_e                                                             { $1 }
 
 logical_and_e:
-    | a=equality_e AND b=logical_and_e                                          { mk_bin $loc Binop.And a b}
+    | a=equality_e AND b=logical_and_e                                          { mk_bin $loc Term.Binop.And a b}
     | equality_e                                                                { $1 }
 
 equality_e:
-    | a=comp_e EQ b=comp_e                                                      { mk_bin $loc Binop.Eq a b }
-    | a=comp_e NEQ b=comp_e                                                     { mk_bin $loc Binop.Neq a b }
+    | a=comp_e EQ b=comp_e                                                      { mk_bin $loc Term.Binop.Eq a b }
+    | a=comp_e NEQ b=comp_e                                                     { mk_bin $loc Term.Binop.Neq a b }
     | comp_e                                                                    { $1 }
 
 comp_e:
@@ -149,37 +149,37 @@ constr_e:
 fun_app_e:
     | f=fun_app_e arg=primary_e                                                 { mk_app $loc f arg }
     | f=primary_e arg=primary_e                                                 { mk_app $loc f arg }
-    | MAX a=primary_e b=primary_e                                               { mk_bin $loc Binop.Max a b}
-    | MIN a=primary_e b=primary_e                                               { mk_bin $loc Binop.Min a b}
+    | MAX a=primary_e b=primary_e                                               { mk_bin $loc Term.Binop.Max a b}
+    | MIN a=primary_e b=primary_e                                               { mk_bin $loc Term.Binop.Min a b}
     | primary_e                                                                 { $1 }
 
 primary_e:
     | LPAR t=expr RPAR                                                          { t }
     | v=IDENT                                                                   { mk_var $loc v }
-    | TRUE                                                                      { mk_const $loc Constant.CTrue}
-    | FALSE                                                                     { mk_const $loc Constant.CFalse}
-    | i=INT                                                                     { mk_const $loc (Constant.of_int i)}
+    | TRUE                                                                      { mk_const $loc Term.Constant.CTrue}
+    | FALSE                                                                     { mk_const $loc Term.Constant.CFalse}
+    | i=INT                                                                     { mk_const $loc (Term.Constant.of_int i)}
 
 arguments:
     | IDENT                                                                     { [$1] }
     | LPAR l=separated_nonempty_list(COMMA, IDENT) RPAR                         { l }
 
 %inline op_comp:
-    | LT        { Binop.Lt }
-    | GT        { Binop.Gt }
-    | LE        { Binop.Le }
-    | GE        { Binop.Ge }
+    | LT        { Term.Binop.Lt }
+    | GT        { Term.Binop.Gt }
+    | LE        { Term.Binop.Le }
+    | GE        { Term.Binop.Ge }
 
 %inline op_add:
-    | PLUS      { Binop.Plus }
-    | MINUS     { Binop.Minus }
+    | PLUS      { Term.Binop.Plus }
+    | MINUS     { Term.Binop.Minus }
 
 %inline op_mult:
-    | DIV       { Binop.Div }
-    | TIMES     { Binop.Times }
-    | MOD       { Binop.Mod }
+    | DIV       { Term.Binop.Div }
+    | TIMES     { Term.Binop.Times }
+    | MOD       { Term.Binop.Mod }
 
 %inline unop:
-    | MINUS       { Unop.Neg }
-    | EXCLAMATION { Unop.Not }
-    | ABS         { Unop.Abs }
+    | MINUS       { Term.Unop.Neg }
+    | EXCLAMATION { Term.Unop.Not }
+    | ABS         { Term.Unop.Abs }
