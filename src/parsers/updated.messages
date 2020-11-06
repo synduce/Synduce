@@ -8,7 +8,7 @@ main: LET IDENT EQ ABS VBAR
 ## ABS
 ##
 
-<YOUR SYNTAX ERROR MESSAGE HERE>
+Message 1.
 
 main: LET IDENT EQ EXCLAMATION VBAR
 ##
@@ -20,7 +20,7 @@ main: LET IDENT EQ EXCLAMATION VBAR
 ## EXCLAMATION
 ##
 
-<YOUR SYNTAX ERROR MESSAGE HERE>
+<TEST>
 
 main: LET IDENT EQ FUN IDENT RIGHTARROW VBAR
 ##
@@ -32,7 +32,7 @@ main: LET IDENT EQ FUN IDENT RIGHTARROW VBAR
 ## FUN arguments RIGHTARROW
 ##
 
-<YOUR SYNTAX ERROR MESSAGE HERE>
+<TEST>
 
 main: LET IDENT EQ FUN IDENT VBAR
 ##
@@ -44,7 +44,7 @@ main: LET IDENT EQ FUN IDENT VBAR
 ## FUN arguments
 ##
 
-<YOUR SYNTAX ERROR MESSAGE HERE>
+<TEST>
 
 main: LET IDENT EQ FUN LPAR VBAR
 ##
@@ -56,7 +56,7 @@ main: LET IDENT EQ FUN LPAR VBAR
 ## LPAR
 ##
 
-<YOUR SYNTAX ERROR MESSAGE HERE>
+<TEST>
 
 main: LET IDENT EQ FUN VBAR
 ##
@@ -68,7 +68,7 @@ main: LET IDENT EQ FUN VBAR
 ## FUN
 ##
 
-<YOUR SYNTAX ERROR MESSAGE HERE>
+<TEST>
 
 main: LET IDENT EQ MINUS VBAR
 ##
@@ -80,7 +80,7 @@ main: LET IDENT EQ MINUS VBAR
 ## MINUS
 ##
 
-<YOUR SYNTAX ERROR MESSAGE HERE>
+<TEST>
 
 main: LET IDENT EQ TRUE AND VBAR
 ##
@@ -92,7 +92,7 @@ main: LET IDENT EQ TRUE AND VBAR
 ## equality_e AND
 ##
 
-<YOUR SYNTAX ERROR MESSAGE HERE>
+<TEST>
 
 main: LET IDENT EQ TRUE COMMA TRUE COMMA VBAR
 ##
@@ -104,7 +104,7 @@ main: LET IDENT EQ TRUE COMMA TRUE COMMA VBAR
 ## logical_or_e COMMA
 ##
 
-<YOUR SYNTAX ERROR MESSAGE HERE>
+<TEST>
 
 main: LET IDENT EQ TRUE COMMA VBAR
 ##
@@ -116,7 +116,7 @@ main: LET IDENT EQ TRUE COMMA VBAR
 ## logical_or_e COMMA
 ##
 
-<YOUR SYNTAX ERROR MESSAGE HERE>
+<TEST>
 
 main: LET IDENT EQ TRUE DIV VBAR
 ##
@@ -128,7 +128,7 @@ main: LET IDENT EQ TRUE DIV VBAR
 ## unary_e DIV
 ##
 
-<YOUR SYNTAX ERROR MESSAGE HERE>
+<TEST>
 
 main: LET IDENT EQ TRUE EQ CIDENT NEQ
 ##
@@ -144,15 +144,15 @@ main: LET IDENT EQ TRUE EQ CIDENT NEQ
 ## This implies that, although the LR(1) items shown above provide an
 ## accurate view of the past (what has been recognized so far), they
 ## may provide an INCOMPLETE view of the future (what was expected next).
-## In state 80, spurious reduction of production constr_e -> CIDENT 
-## In state 95, spurious reduction of production unary_e -> constr_e 
-## In state 96, spurious reduction of production mult_e -> unary_e 
-## In state 104, spurious reduction of production add_e -> mult_e 
-## In state 124, spurious reduction of production comp_e -> add_e 
-## In state 134, spurious reduction of production equality_e -> comp_e EQ comp_e 
+## In state 80, spurious reduction of production constr_e -> CIDENT
+## In state 95, spurious reduction of production unary_e -> constr_e
+## In state 96, spurious reduction of production mult_e -> unary_e
+## In state 104, spurious reduction of production add_e -> mult_e
+## In state 124, spurious reduction of production comp_e -> add_e
+## In state 134, spurious reduction of production equality_e -> comp_e EQ comp_e
 ##
 
-<YOUR SYNTAX ERROR MESSAGE HERE>
+<TEST>
 
 main: LET IDENT EQ TRUE EQ VBAR
 ##
@@ -164,7 +164,7 @@ main: LET IDENT EQ TRUE EQ VBAR
 ## comp_e EQ
 ##
 
-<YOUR SYNTAX ERROR MESSAGE HERE>
+<TEST>
 
 main: LET IDENT EQ TRUE GE CIDENT LT
 ##
@@ -181,14 +181,14 @@ main: LET IDENT EQ TRUE GE CIDENT LT
 ## This implies that, although the LR(1) items shown above provide an
 ## accurate view of the past (what has been recognized so far), they
 ## may provide an INCOMPLETE view of the future (what was expected next).
-## In state 80, spurious reduction of production constr_e -> CIDENT 
-## In state 95, spurious reduction of production unary_e -> constr_e 
-## In state 96, spurious reduction of production mult_e -> unary_e 
-## In state 104, spurious reduction of production add_e -> mult_e 
-## In state 132, spurious reduction of production comp_e -> add_e GE add_e 
+## In state 80, spurious reduction of production constr_e -> CIDENT
+## In state 95, spurious reduction of production unary_e -> constr_e
+## In state 96, spurious reduction of production mult_e -> unary_e
+## In state 104, spurious reduction of production add_e -> mult_e
+## In state 132, spurious reduction of production comp_e -> add_e GE add_e
 ##
 
-<YOUR SYNTAX ERROR MESSAGE HERE>
+<TEST>
 
 main: LET IDENT EQ TRUE GE VBAR
 ##
@@ -200,7 +200,7 @@ main: LET IDENT EQ TRUE GE VBAR
 ## add_e GE
 ##
 
-<YOUR SYNTAX ERROR MESSAGE HERE>
+<TEST>
 
 main: LET IDENT EQ TRUE GT VBAR
 ##
@@ -212,7 +212,7 @@ main: LET IDENT EQ TRUE GT VBAR
 ## add_e GT
 ##
 
-<YOUR SYNTAX ERROR MESSAGE HERE>
+<TEST>
 
 main: LET IDENT EQ TRUE LE VBAR
 ##
@@ -224,7 +224,7 @@ main: LET IDENT EQ TRUE LE VBAR
 ## add_e LE
 ##
 
-<YOUR SYNTAX ERROR MESSAGE HERE>
+<TEST>
 
 main: LET IDENT EQ TRUE LT VBAR
 ##
@@ -236,7 +236,7 @@ main: LET IDENT EQ TRUE LT VBAR
 ## add_e LT
 ##
 
-<YOUR SYNTAX ERROR MESSAGE HERE>
+<TEST>
 
 main: LET IDENT EQ TRUE MINUS VBAR
 ##
@@ -248,7 +248,7 @@ main: LET IDENT EQ TRUE MINUS VBAR
 ## mult_e MINUS
 ##
 
-<YOUR SYNTAX ERROR MESSAGE HERE>
+<TEST>
 
 main: LET IDENT EQ TRUE MOD VBAR
 ##
@@ -260,7 +260,7 @@ main: LET IDENT EQ TRUE MOD VBAR
 ## unary_e MOD
 ##
 
-<YOUR SYNTAX ERROR MESSAGE HERE>
+<TEST>
 
 main: LET IDENT EQ TRUE NEQ VBAR
 ##
@@ -272,7 +272,7 @@ main: LET IDENT EQ TRUE NEQ VBAR
 ## comp_e NEQ
 ##
 
-<YOUR SYNTAX ERROR MESSAGE HERE>
+<TEST>
 
 main: LET IDENT EQ TRUE OR VBAR
 ##
@@ -284,7 +284,7 @@ main: LET IDENT EQ TRUE OR VBAR
 ## logical_and_e OR
 ##
 
-<YOUR SYNTAX ERROR MESSAGE HERE>
+<TEST>
 
 main: LET IDENT EQ TRUE PLUS VBAR
 ##
@@ -296,7 +296,7 @@ main: LET IDENT EQ TRUE PLUS VBAR
 ## mult_e PLUS
 ##
 
-<YOUR SYNTAX ERROR MESSAGE HERE>
+<TEST>
 
 main: LET IDENT EQ TRUE QUESTION TRUE COLON VBAR
 ##
@@ -308,7 +308,7 @@ main: LET IDENT EQ TRUE QUESTION TRUE COLON VBAR
 ## expr QUESTION expr COLON
 ##
 
-<YOUR SYNTAX ERROR MESSAGE HERE>
+<TEST>
 
 main: LET IDENT EQ TRUE QUESTION TRUE VBAR
 ##
@@ -324,20 +324,20 @@ main: LET IDENT EQ TRUE QUESTION TRUE VBAR
 ## This implies that, although the LR(1) items shown above provide an
 ## accurate view of the past (what has been recognized so far), they
 ## may provide an INCOMPLETE view of the future (what was expected next).
-## In state 91, spurious reduction of production fun_app_e -> primary_e 
-## In state 93, spurious reduction of production constr_e -> fun_app_e 
-## In state 95, spurious reduction of production unary_e -> constr_e 
-## In state 96, spurious reduction of production mult_e -> unary_e 
-## In state 104, spurious reduction of production add_e -> mult_e 
-## In state 124, spurious reduction of production comp_e -> add_e 
-## In state 121, spurious reduction of production equality_e -> comp_e 
-## In state 118, spurious reduction of production logical_and_e -> equality_e 
-## In state 115, spurious reduction of production logical_or_e -> logical_and_e 
-## In state 109, spurious reduction of production tuple_e -> logical_or_e 
-## In state 135, spurious reduction of production expr -> tuple_e 
+## In state 91, spurious reduction of production fun_app_e -> primary_e
+## In state 93, spurious reduction of production constr_e -> fun_app_e
+## In state 95, spurious reduction of production unary_e -> constr_e
+## In state 96, spurious reduction of production mult_e -> unary_e
+## In state 104, spurious reduction of production add_e -> mult_e
+## In state 124, spurious reduction of production comp_e -> add_e
+## In state 121, spurious reduction of production equality_e -> comp_e
+## In state 118, spurious reduction of production logical_and_e -> equality_e
+## In state 115, spurious reduction of production logical_or_e -> logical_and_e
+## In state 109, spurious reduction of production tuple_e -> logical_or_e
+## In state 135, spurious reduction of production expr -> tuple_e
 ##
 
-<YOUR SYNTAX ERROR MESSAGE HERE>
+<TEST>
 
 main: LET IDENT EQ TRUE QUESTION VBAR
 ##
@@ -349,7 +349,7 @@ main: LET IDENT EQ TRUE QUESTION VBAR
 ## expr QUESTION
 ##
 
-<YOUR SYNTAX ERROR MESSAGE HERE>
+<TEST>
 
 main: LET IDENT EQ TRUE RIGHTARROW
 ##
@@ -367,12 +367,12 @@ main: LET IDENT EQ TRUE RIGHTARROW
 ## This implies that, although the LR(1) items shown above provide an
 ## accurate view of the past (what has been recognized so far), they
 ## may provide an INCOMPLETE view of the future (what was expected next).
-## In state 91, spurious reduction of production fun_app_e -> primary_e 
-## In state 93, spurious reduction of production constr_e -> fun_app_e 
-## In state 95, spurious reduction of production unary_e -> constr_e 
+## In state 91, spurious reduction of production fun_app_e -> primary_e
+## In state 93, spurious reduction of production constr_e -> fun_app_e
+## In state 95, spurious reduction of production unary_e -> constr_e
 ##
 
-<YOUR SYNTAX ERROR MESSAGE HERE>
+<TEST>
 
 main: LET IDENT EQ TRUE TIMES VBAR
 ##
@@ -384,7 +384,7 @@ main: LET IDENT EQ TRUE TIMES VBAR
 ## unary_e TIMES
 ##
 
-<YOUR SYNTAX ERROR MESSAGE HERE>
+<TEST>
 
 main: LET IDENT EQ TRUE VBAR
 ##
@@ -400,20 +400,20 @@ main: LET IDENT EQ TRUE VBAR
 ## This implies that, although the LR(1) items shown above provide an
 ## accurate view of the past (what has been recognized so far), they
 ## may provide an INCOMPLETE view of the future (what was expected next).
-## In state 91, spurious reduction of production fun_app_e -> primary_e 
-## In state 93, spurious reduction of production constr_e -> fun_app_e 
-## In state 95, spurious reduction of production unary_e -> constr_e 
-## In state 96, spurious reduction of production mult_e -> unary_e 
-## In state 104, spurious reduction of production add_e -> mult_e 
-## In state 124, spurious reduction of production comp_e -> add_e 
-## In state 121, spurious reduction of production equality_e -> comp_e 
-## In state 118, spurious reduction of production logical_and_e -> equality_e 
-## In state 115, spurious reduction of production logical_or_e -> logical_and_e 
-## In state 109, spurious reduction of production tuple_e -> logical_or_e 
-## In state 135, spurious reduction of production expr -> tuple_e 
+## In state 91, spurious reduction of production fun_app_e -> primary_e
+## In state 93, spurious reduction of production constr_e -> fun_app_e
+## In state 95, spurious reduction of production unary_e -> constr_e
+## In state 96, spurious reduction of production mult_e -> unary_e
+## In state 104, spurious reduction of production add_e -> mult_e
+## In state 124, spurious reduction of production comp_e -> add_e
+## In state 121, spurious reduction of production equality_e -> comp_e
+## In state 118, spurious reduction of production logical_and_e -> equality_e
+## In state 115, spurious reduction of production logical_or_e -> logical_and_e
+## In state 109, spurious reduction of production tuple_e -> logical_or_e
+## In state 135, spurious reduction of production expr -> tuple_e
 ##
 
-<YOUR SYNTAX ERROR MESSAGE HERE>
+<TEST>
 
 main: LET IDENT EQ VBAR
 ##
@@ -425,7 +425,7 @@ main: LET IDENT EQ VBAR
 ## LET IDENT list(IDENT) EQ
 ##
 
-<YOUR SYNTAX ERROR MESSAGE HERE>
+<TEST>
 
 main: LET IDENT VBAR
 ##
@@ -437,7 +437,7 @@ main: LET IDENT VBAR
 ## LET IDENT
 ##
 
-<YOUR SYNTAX ERROR MESSAGE HERE>
+<TEST>
 
 main: LET VBAR
 ##
@@ -449,7 +449,7 @@ main: LET VBAR
 ## LET
 ##
 
-<YOUR SYNTAX ERROR MESSAGE HERE>
+<TEST>
 
 main: LETPMRS IDENT EQ CIDENT LPAR TRUE VBAR
 ##
@@ -466,20 +466,20 @@ main: LETPMRS IDENT EQ CIDENT LPAR TRUE VBAR
 ## This implies that, although the LR(1) items shown above provide an
 ## accurate view of the past (what has been recognized so far), they
 ## may provide an INCOMPLETE view of the future (what was expected next).
-## In state 91, spurious reduction of production fun_app_e -> primary_e 
-## In state 93, spurious reduction of production constr_e -> fun_app_e 
-## In state 95, spurious reduction of production unary_e -> constr_e 
-## In state 96, spurious reduction of production mult_e -> unary_e 
-## In state 104, spurious reduction of production add_e -> mult_e 
-## In state 124, spurious reduction of production comp_e -> add_e 
-## In state 121, spurious reduction of production equality_e -> comp_e 
-## In state 118, spurious reduction of production logical_and_e -> equality_e 
-## In state 115, spurious reduction of production logical_or_e -> logical_and_e 
-## In state 109, spurious reduction of production tuple_e -> logical_or_e 
-## In state 135, spurious reduction of production expr -> tuple_e 
+## In state 91, spurious reduction of production fun_app_e -> primary_e
+## In state 93, spurious reduction of production constr_e -> fun_app_e
+## In state 95, spurious reduction of production unary_e -> constr_e
+## In state 96, spurious reduction of production mult_e -> unary_e
+## In state 104, spurious reduction of production add_e -> mult_e
+## In state 124, spurious reduction of production comp_e -> add_e
+## In state 121, spurious reduction of production equality_e -> comp_e
+## In state 118, spurious reduction of production logical_and_e -> equality_e
+## In state 115, spurious reduction of production logical_or_e -> logical_and_e
+## In state 109, spurious reduction of production tuple_e -> logical_or_e
+## In state 135, spurious reduction of production expr -> tuple_e
 ##
 
-<YOUR SYNTAX ERROR MESSAGE HERE>
+<TEST>
 
 main: LETPMRS IDENT EQ CIDENT LPAR VBAR
 ##
@@ -491,7 +491,7 @@ main: LETPMRS IDENT EQ CIDENT LPAR VBAR
 ## CIDENT LPAR
 ##
 
-<YOUR SYNTAX ERROR MESSAGE HERE>
+<TEST>
 
 main: LETPMRS IDENT EQ CIDENT PIDENT
 ##
@@ -504,7 +504,7 @@ main: LETPMRS IDENT EQ CIDENT PIDENT
 ## CIDENT
 ##
 
-<YOUR SYNTAX ERROR MESSAGE HERE>
+<TEST>
 
 main: LETPMRS IDENT EQ LPAR TRUE VBAR
 ##
@@ -520,20 +520,20 @@ main: LETPMRS IDENT EQ LPAR TRUE VBAR
 ## This implies that, although the LR(1) items shown above provide an
 ## accurate view of the past (what has been recognized so far), they
 ## may provide an INCOMPLETE view of the future (what was expected next).
-## In state 91, spurious reduction of production fun_app_e -> primary_e 
-## In state 93, spurious reduction of production constr_e -> fun_app_e 
-## In state 95, spurious reduction of production unary_e -> constr_e 
-## In state 96, spurious reduction of production mult_e -> unary_e 
-## In state 104, spurious reduction of production add_e -> mult_e 
-## In state 124, spurious reduction of production comp_e -> add_e 
-## In state 121, spurious reduction of production equality_e -> comp_e 
-## In state 118, spurious reduction of production logical_and_e -> equality_e 
-## In state 115, spurious reduction of production logical_or_e -> logical_and_e 
-## In state 109, spurious reduction of production tuple_e -> logical_or_e 
-## In state 135, spurious reduction of production expr -> tuple_e 
+## In state 91, spurious reduction of production fun_app_e -> primary_e
+## In state 93, spurious reduction of production constr_e -> fun_app_e
+## In state 95, spurious reduction of production unary_e -> constr_e
+## In state 96, spurious reduction of production mult_e -> unary_e
+## In state 104, spurious reduction of production add_e -> mult_e
+## In state 124, spurious reduction of production comp_e -> add_e
+## In state 121, spurious reduction of production equality_e -> comp_e
+## In state 118, spurious reduction of production logical_and_e -> equality_e
+## In state 115, spurious reduction of production logical_or_e -> logical_and_e
+## In state 109, spurious reduction of production tuple_e -> logical_or_e
+## In state 135, spurious reduction of production expr -> tuple_e
 ##
 
-<YOUR SYNTAX ERROR MESSAGE HERE>
+<TEST>
 
 main: LETPMRS IDENT EQ LPAR VBAR
 ##
@@ -545,7 +545,7 @@ main: LETPMRS IDENT EQ LPAR VBAR
 ## LPAR
 ##
 
-<YOUR SYNTAX ERROR MESSAGE HERE>
+<TEST>
 
 main: LETPMRS IDENT EQ MAX TRUE VBAR
 ##
@@ -557,7 +557,7 @@ main: LETPMRS IDENT EQ MAX TRUE VBAR
 ## MAX primary_e
 ##
 
-<YOUR SYNTAX ERROR MESSAGE HERE>
+<TEST>
 
 main: LETPMRS IDENT EQ MAX VBAR
 ##
@@ -569,7 +569,7 @@ main: LETPMRS IDENT EQ MAX VBAR
 ## MAX
 ##
 
-<YOUR SYNTAX ERROR MESSAGE HERE>
+<TEST>
 
 main: LETPMRS IDENT EQ MIN TRUE VBAR
 ##
@@ -581,7 +581,7 @@ main: LETPMRS IDENT EQ MIN TRUE VBAR
 ## MIN primary_e
 ##
 
-<YOUR SYNTAX ERROR MESSAGE HERE>
+<TEST>
 
 main: LETPMRS IDENT EQ MIN VBAR
 ##
@@ -593,7 +593,7 @@ main: LETPMRS IDENT EQ MIN VBAR
 ## MIN
 ##
 
-<YOUR SYNTAX ERROR MESSAGE HERE>
+<TEST>
 
 main: LETPMRS IDENT EQ RIGHTARROW CIDENT VBAR VBAR
 ##
@@ -605,7 +605,7 @@ main: LETPMRS IDENT EQ RIGHTARROW CIDENT VBAR VBAR
 ## prule VBAR
 ##
 
-<YOUR SYNTAX ERROR MESSAGE HERE>
+<TEST>
 
 main: LETPMRS IDENT EQ RIGHTARROW TRUE RPAR
 ##
@@ -621,20 +621,20 @@ main: LETPMRS IDENT EQ RIGHTARROW TRUE RPAR
 ## This implies that, although the LR(1) items shown above provide an
 ## accurate view of the past (what has been recognized so far), they
 ## may provide an INCOMPLETE view of the future (what was expected next).
-## In state 91, spurious reduction of production fun_app_e -> primary_e 
-## In state 93, spurious reduction of production constr_e -> fun_app_e 
-## In state 95, spurious reduction of production unary_e -> constr_e 
-## In state 96, spurious reduction of production mult_e -> unary_e 
-## In state 104, spurious reduction of production add_e -> mult_e 
-## In state 124, spurious reduction of production comp_e -> add_e 
-## In state 121, spurious reduction of production equality_e -> comp_e 
-## In state 118, spurious reduction of production logical_and_e -> equality_e 
-## In state 115, spurious reduction of production logical_or_e -> logical_and_e 
-## In state 109, spurious reduction of production tuple_e -> logical_or_e 
-## In state 135, spurious reduction of production expr -> tuple_e 
+## In state 91, spurious reduction of production fun_app_e -> primary_e
+## In state 93, spurious reduction of production constr_e -> fun_app_e
+## In state 95, spurious reduction of production unary_e -> constr_e
+## In state 96, spurious reduction of production mult_e -> unary_e
+## In state 104, spurious reduction of production add_e -> mult_e
+## In state 124, spurious reduction of production comp_e -> add_e
+## In state 121, spurious reduction of production equality_e -> comp_e
+## In state 118, spurious reduction of production logical_and_e -> equality_e
+## In state 115, spurious reduction of production logical_or_e -> logical_and_e
+## In state 109, spurious reduction of production tuple_e -> logical_or_e
+## In state 135, spurious reduction of production expr -> tuple_e
 ##
 
-<YOUR SYNTAX ERROR MESSAGE HERE>
+<TEST>
 
 main: LETPMRS IDENT EQ RIGHTARROW VBAR
 ##
@@ -646,7 +646,7 @@ main: LETPMRS IDENT EQ RIGHTARROW VBAR
 ## list(constr_e) RIGHTARROW
 ##
 
-<YOUR SYNTAX ERROR MESSAGE HERE>
+<TEST>
 
 main: LETPMRS IDENT EQ TRUE PIDENT
 ##
@@ -659,7 +659,7 @@ main: LETPMRS IDENT EQ TRUE PIDENT
 ## primary_e
 ##
 
-<YOUR SYNTAX ERROR MESSAGE HERE>
+<TEST>
 
 main: LETPMRS IDENT EQ TRUE TRUE PIDENT
 ##
@@ -672,7 +672,7 @@ main: LETPMRS IDENT EQ TRUE TRUE PIDENT
 ## fun_app_e
 ##
 
-<YOUR SYNTAX ERROR MESSAGE HERE>
+<TEST>
 
 main: LETPMRS IDENT EQ TRUE VBAR
 ##
@@ -687,11 +687,11 @@ main: LETPMRS IDENT EQ TRUE VBAR
 ## This implies that, although the LR(1) items shown above provide an
 ## accurate view of the past (what has been recognized so far), they
 ## may provide an INCOMPLETE view of the future (what was expected next).
-## In state 91, spurious reduction of production fun_app_e -> primary_e 
-## In state 93, spurious reduction of production constr_e -> fun_app_e 
+## In state 91, spurious reduction of production fun_app_e -> primary_e
+## In state 93, spurious reduction of production constr_e -> fun_app_e
 ##
 
-<YOUR SYNTAX ERROR MESSAGE HERE>
+<TEST>
 
 main: LETPMRS IDENT EQ VBAR
 ##
@@ -703,7 +703,7 @@ main: LETPMRS IDENT EQ VBAR
 ## IDENT list(IDENT) EQ
 ##
 
-<YOUR SYNTAX ERROR MESSAGE HERE>
+<TEST>
 
 main: LETPMRS IDENT IDENT VBAR
 ##
@@ -715,7 +715,7 @@ main: LETPMRS IDENT IDENT VBAR
 ## IDENT
 ##
 
-<YOUR SYNTAX ERROR MESSAGE HERE>
+<TEST>
 
 main: LETPMRS IDENT VBAR
 ##
@@ -727,7 +727,7 @@ main: LETPMRS IDENT VBAR
 ## IDENT
 ##
 
-<YOUR SYNTAX ERROR MESSAGE HERE>
+<TEST>
 
 main: LETPMRS LPAR IDENT COMMA VBAR
 ##
@@ -739,7 +739,7 @@ main: LETPMRS LPAR IDENT COMMA VBAR
 ## IDENT COMMA
 ##
 
-<YOUR SYNTAX ERROR MESSAGE HERE>
+<TEST>
 
 main: LETPMRS LPAR IDENT VBAR
 ##
@@ -752,7 +752,7 @@ main: LETPMRS LPAR IDENT VBAR
 ## IDENT
 ##
 
-<YOUR SYNTAX ERROR MESSAGE HERE>
+<TEST>
 
 main: LETPMRS LPAR RPAR IDENT EQ VBAR
 ##
@@ -764,7 +764,7 @@ main: LETPMRS LPAR RPAR IDENT EQ VBAR
 ## LPAR loption(separated_nonempty_list(COMMA,IDENT)) RPAR IDENT list(IDENT) EQ
 ##
 
-<YOUR SYNTAX ERROR MESSAGE HERE>
+<TEST>
 
 main: LETPMRS LPAR RPAR IDENT VBAR
 ##
@@ -776,7 +776,7 @@ main: LETPMRS LPAR RPAR IDENT VBAR
 ## LPAR loption(separated_nonempty_list(COMMA,IDENT)) RPAR IDENT
 ##
 
-<YOUR SYNTAX ERROR MESSAGE HERE>
+<TEST>
 
 main: LETPMRS LPAR RPAR VBAR
 ##
@@ -788,7 +788,7 @@ main: LETPMRS LPAR RPAR VBAR
 ## LPAR loption(separated_nonempty_list(COMMA,IDENT)) RPAR
 ##
 
-<YOUR SYNTAX ERROR MESSAGE HERE>
+<TEST>
 
 main: LETPMRS LPAR VBAR
 ##
@@ -800,7 +800,7 @@ main: LETPMRS LPAR VBAR
 ## LPAR
 ##
 
-<YOUR SYNTAX ERROR MESSAGE HERE>
+<TEST>
 
 main: LETPMRS VBAR
 ##
@@ -812,7 +812,7 @@ main: LETPMRS VBAR
 ## LETPMRS
 ##
 
-<YOUR SYNTAX ERROR MESSAGE HERE>
+<TEST>
 
 main: TYPE IDENT EQ CIDENT OF PIDENT TIMES PIDENT TIMES VBAR
 ##
@@ -824,7 +824,7 @@ main: TYPE IDENT EQ CIDENT OF PIDENT TIMES PIDENT TIMES VBAR
 ## typefun TIMES
 ##
 
-<YOUR SYNTAX ERROR MESSAGE HERE>
+<TEST>
 
 main: TYPE IDENT EQ CIDENT OF PIDENT TIMES TRUE
 ##
@@ -836,7 +836,7 @@ main: TYPE IDENT EQ CIDENT OF PIDENT TIMES TRUE
 ## CIDENT OF typefun TIMES
 ##
 
-<YOUR SYNTAX ERROR MESSAGE HERE>
+<TEST>
 
 main: TYPE IDENT EQ CIDENT OF VBAR
 ##
@@ -849,7 +849,7 @@ main: TYPE IDENT EQ CIDENT OF VBAR
 ## CIDENT OF
 ##
 
-<YOUR SYNTAX ERROR MESSAGE HERE>
+<TEST>
 
 main: TYPE IDENT EQ CIDENT TRUE
 ##
@@ -863,7 +863,7 @@ main: TYPE IDENT EQ CIDENT TRUE
 ## CIDENT
 ##
 
-<YOUR SYNTAX ERROR MESSAGE HERE>
+<TEST>
 
 main: TYPE IDENT EQ CIDENT VBAR VBAR
 ##
@@ -875,7 +875,7 @@ main: TYPE IDENT EQ CIDENT VBAR VBAR
 ## typeconstr VBAR
 ##
 
-<YOUR SYNTAX ERROR MESSAGE HERE>
+<TEST>
 
 main: TYPE IDENT EQ LPAR PIDENT COMMA PIDENT COMMA VBAR
 ##
@@ -887,7 +887,7 @@ main: TYPE IDENT EQ LPAR PIDENT COMMA PIDENT COMMA VBAR
 ## typeapp COMMA
 ##
 
-<YOUR SYNTAX ERROR MESSAGE HERE>
+<TEST>
 
 main: TYPE IDENT EQ LPAR PIDENT COMMA PIDENT RPAR VBAR
 ##
@@ -899,7 +899,7 @@ main: TYPE IDENT EQ LPAR PIDENT COMMA PIDENT RPAR VBAR
 ## LPAR typeapp COMMA separated_nonempty_list(COMMA,typeapp) RPAR
 ##
 
-<YOUR SYNTAX ERROR MESSAGE HERE>
+<TEST>
 
 main: TYPE IDENT EQ LPAR PIDENT COMMA PIDENT VBAR
 ##
@@ -916,10 +916,10 @@ main: TYPE IDENT EQ LPAR PIDENT COMMA PIDENT VBAR
 ## This implies that, although the LR(1) items shown above provide an
 ## accurate view of the past (what has been recognized so far), they
 ## may provide an INCOMPLETE view of the future (what was expected next).
-## In state 10, spurious reduction of production typeapp -> typetermb 
+## In state 10, spurious reduction of production typeapp -> typetermb
 ##
 
-<YOUR SYNTAX ERROR MESSAGE HERE>
+<TEST>
 
 main: TYPE IDENT EQ LPAR PIDENT COMMA VBAR
 ##
@@ -931,7 +931,7 @@ main: TYPE IDENT EQ LPAR PIDENT COMMA VBAR
 ## LPAR typeapp COMMA
 ##
 
-<YOUR SYNTAX ERROR MESSAGE HERE>
+<TEST>
 
 main: TYPE IDENT EQ LPAR PIDENT VBAR
 ##
@@ -948,10 +948,10 @@ main: TYPE IDENT EQ LPAR PIDENT VBAR
 ## This implies that, although the LR(1) items shown above provide an
 ## accurate view of the past (what has been recognized so far), they
 ## may provide an INCOMPLETE view of the future (what was expected next).
-## In state 10, spurious reduction of production typeapp -> typetermb 
+## In state 10, spurious reduction of production typeapp -> typetermb
 ##
 
-<YOUR SYNTAX ERROR MESSAGE HERE>
+<TEST>
 
 main: TYPE IDENT EQ LPAR VBAR
 ##
@@ -964,7 +964,7 @@ main: TYPE IDENT EQ LPAR VBAR
 ## LPAR
 ##
 
-<YOUR SYNTAX ERROR MESSAGE HERE>
+<TEST>
 
 main: TYPE IDENT EQ PIDENT LPAR PIDENT VBAR
 ##
@@ -980,10 +980,10 @@ main: TYPE IDENT EQ PIDENT LPAR PIDENT VBAR
 ## This implies that, although the LR(1) items shown above provide an
 ## accurate view of the past (what has been recognized so far), they
 ## may provide an INCOMPLETE view of the future (what was expected next).
-## In state 10, spurious reduction of production typeapp -> typetermb 
+## In state 10, spurious reduction of production typeapp -> typetermb
 ##
 
-<YOUR SYNTAX ERROR MESSAGE HERE>
+<TEST>
 
 main: TYPE IDENT EQ PIDENT LPAR VBAR
 ##
@@ -995,7 +995,7 @@ main: TYPE IDENT EQ PIDENT LPAR VBAR
 ## LPAR
 ##
 
-<YOUR SYNTAX ERROR MESSAGE HERE>
+<TEST>
 
 main: TYPE IDENT EQ PIDENT RIGHTARROW PIDENT RPAR
 ##
@@ -1011,10 +1011,10 @@ main: TYPE IDENT EQ PIDENT RIGHTARROW PIDENT RPAR
 ## This implies that, although the LR(1) items shown above provide an
 ## accurate view of the past (what has been recognized so far), they
 ## may provide an INCOMPLETE view of the future (what was expected next).
-## In state 10, spurious reduction of production typeapp -> typetermb 
+## In state 10, spurious reduction of production typeapp -> typetermb
 ##
 
-<YOUR SYNTAX ERROR MESSAGE HERE>
+<TEST>
 
 main: TYPE IDENT EQ PIDENT RIGHTARROW VBAR
 ##
@@ -1026,7 +1026,7 @@ main: TYPE IDENT EQ PIDENT RIGHTARROW VBAR
 ## typefun RIGHTARROW
 ##
 
-<YOUR SYNTAX ERROR MESSAGE HERE>
+<TEST>
 
 main: TYPE IDENT EQ PIDENT RPAR
 ##
@@ -1042,10 +1042,10 @@ main: TYPE IDENT EQ PIDENT RPAR
 ## This implies that, although the LR(1) items shown above provide an
 ## accurate view of the past (what has been recognized so far), they
 ## may provide an INCOMPLETE view of the future (what was expected next).
-## In state 10, spurious reduction of production typeapp -> typetermb 
+## In state 10, spurious reduction of production typeapp -> typetermb
 ##
 
-<YOUR SYNTAX ERROR MESSAGE HERE>
+<TEST>
 
 main: TYPE IDENT EQ PIDENT TRUE
 ##
@@ -1058,7 +1058,7 @@ main: TYPE IDENT EQ PIDENT TRUE
 ## typetermb
 ##
 
-<YOUR SYNTAX ERROR MESSAGE HERE>
+<TEST>
 
 main: TYPE IDENT EQ PIDENT VBAR
 ##
@@ -1074,11 +1074,11 @@ main: TYPE IDENT EQ PIDENT VBAR
 ## This implies that, although the LR(1) items shown above provide an
 ## accurate view of the past (what has been recognized so far), they
 ## may provide an INCOMPLETE view of the future (what was expected next).
-## In state 10, spurious reduction of production typeapp -> typetermb 
-## In state 30, spurious reduction of production typefun -> typeapp 
+## In state 10, spurious reduction of production typeapp -> typetermb
+## In state 30, spurious reduction of production typefun -> typeapp
 ##
 
-<YOUR SYNTAX ERROR MESSAGE HERE>
+<TEST>
 
 main: TYPE IDENT EQ VBAR
 ##
@@ -1090,7 +1090,7 @@ main: TYPE IDENT EQ VBAR
 ## IDENT EQ
 ##
 
-<YOUR SYNTAX ERROR MESSAGE HERE>
+<TEST>
 
 main: TYPE IDENT VBAR
 ##
@@ -1102,7 +1102,7 @@ main: TYPE IDENT VBAR
 ## IDENT
 ##
 
-<YOUR SYNTAX ERROR MESSAGE HERE>
+<TEST>
 
 main: TYPE LPAR PIDENT COMMA VBAR
 ##
@@ -1114,7 +1114,7 @@ main: TYPE LPAR PIDENT COMMA VBAR
 ## PIDENT COMMA
 ##
 
-<YOUR SYNTAX ERROR MESSAGE HERE>
+<TEST>
 
 main: TYPE LPAR PIDENT VBAR
 ##
@@ -1127,7 +1127,7 @@ main: TYPE LPAR PIDENT VBAR
 ## PIDENT
 ##
 
-<YOUR SYNTAX ERROR MESSAGE HERE>
+<TEST>
 
 main: TYPE LPAR RPAR IDENT EQ VBAR
 ##
@@ -1139,7 +1139,7 @@ main: TYPE LPAR RPAR IDENT EQ VBAR
 ## LPAR loption(separated_nonempty_list(COMMA,PIDENT)) RPAR IDENT EQ
 ##
 
-<YOUR SYNTAX ERROR MESSAGE HERE>
+<TEST>
 
 main: TYPE LPAR RPAR IDENT VBAR
 ##
@@ -1151,7 +1151,7 @@ main: TYPE LPAR RPAR IDENT VBAR
 ## LPAR loption(separated_nonempty_list(COMMA,PIDENT)) RPAR IDENT
 ##
 
-<YOUR SYNTAX ERROR MESSAGE HERE>
+<TEST>
 
 main: TYPE LPAR RPAR VBAR
 ##
@@ -1163,7 +1163,7 @@ main: TYPE LPAR RPAR VBAR
 ## LPAR loption(separated_nonempty_list(COMMA,PIDENT)) RPAR
 ##
 
-<YOUR SYNTAX ERROR MESSAGE HERE>
+<TEST>
 
 main: TYPE LPAR VBAR
 ##
@@ -1175,7 +1175,7 @@ main: TYPE LPAR VBAR
 ## LPAR
 ##
 
-<YOUR SYNTAX ERROR MESSAGE HERE>
+<TEST>
 
 main: TYPE PIDENT IDENT EQ VBAR
 ##
@@ -1187,7 +1187,7 @@ main: TYPE PIDENT IDENT EQ VBAR
 ## PIDENT IDENT EQ
 ##
 
-<YOUR SYNTAX ERROR MESSAGE HERE>
+<TEST>
 
 main: TYPE PIDENT IDENT VBAR
 ##
@@ -1199,7 +1199,7 @@ main: TYPE PIDENT IDENT VBAR
 ## PIDENT IDENT
 ##
 
-<YOUR SYNTAX ERROR MESSAGE HERE>
+<TEST>
 
 main: TYPE PIDENT VBAR
 ##
@@ -1211,7 +1211,7 @@ main: TYPE PIDENT VBAR
 ## PIDENT
 ##
 
-<YOUR SYNTAX ERROR MESSAGE HERE>
+<TEST>
 
 main: TYPE VBAR
 ##
@@ -1223,7 +1223,7 @@ main: TYPE VBAR
 ## TYPE
 ##
 
-<YOUR SYNTAX ERROR MESSAGE HERE>
+<TEST>
 
 main: VBAR
 ##
@@ -1235,5 +1235,5 @@ main: VBAR
 ##
 ##
 
-<YOUR SYNTAX ERROR MESSAGE HERE>
+<TEST>
 

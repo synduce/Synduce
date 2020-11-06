@@ -100,7 +100,7 @@ pmrsdecl:
 pbody: separated_list(VBAR, prule)                                               { $1 }
 
 
-prule: args=list(constr_e) RIGHTARROW t=expr                                    { $loc, args, t }
+prule: args=fun_app_e RIGHTARROW t=expr                                    { $loc, args, t }
 
 
 expr:
@@ -142,13 +142,12 @@ unary_e:
     | constr_e                                                                  { $1 }
 
 constr_e:
-    | CIDENT LPAR l=separated_list(COMMA, expr) RPAR                            { mk_data $loc $1 l  }
+    | CIDENT LPAR l=separated_list(COMMA, fun_app_e) RPAR                            { mk_data $loc $1 l  }
     | CIDENT                                                                    { mk_data $loc $1 [] }
     | fun_app_e                                                                 { $1 }
 
 fun_app_e:
-    | f=fun_app_e arg=primary_e                                                 { mk_app $loc f arg }
-    | f=primary_e arg=primary_e                                                 { mk_app $loc f arg }
+    | f=primary_e arg=nonempty_list(constr_e)                                  { mk_app $loc f arg }
     | MAX a=primary_e b=primary_e                                               { mk_bin $loc Term.Binop.Max a b}
     | MIN a=primary_e b=primary_e                                               { mk_bin $loc Term.Binop.Min a b}
     | primary_e                                                                 { $1 }

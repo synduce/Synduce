@@ -1,4 +1,4 @@
-type 'a clist = Nil | Single of 'a | Concat of 'a list * 'a list
+type 'a clist = CNil | Single of 'a | Concat of 'a list * 'a list
 
 type 'a list = Nil | Cons of 'a * 'a list
 
@@ -9,6 +9,6 @@ pmrs mts l =
 
 pmrs (odot,f_0,s_0) listhom t =
     main t           -> f t
-    | f Nil          -> s_0
+    | f CNil          -> s_0
     | f Single(a)    -> f_0 a
     | f Concat(x, y) -> odot (f x) (f y)

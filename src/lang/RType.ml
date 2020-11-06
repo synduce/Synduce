@@ -101,6 +101,13 @@ let add_type ?(params: ident list = [])  ~(typename: string) (tterm : type_term)
     add_with_variants variants
   | _ -> add_only ()
 
+let type_of_variant (variant : string) : t option =
+  match Hashtbl.find _variants variant with
+  | Some tname ->
+    (match Hashtbl.find _types tname with
+     | Some _ -> Some (TNamed tname)
+     | _ -> None)
+  | None -> None
 
 
 (* ============================================================================================= *)

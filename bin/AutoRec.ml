@@ -13,9 +13,10 @@ let main () =
   let filename = ref "" in
   parse_cmdline options (fun s -> filename := s);
   set_style_renderer stdout `Ansi_tty;
+  Caml.Format.set_margin 100;
   let prog = parse_pmrs !filename in
   let _ = seek_types prog in
-  let _ = translate prog in
-  ()
+  let plist = translate prog in
+  List.iter plist ~f:(fun p -> pf stdout "%a@." Lang.PMRScheme.pp_pmrs p)
 ;;
 main ()

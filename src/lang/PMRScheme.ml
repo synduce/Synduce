@@ -6,15 +6,16 @@ open Term
 (* ============================================================================================= *)
 
 
-type pattern = variable * variable list
+type pattern = string * variable list
 
 type rewrite_rule = variable * variable list * pattern option * term
 
 type pmrs = {
+  pname : string;
   pargs : VarSet.t;
   pparams : VarSet.t;
   pmain_id : int;
-  prules : (rewrite_rule list) Map.M(Int).t;
+  prules : rewrite_rule list;
   pnon_terminals : VarSet.t;
   porder : int;
 }
@@ -29,12 +30,11 @@ type variables = variable Map.M(String).t
 (* ============================================================================================= *)
 (* Update the order of the pmrs. *)
 let update_order (p : pmrs) : pmrs =
-  let all_rules = List.concat (List.map ~f:snd (Map.to_alist p.prules)) in
   let order =
     let f m (_, args, p, _) =
       max m (List.length args + if Option.is_some p then 1 else 0)
     in
-    List.fold ~f ~init:0 all_rules
+    List.fold ~f ~init:0 p.prules
   in { p with porder = order }
 
 
@@ -42,19 +42,18 @@ let update_order (p : pmrs) : pmrs =
 (*                                 PRETTY PRINTING                                               *)
 (* ============================================================================================= *)
 
-(* let pp_pattern (frmt : Formatter.t) (t, args : pattern) : unit =
-   Fmt.(pf frmt "%s(%a)" t.name (list ~sep:comma string) (Variable.names args))
+let pp_pattern (frmt : Formatter.t) (t, args : pattern) : unit =
+  if List.length args = 0 then
+    Fmt.(pf frmt "%s" t)
+  else
+    Fmt.(pf frmt "%s(%a)" t (list ~sep:comma Variable.pp) args)
 
-   let pp_rewrite_rule (frmt : Formatter.t) (nt, vargs, pat, t : rewrite_rule) : unit =
-   Fmt.(pf frmt "%s %a %a --> %a"
-         nt.name
-         (list ~sep:comma string) (Variable.names vargs)
+let pp_rewrite_rule (frmt : Formatter.t) (nt, vargs, pat, t : rewrite_rule) : unit =
+  Fmt.(pf frmt "@[<hov 2>%s %a %a  ⟹  %a@]"
+         nt.vname
+         (list ~sep:comma Variable.pp) vargs
          (option pp_pattern) pat
          (box pp_term) t)
 
-   let pp_pmrs (frmt : Formatter.t) (pmrs : pmrs) : unit =
-   List.iter
-    ~f:(fun (_, r) ->
-        Fmt.(pf frmt "%a@." (list (box pp_rewrite_rule)) r))
-    (Map.to_alist pmrs.rules) *)
-
+let pp_pmrs (frmt : Formatter.t) (pmrs : pmrs) : unit =
+  Fmt.(pf frmt "%s:@;@[<v 2>{@;%a@;}@]" pmrs.pname (list ~sep:sp pp_rewrite_rule) pmrs.prules)

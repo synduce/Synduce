@@ -80,6 +80,8 @@ module Variable = struct
   let is_nonterminal (v : t) = Set.exists ~f:Attributes.Elt.is_non_terminal v.vattrs
 
   let same_name (v : t) (v2 : t) : bool = String.equal v.vname v2.vname
+
+  let pp (frmt : Formatter.t) (v : t) = Fmt.(pf frmt "%s" v.vname)
 end
 
 
@@ -134,6 +136,9 @@ struct
   let record vs =
     List.map ~f:(fun elt -> elt.vname, elt.vtype) (elements vs)
 
+  let to_env vs =
+    Map.of_alist (module String) (List.map ~f:(fun v -> v.vname, v) (elements vs))
+
   let add_prefix vs prefix =
     of_list (List.map ~f:(fun v -> {v with vname = prefix^v.vname}) (elements vs))
 
@@ -165,12 +170,37 @@ module Binop = struct
     | Plus | Minus
     | Times | Div | Mod
     | And | Or
+
+  let to_string (op : t) =
+    match op with
+    | Lt -> "<"
+    | Gt -> ">"
+    | Ge -> "≥"
+    | Le -> "≤"
+    | Eq -> "="
+    | Neq -> "≠"
+    | Max -> "￪"
+    | Min -> "￬"
+    | Plus -> "+"
+    | Minus -> "-"
+    | Times -> "×"
+    | Div -> "/"
+    | Mod -> "%"
+    | And -> "∧"
+    | Or -> "∨"
+
+  let pp (frmt : Formatter.t) (op : t) = Fmt.string frmt (to_string op)
 end
 
 module Unop = struct
   type t =
     | Neg | Not
     | Abs
+
+  let to_string (op : t) =
+    match op with | Neg -> failwith "-" | Not -> failwith "¬" | Abs -> failwith "abs"
+
+  let pp frmt op = Fmt.string frmt (to_string op)
 end
 
 module Constant = struct
@@ -183,7 +213,11 @@ module Constant = struct
   let of_bool b = if b then CTrue else CFalse
   let _if c t f =
     match c with CTrue -> t | _ -> f
-
+  let pp (frmt : Formatter.t) (c : t) =
+    match c with
+    | CInt i -> Fmt.int frmt i
+    | CTrue -> Fmt.bool frmt true
+    | CFalse -> Fmt.bool frmt false
 end
 
 
@@ -195,10 +229,99 @@ type termkind =
   | TIte of term * term * term
   | TTup of term list
   | TFun of variable list * term
-  | TApp of term * term
+  | TApp of term * term list
   | TData of string * term list
 
 and term = { tpos: position * position; tkind : termkind; ttyp : RType.t }
 
 let mk_var ?(pos = dummy_loc) ?(t = RType.TAnon) (v : variable) : term =
   { tpos = pos; tkind = TVar v; ttyp = t }
+
+let mk_const ?(pos = dummy_loc) (c : Constant.t) =
+  let ctyp =
+    match c with
+    | Constant.CInt _ -> RType.TInt
+    | Constant.CTrue
+    | Constant.CFalse ->  RType.TBool
+  in
+  { tpos = pos; tkind = TConst c; ttyp = ctyp }
+
+let mk_app ?(pos = dummy_loc) ?(typ = RType.TAnon) (f : term) (x : term list) =
+  {tpos = pos; tkind = TApp(f,x); ttyp = typ}
+
+let mk_bin ?(pos = dummy_loc) ?(typ = RType.TAnon) (op : Binop.t) (t1 : term) (t2 : term) =
+  {tpos = pos; tkind = TBin(op, t1, t2); ttyp = typ }
+
+let mk_data ?(pos = dummy_loc) (c : string) (xs : term list) =
+  let typ =
+    match RType.type_of_variant c with
+    | Some t -> t
+    | _ -> RType.TAnon (* May need to revise behaviour. *)
+  in
+  {tpos = pos; tkind = TData(c,xs); ttyp = typ}
+
+let mk_fun ?(pos = dummy_loc) (args : variable list) (body : term) =
+  let targs = RType.(TTup(List.map ~f:(fun t -> t.vtype) args)) in
+  {tpos = pos; tkind = TFun(args, body); ttyp = RType.TFun(targs, body.ttyp)}
+
+let mk_ite ?(pos = dummy_loc) ?(typ = RType.TAnon) (c : term) (th : term) (el : term) =
+  {tpos = pos; tkind = TIte(c, th, el); ttyp = typ}
+
+let mk_tup ?(pos = dummy_loc) (l : term list) =
+  {tpos = pos; tkind = TTup(l); ttyp = RType.TTup (List.map ~f:(fun t -> t.ttyp) l) }
+
+let mk_un ?(pos = dummy_loc) ?(typ = RType.TAnon) (op : Unop.t) (t : term) =
+  { tpos = pos; tkind = TUn(op, t); ttyp = typ }
+
+
+open Fmt
+
+let pp_term (frmt : Formatter.t) (x : term) =
+  let rec aux (paren : bool) (frmt : Formatter.t) (t : term) =
+    match t.tkind with
+    | TConst c -> pf frmt "%a" Constant.pp c
+    | TVar v -> pf frmt "%a" Variable.pp v
+
+    | TBin (op, t1, t2) ->
+      if paren then
+        pf frmt "@[<hov 2>(%a@;%a@;%a)@]" (aux true) t1 Binop.pp op (aux true) t2
+      else
+        pf frmt "@[<hov 2>%a@;%a@;%a@]" (aux true) t1 Binop.pp op (aux true) t2
+
+    | TUn (op, t1) ->
+      if paren then
+        pf frmt "@[<hov 2>(%a@;%a)@]" Unop.pp op (aux true) t1
+      else
+        pf frmt "@[<hov 2>%a@;%a@]" Unop.pp op (aux true) t1
+
+    | TIte (c, t1, t2) ->
+      if paren then
+        pf frmt "@[<hov 2>(%a@;?@;%a@;:@;%a)@]" (aux false) c (aux false) t1 (aux false) t2
+      else
+        pf frmt "@[<hov 2>%a@;?@;%a@;:@;%a@]" (aux false) c (aux false) t1 (aux false) t2
+
+    | TTup tl ->
+      if paren then
+        pf frmt "@[<hov 2>(%a)@]" (list ~sep:comma (aux false)) tl
+      else
+        pf frmt "@[<hov 2>%a@]" (list ~sep:comma (aux false)) tl
+
+    | TFun (args, body) ->
+      if paren then
+        pf frmt "@[<hov 2>(%a ⟶ @;%a)@]" (list ~sep:comma Variable.pp) args (aux false) body
+      else
+        pf frmt "@[<hov 2>%a ⟶ @;%a@]" (list ~sep:comma Variable.pp) args (aux false) body
+
+    | TApp (func, args) ->
+      if paren then
+        pf frmt "@[<hov 2>(%a@;%a)@]" (aux true) func (list ~sep:sp (aux true)) args
+      else
+        pf frmt "@[<hov 2>%a@;%a@]" (aux true) func (list ~sep:sp (aux true)) args
+
+    | TData (cstr, args) ->
+      if List.length args = 0 then
+        pf frmt "%s" cstr
+      else
+        pf frmt "%s(%a)" cstr (list ~sep:comma (aux false)) args
+  in aux false frmt x
+

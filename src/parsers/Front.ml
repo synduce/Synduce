@@ -13,7 +13,7 @@ type type_decl =
 
 type termkind =
   | FTConst of Constant.t
-  | FTApp of term * term
+  | FTApp of term * term list
   | FTData of id * term list
   | FTVar of id
   | FTTup of term list
@@ -26,6 +26,7 @@ type termkind =
 and term =
   { pos : position * position; kind : termkind }
 
+
 let mk_const pos c = {pos; kind = FTConst c}
 let mk_app pos f args = {pos; kind = FTApp(f,args)}
 let mk_data pos c args = {pos; kind = FTData(c, args)}
@@ -37,7 +38,7 @@ let mk_tup pos tl = {pos; kind=FTTup tl}
 let mk_fun pos args t = {pos; kind=FTFun(args,t)}
 
 
-type pmrs_rule = loc * term list * term
+type pmrs_rule = loc * term * term
 
 type pmrs_body = pmrs_rule list
 
@@ -47,3 +48,18 @@ type decl =
   | PMRSDecl of loc * (id list) * id * (id list) * pmrs_body
 
 type program = decl list
+
+(*  Pretty printing *)
+let rec pp_fterm (frmt : Formatter.t) (t : term) =
+  let tkind = t.kind in
+  match tkind with
+  | FTConst c -> Constant.pp frmt c
+  | FTApp (t1, t2) -> Fmt.(pf frmt "%a %a" pp_fterm t1 (list ~sep:sp pp_fterm) t2)
+  | FTData (c, t2) -> Fmt.(pf frmt "%s(%a)" c (list ~sep:comma pp_fterm) t2)
+  | FTVar v -> Fmt.string frmt v
+  | FTTup l -> Fmt.(pf frmt "(%a)" (list ~sep:comma pp_fterm) l)
+  | FTFun (args, body) -> Fmt.(pf frmt "(%a)->%a" (list ~sep:comma string) args pp_fterm body)
+  | FTBin (op, t1, t2) -> Fmt.(pf frmt "%a %a %a" pp_fterm t1 Binop.pp op pp_fterm t2)
+  | FTUn (op, t1) -> Fmt.(pf frmt "%a %a" Unop.pp op pp_fterm t1)
+  | FTHOBin op -> Fmt.(pf frmt "(%a)" Binop.pp op)
+  | FTIte (c, a, b) -> Fmt.(pf frmt "(%a?%a:%a)" pp_fterm c pp_fterm a pp_fterm b)
