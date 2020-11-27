@@ -179,6 +179,17 @@ let translate_rules loc (globs : (string, Term.variable) Hashtbl.t)
     in
     List.map ~f:transf_rule body
   in
+  let rules =
+    match
+      Map.of_alist (module Int) (List.mapi ~f:(fun i a -> (i,a)) rules)
+    with
+    | `Duplicate_key _ -> failwith "impossible"
+    | `Ok m -> m
+  in
+  let main_id = ref (-1) in
+  Map.iteri
+    ~f:(fun ~key:i ~data:(nt, _,_,_) -> if String.equal nt.vname "main" then main_id := i)
+    rules;
   Term.{
     pname = pname;
     pargs = VarSet.of_list args;
@@ -186,7 +197,7 @@ let translate_rules loc (globs : (string, Term.variable) Hashtbl.t)
     pnon_terminals = nont;
     prules = rules;
     porder = -1;
-    pmain_id = -1;
+    pmain_id = !main_id;
   }
 
 

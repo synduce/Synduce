@@ -171,6 +171,9 @@ module Binop = struct
     | Times | Div | Mod
     | And | Or
 
+  let compare = Poly.compare
+  let equal = Poly.equal
+
   let to_string (op : t) =
     match op with
     | Lt -> "<"
@@ -197,6 +200,8 @@ module Unop = struct
     | Neg | Not
     | Abs
 
+  let compare = Poly.compare
+  let equal = Poly.equal
   let to_string (op : t) =
     match op with | Neg -> failwith "-" | Not -> failwith "¬" | Abs -> failwith "abs"
 
@@ -208,7 +213,16 @@ module Constant = struct
     | CInt of int
     | CTrue
     | CFalse
-
+  let compare c1 c2 =
+    match c1, c2 with
+    | CInt i1, CInt i2 -> Int.compare i1 i2
+    | CTrue, CTrue -> 0
+    | CTrue, CFalse -> 1
+    | CFalse, CTrue -> -1
+    | CFalse, CFalse -> 0
+    | CInt _, _ -> 1
+    | _, CInt _ -> -1
+  let equal c1 c2 = compare c1 c2 = 0
   let of_int i = CInt i
   let of_bool b = if b then CTrue else CFalse
   let _if c t f =
@@ -274,6 +288,70 @@ let mk_un ?(pos = dummy_loc) ?(typ = RType.TAnon) (op : Unop.t) (t : term) =
   { tpos = pos; tkind = TUn(op, t); ttyp = typ }
 
 
+(* ====================================================================================== *)
+let rec term_compare (t1 : term) (t2 : term) : int =
+  match t1.tkind, t2.tkind with
+  | TConst c1, TConst c2 -> Constant.compare c1 c2
+  | TVar v1, TVar v2 -> Variable.compare v1 v2
+  | TData(c1, args1), TData(c2, args2) ->
+    let c = String.compare c1 c2 in
+    if c = 0 then List.compare term_compare args1 args2 else c
+  | TApp(f1, args1), TApp(f2, args2) ->
+    let c = term_compare f1 f2 in
+    if c = 0 then List.compare term_compare args1 args2 else c
+  | TBin(b1, t11, t12), TBin(b2, t21, t22) ->
+    let c = Binop.compare b1 b2 in
+    if c = 0 then
+      let c' = term_compare t11 t21 in
+      if c' = 0 then term_compare t12 t22 else c'
+    else c
+  | TUn(u1, t11), TUn(u2, t21) ->
+    let c = Unop.compare u1 u2 in
+    if c = 0 then term_compare t11 t21 else c
+  | TFun(fargs1, body1), TFun(fargs2, body2) ->
+    let c = compare (List.length fargs1) (List.length fargs2) in
+    if c = 0 then
+      term_compare body1
+        (substitution (List.map2_exn ~f:(fun a b -> mk_var a, mk_var b) fargs2 fargs1)
+           body2)
+    else c
+  | TTup tl1, TTup tl2 -> List.compare term_compare tl1 tl2
+  | _, _ -> Poly.compare t1 t2
+
+and substitution (substs : (term * term) list) (t : term) : term =
+  let rec aux (t : term) =
+    match List.Assoc.find substs ~equal:term_equal t with
+    | Some t' -> t'
+    | None ->
+      let new_kind =
+        match t.tkind with
+        | TBin (b1, t1, t2) -> TBin (b1, aux t1, aux t2)
+        | TUn (u, t1) -> TUn(u, aux t1)
+        | TIte (c, tt, tf) -> TIte(aux c, aux tt, aux tf)
+        | TTup tl -> TTup(List.map ~f:aux tl)
+        | TFun (args, body) -> TFun(args, aux body)
+        | TApp (f, args) -> TApp(aux f, List.map ~f:aux args)
+        | TData (cstr, args) -> TData(cstr, List.map ~f:aux args)
+        | TVar _ | TConst _ -> t.tkind
+      in { t with tkind = new_kind; }
+  in aux t
+
+and term_equal t1 t2 = term_compare t1 t2 = 0
+
+
+
+module Terms =
+struct
+  module E = struct
+    type t = term
+    let compare = term_compare
+    let equal = term_equal
+  end
+  include E
+end
+(* ====================================================================================== *)
+(* Pretty printing *)
+(* ====================================================================================== *)
 open Fmt
 
 let pp_term (frmt : Formatter.t) (x : term) =

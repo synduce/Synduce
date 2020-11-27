@@ -4,7 +4,6 @@ B /home/victorn/.opam/4.10.0/lib/base/base_internalhash_types
 B /home/victorn/.opam/4.10.0/lib/base/caml
 B /home/victorn/.opam/4.10.0/lib/base/shadow_stdlib
 B /home/victorn/.opam/4.10.0/lib/fmt
-B /home/victorn/.opam/4.10.0/lib/menhirLib
 B /home/victorn/.opam/4.10.0/lib/ocaml
 B /home/victorn/.opam/4.10.0/lib/ocaml-compiler-libs/common
 B /home/victorn/.opam/4.10.0/lib/ocaml-compiler-libs/shadow
@@ -25,17 +24,14 @@ B /home/victorn/.opam/4.10.0/lib/sexplib
 B /home/victorn/.opam/4.10.0/lib/sexplib0
 B /home/victorn/.opam/4.10.0/lib/stdio
 B /home/victorn/.opam/4.10.0/lib/stdlib-shims
-B ../_build/default/src/.Lib.objs/byte
-B ../_build/default/src/algo/.algo.objs/byte
-B ../_build/default/src/lang/.lang.objs/byte
-B ../_build/default/src/parsers/.parsers.objs/byte
-B ../_build/default/src/utils/.utils.objs/byte
+B ../../_build/default/src/algo/.algo.objs/byte
+B ../../_build/default/src/lang/.lang.objs/byte
+B ../../_build/default/src/utils/.utils.objs/byte
 S /home/victorn/.opam/4.10.0/lib/base
 S /home/victorn/.opam/4.10.0/lib/base/base_internalhash_types
 S /home/victorn/.opam/4.10.0/lib/base/caml
 S /home/victorn/.opam/4.10.0/lib/base/shadow_stdlib
 S /home/victorn/.opam/4.10.0/lib/fmt
-S /home/victorn/.opam/4.10.0/lib/menhirLib
 S /home/victorn/.opam/4.10.0/lib/ocaml
 S /home/victorn/.opam/4.10.0/lib/ocaml-compiler-libs/common
 S /home/victorn/.opam/4.10.0/lib/ocaml-compiler-libs/shadow
@@ -57,8 +53,7 @@ S /home/victorn/.opam/4.10.0/lib/sexplib0
 S /home/victorn/.opam/4.10.0/lib/stdio
 S /home/victorn/.opam/4.10.0/lib/stdlib-shims
 S .
-S algo
-S lang
-S parsers
-S utils
-FLG -w @1..3@5..28@30..39@43@46..47@49..57@61..62-40 -strict-sequence -strict-formats -short-paths -keep-locs
+S ../lang
+S ../utils
+FLG -ppx '/home/victorn/repos/autorec/_build/default/.ppx/99ce26c0794e45efde3013f872b0677a/ppx.exe --as-ppx --cookie '\''library-name="algo"'\'''
+FLG -open Algo -w @1..3@5..28@30..39@43@46..47@49..57@61..62-40 -strict-sequence -strict-formats -short-paths -keep-locs

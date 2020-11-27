@@ -1,5 +1,6 @@
 open Base
 open Term
+open Utils
 
 (* ============================================================================================= *)
 (*                      TYPE DEFINITIONS AND UTILS                                               *)
@@ -15,7 +16,7 @@ type pmrs = {
   pargs : VarSet.t;
   pparams : VarSet.t;
   pmain_id : int;
-  prules : rewrite_rule list;
+  prules : rewrite_rule IntMap.t;
   pnon_terminals : VarSet.t;
   porder : int;
 }
@@ -31,10 +32,10 @@ type variables = variable Map.M(String).t
 (* Update the order of the pmrs. *)
 let update_order (p : pmrs) : pmrs =
   let order =
-    let f m (_, args, p, _) =
+    let f ~key:_ ~data:(_, args, p, _) m =
       max m (List.length args + if Option.is_some p then 1 else 0)
     in
-    List.fold ~f ~init:0 p.prules
+    Map.fold ~f ~init:0 p.prules
   in { p with porder = order }
 
 
@@ -56,4 +57,16 @@ let pp_rewrite_rule (frmt : Formatter.t) (nt, vargs, pat, t : rewrite_rule) : un
          (box pp_term) t)
 
 let pp_pmrs (frmt : Formatter.t) (pmrs : pmrs) : unit =
-  Fmt.(pf frmt "%s:@;@[<v 2>{@;%a@;}@]" pmrs.pname (list ~sep:sp pp_rewrite_rule) pmrs.prules)
+  let pp_rules frmt () =
+    Map.iteri
+      ~f:(fun ~key:i ~data:rrule ->
+          if i = pmrs.pmain_id then
+            Fmt.(pf frmt "@[<v 2>‣ %a@]@;" pp_rewrite_rule rrule)
+          else
+            Fmt.(pf frmt "@[<v 2>  %a@]@;" pp_rewrite_rule rrule)
+        ) pmrs.prules
+  in
+  Fmt.(pf frmt "%s[%a]:@;@[<v 2>{@;%a@;}@]"
+         pmrs.pname
+         VarSet.pp_var_names pmrs.pparams
+         pp_rules ())
