@@ -315,7 +315,7 @@ let mk_app ?(pos = dummy_loc) ?(typ = None) (f : term) (x : term list) =
   let typ =
     match typ with
     | Some t -> t
-    | None -> RType.get_fresh_tvar ()
+    | None ->  RType.get_fresh_tvar ()
   in
   {tpos = pos; tkind = TApp(f,x); ttyp = typ}
 
@@ -330,8 +330,8 @@ let mk_bin ?(pos = dummy_loc) ?(typ = None) (op : Binop.t) (t1 : term) (t2 : ter
 let mk_data ?(pos = dummy_loc) (c : string) (xs : term list) =
   let typ =
     match RType.type_of_variant c with
-    | Some t -> t
-    | _ ->  RType.get_fresh_tvar ();
+    | Some (t, _) -> t
+    | _ ->  RType.get_fresh_tvar ()
   in
   {tpos = pos; tkind = TData(c,xs); ttyp = typ}
 
@@ -427,20 +427,22 @@ end
 let rewrite_with (f : term -> term) (t : term) =
   let rec aux t0 =
     let tk = t0.tkind in
-    match tk with
-    | TBin (op, t1, t2) -> f (mk_bin op (aux t1) (aux t2))
-    | TUn (op, t1) -> f (mk_un op (aux t1))
-    | TConst _ -> f t0
-    | TVar _ -> f t0
-    | TIte (c, t1, t2) -> f (mk_ite (aux c) (aux t1) (aux t2))
-    | TTup tl -> f (mk_tup (List.map ~f:aux tl))
-    | TFun (fargs, body) -> f (mk_fun fargs (aux body))
-    | TApp (func, args) -> f (mk_app func args)
-    | TData (cstr, args) -> f (mk_data cstr args)
+    let tk' = match tk with
+      | TBin (op, t1, t2) -> TBin(op, aux t1, aux t2)
+      | TUn (op, t1) -> TUn(op, aux t1)
+      | TConst _ -> tk
+      | TVar _ -> tk
+      | TIte (c, t1, t2) -> TIte(aux c, aux t1, aux t2)
+      | TTup tl -> TTup (List.map ~f:aux tl)
+      | TFun (fargs, body) -> TFun(fargs, aux body)
+      | TApp (func, args) -> TApp(aux func, List.map ~f:aux args)
+      | TData (cstr, args) -> TData(cstr, List.map ~f:aux args)
+    in f {t0 with tkind = tk';}
   in aux t
 
-let rewrite_types t_subs _t =
-  { _t with ttyp = RType.sub_all t_subs _t.ttyp }
+let rewrite_types t_subs =
+  Variable.update_var_types t_subs;
+  rewrite_with (fun _t -> { _t with ttyp = RType.sub_all t_subs _t.ttyp })
 
 (* ====================================================================================== *)
 (* Pretty printing *)
@@ -582,9 +584,19 @@ let infer_type (t : term) : term * RType.substitution =
 
     | TData (cstr, args) ->
       (match RType.type_of_variant cstr with
-       | Some _ ->
+       | Some (tout, targs) ->
          let t_args, c_args = List.unzip (List.map ~f:aux args) in
-         { t0 with tkind = TData(cstr, t_args)}, List.concat c_args
+         (match List.zip targs (List.map ~f:(fun term -> term.ttyp) t_args) with
+          | Ok pairs ->
+            (match RType.unify (pairs @ (RType.mkv (List.concat c_args))) with
+             | Some subs ->
+               { t0 with ttyp = tout; tkind = TData(cstr, t_args)}, subs
+             | None ->
+               Log.loc_fatal_errmsg eloc "Type inference failure: could not unify constr. arguments.")
+          | Unequal_lengths ->
+            Log.loc_fatal_errmsg eloc
+              (Fmt.str "Type inference failure: could not match %s arguments: %a and %a."
+                 cstr (list ~sep:comma pp_term) t_args (list ~sep:comma RType.pp) targs))
        | None ->
          Log.loc_fatal_errmsg eloc "Type inference failure: could not find constructor type.")
   in
@@ -592,6 +604,5 @@ let infer_type (t : term) : term * RType.substitution =
   match RType.unify (RType.mkv subs) with
   | Some merge_subs ->
     let tsubs = RType.mkv merge_subs in
-    Variable.update_var_types tsubs;
-    rewrite_with (rewrite_types tsubs) t', merge_subs
+    rewrite_types tsubs t', merge_subs
   | None -> Log.loc_fatal_errmsg t'.tpos "Could not infer type."

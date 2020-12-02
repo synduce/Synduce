@@ -42,8 +42,6 @@ let update_order (p : pmrs) : pmrs =
 
 let infer_pmrs_types (prog : pmrs) =
   let infer_aux ~key ~data:(nt, args, pat, body) (map, substs) =
-    Fmt.(pf stdout "Nont: %a@." RType.pp (Variable.vtype_or_new nt));
-    Fmt.(pf stdout "Substs: %a@." (list ~sep:sp (parens (pair ~sep:comma int RType.pp))) substs);
     let t_body, c_body = infer_type body in
     let t_head, c_head =
       let head_term =
@@ -55,11 +53,9 @@ let infer_pmrs_types (prog : pmrs) =
       infer_type head_term
     in
     let cur_loc = body.tpos in
-    Fmt.(pf stdout "%a => %a@."
-           RType.pp t_head.ttyp RType.pp t_body.ttyp);
     let c_rule = RType.merge_subs cur_loc c_body c_head in
-    match RType.unify ((RType.mkv (substs @ c_rule))) with
-    | Some res -> Map.set map ~key ~data:(nt, args, pat, t_body), res
+    match RType.unify ((RType.mkv (substs @ c_rule)) @ [t_head.ttyp, t_body.ttyp]) with
+    | Some res -> Map.set map ~key ~data:(nt, args, pat, rewrite_types (RType.mkv res) t_body), res
     | None -> Log.loc_fatal_errmsg cur_loc "Unification failed between head and body."
   in
   let new_rules, new_subs =

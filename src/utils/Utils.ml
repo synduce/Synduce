@@ -10,6 +10,9 @@ type z = Z : z
 
 type 'n s = S : 'n -> 'n s
 
+let first (a,_) = a
+let second (_, b) = b
+
 let rec product (l : 'a list list) : 'a list list  =
   let rec aux ~acc l1 l2 = match l1, l2 with
     | [], _ | _, [] -> acc

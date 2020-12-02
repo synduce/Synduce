@@ -44,7 +44,7 @@ type t =
   | TNamed of ident
   | TTup of t list
   | TFun of t * t
-  | TPoly of int list * t
+  | TParam of t list * t
   | TVar of int
 
 let _tvar_idx = ref 0
@@ -59,8 +59,8 @@ let rec pp (frmt : Formatter.t) (typ : t) =
   | TNamed s -> Fmt.(pf frmt "%s" s)
   | TTup tl -> Fmt.(pf frmt "%a" (parens (list ~sep:comma pp)) tl)
   | TFun (tin, tout) -> Fmt.(pf frmt "%a -> %a" pp tin pp tout)
-  | TPoly (alpha, t') ->
-    Fmt.(pf frmt "∀%a.%a" (list ~sep:comma pp) (List.map ~f:(fun i -> TVar i) alpha) pp t')
+  | TParam (alpha, t') ->
+    Fmt.(pf frmt "%a[%a]" pp t' (list ~sep:comma pp) alpha)
   | TVar i -> Fmt.(pf frmt "α%i" i)
 (**
    This hashtable maps type names to the type term of their declaration.
@@ -79,10 +79,11 @@ let _types : (ident, ident list * type_term) Hashtbl.t =
 *)
 let _variants : (string, string) Hashtbl.t = Hashtbl.create (module String)
 
-(* Add the builtin types *)
 
+(* Add the builtin types *)
 let add_variant ~(variant : string) ~(typename: string) =
   Hashtbl.add _variants ~key:variant ~data:typename
+
 
 let add_type ?(params: ident list = [])  ~(typename: string) (tterm : type_term) =
   let add_only () =
@@ -114,11 +115,54 @@ let add_type ?(params: ident list = [])  ~(typename: string) (tterm : type_term)
   | TySum variants -> add_with_variants variants
   | _ -> add_only ()
 
-let type_of_variant (variant : string) : t option =
+
+let instantiate_variant (variants : type_term list) (instantiator : (ident * int) list) =
+  let rec variant_arg tt =
+    match tt.tkind with
+    | TyInt -> TInt | TyBool -> TBool | TyChar -> TChar | TyString -> TString
+    | TyFun (tin, tout) -> TFun(variant_arg tin, variant_arg tout)
+    | TyTyp e -> TNamed e
+    | TyParam x ->
+      (match List.Assoc.find instantiator ~equal:String.equal x with
+       | Some i -> TVar i
+       | None -> Log.loc_fatal_errmsg tt.pos "Unknown type parameter.")
+    | TySum _ -> Log.loc_fatal_errmsg tt.pos "Variant is a sum type."
+    | TyVariant (_, tl) -> TTup(List.map ~f:variant_arg tl)
+    | TyConstr (params, te) -> TParam(List.map ~f:variant_arg params, variant_arg te)
+  in
+  List.map variants ~f:variant_arg
+
+
+let type_of_variant (variant : string) : (t * t list) option =
   match Hashtbl.find _variants variant with
   | Some tname ->
     (match Hashtbl.find _types tname with
-     | Some _ -> Some (TNamed tname)
+     | Some (params, {tkind = TySum tl; _}) ->
+       (match params with
+        | [] -> Some (TNamed tname, [])
+        | _ ->
+          let ty_params_inst =
+            List.map
+              ~f:(fun s ->
+                  match get_fresh_tvar () with
+                  |TVar i -> s, i
+                  | _ -> failwith "unexpected")
+              params
+          in
+          let variant_args =
+            let x = List.find_map
+                ~f:(fun e ->
+                    match e.tkind with
+                    | TyVariant(n, var_args) ->
+                      if String.(n = variant) then Some var_args else None
+                    | _ -> None)
+                tl
+            in match x with
+            | Some y -> y
+            | None -> failwith "Could not find variant."
+          in
+          Some (TParam(List.map ~f:(fun (_,b) -> TVar b) ty_params_inst, TNamed tname),
+                instantiate_variant variant_args ty_params_inst))
      | _ -> None)
   | None -> None
 
@@ -133,7 +177,7 @@ let substitute ~(old:t) ~(by:t) ~(in_: t) =
       | TInt | TBool | TChar | TString | TNamed _ | TVar _ -> ty
       | TTup tl -> TTup (List.map ~f:s tl)
       | TFun (a,b) -> TFun(s a, s b)
-      | TPoly(params, t) -> TPoly(params, s t)
+      | TParam(params, t) -> TParam(List.map ~f:s params, s t)
   in s in_
 
 let sub_all (subs : (t * t) list) (ty : t) =
@@ -148,8 +192,8 @@ let rec subtype_of (t1 : t) (t2 : t) =
       (match List.for_all2 ~f tl1 tl2 with
        | Ok b -> b
        | Unequal_lengths -> false)
-    | TPoly (p1, t1'), TPoly (p2, t2') ->
-      (match List.map2 p1 p2 ~f:(fun a b -> (TVar a, TVar b)) with
+    | TParam (p1, t1'), TParam (p2, t2') ->
+      (match List.zip p1 p2 with
        | Ok subs -> subtype_of (sub_all subs t1') t2'
        | Unequal_lengths -> false)
     | _ -> false
@@ -160,7 +204,7 @@ let rec occurs (x : int) (typ : t) : bool =
   | TInt | TBool | TString | TChar | TNamed _ -> false
   | TTup tl -> List.exists ~f:(occurs x) tl
   | TFun (tin, tout) -> occurs x tin || occurs x tout
-  | TPoly (_, te) -> occurs x te
+  | TParam (param, te) -> List.exists ~f:(occurs x) param || occurs x te
   | TVar y -> x = y
 
 type substitution = (int * t) list
@@ -178,15 +222,14 @@ let rec unify_one (s : t) (t : t) : substitution option =
                     (fun frmt () ->
                        Fmt.(pf frmt "Type unification: cannot unify %a and %a.") pp s pp t);
                   None)))
-  | TPoly(_, t1), TPoly(_, t2) -> unify_one t1 t2
-  | (TVar x, t | t, TVar x) ->
-    if occurs x t
-    then
-      (Log.error
-         (fun frmt () ->
-            Fmt.(pf frmt "Type unification: circularity %a - %a") pp s pp t);
-       None)
-    else Some [x, t]
+  | TParam(params1, t1), TParam(params2, t2) ->
+    (match List.zip (params1 @ [t1]) (params2 @ [t2]) with
+     | Ok pairs -> unify pairs
+     | Unequal_lengths -> (Log.error
+                             (fun frmt () ->
+                                Fmt.(pf frmt "Type unification: cannot unify %a and %a.") pp s pp t);
+                           None))
+
   | TTup tl1, TTup tl2 ->
     (match List.zip tl1 tl2 with
      | Ok tls -> unify tls
@@ -195,6 +238,14 @@ let rec unify_one (s : t) (t : t) : substitution option =
          (fun frmt () ->
             Fmt.(pf frmt "Type unification: Tuples %a and %a have different sizes") pp s pp t);
        None)
+  | (TVar x, t | t, TVar x) ->
+    if occurs x t
+    then
+      (Log.error
+         (fun frmt () ->
+            Fmt.(pf frmt "Type unification: circularity %a - %a") pp s pp t);
+       None)
+    else Some [x, t]
   | _ -> if Poly.equal s t then Some [] else
       (Log.error
          (fun frmt () ->
