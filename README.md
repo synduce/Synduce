@@ -1,4 +1,4 @@
-# AutoRec
+# ReFunS
 
 Automatic recursive function synthesis.
 

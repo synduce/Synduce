@@ -1,5 +1,5 @@
 (lang dune 2.6)
-(name AutoRec)
+(name ReFunS)
 (version 0.1)
 (license MIT)
 (authors "Victor Nicolet")
@@ -10,8 +10,8 @@
 
 
 (package
-    (name AutoRec)
-    (synopsis "Automatic Synthesis of Recursive Functions")
+    (name ReFunS)
+    (synopsis "Recursive Function Synthesizer")
     (description "Executable and libraries for automatic synthesis of recursive functions.")
     (depends
         (base (>= v0.14.0))

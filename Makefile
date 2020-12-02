@@ -1,3 +1,3 @@
 all:
-	dune build bin/AutoRec.exe
-	ls -s _build/default/bin/AutoRec.exe AutoRec
+	dune build bin/ReFunS.exe
+	ln -s _build/default/bin/ReFunS.exe ReFunS

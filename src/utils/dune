@@ -1,4 +1,4 @@
 (library
     (name utils)
-    (public_name AutoRec.Lib.Utils)
+    (public_name ReFunS.Lib.Utils)
     (libraries base fmt sexplib str))

@@ -16,7 +16,7 @@
 
 (library
  (name      parsers)
- (public_name AutoRec.Lib.Parsers)
+ (public_name ReFunS.Lib.Parsers)
  (libraries str lang sexplib utils fmt menhirLib stdio))
 
 (rule

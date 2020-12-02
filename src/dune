@@ -1,4 +1,4 @@
 (library
  (name Lib)
- (public_name AutoRec.Lib)
+ (public_name ReFunS.Lib)
  (libraries base fmt unix ppx_let utils lang parsers algo))

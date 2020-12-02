@@ -1,4 +1,4 @@
 (executable
-    (name AutoRec)
-    (public_name AutoRec.Driver)
+    (name ReFunS)
+    (public_name ReFunS.Driver)
     (libraries Lib fmt base parsexp sexplib getopt))
