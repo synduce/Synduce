@@ -1,6 +1,5 @@
 open Base
 open Term
-open Utils
 
 let free_variables (t : term) : VarSet.t =
   let rec f t =
@@ -23,9 +22,9 @@ let unify (terms : term list) =
   | hd :: tl ->
     if List.for_all ~f:(fun x -> Terms.equal x hd) tl then Some hd else None
 
-let matches (t : term) (pattern : term) : (term IntMap.t) option  =
+let matches (t : term) ~(pattern : term)  =
   let rec aux pat t = match pat.tkind, t.tkind with
-    | TVar vpat, _ -> Ok [vpat.vid, t]
+    | TVar vpat, _ -> Ok [vpat, t]
     | TData (cstr, mems), TData(cstr', mems') ->
       if String.equal cstr cstr' && List.length mems = List.length mems' then
         (match List.map2 ~f:aux mems mems' with
@@ -40,8 +39,8 @@ let matches (t : term) (pattern : term) : (term IntMap.t) option  =
   match aux pattern t with
   | Error _ -> None (* TODO: print error message *)
   | Ok substs ->
-    let im = Map.empty (module Int) in
-    let f accum (idx, t) = Map.add_multi ~key:idx ~data:t accum in
+    let im = Map.empty (module Variable) in
+    let f accum (var, t) = Map.add_multi ~key:var ~data:t accum in
     try
       Some
         (Map.map

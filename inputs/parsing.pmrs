@@ -22,6 +22,6 @@ let x = (fun x -> x + x) 1
 
 // Pattern matching recursion scheme declaration
 pmrs (f0) test x =
-    f x -> g x
+    main x -> g x
     | g Nil -> f0
-    | g Cons(hd, tl) -> g tl
+    | g Cons(hd, tl) -> g tl hd

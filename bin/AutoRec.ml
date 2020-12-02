@@ -17,6 +17,7 @@ let main () =
   let prog = parse_pmrs !filename in
   let _ = seek_types prog in
   let plist = translate prog in
-  List.iter plist ~f:(fun p -> pf stdout "%a@." Lang.PMRScheme.pp_pmrs p)
+  List.iter plist ~f:(fun p -> pf stdout "%a@." Lang.PMRScheme.pp_pmrs p);
+  Lang.Term.Variable.print_summary stdout ()
 ;;
 main ()

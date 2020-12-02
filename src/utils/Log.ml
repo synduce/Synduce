@@ -2,6 +2,8 @@ open Fmt
 open Lexing
 open Base
 
+let reference_text = ref ""
+
 let extract text (pos1, pos2) : string =
   let ofs1 = pos1.pos_cnum
   and ofs2 = pos2.pos_cnum in
@@ -31,6 +33,7 @@ let log_located (frmt : Formatter.t) (location: position * position) s x =
   and start_line = _start.pos_lnum
   and end_lin = _end.pos_lnum in
   Fmt.(pf frmt "@[<v 2>%s (%i:%i)-(%i:%i)@;%a@]" _start.pos_fname start_line start_col end_lin end_col s x)
+
 
 
 let (@!) (msg : Sexp.t) (loc : position * position) =
@@ -63,7 +66,6 @@ let log_with_excerpt (frmt : Formatter.t) (ttext : string) (location: position *
          (range ttext location)
          s x)
 
-
 let wrap (s : string) =
   (fun fmt () -> string fmt s)
 
@@ -73,3 +75,6 @@ let error (msg : Formatter.t -> unit -> unit) : unit =
   pf Fmt.stdout "%a@;%a@." (styled (`Bg `Red) string) "[ERROR]" msg ()
 
 let fatal () = failwith "Fatal error. See messages."
+
+let loc_fatal_errmsg loc msg =
+  error (fun f () -> log_with_excerpt f !reference_text loc Fmt.string msg); fatal ()

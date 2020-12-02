@@ -139,20 +139,19 @@ mult_e:
 
 unary_e:
     | op=unop a=unary_e                                                         { mk_un $loc op a }
-    | constr_e                                                                  { $1 }
+    | fun_app_e                                                                  { $1 }
 
-constr_e:
-    | CIDENT LPAR l=separated_list(COMMA, fun_app_e) RPAR                            { mk_data $loc $1 l  }
-    | CIDENT                                                                    { mk_data $loc $1 [] }
-    | fun_app_e                                                                 { $1 }
+
 
 fun_app_e:
-    | f=primary_e arg=nonempty_list(constr_e)                                  { mk_app $loc f arg }
+    | f=primary_e arg=nonempty_list(primary_e)                                   { mk_app $loc f arg }
     | MAX a=primary_e b=primary_e                                               { mk_bin $loc Term.Binop.Max a b}
     | MIN a=primary_e b=primary_e                                               { mk_bin $loc Term.Binop.Min a b}
     | primary_e                                                                 { $1 }
 
 primary_e:
+    | CIDENT LPAR l=separated_list(COMMA, fun_app_e) RPAR                       { mk_data $loc $1 l  }
+    | CIDENT                                                                    { mk_data $loc $1 [] }
     | LPAR t=expr RPAR                                                          { t }
     | v=IDENT                                                                   { mk_var $loc v }
     | TRUE                                                                      { mk_const $loc Term.Constant.CTrue}

@@ -41,13 +41,27 @@ type t =
   | TBool
   | TString
   | TChar
-  | TAnon
   | TNamed of ident
   | TTup of t list
   | TFun of t * t
-  | TPoly of ident list * t
+  | TPoly of int list * t
+  | TVar of int
 
+let _tvar_idx = ref 0
+let get_fresh_tvar () = Int.incr _tvar_idx; TVar (!_tvar_idx)
 
+let rec pp (frmt : Formatter.t) (typ : t) =
+  match typ with
+  | TInt -> Fmt.(pf frmt "int")
+  | TBool -> Fmt.(pf frmt "bool")
+  | TString -> Fmt.(pf frmt "string")
+  | TChar -> Fmt.(pf frmt "char")
+  | TNamed s -> Fmt.(pf frmt "%s" s)
+  | TTup tl -> Fmt.(pf frmt "%a" (parens (list ~sep:comma pp)) tl)
+  | TFun (tin, tout) -> Fmt.(pf frmt "%a -> %a" pp tin pp tout)
+  | TPoly (alpha, t') ->
+    Fmt.(pf frmt "∀%a.%a" (list ~sep:comma pp) (List.map ~f:(fun i -> TVar i) alpha) pp t')
+  | TVar i -> Fmt.(pf frmt "α%i" i)
 (**
    This hashtable maps type names to the type term of their declaration.
    It is initialized with the builtin types int, bool, char and string.
@@ -97,8 +111,7 @@ let add_type ?(params: ident list = [])  ~(typename: string) (tterm : type_term)
       (fun _ -> add_only ()))
   in
   match tterm.tkind with
-  | TySum variants ->
-    add_with_variants variants
+  | TySum variants -> add_with_variants variants
   | _ -> add_only ()
 
 let type_of_variant (variant : string) : t option =
@@ -111,18 +124,20 @@ let type_of_variant (variant : string) : t option =
 
 
 (* ============================================================================================= *)
+
+
 let substitute ~(old:t) ~(by:t) ~(in_: t) =
   let rec s ty =
     if Poly.(ty = old) then by else
       match ty with
-      | TInt | TBool | TChar | TAnon | TString | TNamed _ -> ty
+      | TInt | TBool | TChar | TString | TNamed _ | TVar _ -> ty
       | TTup tl -> TTup (List.map ~f:s tl)
       | TFun (a,b) -> TFun(s a, s b)
       | TPoly(params, t) -> TPoly(params, s t)
   in s in_
 
 let sub_all (subs : (t * t) list) (ty : t) =
-  List.fold ~f:(fun acc (old, by) -> substitute ~old ~by ~in_:acc) ~init:ty subs
+  List.fold_right ~f:(fun (old, by) acc -> substitute ~old ~by ~in_:acc) ~init:ty subs
 
 let rec subtype_of (t1 : t) (t2 : t) =
   if Poly.(t1 = t2) then true else
@@ -134,7 +149,69 @@ let rec subtype_of (t1 : t) (t2 : t) =
        | Ok b -> b
        | Unequal_lengths -> false)
     | TPoly (p1, t1'), TPoly (p2, t2') ->
-      (match List.map2 p1 p2 ~f:(fun a b -> (TNamed a, TNamed b)) with
+      (match List.map2 p1 p2 ~f:(fun a b -> (TVar a, TVar b)) with
        | Ok subs -> subtype_of (sub_all subs t1') t2'
        | Unequal_lengths -> false)
     | _ -> false
+
+
+let rec occurs (x : int) (typ : t) : bool =
+  match typ with
+  | TInt | TBool | TString | TChar | TNamed _ -> false
+  | TTup tl -> List.exists ~f:(occurs x) tl
+  | TFun (tin, tout) -> occurs x tin || occurs x tout
+  | TPoly (_, te) -> occurs x te
+  | TVar y -> x = y
+
+type substitution = (int * t) list
+
+(* unify one pair *)
+let rec unify_one (s : t) (t : t) : substitution option =
+  match (s, t) with
+  | TVar x, TVar y -> if x = y then Some [] else Some [(x, t)]
+  | TFun (f, sc), TFun (g, tc) ->
+    Option.(unify_one f g >>=
+            (fun u1 -> match unify_one sc tc with
+               | Some u2 -> unify ((mkv u1) @ (mkv u2))
+               | None ->
+                 (Log.error
+                    (fun frmt () ->
+                       Fmt.(pf frmt "Type unification: cannot unify %a and %a.") pp s pp t);
+                  None)))
+  | TPoly(_, t1), TPoly(_, t2) -> unify_one t1 t2
+  | (TVar x, t | t, TVar x) ->
+    if occurs x t
+    then
+      (Log.error
+         (fun frmt () ->
+            Fmt.(pf frmt "Type unification: circularity %a - %a") pp s pp t);
+       None)
+    else Some [x, t]
+  | TTup tl1, TTup tl2 ->
+    (match List.zip tl1 tl2 with
+     | Ok tls -> unify tls
+     | Unequal_lengths ->
+       Log.error
+         (fun frmt () ->
+            Fmt.(pf frmt "Type unification: Tuples %a and %a have different sizes") pp s pp t);
+       None)
+  | _ -> if Poly.equal s t then Some [] else
+      (Log.error
+         (fun frmt () ->
+            Fmt.(pf frmt "Type unification: cannot unify %a and %a") pp s pp t);
+       None)
+
+and mkv = List.map ~f:(fun (a, b) -> (TVar a, b))
+(* unify a list of pairs *)
+and unify (s : (t * t) list) : substitution option =
+  match s with
+  | [] -> Some []
+  | (x, y) :: t ->
+    Option.(unify t
+            >>=(fun t2 -> unify_one (sub_all (mkv t2) x) (sub_all (mkv t2) y)
+                 >>= (fun t1 -> Some (t1 @ t2))))
+
+let merge_subs loc (s : substitution) (t : substitution) : substitution =
+  match unify (List.map ~f:(fun (a,b) -> TVar a, b) (s @ t)) with
+  | Some subs -> subs
+  | None -> Log.loc_fatal_errmsg loc "Error merging constraints."

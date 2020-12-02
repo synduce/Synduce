@@ -1,9 +1,11 @@
 open Base
 open Lexing
+open Utils
 
 module O = Option
 
 let dummy_loc : position * position = dummy_pos, dummy_pos
+
 
 (* ----------------------------------------------------- *)
 (**
@@ -36,7 +38,7 @@ module Attributes = struct
 end
 
 
-type variable = { vname : string; vid : int; vtype : RType.t; vattrs : Attributes.t }
+type variable = { vname : string; vid : int; vattrs : Attributes.t }
 
 let sexp_of_variable v =
   Sexp.(List [Atom "var"; Atom v.vname])(*  Atom (Int.to_string v.vid); sexp_of_typ v.vtype]) *)
@@ -63,8 +65,29 @@ module Variable = struct
   include T
   include Comparator.Make (T)
 
-  let mk ?(attrs = Attributes.empty) ?(t = RType.TAnon) (name : string) =
-    Alpha.mk_with_id (-1) name (fun vid -> { vname = name; vid = vid; vtype = t; vattrs = attrs })
+  let _types : (int, RType.t) Hashtbl.t = Hashtbl.create (module Int)
+
+  let assign_vtype (v : variable) (t : RType.t) = Hashtbl.set _types ~key:v.vid ~data:t
+
+  let vtype (v : variable) = Hashtbl.find _types v.vid
+
+  let vtype_or_new (v : variable) =
+    match vtype v with
+    | Some x -> x
+    | None ->
+      let new_t = RType.get_fresh_tvar () in
+      assign_vtype v new_t;
+      new_t
+
+  let update_var_types  (tsubs : (RType.t * RType.t) list) =
+    Hashtbl.map_inplace _types ~f:(fun t -> RType.sub_all tsubs t)
+
+  let mk ?(attrs = Attributes.empty) ?(t = None) (name : string) =
+    let v = Alpha.mk_with_id (-1) name (fun vid -> { vname = name; vid = vid; vattrs = attrs }) in
+    (match t with
+     | Some t -> assign_vtype v t
+     | None -> assign_vtype v (RType.get_fresh_tvar ()));
+    v
 
   let is_anonymous (v : t) : bool = Set.mem v.vattrs Anonymous
   let make_anonymous (v : t) : t =
@@ -82,6 +105,15 @@ module Variable = struct
   let same_name (v : t) (v2 : t) : bool = String.equal v.vname v2.vname
 
   let pp (frmt : Formatter.t) (v : t) = Fmt.(pf frmt "%s" v.vname)
+
+  let print_summary (frmt : Formatter.t) () =
+    Fmt.(pf stdout "[INFO] Variables in tables:@.");
+    Hashtbl.iteri Alpha._IDS
+      ~f:(fun ~key ~data ->
+          match Hashtbl.find _types key with
+          | Some t -> Fmt.(pf frmt "\t%i - %s : %a@." key data RType.pp t)
+          | None -> Fmt.(pf frmt "\t%i - %s : ??@." key data))
+
 end
 
 
@@ -130,11 +162,8 @@ struct
   let names vs =
     List.map ~f:(fun elt -> elt.vname) (elements vs)
 
-  let types vs =
-    List.map ~f:(fun elt -> elt.vtype) (elements vs)
-
   let record vs =
-    List.map ~f:(fun elt -> elt.vname, elt.vtype) (elements vs)
+    List.map ~f:(fun elt -> elt.vname, Option.value_exn (Variable.vtype elt)) (elements vs)
 
   let to_env vs =
     Map.of_alist (module String) (List.map ~f:(fun v -> v.vname, v) (elements vs))
@@ -173,7 +202,6 @@ module Binop = struct
 
   let compare = Poly.compare
   let equal = Poly.equal
-
   let to_string (op : t) =
     match op with
     | Lt -> "<"
@@ -191,7 +219,19 @@ module Binop = struct
     | Mod -> "%"
     | And -> "∧"
     | Or -> "∨"
+  let operand_types (op : t) =
+    RType.(match op with
+        | Lt | Gt | Ge | Le -> TInt, TInt
+        | Eq | Neq -> TInt, TInt
+        | Max | Min| Plus | Minus | Times | Div | Mod -> TInt, TInt
+        | And | Or -> TBool, TBool)
 
+  let result_type (op : t) =
+    RType.(match op with
+        | Lt | Gt | Ge | Le -> TBool
+        | Eq| Neq -> TBool
+        | Max | Min| Plus | Minus | Times | Div | Mod -> TInt
+        | And | Or -> TBool)
   let pp (frmt : Formatter.t) (op : t) = Fmt.string frmt (to_string op)
 end
 
@@ -202,9 +242,14 @@ module Unop = struct
 
   let compare = Poly.compare
   let equal = Poly.equal
+  let operand_type (op : t) =
+    match op with | Neg -> RType.TInt| Not -> RType.TBool | Abs -> RType.TInt
+
+  let result_type (op : t) =
+    match op with | Neg -> RType.TInt| Not -> RType.TBool | Abs -> RType.TInt
+
   let to_string (op : t) =
     match op with | Neg -> failwith "-" | Not -> failwith "¬" | Abs -> failwith "abs"
-
   let pp frmt op = Fmt.string frmt (to_string op)
 end
 
@@ -227,6 +272,11 @@ module Constant = struct
   let of_bool b = if b then CTrue else CFalse
   let _if c t f =
     match c with CTrue -> t | _ -> f
+  let type_of (c : t) =
+    match c with
+    | CInt _ -> RType.TInt
+    | CTrue | CFalse -> RType.TBool
+
   let pp (frmt : Formatter.t) (c : t) =
     match c with
     | CInt i -> Fmt.int frmt i
@@ -248,8 +298,9 @@ type termkind =
 
 and term = { tpos: position * position; tkind : termkind; ttyp : RType.t }
 
-let mk_var ?(pos = dummy_loc) ?(t = RType.TAnon) (v : variable) : term =
-  { tpos = pos; tkind = TVar v; ttyp = t }
+let mk_var ?(pos = dummy_loc) (v : variable) : term =
+  { tpos = pos; tkind = TVar v; ttyp = Variable.vtype_or_new v }
+
 
 let mk_const ?(pos = dummy_loc) (c : Constant.t) =
   let ctyp =
@@ -260,32 +311,55 @@ let mk_const ?(pos = dummy_loc) (c : Constant.t) =
   in
   { tpos = pos; tkind = TConst c; ttyp = ctyp }
 
-let mk_app ?(pos = dummy_loc) ?(typ = RType.TAnon) (f : term) (x : term list) =
+let mk_app ?(pos = dummy_loc) ?(typ = None) (f : term) (x : term list) =
+  let typ =
+    match typ with
+    | Some t -> t
+    | None -> RType.get_fresh_tvar ()
+  in
   {tpos = pos; tkind = TApp(f,x); ttyp = typ}
 
-let mk_bin ?(pos = dummy_loc) ?(typ = RType.TAnon) (op : Binop.t) (t1 : term) (t2 : term) =
+let mk_bin ?(pos = dummy_loc) ?(typ = None) (op : Binop.t) (t1 : term) (t2 : term) =
+  let typ =
+    match typ with
+    | Some t -> t
+    | None -> RType.get_fresh_tvar ()
+  in
   {tpos = pos; tkind = TBin(op, t1, t2); ttyp = typ }
 
 let mk_data ?(pos = dummy_loc) (c : string) (xs : term list) =
   let typ =
     match RType.type_of_variant c with
     | Some t -> t
-    | _ -> RType.TAnon (* May need to revise behaviour. *)
+    | _ ->  RType.get_fresh_tvar ();
   in
   {tpos = pos; tkind = TData(c,xs); ttyp = typ}
 
 let mk_fun ?(pos = dummy_loc) (args : variable list) (body : term) =
-  let targs = RType.(TTup(List.map ~f:(fun t -> t.vtype) args)) in
+  let targs =
+    RType.(TTup(List.map ~f:(fun t -> Variable.vtype_or_new t) args))
+  in
   {tpos = pos; tkind = TFun(args, body); ttyp = RType.TFun(targs, body.ttyp)}
 
-let mk_ite ?(pos = dummy_loc) ?(typ = RType.TAnon) (c : term) (th : term) (el : term) =
+let mk_ite ?(pos = dummy_loc) ?(typ = None) (c : term) (th : term) (el : term) =
+  let typ =
+    match typ with
+    | Some t -> t
+    | None -> RType.get_fresh_tvar ()
+  in
   {tpos = pos; tkind = TIte(c, th, el); ttyp = typ}
 
 let mk_tup ?(pos = dummy_loc) (l : term list) =
   {tpos = pos; tkind = TTup(l); ttyp = RType.TTup (List.map ~f:(fun t -> t.ttyp) l) }
 
-let mk_un ?(pos = dummy_loc) ?(typ = RType.TAnon) (op : Unop.t) (t : term) =
+let mk_un ?(pos = dummy_loc) ?(typ = None) (op : Unop.t) (t : term) =
+  let typ =
+    match typ with
+    | Some t -> t
+    | None -> RType.get_fresh_tvar ()
+  in
   { tpos = pos; tkind = TUn(op, t); ttyp = typ }
+
 
 
 (* ====================================================================================== *)
@@ -349,6 +423,25 @@ struct
   end
   include E
 end
+
+let rewrite_with (f : term -> term) (t : term) =
+  let rec aux t0 =
+    let tk = t0.tkind in
+    match tk with
+    | TBin (op, t1, t2) -> f (mk_bin op (aux t1) (aux t2))
+    | TUn (op, t1) -> f (mk_un op (aux t1))
+    | TConst _ -> f t0
+    | TVar _ -> f t0
+    | TIte (c, t1, t2) -> f (mk_ite (aux c) (aux t1) (aux t2))
+    | TTup tl -> f (mk_tup (List.map ~f:aux tl))
+    | TFun (fargs, body) -> f (mk_fun fargs (aux body))
+    | TApp (func, args) -> f (mk_app func args)
+    | TData (cstr, args) -> f (mk_data cstr args)
+  in aux t
+
+let rewrite_types t_subs _t =
+  { _t with ttyp = RType.sub_all t_subs _t.ttyp }
+
 (* ====================================================================================== *)
 (* Pretty printing *)
 (* ====================================================================================== *)
@@ -403,3 +496,102 @@ let pp_term (frmt : Formatter.t) (x : term) =
         pf frmt "%s(%a)" cstr (list ~sep:comma (aux false)) args
   in aux false frmt x
 
+(* ====================================================================================== *)
+
+let infer_type (t : term) : term * RType.substitution =
+  let rec aux t0 =
+    let eloc = t0.tpos in
+    let merge_subs = RType.merge_subs eloc in
+    match t0.tkind with
+    | TBin (op, t1, t2) ->
+      let t_t1, c_t1 = aux t1 and t_t2, c_t2 = aux t2 in
+      let ta, tb = Binop.operand_types op in
+      (match RType.unify [t_t1.ttyp, ta; t_t2.ttyp, tb] with
+       | Some subs -> mk_bin ~pos:t0.tpos ~typ:(Some (Binop.result_type op)) op t_t1 t_t2,
+                      merge_subs subs (merge_subs c_t1 c_t2)
+       | None -> failwith "Type inference failure")
+
+    | TUn (op, t1) ->
+      let t_t1, c_t1 = aux t1 in
+      (match RType.unify [t_t1.ttyp, Unop.operand_type op] with
+       | Some subs -> mk_un ~pos:t0.tpos ~typ:(Some (Unop.result_type op)) op t_t1,
+                      merge_subs subs c_t1
+       | None -> Log.loc_fatal_errmsg eloc "Type inference failure.")
+
+    | TConst c -> {t0 with ttyp = Constant.type_of c }, []
+
+    | TVar v ->
+      let tv = Variable.vtype_or_new v in
+      (match RType.unify [tv, t0.ttyp] with
+       | Some res -> {t0 with ttyp = tv}, res
+       | None -> failwith "Type inference failure")
+
+    | TIte (c, t1, t2) ->
+      let t_c, c_c = aux c and t_t1, c_t1 = aux t1 and t_t2, c_t2 = aux t2 in
+      (match RType.unify [t_c.ttyp, RType.TBool; t_t1.ttyp, t_t2.ttyp] with
+       | Some subs -> mk_ite ~pos:t0.tpos ~typ:(Some t_t1.ttyp) t_c t_t1 t_t2,
+                      merge_subs subs (merge_subs c_c (merge_subs c_t1 c_t2))
+       | None -> failwith "Type inference failure.")
+
+    | TTup tl ->
+      let term_l, c_l = List.unzip (List.map ~f:aux tl) in
+      mk_tup ~pos:t0.tpos term_l, merge_subs (List.concat c_l) []
+
+    | TFun (args, body) ->
+      let t_body, c_body = aux body in  mk_fun ~pos:t0.tpos args t_body, c_body
+
+    | TApp (ft, [farg]) ->
+      let t_func, c_func = aux ft and t_arg, c_arg = aux farg in
+      let _c = RType.(mkv c_func @ mkv c_arg) in
+      (match t_func.ttyp with
+       | RType.TFun(a,b) ->
+         (match RType.(unify (_c @ [t_arg.ttyp, a])) with
+          | Some subs ->
+            mk_app ~pos:t0.tpos ~typ:(Some b) t_func [t_arg], subs
+          | None ->
+            Log.loc_fatal_errmsg eloc "Type inference failure: could not unify arguments in application.")
+       | RType.TVar f_tvar ->
+         let a = RType.get_fresh_tvar () and b = RType.get_fresh_tvar () in
+         (match RType.(unify (_c @ [RType.TFun(a,b), RType.TVar f_tvar; t_arg.ttyp, a])) with
+          | Some subs ->
+            mk_app ~pos:t0.tpos ~typ:(Some b) t_func [t_arg], subs
+          | None -> failwith "Type inference failure.")
+       | _ -> Log.loc_fatal_errmsg eloc "Type inference failure: could not type as function.")
+
+    | TApp (func, fargs) ->
+      let t_func, c_func = aux func and t_args, c_args = List.unzip (List.map ~f:aux fargs) in
+      let _c = RType.(mkv c_func @ mkv (List.concat c_args)) in
+      (match t_func.ttyp with
+       | RType.TFun(a,b) ->
+         (match RType.(unify (_c @ [RType.TTup (List.map ~f:(fun t -> t.ttyp) t_args), a]))
+          with
+          | Some subs ->
+            mk_app ~pos:t0.tpos ~typ:(Some b) t_func t_args, subs
+          | None ->
+            Log.loc_fatal_errmsg eloc "Type inference failure: could not unify arguments in application.")
+       | RType.TVar f_tvar ->
+         let a = RType.get_fresh_tvar () and b = RType.get_fresh_tvar () in
+         (match
+            RType.(unify (_c @
+                          [RType.TFun(a,b), RType.TVar f_tvar;
+                           RType.TTup (List.map ~f:(fun t -> t.ttyp) t_args), a]))
+          with
+          | Some subs -> mk_app ~pos:t0.tpos ~typ:(Some b) t_func t_args, subs
+          | None -> failwith "Type inference failure.")
+       | _ -> Log.loc_fatal_errmsg eloc "Type inference failure: could not type as function.")
+
+    | TData (cstr, args) ->
+      (match RType.type_of_variant cstr with
+       | Some _ ->
+         let t_args, c_args = List.unzip (List.map ~f:aux args) in
+         { t0 with tkind = TData(cstr, t_args)}, List.concat c_args
+       | None ->
+         Log.loc_fatal_errmsg eloc "Type inference failure: could not find constructor type.")
+  in
+  let t', subs = aux t in
+  match RType.unify (RType.mkv subs) with
+  | Some merge_subs ->
+    let tsubs = RType.mkv merge_subs in
+    Variable.update_var_types tsubs;
+    rewrite_with (rewrite_types tsubs) t', merge_subs
+  | None -> Log.loc_fatal_errmsg t'.tpos "Could not infer type."

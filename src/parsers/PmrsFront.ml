@@ -25,6 +25,7 @@ let variable_not_found loc k =
 let parsefile filename =
   (* Save the text for better error reporting. *)
   text := Stdio.In_channel.read_all filename;
+  Log.reference_text := !text;
   let lexbuf = Lexing.from_channel ~with_positions:true (Stdio.In_channel.create filename) in
   lexbuf.lex_curr_p <- {lexbuf.lex_curr_p with pos_fname = filename;};
   let module I = P.MenhirInterpreter in
@@ -138,7 +139,7 @@ let translate_rules loc (globs : (string, Term.variable) Hashtbl.t)
   let translate_pattern constr args : PMRScheme.pattern =
     let f arg =
       match arg.kind with
-      | FTVar x -> Term.Variable.mk x
+      | FTVar x -> Term.(mk_var (Variable.mk x))
       | _ -> loc_fatal_errmsg arg.pos (Fmt.str "expected a variable in pattern, got %a" pp_fterm arg)
     in constr, List.map ~f args
   in
@@ -169,12 +170,15 @@ let translate_rules loc (globs : (string, Term.variable) Hashtbl.t)
       let local_vars : Term.VarSet.t =
         let pat_vars =
           match pat with
-          | Some (_, xs) -> Term.VarSet.of_list xs
+          | Some (_, pat_args) ->
+            Term.VarSet.union_list (List.map ~f:Analysis.free_variables pat_args)
           | None -> Term.VarSet.empty
         in
         Set.union (Term.VarSet.of_list xs) pat_vars
       in
-      let rule_rhs = fterm_to_term rloc allv globs local_vars rterm in
+      let rule_rhs =
+        fterm_to_term rloc allv globs local_vars rterm
+      in
       nt, xs, pat, rule_rhs
     in
     List.map ~f:transf_rule body
@@ -186,19 +190,22 @@ let translate_rules loc (globs : (string, Term.variable) Hashtbl.t)
     | `Duplicate_key _ -> failwith "impossible"
     | `Ok m -> m
   in
-  let main_id = ref (-1) in
-  Map.iteri
-    ~f:(fun ~key:i ~data:(nt, _,_,_) -> if String.equal nt.vname "main" then main_id := i)
-    rules;
-  Term.{
-    pname = pname;
-    pargs = VarSet.of_list args;
-    pparams = VarSet.of_list params;
-    pnon_terminals = nont;
-    prules = rules;
-    porder = -1;
-    pmain_id = !main_id;
-  }
+  let main_symb =
+    match Term.VarSet.find_by_name nont "main" with
+    | Some x -> x
+    | None -> loc_fatal_errmsg loc "No main rule."
+  in
+  PMRScheme.infer_pmrs_types
+    (Term.{
+        pname = pname;
+        pargs = VarSet.of_list args;
+        pparams = VarSet.of_list params;
+        pnon_terminals = nont;
+        prules = rules;
+        porder = -1;
+        pmain_symb = main_symb;
+        pinput_typ = RType.get_fresh_tvar ();
+      })
 
 
 
