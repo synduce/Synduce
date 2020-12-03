@@ -2,6 +2,7 @@ open Base
 open Getopt
 open Fmt
 open Parsers
+open Algo.PmrsAlgos
 
 module Config = Lib.Utils.Config
 
@@ -17,7 +18,15 @@ let main () =
   let prog = parse_pmrs !filename in
   let _ = seek_types prog in
   let plist = translate prog in
-  List.iter plist ~f:(fun p -> pf stdout "%a@." Lang.PMRScheme.pp_pmrs p);
+  let do_prog p =
+    Lang.(
+      let mgt = most_general_terms p in
+      pf stdout "%a@." PMRScheme.pp_pmrs p;
+      if List.length mgt > 0 then
+        pf stdout "Most general terms: %a@."
+          (list Term.pp_term) mgt)
+  in
+  List.iter plist  ~f:do_prog;
   Lang.Term.Variable.print_summary stdout ()
 ;;
 main ()

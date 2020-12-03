@@ -238,14 +238,14 @@ let rec unify_one (s : t) (t : t) : substitution option =
          (fun frmt () ->
             Fmt.(pf frmt "Type unification: Tuples %a and %a have different sizes") pp s pp t);
        None)
-  | (TVar x, t | t, TVar x) ->
-    if occurs x t
+  | (TVar x, t' | t', TVar x) ->
+    if occurs x t'
     then
       (Log.error
          (fun frmt () ->
             Fmt.(pf frmt "Type unification: circularity %a - %a") pp s pp t);
        None)
-    else Some [x, t]
+    else Some [x, t']
   | _ -> if Poly.equal s t then Some [] else
       (Log.error
          (fun frmt () ->

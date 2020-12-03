@@ -413,6 +413,20 @@ and substitution (substs : (term * term) list) (t : term) : term =
 and term_equal t1 t2 = term_compare t1 t2 = 0
 
 
+let mk_with_fresh_vars (vs : VarSet.t) (t : term) : VarSet.t * term =
+  let substs =
+    let f var =
+      let fresh =
+        let t = Some (Variable.vtype_or_new var) in
+        Variable.mk ~t (var.vname^(Int.to_string !Alpha._MAX_ID))
+      in
+      fresh, (mk_var var, mk_var fresh)
+    in
+    List.map ~f (Set.elements vs)
+  in
+  VarSet.of_list (List.map ~f:first substs),
+  substitution (List.map ~f:second substs) t
+
 
 module Terms =
 struct
@@ -438,6 +452,24 @@ let rewrite_with (f : term -> term) (t : term) =
       | TApp (func, args) -> TApp(aux func, List.map ~f:aux args)
       | TData (cstr, args) -> TData(cstr, List.map ~f:aux args)
     in f {t0 with tkind = tk';}
+  in aux t
+
+let rewrite_top_down (f : term -> term option) (t : term) =
+  let rec aux t0 =
+    match f t0 with
+    | Some t0' -> t0'
+    | None ->
+      let tk' = match t0.tkind with
+        | TBin (op, t1, t2) -> TBin(op, aux t1, aux t2)
+        | TUn (op, t1) -> TUn(op, aux t1)
+        | TConst _ -> t0.tkind
+        | TVar _ -> t0.tkind
+        | TIte (c, t1, t2) -> TIte(aux c, aux t1, aux t2)
+        | TTup tl -> TTup (List.map ~f:aux tl)
+        | TFun (fargs, body) -> TFun(fargs, aux body)
+        | TApp (func, args) -> TApp(aux func, List.map ~f:aux args)
+        | TData (cstr, args) -> TData(cstr, List.map ~f:aux args)
+      in {t0 with tkind = tk';}
   in aux t
 
 let rewrite_types t_subs =
