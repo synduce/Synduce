@@ -7,10 +7,9 @@ pmrs mts l =
     | f Nil -> (0,0)
     | f Cons(hd,tl) -> (fun (s,m) -> s + hd, max (s + hd) m) (f tl)
 
-pmrs (odot,f_0,s_0) listhom t =
+pmrs (odot1, odot2, f_0, s_0) listhom t =
     main t           -> h t
     | h CNil          -> s_0
     | h Single(a)    -> f_0 a
-    | h Concat(x, y) -> odot (h x) (h y)
-
-let repr x = x
+    | h Concat(Single(a), y) -> odot1 a (h y)
+    | h Concat(x, y) -> odot2 (h x) (h y)

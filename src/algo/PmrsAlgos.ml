@@ -1,97 +1,111 @@
 open Base
-open Lang.PMRScheme
+open Lang
 open Lang.Term
-open Lang.Analysis
-
-let mgt_of_one (prog : pmrs) (_ : int) (rule_id : int) =
-  let get_rule i =
-    match Map.find prog.prules i with
-    | Some r -> r
-    | None -> failwith (Fmt.str "mgt_of_one : could not find rule %i" i)
-  in
-  let boundvars = ref (VarSet.union_list [prog.pnon_terminals; prog.pparams]) in
-  let unbound x =
-    Set.diff (free_variables x) !boundvars
-  in
-  (* Find a rule, such that the rhs has a subexpression that can be unified with target. *)
-  let matching_rules visited_rules target =
-    let filter ~key ~data:(nt,args,pat,r_rhs) =
-      if Set.mem visited_rules key then None else
-        (match matches_subpattern ~boundvars:!boundvars target ~pattern:r_rhs with
-         | Some (_, substs, _) ->
-           let lhs, _ =
-             match pat with
-             | Some (cstr, pat_args) ->
-               let pat_arg = mk_data cstr pat_args in
-               infer_type (mk_app (mk_var nt) (List.map ~f:mk_var args @ [pat_arg]))
-             | None ->
-               infer_type (mk_app (mk_var nt) (List.map ~f:mk_var args))
-           in
-           let target' = substitution substs lhs in
-           let t_free = unbound target' in
-           let new_symbols, new_target = mk_with_fresh_vars t_free target' in
-           boundvars := Set.union new_symbols !boundvars;
-           Some (nt, new_target)
-
-         | None -> None)
-    in
-    Map.filter_mapi ~f:filter prog.prules
-  in
-  (* Recursive construction of the MGT. *)
-  let rec aux visited_rules target_rhs =
-    let all_mrules = Map.to_alist (matching_rules visited_rules target_rhs) in
-    match all_mrules with
-    | (m_id, (m_nt, m_term)) :: _ ->
-      if Variable.(m_nt = prog.pmain_symb) then
-        m_term
-      else
-        aux (Set.add visited_rules m_id) m_term
-    | [] -> failwith (Fmt.str "No matching rule for %a." pp_term target_rhs)
-  in
-  let init_term =
-    let _, _, _, init_t =
-      get_rule rule_id
-    in
-    let new_symbols, new_term =
-      mk_with_fresh_vars
-        (unbound init_t)
-        init_t
-    in
-    boundvars := Set.union !boundvars new_symbols;
-    new_term
-  in
-  aux (Set.empty (module Int)) init_term
-
-let mgt (prog : pmrs) : term list =
-  let xi = prog.pparams in
-  (* A map from xi.id to rule.id *)
-  let xi_to_rule =
-    let xim =
-      match
-        Map.of_alist (module Int)
-          (List.map ~f:(fun v -> (v.vid, [])) (VarSet.elements xi))
-      with
-      | `Duplicate_key _ -> failwith "impossible"
-      | `Ok xmap -> xmap
-    in
-    let f ~key:rule_id ~data:(_,_,_,rule_rhs) acc =
-      let rule_unknowns =
-        Set.inter xi (free_variables rule_rhs)
-      in
-      List.fold ~init:acc
-        ~f:(fun xmap xi -> Map.add_multi xmap ~key:xi.vid ~data:rule_id)
-        (Set.elements rule_unknowns)
-    in
-    Map.fold ~init:xim ~f prog.prules
-  in
-  (* For each pair of xi.id, rule.id, compute the mgt. *)
-  let xi_rule_pairs =
-    Map.fold ~init:[]
-      ~f:(fun ~key ~data acc -> acc @ (List.map ~f:(fun rid -> key, rid) data))
-      xi_to_rule
-  in
-  List.map ~f:(fun (xi_id, rule_id) -> mgt_of_one prog xi_id rule_id) xi_rule_pairs
+open Utils
 
 
-let most_general_terms (prog : pmrs) : term list =
-  if Set.is_empty prog.pparams then [] else mgt prog
+
+(* ============================================================================================= *)
+(*                                                                                               *)
+(* ============================================================================================= *)
+
+
+let psi (target_f : PMRS.t) (orig_f : PMRS.t) (repr : PMRS.t) =
+  let _ = target_f in
+  let _ = orig_f in
+  let _ = repr in
+  let mgts = MGT.most_general_terms target_f in
+  let xt =
+    List.map mgts
+      ~f:(fun ((xi_id, rule_id), t) -> (xi_id, rule_id), Option.map ~f:Analysis.expand_once t)
+  in
+  List.iter xt
+    ~f:(fun (_, t) -> Fmt.(pf stdout "@[<hov 2>%a@]@." (option (list ~sep:comma Term.pp_term)) t))
+
+
+(* ============================================================================================= *)
+(*                                                 MAIN ENTRY POINTS                             *)
+(* ============================================================================================= *)
+
+let no_synth () = failwith "No synthesis objective found."
+
+let solve_problem (pmrs : (string, PMRS.t, Base.String.comparator_witness) Map.t)
+    (functions : (string, PMRS.top_function, Base.String.comparator_witness) Map.t) : unit =
+  let orig_fname = "spec" and target_fname = "target" and repr_fname = "repr" in
+  let repr, theta_to_tau =
+    match Map.find pmrs repr_fname with
+    | Some pmrs -> Either.First pmrs, Variable.vtype_or_new pmrs.pmain_symb
+    | None ->
+      (match Map.find functions repr_fname  with
+       | Some (f,a,b) -> Either.Second (f,a,b), Variable.vtype_or_new f
+       | None -> Log.error_msg "No representation function given."; no_synth ())
+  in
+  let orig_f, tau =
+    match Map.find pmrs orig_fname with
+    | Some pmrs -> pmrs, pmrs.pinput_typ
+    | None -> Log.error_msg "No origin function found."; no_synth ()
+  in
+  let target_f, xi, theta =
+    let target_f =
+      match Map.find pmrs target_fname with
+      | Some pmrs -> pmrs
+      | None -> Log.error_msg "No target recursion scheme found"; no_synth ()
+    in
+    target_f, target_f.pparams, target_f.pinput_typ
+  in
+  (* Match origin and target recursion scheme types. *)
+  (match theta_to_tau with
+   | RType.TFun (theta', tau') ->
+     let sb1 = RType.unify_one theta' theta in
+     let sb2 = RType.unify_one tau tau' in
+     (match sb1, sb2 with
+      | Some sb1, Some sb2 ->
+        (match RType.unify (RType.mkv (sb1 @ sb2)) with
+         | Some sb' -> Term.Variable.update_var_types (RType.mkv sb')
+         | None -> Log.error_msg "Could not unify θ and τ in problem definition.")
+      | _ -> Log.error_msg "Could not unify θ and τ in problem definition.")
+   | _ -> Log.error_msg "Representation function should be a function.");
+  Term.(
+    match Variable.vtype_or_new orig_f.pmain_symb, Variable.vtype_or_new target_f.pmain_symb with
+    | TFun(_, tout), TFun(_, tout') ->
+      (match RType.unify_one tout tout' with
+       | Some subs -> Variable.update_var_types (RType.mkv subs)
+       | None -> Log.error_msg "Failed to unify output types."; no_synth ())
+    |_ -> Log.error_msg "Original or target is not a function."; no_synth ());
+  (*  Update the type of all the components. *)
+  let repr =
+    match repr with
+    | Either.First pmrs -> Either.First (PMRS.infer_pmrs_types pmrs)
+    | Either.Second (f,a,b) ->
+      let b', _ = Term.infer_type b in Either.Second (f, a, b')
+  in
+  let target_f = PMRS.infer_pmrs_types target_f in
+  let orig_f = PMRS.infer_pmrs_types orig_f in
+  let theta = target_f.pinput_typ in
+  let t_out =
+    Term.(match Variable.vtype_or_new orig_f.pmain_symb with
+        | TFun(_, tout) -> tout
+        | _ -> failwith "Unexpected.")
+  in
+  (* Print summary information about the problem. *)
+  Log.info
+    Fmt.(fun fmt () -> pf fmt " Ψ (%a) := ∀ x : %a. (%s o %s)(x) = %s(x)"
+            (list ~sep:comma Term.Variable.pp) (Set.elements xi) RType.pp theta
+            orig_fname repr_fname target_fname);
+  Log.info Fmt.(fun fmt () -> pf fmt "%a" PMRS.pp orig_f);
+  Log.info Fmt.(fun fmt () -> pf fmt "%a" PMRS.pp target_f);
+  Log.info Fmt.(fun fmt () ->
+      match repr with
+      | Either.First pmrs -> pf fmt "%a" PMRS.pp pmrs
+      | Either.Second (fv, args, body) ->
+        pf fmt "%s(%a) = %a" fv.vname
+          (list ~sep:comma Term.Variable.pp) args Term.pp_term body);
+  let repr_pmrs =
+    match repr with
+    | Either.First p -> p
+    | Either.Second (f,a,b) -> PMRS.func_to_pmrs f a b
+  in
+  AState.tau := tau;
+  AState.theta := theta;
+  AState.alpha := t_out;
+  psi target_f orig_f repr_pmrs

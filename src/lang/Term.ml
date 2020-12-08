@@ -108,7 +108,7 @@ module Variable = struct
 
   let print_summary (frmt : Formatter.t) () =
     Fmt.(pf stdout "[INFO] Variables in tables:@.");
-    Hashtbl.iteri Alpha._IDS
+    Hashtbl.iteri (Alpha.get_ids ())
       ~f:(fun ~key ~data ->
           match Hashtbl.find _types key with
           | Some t -> Fmt.(pf frmt "\t%i - %s : %a@." key data RType.pp t)
@@ -418,7 +418,7 @@ let mk_with_fresh_vars (vs : VarSet.t) (t : term) : VarSet.t * term =
     let f var =
       let fresh =
         let t = Some (Variable.vtype_or_new var) in
-        Variable.mk ~t (var.vname^(Int.to_string !Alpha._MAX_ID))
+        Variable.mk ~t (Alpha.fresh var.vname)
       in
       fresh, (mk_var var, mk_var fresh)
     in
@@ -530,7 +530,9 @@ let pp_term (frmt : Formatter.t) (x : term) =
         pf frmt "%s(%a)" cstr (list ~sep:comma (aux false)) args
   in aux false frmt x
 
-(* ====================================================================================== *)
+(* ============================================================================================= *)
+(*                                  TYPE INFERENCE                                               *)
+(* ============================================================================================= *)
 
 let infer_type (t : term) : term * RType.substitution =
   let rec aux t0 =

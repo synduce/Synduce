@@ -107,7 +107,7 @@ let translate_rules loc (globs : (string, Term.variable) Hashtbl.t)
     (params : Term.variable list) (args : Term.variable list)
     (pname : string)
     (body : pmrs_body)
-  : PMRScheme.pmrs =
+  : PMRS.t =
   (* Check that params and args do not have variables with the same name.
      Params and args can shadow globals though.
   *)
@@ -136,14 +136,18 @@ let translate_rules loc (globs : (string, Term.variable) Hashtbl.t)
   in
   (* Find a variable in environment. If it's not in the local enviroment, it should be in the globals.*)
   let allv = Term.VarSet.union_list [nont; pset; aset] in
-  let translate_pattern constr args : PMRScheme.pattern =
+  let translate_pattern constr args : PMRS.pattern =
     let f arg =
-      match arg.kind with
-      | FTVar x -> Term.(mk_var (Variable.mk x))
-      | _ -> loc_fatal_errmsg arg.pos (Fmt.str "expected a variable in pattern, got %a" pp_fterm arg)
+      let rec aux t =
+        match t.kind with
+        | FTVar x -> Term.(mk_var (Variable.mk x))
+        | FTData(cstr, xl) -> Term.(mk_data cstr (List.map ~f:aux xl))
+        | _ -> loc_fatal_errmsg arg.pos (Fmt.str "expected a variable in pattern, got %a" pp_fterm arg)
+      in
+      aux arg
     in constr, List.map ~f args
   in
-  let rules : PMRScheme.rewrite_rule list =
+  let rules : PMRS.rewrite_rule list =
     let transf_rule (rloc, rhead, rterm : pmrs_rule) =
       let nt, (xs, pat) =
         let rec f r_args =
@@ -155,16 +159,11 @@ let translate_rules loc (globs : (string, Term.variable) Hashtbl.t)
           | hd :: _ -> loc_fatal_errmsg hd.pos "Unexpected term in rule head."
         in
         match rhead.kind with
-        | FTApp(rf, rule_args) ->
-          (match rf.kind with
-           | FTVar nt ->
-             (match Term.VarSet.find_by_name nont nt with
-              | Some x -> x
-              (* The cases below should have been filtered when seeking non-terminals. *)
-              | None -> failwith "impossible")
-           | _ -> failwith "impossible"),
+        | FTApp({kind=FTVar nt; _}, rule_args) ->
+          (match Term.VarSet.find_by_name nont nt with
+           | Some x -> x
+           | None -> failwith "impossible"),
           f rule_args
-
         | _ -> loc_fatal_errmsg rloc "Rule head is empty."
       in
       let local_vars : Term.VarSet.t =
@@ -195,7 +194,7 @@ let translate_rules loc (globs : (string, Term.variable) Hashtbl.t)
     | Some x -> x
     | None -> loc_fatal_errmsg loc "No main rule."
   in
-  PMRScheme.infer_pmrs_types
+  PMRS.infer_pmrs_types
     (Term.{
         pname = pname;
         pargs = VarSet.of_list args;
@@ -204,12 +203,26 @@ let translate_rules loc (globs : (string, Term.variable) Hashtbl.t)
         prules = rules;
         porder = -1;
         pmain_symb = main_symb;
-        pinput_typ = RType.get_fresh_tvar ();
+        pinput_typ = Variable.vtype_or_new main_symb;
       })
 
+let translate_function loc globs
+    (f : Term.Variable.t)
+    (args : Term.Variable.t list) (body : term) =
+  let body =
+    fterm_to_term loc (Term.VarSet.empty) globs (Term.VarSet.of_list (f::args))  body
+  in
+  let typed_body, _ = Term.infer_type body in
+  let f_type =
+    match args with
+    | [] -> typed_body.ttyp
+    | [a] -> RType.TFun(Term.Variable.vtype_or_new a, typed_body.ttyp)
+    | _ -> RType.(TFun (TTup (List.map ~f:(fun a -> Term.Variable.vtype_or_new a) args), typed_body.ttyp))
+  in
+  Term.Variable.update_var_types [Term.Variable.vtype_or_new f, f_type];
+  f, args, typed_body
 
-
-let translate (prog : program) : PMRScheme.pmrs list =
+let translate (prog : program) =
   let globals : (string, Term.variable) Hashtbl.t = Hashtbl.create (module String) in
   (* First pass to create the global variables *)
   List.iter prog
@@ -223,12 +236,15 @@ let translate (prog : program) : PMRScheme.pmrs list =
              loc_fatal_errmsg loc (Fmt.str "%s already declared." fname))
         | _ -> ());
   (* Second pass  *)
-  List.fold ~init:[] prog
-    ~f:(fun l decl ->
+  List.fold ~init:(Map.empty (module String), Map.empty (module String)) prog
+    ~f:(fun (pmrses, functions) decl ->
         match decl with
         | PMRSDecl(loc, params, pname, args, body) ->
           let vparams = List.map ~f:Term.Variable.mk params in
           let vargs = List.map ~f:Term.Variable.mk args in
-          l @ [translate_rules loc globals vparams vargs pname body]
-
-        | _ -> l)
+          Map.set pmrses ~key:pname ~data:(translate_rules loc globals vparams vargs pname body), functions
+        | FunDecl (loc, fname, args, body) ->
+          let vargs = List.map ~f:Term.Variable.mk args in
+          let fvar = Hashtbl.find_exn globals fname in
+          pmrses, Map.set functions ~key:fname ~data:(translate_function loc globals fvar vargs body)
+        | _ -> pmrses, functions)

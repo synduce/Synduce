@@ -1,4 +1,4 @@
-module PMRS = Lang.PMRScheme
+module PMRS = Lang.PMRS
 module Automata = Lang.Automata
 module Parsers = Parsers
 module Utils = Utils

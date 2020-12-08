@@ -12,7 +12,9 @@ type pattern = string * term list
 
 type rewrite_rule = variable * variable list * pattern option * term
 
-type pmrs = {
+type top_function = variable * variable list * term
+
+type t = {
   pname : string;
   pinput_typ : RType.t;
   pargs : VarSet.t;
@@ -32,7 +34,7 @@ type variables = variable Map.M(String).t
 (*                             BASIC PROPETIES AND TYPE INFERENCE                                *)
 (* ============================================================================================= *)
 (* Update the order of the pmrs. *)
-let update_order (p : pmrs) : pmrs =
+let update_order (p : t) : t =
   let order =
     let f ~key:_ ~data:(_, args, p, _) m =
       max m (List.length args + if Option.is_some p then 1 else 0)
@@ -40,7 +42,7 @@ let update_order (p : pmrs) : pmrs =
     Map.fold ~f ~init:0 p.prules
   in { p with porder = order }
 
-let infer_pmrs_types (prog : pmrs) =
+let infer_pmrs_types (prog : t) =
   let infer_aux ~key ~data:(nt, args, pat, body) (map, substs) =
     let t_body, c_body = infer_type body in
     let t_head, c_head =
@@ -64,9 +66,12 @@ let infer_pmrs_types (prog : pmrs) =
   match RType.unify (RType.mkv new_subs) with
   | Some usubs ->
     Variable.update_var_types (RType.mkv usubs);
-    {
-      prog with prules = new_rules;
-    }
+    let in_typ =
+      match Variable.vtype_or_new prog.pmain_symb with
+      | RType.TFun (tin,_) -> tin
+      | t -> t
+    in
+    { prog with prules = new_rules; pinput_typ = in_typ;}
   | None -> failwith "Failed infering types for pmrs."
 
 
@@ -87,7 +92,7 @@ let pp_rewrite_rule (frmt : Formatter.t) (nt, vargs, pat, t : rewrite_rule) : un
          (option pp_pattern) pat
          (box pp_term) t)
 
-let pp_pmrs (frmt : Formatter.t) (pmrs : pmrs) : unit =
+let pp (frmt : Formatter.t) (pmrs : t) : unit =
   let pp_rules frmt () =
     Map.iteri
       ~f:(fun ~key:_ ~data:(nt,args,pat,res) ->
@@ -97,9 +102,10 @@ let pp_pmrs (frmt : Formatter.t) (pmrs : pmrs) : unit =
             Fmt.(pf frmt "@[<v 2>  %a@]@;" pp_rewrite_rule (nt,args,pat,res))
         ) pmrs.prules
   in
-  Fmt.(pf frmt "%s⟨%a⟩:@;@[<v 2>{@;%a@;}@]"
+  Fmt.(pf frmt "%s⟨%a⟩: %a = @;@[<v 2>{@;%a@;}@]"
          pmrs.pname
          VarSet.pp_var_names pmrs.pparams
+         RType.pp pmrs.pinput_typ
          pp_rules ())
 
 
@@ -107,7 +113,7 @@ let pp_pmrs (frmt : Formatter.t) (pmrs : pmrs) : unit =
 (*                                       REDUCTION                                               *)
 (* ============================================================================================= *)
 
-let reduce (prog : pmrs) (input : term) =
+let reduce (prog : t) (input : term) =
   let rule_m f fargs =
     let app_sub bindv bindto expr =
       let bindt = List.map ~f:mk_var bindv in
@@ -147,7 +153,8 @@ let reduce (prog : pmrs) (input : term) =
          | hd :: _ -> rstep := true; hd)
       | _ -> _t
     in
-    rewrite_with rewrite_rule t0, !rstep
+    let t0' = rewrite_with rewrite_rule t0 in
+    t0', !rstep
   in
   let f_input = mk_app (mk_var prog.pmain_symb) [input] in
   let steps = ref 0 in
@@ -155,4 +162,33 @@ let reduce (prog : pmrs) (input : term) =
     Int.incr steps;
     let t', reduced =  one_step t in
     if reduced && !steps <  !Config.reduction_limit then apply_until_irreducible t' else t'
-  in apply_until_irreducible f_input
+  in
+  let res = apply_until_irreducible f_input in
+  res
+
+
+(* ============================================================================================= *)
+(*                             TRANSLATION FROM FUNCTION to PMRS                                 *)
+(* ============================================================================================= *)
+
+let func_to_pmrs (f : Variable.t) (args : Variable.t list) (body : Term.term) =
+  let tin, _ = match Variable.vtype_or_new f with
+    | RType.TFun (tin, tout) -> tin, tout
+    | _ -> failwith "Cannot make pmrs of non-function."
+  in
+  let pmain_symb, prules, pnon_terminals =
+    match args, body with
+    | [x], {tkind = TVar(x_v); _} when Variable.(x = x_v) ->
+      f, Map.singleton (module Int) 0 (f, [x], None, body), VarSet.singleton x
+    | _ -> failwith "TODO: only identity supported by func_to_pmrs"
+  in
+  {
+    pname = f.vname;
+    pinput_typ = tin;
+    pargs = VarSet.of_list args ;
+    pparams = VarSet.empty; (* PMRS from a function cannot have unkowns. *)
+    porder = 0;
+    pmain_symb = pmain_symb;
+    prules = prules;
+    pnon_terminals = pnon_terminals;
+  }

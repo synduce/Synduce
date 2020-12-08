@@ -16,6 +16,12 @@ let free_variables (t : term) : VarSet.t =
   in
   f t
 
+
+
+(* ============================================================================================= *)
+(*                                  TERM MATCHING                                                *)
+(* ============================================================================================= *)
+
 let unify (terms : term list) =
   match terms with
   | [] -> None
@@ -67,7 +73,7 @@ let matches_subpattern ?(boundvars = VarSet.empty) (t : term) ~(pattern : term) 
   let rrule (pat : term) =
     match matches ~boundvars t ~pattern:pat with
     | Some substmap ->
-      let match_loc_place = Variable.mk ~t:(Some pat.ttyp) (Fmt.str "_^_%i" !Alpha._MAX_ID) in
+      let match_loc_place = Variable.mk ~t:(Some pat.ttyp) (Alpha.fresh "*") in
       match_locations := (match_loc_place, substmap) :: !match_locations;
       Some {pat with tkind = TVar match_loc_place; }
     | None -> None
@@ -90,3 +96,34 @@ let matches_subpattern ?(boundvars = VarSet.empty) (t : term) ~(pattern : term) 
     None
   else
     Some (pat_skel, substs, loc_set)
+
+
+
+(* ============================================================================================= *)
+(*                                  TERM EXPANSION                                               *)
+(* ============================================================================================= *)
+
+let expand_once (t : term) : term list =
+  let fvt = free_variables t in
+  (* Pick a variable to expand on *)
+  let expansions =
+    let filter v =
+      match RType.get_variants (Variable.vtype_or_new v) with
+      | [] -> None
+      | l -> Some (v, l)
+    in
+    List.filter_map (Set.elements fvt)  ~f:filter
+  in
+  let aux (v, v_expan) =
+    let f (cstr_name, cstr_arg_types) =
+      let cstr_args =
+        List.map ~f:(fun ty -> mk_var (Variable.mk ~t:(Some ty) (Alpha.fresh v.vname))) cstr_arg_types
+      in
+      let t, _ =
+        infer_type
+          (substitution [mk_var v, mk_data cstr_name cstr_args] t)
+      in t
+    in
+    List.map ~f v_expan
+  in
+  List.concat (List.map ~f:aux expansions)

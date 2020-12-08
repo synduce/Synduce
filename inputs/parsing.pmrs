@@ -21,7 +21,7 @@ let h x y = x + y % 2 = 0 ? x : max y 2
 let x = (fun x -> x + x) 1
 
 // Pattern matching recursion scheme declaration
-pmrs (f0) test x =
+pmrs (f0, oplus) test x =
     main x -> g x
     | g Nil -> f0
-    | g Cons(hd, tl) -> g tl hd
+    | g Cons(hd, tl) -> oplus (g tl) hd

@@ -74,7 +74,12 @@ let wrap1 f s t = fun fmt () -> pf fmt f s t
 let error (msg : Formatter.t -> unit -> unit) : unit =
   pf Fmt.stdout "%a@;%a@." (styled (`Bg `Red) string) "[ERROR]" msg ()
 
+let error_msg (msg : string) = error (fun fmt () -> pf fmt "%s" msg)
+
 let fatal () = failwith "Fatal error. See messages."
 
 let loc_fatal_errmsg loc msg =
   error (fun f () -> log_with_excerpt f !reference_text loc Fmt.string msg); fatal ()
+
+let info (msg : Formatter.t -> unit -> unit) : unit =
+  pf Fmt.stdout "@[<hov 4>%a@;%a@]@." (styled (`Bg `Blue) string) "[INFO]" msg ()
