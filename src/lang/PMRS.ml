@@ -31,7 +31,7 @@ type 'a sresult = ('a, (string * term) list) Result.t
 type variables = variable Map.M(String).t
 
 (* ============================================================================================= *)
-(*                             BASIC PROPETIES AND TYPE INFERENCE                                *)
+(*                             BASIC PROPERTIES AND TYPE INFERENCE                               *)
 (* ============================================================================================= *)
 (* Update the order of the pmrs. *)
 let update_order (p : t) : t =
@@ -41,6 +41,7 @@ let update_order (p : t) : t =
     in
     Map.fold ~f ~init:0 p.prules
   in { p with porder = order }
+
 
 let infer_pmrs_types (prog : t) =
   let infer_aux ~key ~data:(nt, args, pat, body) (map, substs) =
@@ -113,47 +114,51 @@ let pp (frmt : Formatter.t) (pmrs : t) : unit =
 (*                                       REDUCTION                                               *)
 (* ============================================================================================= *)
 
-let reduce (prog : t) (input : term) =
-  let rule_m f fargs =
-    let app_sub bindv bindto expr =
-      let bindt = List.map ~f:mk_var bindv in
-      match List.map2 ~f:Utils.pair bindt bindto with
-      | Ok x -> Some (substitution x expr)
-      | _ -> None
-    in
-    let f (nt, args, pat, res) =
-      if Variable.(nt = f) then
-        match pat with
-        (* We have a pattern, try to match it. *)
-        | Some (cstr, pat_args) ->
-          (match List.last fargs, List.drop_last fargs with
-           | Some pat_match, Some first_args ->
-             (match matches pat_match ~pattern:(mk_data cstr pat_args) with
-              | Some  bindto_map  ->
-                let bindto_list = Map.to_alist bindto_map in
-                let pat_v, pat_bto = List.unzip bindto_list in
-                app_sub (args @ pat_v) (first_args @ pat_bto) res
-              | None -> None)
-           | _ -> None)
-        (* Pattern is empty. Simple substitution. *)
-        | None -> app_sub args fargs res
-      else
-        None
-    in
-    let _, b = List.unzip (Map.to_alist (Map.filter_map prog.prules ~f)) in
-    b
+(** Looks for a set of applicable rules in prules to rewrite (f fargs) and return
+    the result of applying the possible rules.
+    If there is no rule that is applicable, then return an empty list.
+*)
+let rule_lookup prules (f : variable) (fargs : term list) : term list =
+  let app_sub bindv bindto expr =
+    let bindt = List.map ~f:mk_var bindv in
+    match List.map2 ~f:Utils.pair bindt bindto with
+    | Ok x -> Some (substitution x expr)
+    | _ -> None
   in
+  let f (nt, args, pat, res) =
+    if Variable.(nt = f) then
+      match pat with
+      (* We have a pattern, try to match it. *)
+      | Some (cstr, pat_args) ->
+        (match List.last fargs, List.drop_last fargs with
+         | Some pat_match, Some first_args ->
+           (match matches pat_match ~pattern:(mk_data cstr pat_args) with
+            | Some  bindto_map  ->
+              let bindto_list = Map.to_alist bindto_map in
+              let pat_v, pat_bto = List.unzip bindto_list in
+              app_sub (args @ pat_v) (first_args @ pat_bto) res
+            | None -> None)
+         | _ -> None)
+      (* Pattern is empty. Simple substitution. *)
+      | None -> app_sub args fargs res
+    else
+      None
+  in
+  let _, b = List.unzip (Map.to_alist (Map.filter_map prules ~f)) in
+  b
+
+let reduce (prog : t) (input : term) =
   let one_step t0 =
     let rstep = ref false in
     let rewrite_rule _t =
       match _t.tkind with
       | TApp({tkind=(TVar(f)); _}, fargs) ->
-        (match rule_m f fargs with
+        (match rule_lookup prog.prules f fargs with
          | [] -> _t
          | hd :: _ -> rstep := true; hd)
       | _ -> _t
     in
-    let t0' = rewrite_with rewrite_rule t0 in
+    let t0' = reduce_term (rewrite_with rewrite_rule t0) in
     t0', !rstep
   in
   let f_input = mk_app (mk_var prog.pmain_symb) [input] in
@@ -167,25 +172,39 @@ let reduce (prog : t) (input : term) =
   res
 
 
+let inverted_rule_lookup rules func args = 
+  let f (nt, args, pat, rhs) = 
+    match rhs.tkind with 
+    | TApp(rhs_func, rhs_args) -> 
+      if Terms.(rhs_func = func) then 
+        (match List.zip rhs_args args with 
+         | Ok _ -> 
+         | _ -> None)
+      else None 
+    | _ -> None
+  in
+  Map.filter_map ~f rules
+
+
 (* ============================================================================================= *)
 (*                             TRANSLATION FROM FUNCTION to PMRS                                 *)
 (* ============================================================================================= *)
 
-let func_to_pmrs (f : Variable.t) (args : Variable.t list) (body : Term.term) =
+let func_to_pmrs (f : Variable.t) (args : fpattern list) (body : Term.term) =
   let tin, _ = match Variable.vtype_or_new f with
     | RType.TFun (tin, tout) -> tin, tout
     | _ -> failwith "Cannot make pmrs of non-function."
   in
   let pmain_symb, prules, pnon_terminals =
     match args, body with
-    | [x], {tkind = TVar(x_v); _} when Variable.(x = x_v) ->
+    | [PatVar x], {tkind = TVar(x_v); _} when Variable.(x = x_v) ->
       f, Map.singleton (module Int) 0 (f, [x], None, body), VarSet.singleton x
     | _ -> failwith "TODO: only identity supported by func_to_pmrs"
   in
   {
     pname = f.vname;
     pinput_typ = tin;
-    pargs = VarSet.of_list args ;
+    pargs = fpat_vars (PatTup args) ;
     pparams = VarSet.empty; (* PMRS from a function cannot have unkowns. *)
     porder = 0;
     pmain_symb = pmain_symb;

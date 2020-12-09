@@ -18,8 +18,8 @@ let main () =
   Caml.Format.set_margin 100;
   let prog = parse_pmrs !filename in
   let _ = seek_types prog in
-  let all_pmrs, all_functions = translate prog in
-  Algo.PmrsAlgos.solve_problem all_pmrs all_functions;
+  let all_pmrs = translate prog in
+  Algo.PmrsAlgos.solve_problem all_pmrs;
   Term.Variable.print_summary stdout ()
 
 ;;

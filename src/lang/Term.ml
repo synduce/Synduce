@@ -284,6 +284,9 @@ module Constant = struct
     | CFalse -> Fmt.bool frmt false
 end
 
+type fpattern =
+  | PatVar of variable
+  | PatTup of fpattern list
 
 type termkind =
   | TBin of Binop.t * term * term
@@ -292,11 +295,31 @@ type termkind =
   | TVar of variable
   | TIte of term * term * term
   | TTup of term list
-  | TFun of variable list * term
+  | TFun of fpattern list * term
   | TApp of term * term list
   | TData of string * term list
 
 and term = { tpos: position * position; tkind : termkind; ttyp : RType.t }
+
+
+let _globals : (int, Variable.t * fpattern list * term) Hashtbl.t = Hashtbl.create (module Int)
+
+(* F-Patterns helpers *)
+
+let rec fpat_ty fp =
+  match fp with
+  | PatVar v -> Variable.vtype_or_new v
+  | PatTup tl -> RType.(TTup (List.map ~f:fpat_ty tl))
+
+let rec fpat_vars fp =
+  match fp with
+  | PatVar v -> VarSet.singleton v
+  | PatTup tl -> VarSet.union_list (List.map ~f:fpat_vars tl)
+
+(* ============================================================================================= *)
+(*                        CONSTRUCTION FUNCTIONS                                                 *)
+(* ============================================================================================= *)
+
 
 let mk_var ?(pos = dummy_loc) (v : variable) : term =
   { tpos = pos; tkind = TVar v; ttyp = Variable.vtype_or_new v }
@@ -335,9 +358,9 @@ let mk_data ?(pos = dummy_loc) (c : string) (xs : term list) =
   in
   {tpos = pos; tkind = TData(c,xs); ttyp = typ}
 
-let mk_fun ?(pos = dummy_loc) (args : variable list) (body : term) =
+let mk_fun ?(pos = dummy_loc) (args : fpattern list) (body : term) =
   let targs =
-    RType.(TTup(List.map ~f:(fun t -> Variable.vtype_or_new t) args))
+    RType.(TTup(List.map ~f:(fun t -> fpat_ty t) args))
   in
   {tpos = pos; tkind = TFun(args, body); ttyp = RType.TFun(targs, body.ttyp)}
 
@@ -361,8 +384,42 @@ let mk_un ?(pos = dummy_loc) ?(typ = None) (op : Unop.t) (t : term) =
   { tpos = pos; tkind = TUn(op, t); ttyp = typ }
 
 
+let rec fpat_to_term fp =
+  match fp with
+  | PatVar v -> mk_var v
+  | PatTup tl -> mk_tup (List.map ~f:fpat_to_term tl)
 
-(* ====================================================================================== *)
+let fpat_sub fp1 fp2 =
+  let rec aux (fp1, fp2) =
+    match fp1, fp2 with
+    | PatVar v1, PatVar v2 -> [mk_var v1, mk_var v2]
+    | PatTup tl1, PatTup tl2 ->
+      (match List.zip tl1 tl2 with
+       | Ok l -> List.concat (List.map ~f:aux l)
+       | _ -> failwith "no sub")
+    | PatVar v1, _ -> [mk_var v1, fpat_to_term fp2 ]
+    | _ , PatVar v2 -> [fpat_to_term fp1, mk_var v2]
+  in
+  try Some (aux (fp1, fp2)) with _ -> None
+
+let fpat_sub_all fp1s fp2s =
+  match List.zip fp1s fp2s with
+  | Ok z ->
+    (try
+       Some (List.fold ~init:[]
+               ~f:(fun l (a,b) ->
+                   match fpat_sub a b with
+                   | Some subs -> l @ subs
+                   | None -> failwith "done") z)
+     with _ -> None)
+  | _ -> None
+
+let sexp_of_term (_ : term) = Sexp.Atom "TODO"
+
+(* ============================================================================================= *)
+(*                             EQUALITY                                                          *)
+(* ============================================================================================= *)
+
 let rec term_compare (t1 : term) (t2 : term) : int =
   match t1.tkind, t2.tkind with
   | TConst c1, TConst c2 -> Constant.compare c1 c2
@@ -385,9 +442,9 @@ let rec term_compare (t1 : term) (t2 : term) : int =
   | TFun(fargs1, body1), TFun(fargs2, body2) ->
     let c = compare (List.length fargs1) (List.length fargs2) in
     if c = 0 then
-      term_compare body1
-        (substitution (List.map2_exn ~f:(fun a b -> mk_var a, mk_var b) fargs2 fargs1)
-           body2)
+      (match fpat_sub_all fargs1 fargs2 with
+       | Some subs -> term_compare body1 (substitution subs body2)
+       | None -> -1)
     else c
   | TTup tl1, TTup tl2 -> List.compare term_compare tl1 tl2
   | _, _ -> Poly.compare t1 t2
@@ -434,9 +491,24 @@ struct
     type t = term
     let compare = term_compare
     let equal = term_equal
+    let sexp_of_t = sexp_of_term
   end
   include E
+  module C = Comparator.Make (E)
+  include C
 end
+
+module TermSet =
+struct
+  module S = Set.M (Terms)
+  include S
+  let empty = Set.empty (module Terms)
+  let singleton = Set.singleton (module Terms)
+end
+
+(* ============================================================================================= *)
+(*                              TRANFORMATION / REDUCTION                                        *)
+(* ============================================================================================= *)
 
 let rewrite_with (f : term -> term) (t : term) =
   let rec aux t0 =
@@ -476,10 +548,53 @@ let rewrite_types t_subs =
   Variable.update_var_types t_subs;
   rewrite_with (fun _t -> { _t with ttyp = RType.sub_all t_subs _t.ttyp })
 
-(* ====================================================================================== *)
-(* Pretty printing *)
-(* ====================================================================================== *)
+let reduce ~(init : 'a) ~(case : (term -> 'a) -> term -> 'a option) ~(join: 'a -> 'a -> 'a) (t : term) : 'a =
+  let rec aux (t : term) : 'a =
+    match case aux t with
+    | Some x -> x
+    | None ->
+      (match t.tkind with
+       | TBin (_, t1, t2) -> join (aux t1) (aux t2)
+       | TUn (_, t1) -> aux t1
+       | TConst _ -> init
+       | TVar _ -> init
+       | TIte (c, a, b) -> join (aux c) (join (aux a) (aux b))
+       | TTup tl -> aux_l tl
+       | TFun (_, body) -> aux body
+       | TApp (func, args) -> join (aux func) (aux_l args)
+       | TData (_, args) -> aux_l args)
+  and aux_l l = List.fold ~init ~f:join (List.map ~f:aux l)
+  in
+  aux t
+
+let transform ~(case : (term -> term) -> term -> term option) (t : term) : term =
+  let rec aux (t : term) : 'a =
+    match case aux t with
+    | Some x -> x
+    | None ->
+      {t with tkind =
+                (match t.tkind with
+                 | TBin (bo, t1, t2) -> TBin(bo, aux t1, aux t2)
+                 | TUn (uo, t1) -> TUn(uo, aux t1)
+                 | TConst _ -> t.tkind
+                 | TVar _ -> t.tkind
+                 | TIte (c, a, b) -> TIte (aux c, aux a, aux b)
+                 | TTup tl -> TTup(aux_l tl)
+                 | TFun (args, body) -> TFun(args, aux body)
+                 | TApp (func, args) -> TApp(aux func, aux_l args)
+                 | TData (cstr, args) -> TData(cstr, aux_l args))}
+  and aux_l l = List.map ~f:aux l
+  in aux t
+
+(* ============================================================================================= *)
+(*                                    PRETTY PRINTERS                                            *)
+(* ============================================================================================= *)
 open Fmt
+
+let rec pp_fpattern (frmt : Formatter.t) (fp : fpattern) =
+  match fp with
+  | PatVar x -> Variable.pp frmt x
+  | PatTup tl -> pf frmt "%a" (box (parens (list ~sep:comma pp_fpattern))) tl
 
 let pp_term (frmt : Formatter.t) (x : term) =
   let rec aux (paren : bool) (frmt : Formatter.t) (t : term) =
@@ -513,9 +628,9 @@ let pp_term (frmt : Formatter.t) (x : term) =
 
     | TFun (args, body) ->
       if paren then
-        pf frmt "@[<hov 2>(%a ⟶ @;%a)@]" (list ~sep:comma Variable.pp) args (aux false) body
+        pf frmt "@[<hov 2>(λ(%a).@;%a)@]" (list ~sep:comma pp_fpattern) args (aux false) body
       else
-        pf frmt "@[<hov 2>%a ⟶ @;%a@]" (list ~sep:comma Variable.pp) args (aux false) body
+        pf frmt "@[<hov 2>λ(%a).%a@]" (list ~sep:comma pp_fpattern) args (aux false) body
 
     | TApp (func, args) ->
       if paren then
@@ -575,24 +690,6 @@ let infer_type (t : term) : term * RType.substitution =
 
     | TFun (args, body) ->
       let t_body, c_body = aux body in  mk_fun ~pos:t0.tpos args t_body, c_body
-
-    | TApp (ft, [farg]) ->
-      let t_func, c_func = aux ft and t_arg, c_arg = aux farg in
-      let _c = RType.(mkv c_func @ mkv c_arg) in
-      (match t_func.ttyp with
-       | RType.TFun(a,b) ->
-         (match RType.(unify (_c @ [t_arg.ttyp, a])) with
-          | Some subs ->
-            mk_app ~pos:t0.tpos ~typ:(Some b) t_func [t_arg], subs
-          | None ->
-            Log.loc_fatal_errmsg eloc "Type inference failure: could not unify arguments in application.")
-       | RType.TVar f_tvar ->
-         let a = RType.get_fresh_tvar () and b = RType.get_fresh_tvar () in
-         (match RType.(unify (_c @ [RType.TFun(a,b), RType.TVar f_tvar; t_arg.ttyp, a])) with
-          | Some subs ->
-            mk_app ~pos:t0.tpos ~typ:(Some b) t_func [t_arg], subs
-          | None -> failwith "Type inference failure.")
-       | _ -> Log.loc_fatal_errmsg eloc "Type inference failure: could not type as function.")
 
     | TApp (func, fargs) ->
       let t_func, c_func = aux func and t_args, c_args = List.unzip (List.map ~f:aux fargs) in

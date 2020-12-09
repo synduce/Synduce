@@ -104,7 +104,7 @@ prule: args=fun_app_e RIGHTARROW t=expr                                    { $lo
 
 
 expr:
-    | FUN args=arguments RIGHTARROW t=tuple_e                                   { mk_fun $loc args t }
+    | FUN args=list(primary_e) RIGHTARROW t=tuple_e                             { mk_fun $loc args t }
     | c=expr QUESTION t=expr; COLON f=expr                                      { mk_ite $loc c t f}
     | tuple_e                                                                   { $1 }
 
@@ -158,9 +158,6 @@ primary_e:
     | FALSE                                                                     { mk_const $loc Term.Constant.CFalse}
     | i=INT                                                                     { mk_const $loc (Term.Constant.of_int i)}
 
-arguments:
-    | IDENT                                                                     { [$1] }
-    | LPAR l=separated_nonempty_list(COMMA, IDENT) RPAR                         { l }
 
 %inline op_comp:
     | LT        { Term.Binop.Lt }

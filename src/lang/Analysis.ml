@@ -10,7 +10,7 @@ let free_variables (t : term) : VarSet.t =
     | TVar v -> VarSet.singleton v
     | TIte (c, t1, t2) -> VarSet.union_list [f c; f t1; f t2]
     | TTup tl -> VarSet.union_list (List.map ~f tl)
-    | TFun (vl, t1) -> let v1 = f t1 in Set.diff v1 (VarSet.of_list vl)
+    | TFun (vl, t1) -> let v1 = f t1 in Set.diff v1 (fpat_vars (PatTup vl))
     | TApp (ft, targs) -> Set.union (f ft) (VarSet.union_list (List.map ~f targs))
     | TData (_, mems) -> VarSet.union_list (List.map ~f mems)
   in
@@ -117,7 +117,8 @@ let expand_once (t : term) : term list =
   let aux (v, v_expan) =
     let f (cstr_name, cstr_arg_types) =
       let cstr_args =
-        List.map ~f:(fun ty -> mk_var (Variable.mk ~t:(Some ty) (Alpha.fresh v.vname))) cstr_arg_types
+        List.map  cstr_arg_types
+          ~f:(fun ty -> mk_var (Variable.mk ~t:(Some ty) (Alpha.fresh v.vname)))
       in
       let t, _ =
         infer_type
@@ -127,3 +128,48 @@ let expand_once (t : term) : term list =
     List.map ~f v_expan
   in
   List.concat (List.map ~f:aux expansions)
+
+
+(* ============================================================================================= *)
+(*                                  TERM REDUCTION                                               *)
+(* ============================================================================================= *)
+let resolve_func (func : term) =
+  match func.tkind with
+  | TVar x ->
+    (match Hashtbl.find Term._globals x.vid with
+     | Some (_, vargs, body) -> Some (vargs, body)
+     | None -> None)
+  | TFun(vargs, body) -> Some (vargs, body)
+  | _ -> None
+
+let subst_args fpatterns args =
+  let rec f (fpat, t) =
+    match fpat, t.tkind with
+    | PatVar x, _ -> [mk_var x, t]
+    | PatTup pl, TTup tl ->
+      (match List.zip pl tl with
+       | Ok ptl -> List.concat (List.map ~f ptl)
+       | _ -> failwith "no sub")
+    | _ -> failwith "no sub"
+
+  in
+  match List.zip fpatterns args with
+  | Ok l -> (try Some (List.concat (List.map ~f l)) with _ -> None)
+  | _ -> None
+
+
+let reduce_term (t : term) : term =
+  let case f t =
+    match t.tkind with
+    | TApp(func, args) ->
+      let func' = f func in
+      let args' = List.map ~f args in
+      (match resolve_func func' with
+       | Some (fpatterns, body) ->
+         (match subst_args fpatterns args' with
+          | Some subst -> Some (substitution subst body)
+          | None -> None)
+       | _ -> None)
+    | _ -> None
+  in
+  transform ~case t

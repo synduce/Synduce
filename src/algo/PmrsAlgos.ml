@@ -2,25 +2,34 @@ open Base
 open Lang
 open Lang.Term
 open Utils
-
-
+open AState
 
 (* ============================================================================================= *)
 (*                                                                                               *)
 (* ============================================================================================= *)
 
 
-let psi (target_f : PMRS.t) (orig_f : PMRS.t) (repr : PMRS.t) =
-  let _ = target_f in
-  let _ = orig_f in
-  let _ = repr in
-  let mgts = MGT.most_general_terms target_f in
+let psi (p : psi_def) =
+  let _ = p.target in
+  let _ = p.orig in
+  let _ = p.repr in
+  let mgts = MGT.most_general_terms p.target in
   let xt =
+    let reduce_and_expand t =
+      let t' = PMRS.reduce p.orig t in
+      Expand.maximal p t'
+    in
     List.map mgts
-      ~f:(fun ((xi_id, rule_id), t) -> (xi_id, rule_id), Option.map ~f:Analysis.expand_once t)
+      ~f:(fun ((xi_id, rule_id), t) ->
+          (xi_id, rule_id), Option.map ~f:reduce_and_expand t)
   in
   List.iter xt
-    ~f:(fun (_, t) -> Fmt.(pf stdout "@[<hov 2>%a@]@." (option (list ~sep:comma Term.pp_term)) t))
+    ~f:(fun (_, t) ->
+        match t with
+        | Some (terms, _) ->
+          List.iter (Set.to_list terms)
+            ~f:(fun t -> Fmt.(pf stdout "@[<hov 2>--> %a@]@." (box Term.pp_term) t))
+        | None -> ())
 
 
 (* ============================================================================================= *)
@@ -29,15 +38,15 @@ let psi (target_f : PMRS.t) (orig_f : PMRS.t) (repr : PMRS.t) =
 
 let no_synth () = failwith "No synthesis objective found."
 
-let solve_problem (pmrs : (string, PMRS.t, Base.String.comparator_witness) Map.t)
-    (functions : (string, PMRS.top_function, Base.String.comparator_witness) Map.t) : unit =
+let solve_problem (pmrs : (string, PMRS.t, Base.String.comparator_witness) Map.t) : unit =
   let orig_fname = "spec" and target_fname = "target" and repr_fname = "repr" in
   let repr, theta_to_tau =
     match Map.find pmrs repr_fname with
     | Some pmrs -> Either.First pmrs, Variable.vtype_or_new pmrs.pmain_symb
     | None ->
-      (match Map.find functions repr_fname  with
-       | Some (f,a,b) -> Either.Second (f,a,b), Variable.vtype_or_new f
+      let reprs = Hashtbl.filter ~f:(fun (v, _, _) -> String.(v.vname = repr_fname)) Term._globals in
+      (match Hashtbl.choose reprs with
+       | Some (_,(f,a,b)) -> Either.Second (f,a,b), Variable.vtype_or_new f
        | None -> Log.error_msg "No representation function given."; no_synth ())
   in
   let orig_f, tau =
@@ -99,7 +108,7 @@ let solve_problem (pmrs : (string, PMRS.t, Base.String.comparator_witness) Map.t
       | Either.First pmrs -> pf fmt "%a" PMRS.pp pmrs
       | Either.Second (fv, args, body) ->
         pf fmt "%s(%a) = %a" fv.vname
-          (list ~sep:comma Term.Variable.pp) args Term.pp_term body);
+          (list ~sep:comma Term.pp_fpattern) args Term.pp_term body);
   let repr_pmrs =
     match repr with
     | Either.First p -> p
@@ -108,4 +117,4 @@ let solve_problem (pmrs : (string, PMRS.t, Base.String.comparator_witness) Map.t
   AState.tau := tau;
   AState.theta := theta;
   AState.alpha := t_out;
-  psi target_f orig_f repr_pmrs
+  psi { target = target_f; orig =  orig_f; repr =  repr_pmrs }

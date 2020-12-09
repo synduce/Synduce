@@ -17,7 +17,7 @@ type termkind =
   | FTData of id * term list
   | FTVar of id
   | FTTup of term list
-  | FTFun of id list * term
+  | FTFun of term list * term
   | FTBin of Binop.t * term * term
   | FTHOBin of Binop.t
   | FTUn of Unop.t * term
@@ -58,7 +58,7 @@ let rec pp_fterm (frmt : Formatter.t) (t : term) =
   | FTData (c, t2) -> Fmt.(pf frmt "%s(%a)" c (list ~sep:comma pp_fterm) t2)
   | FTVar v -> Fmt.string frmt v
   | FTTup l -> Fmt.(pf frmt "(%a)" (list ~sep:comma pp_fterm) l)
-  | FTFun (args, body) -> Fmt.(pf frmt "(%a)->%a" (list ~sep:comma string) args pp_fterm body)
+  | FTFun (args, body) -> Fmt.(pf frmt "(%a)->%a" (list ~sep:comma pp_fterm) args pp_fterm body)
   | FTBin (op, t1, t2) -> Fmt.(pf frmt "%a %a %a" pp_fterm t1 Binop.pp op pp_fterm t2)
   | FTUn (op, t1) -> Fmt.(pf frmt "%a %a" Unop.pp op pp_fterm t1)
   | FTHOBin op -> Fmt.(pf frmt "(%a)" Binop.pp op)

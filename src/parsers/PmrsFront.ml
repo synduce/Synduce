@@ -63,7 +63,18 @@ let seek_types (prog : program) =
         | _ -> ())
     prog
 
+
 let fterm_to_term rloc allv globs locs rterm =
+  let fterm_function_args args =
+    let rec f x =
+      match x.kind with
+      | FTTup tl -> Term.(PatTup (List.map ~f tl))
+      | FTVar id -> Term.(PatVar (Variable.mk id))
+      | _ -> loc_fatal_errmsg x.pos ("Function arguments can only be variables or tuples.")
+    in
+    let t_args = List.map ~f args in
+    Term.(fpat_vars (PatTup t_args)),t_args
+  in
   let findv loc env k =
     match Map.find env k with
     | None ->
@@ -88,14 +99,12 @@ let fterm_to_term rloc allv globs locs rterm =
     | FTVar v -> Term.mk_var (findv t.pos env v)
     | FTTup l ->  Term.(mk_tup ~pos:t.pos (List.map ~f:(f env) l))
     | FTFun (args, body) ->
-      let fargs = List.map ~f:Term.Variable.mk args in
+      let new_vs, fargs = fterm_function_args args in
       let new_env =
-        List.fold ~init:env fargs
-          ~f:(fun accum_env v ->
-              if Map.mem accum_env v.vname
-              then Map.change accum_env v.vname ~f:(fun _ -> Some v)
-              else Map.add_exn accum_env ~key:v.vname ~data:v)
-      in Term.(mk_fun ~pos:t.pos fargs (f new_env body))
+        Set.fold new_vs ~init:env ~f:(fun a v -> Map.set a ~key:v.Term.vname ~data:v)
+      in
+      Term.(mk_fun ~pos:t.pos fargs (f new_env body))
+
     | FTBin (op, t1, t2) -> Term.(mk_bin ~pos:t.pos op (f env t1) (f env t2))
     | FTUn (op, t1) -> Term.(mk_un ~pos:t.pos op (f env t1))
     | FTIte (c, a, b) -> Term.(mk_ite ~pos:t.pos (f env c) (f env a) (f env b))
@@ -220,7 +229,7 @@ let translate_function loc globs
     | _ -> RType.(TFun (TTup (List.map ~f:(fun a -> Term.Variable.vtype_or_new a) args), typed_body.ttyp))
   in
   Term.Variable.update_var_types [Term.Variable.vtype_or_new f, f_type];
-  f, args, typed_body
+  f, List.map ~f:(fun v -> Term.PatVar v) args, typed_body
 
 let translate (prog : program) =
   let globals : (string, Term.variable) Hashtbl.t = Hashtbl.create (module String) in
@@ -236,15 +245,17 @@ let translate (prog : program) =
              loc_fatal_errmsg loc (Fmt.str "%s already declared." fname))
         | _ -> ());
   (* Second pass  *)
-  List.fold ~init:(Map.empty (module String), Map.empty (module String)) prog
-    ~f:(fun (pmrses, functions) decl ->
+  List.fold ~init:(Map.empty (module String)) prog
+    ~f:(fun pmrses decl ->
         match decl with
         | PMRSDecl(loc, params, pname, args, body) ->
           let vparams = List.map ~f:Term.Variable.mk params in
           let vargs = List.map ~f:Term.Variable.mk args in
-          Map.set pmrses ~key:pname ~data:(translate_rules loc globals vparams vargs pname body), functions
+          Map.set pmrses ~key:pname ~data:(translate_rules loc globals vparams vargs pname body)
         | FunDecl (loc, fname, args, body) ->
           let vargs = List.map ~f:Term.Variable.mk args in
           let fvar = Hashtbl.find_exn globals fname in
-          pmrses, Map.set functions ~key:fname ~data:(translate_function loc globals fvar vargs body)
-        | _ -> pmrses, functions)
+          let func_info = translate_function loc globals fvar vargs body in
+          Hashtbl.add_exn Term._globals ~key:fvar.vid ~data:func_info;
+          pmrses
+        | _ -> pmrses)

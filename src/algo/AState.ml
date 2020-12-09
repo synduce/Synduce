@@ -1,5 +1,6 @@
 open Lang
 
+type psi_def = { target : PMRS.t; orig : PMRS.t; repr : PMRS.t }
 
 let tau = ref RType.TInt
 
