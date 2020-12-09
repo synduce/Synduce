@@ -15,20 +15,25 @@ let psi (p : psi_def) =
   let _ = p.repr in
   let mgts = MGT.most_general_terms p.target in
   let xt =
-    let reduce_and_expand t =
-      let t' = PMRS.reduce p.orig t in
-      Expand.maximal p t'
+    let reduce_and_expand_twice t =
+      let t1, t2 = Expand.maximal p t in
+      let t1', t2' =
+        List.fold ~init:(t1, TermSet.empty) ~f:(fun (a,b) (a',b') -> Set.union a a', Set.union b b')
+          (List.map ~f:(Expand.maximal p) (Set.to_list t2))
+      in
+      t1', t2'
     in
     List.map mgts
-      ~f:(fun ((xi_id, rule_id), t) ->
-          (xi_id, rule_id), Option.map ~f:reduce_and_expand t)
+      ~f:(fun ((xi_id, rule_id), t) -> (xi_id, rule_id), Option.map ~f:reduce_and_expand_twice t)
   in
   List.iter xt
     ~f:(fun (_, t) ->
         match t with
         | Some (terms, _) ->
           List.iter (Set.to_list terms)
-            ~f:(fun t -> Fmt.(pf stdout "@[<hov 2>--> %a@]@." (box Term.pp_term) t))
+            ~f:(fun t -> Log.debug_msg Fmt.(str "@[<hov 2>Result: %a  ⟿  %a@]@."
+                                              (box Term.pp_term) t
+                                              (box Term.pp_term) (PMRS.reduce p.orig t)))
         | None -> ())
 
 

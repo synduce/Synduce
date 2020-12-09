@@ -234,7 +234,7 @@ let rec unify_one (s : t) (t : t) : substitution option =
        None)
     else Some [x, t']
   | _ -> if Poly.equal s t then Some [] else
-      (Log.error
+      (Log.debug
          (fun frmt () ->
             Fmt.(pf frmt "Type unification: cannot unify %a and %a") pp s pp t);
        None)
@@ -256,10 +256,10 @@ let merge_subs loc (s : substitution) (t : substitution) : substitution =
 
 
 (* ============================================================================================= *)
-(** 
-   get_variants t returns a list of variants of a given types. 
+(**
+   get_variants t returns a list of variants of a given types.
    If the type is a sum type with constructore, it returns a list of paris
-   of constructor, list of the types of the arguments of the constructor. 
+   of constructor, list of the types of the arguments of the constructor.
    If the type has no variant, the list is empty.
 *)
 let get_variants (typ : t) : (string * t list) list =

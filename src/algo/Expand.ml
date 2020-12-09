@@ -2,34 +2,74 @@ open Base
 open Lang
 open Lang.Term
 open AState
+open Utils
 
 
+let maximally_reduced_app (p : psi_def) (func : term) (args : term list) : bool =
+  (match func.tkind with
+   | TVar x -> Variable.(x = p.orig.pmain_symb || x = p.target.pmain_symb)
+   | _ -> false)
+  &&
+  (List.for_all args ~f:(fun x -> match x.tkind with TVar _ -> true | _ -> false))
+
+
+let nonreduced_terms (p : psi_def) (t : term) : (variable * term list) list =
+  let join = (@) in
+  let case _ t =
+    match t.tkind with
+    | TApp(func, args) ->
+      (match func.tkind with
+       | TVar func_var ->
+         if maximally_reduced_app p func args then None
+         else Some [func_var, args]
+       | _ -> None)
+    | _ -> None
+  in
+  let init = [] in
+  reduce ~init ~join ~case t
+
+let replace_nonreduced_by_main (p : psi_def) (t : term) : term =
+  let nr = nonreduced_terms p t in
+  let f_init_rules =
+    Map.filter ~f:(fun (nt, _, _, _) -> Variable.(nt = p.orig.pmain_symb)) p.orig.prules
+  in
+  let replacements =
+    let f (nt, args) =
+      match Map.max_elt (PMRS.inverted_rule_lookup f_init_rules (mk_var nt) args) with
+      | Some (_, lhs) -> Some (mk_app (mk_var nt) args, lhs)
+      | None -> None
+    in
+    List.filter_map ~f:(fun x -> x) (List.map ~f nr)
+  in
+  substitution replacements t
 
 let maximal (p : psi_def) (t : term) : TermSet.t * TermSet .t =
-  let p_orig = p.orig in
-  let f_init_rules =
-    Map.filter ~f:(fun (nt, _, _, _) -> Variable.(nt = p_orig.pmain_symb)) p.orig.prules
+  let t' = replace_nonreduced_by_main p (PMRS.reduce p.orig t) in
+  let nr = nonreduced_terms p t' in
+  (* Collect all the variables that need to be expanded. *)
+  let expand_reqs =
+    let collect c (_, args) =
+      match List.last args with
+      | Some arg -> Set.union c (Analysis.free_variables arg)
+      | None -> c
+    in List.fold ~f:collect ~init:VarSet.empty nr
   in
-  let nonreduced_terms =
-    let join = (@) in
-    let case _ t =
-      match t.tkind with
-      | TApp(func, args) ->
-        (match func.tkind with
-         | TVar func_var ->
-           (if Set.mem p.orig.PMRS.pnon_terminals func_var then
-              Some [func_var, args] else None)
-         | _ -> None)
-      | _ -> None
+  let substs =
+    let expansions =
+      List.map ~f:(fun x -> List.cartesian_product [mk_var x] (Analysis.expand_once (mk_var x)))
+        (Set.to_list expand_reqs)
     in
-    let init = [] in
-    reduce ~init ~join ~case t
+    cartesian_nary_product expansions
   in
-  let _ =
-    let f (nt, args) =
-      match t.tkind with
-      |
-    in
+  let all_ts = List.map substs ~f:(fun s -> substitution s t) in
+  (* Log.debug_msg "Terms after expansions:";
+     List.iter all_ts ~f:(fun t -> Log.debug_msg Fmt.(str "@[<hov 2>%a@]" pp_term t)); *)
+  let mr_terms, rest =
+    List.partition_tf (t :: all_ts)
+      ~f:(fun t ->
+          let tr = replace_nonreduced_by_main p (PMRS.reduce p.orig t) in
+          match nonreduced_terms p tr with
+            [] -> true | _ -> false)
   in
-  Fmt.(pf stdout "%a@." (list ~sep:comma pp_term) (Set.to_list nonreduced_terms));
-  TermSet.singleton t, TermSet.empty
+  (* Expand and replace in term *)
+  TermSet.of_list mr_terms, TermSet.of_list rest

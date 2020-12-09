@@ -8,6 +8,7 @@ module Config = Lib.Utils.Config
 
 let options = [
   ('v', "verbose", (set Config.verbose true), None);
+  ('d', "debug", (set Config.debug true), None)
 ]
 
 

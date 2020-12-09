@@ -107,12 +107,13 @@ module Variable = struct
   let pp (frmt : Formatter.t) (v : t) = Fmt.(pf frmt "%s" v.vname)
 
   let print_summary (frmt : Formatter.t) () =
-    Fmt.(pf stdout "[INFO] Variables in tables:@.");
+    Utils.Log.(info (wrap "Variables in tables:"));
+    Fmt.(pf frmt "\tID\t NAME \t TYPE@.");
     Hashtbl.iteri (Alpha.get_ids ())
       ~f:(fun ~key ~data ->
           match Hashtbl.find _types key with
-          | Some t -> Fmt.(pf frmt "\t%i - %s : %a@." key data RType.pp t)
-          | None -> Fmt.(pf frmt "\t%i - %s : ??@." key data))
+          | Some t -> Fmt.(pf frmt "\t%i\t %s \t %a@." key data RType.pp t)
+          | None -> Fmt.(pf frmt "\t%i\t %s \t ??@." key data))
 
 end
 
@@ -342,6 +343,14 @@ let mk_app ?(pos = dummy_loc) ?(typ = None) (f : term) (x : term list) =
   in
   {tpos = pos; tkind = TApp(f,x); ttyp = typ}
 
+let mk_app_v ?(pos = dummy_loc) ?(typ = None) (f : variable) (x : term list) =
+  let typ =
+    match typ with
+    | Some t -> t
+    | None ->  RType.get_fresh_tvar ()
+  in
+  {tpos = pos; tkind = TApp(mk_var f,x); ttyp = typ}
+
 let mk_bin ?(pos = dummy_loc) ?(typ = None) (op : Binop.t) (t1 : term) (t2 : term) =
   let typ =
     match typ with
@@ -496,6 +505,9 @@ struct
   include E
   module C = Comparator.Make (E)
   include C
+
+  let substs_of_alist (alist : (variable * term) list) : (term * term) list=
+    List.map ~f:(fun (a,b) -> mk_var a, b) alist
 end
 
 module TermSet =
@@ -504,6 +516,7 @@ struct
   include S
   let empty = Set.empty (module Terms)
   let singleton = Set.singleton (module Terms)
+  let of_list = Set.of_list (module Terms)
 end
 
 (* ============================================================================================= *)
@@ -621,10 +634,7 @@ let pp_term (frmt : Formatter.t) (x : term) =
         pf frmt "@[<hov 2>%a@;?@;%a@;:@;%a@]" (aux false) c (aux false) t1 (aux false) t2
 
     | TTup tl ->
-      if paren then
-        pf frmt "@[<hov 2>(%a)@]" (list ~sep:comma (aux false)) tl
-      else
-        pf frmt "@[<hov 2>%a@]" (list ~sep:comma (aux false)) tl
+      pf frmt "@[<hov 2>(%a)@]" (list ~sep:comma (aux false)) tl
 
     | TFun (args, body) ->
       if paren then

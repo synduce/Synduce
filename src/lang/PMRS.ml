@@ -30,6 +30,16 @@ type 'a xresult = ('a, (string * Sexp.t) list) Result.t
 type 'a sresult = ('a, (string * term) list) Result.t
 type variables = variable Map.M(String).t
 
+let lhs (nt, args, pat, rhs) =
+  let all_args =
+    let args = List.map ~f:mk_var args in
+    match pat with
+    | Some (c, args) -> args @ [mk_data c args]
+    | None -> args
+  in
+  let t, _ = infer_type (mk_app ~pos:rhs.tpos (mk_var nt) all_args) in
+  t
+
 (* ============================================================================================= *)
 (*                             BASIC PROPERTIES AND TYPE INFERENCE                               *)
 (* ============================================================================================= *)
@@ -125,9 +135,9 @@ let rule_lookup prules (f : variable) (fargs : term list) : term list =
     | Ok x -> Some (substitution x expr)
     | _ -> None
   in
-  let f (nt, args, pat, res) =
+  let f (nt, rule_args, rule_pat, rhs) =
     if Variable.(nt = f) then
-      match pat with
+      match rule_pat with
       (* We have a pattern, try to match it. *)
       | Some (cstr, pat_args) ->
         (match List.last fargs, List.drop_last fargs with
@@ -136,16 +146,15 @@ let rule_lookup prules (f : variable) (fargs : term list) : term list =
             | Some  bindto_map  ->
               let bindto_list = Map.to_alist bindto_map in
               let pat_v, pat_bto = List.unzip bindto_list in
-              app_sub (args @ pat_v) (first_args @ pat_bto) res
+              app_sub (rule_args @ pat_v) (first_args @ pat_bto) rhs
             | None -> None)
          | _ -> None)
       (* Pattern is empty. Simple substitution. *)
-      | None -> app_sub args fargs res
+      | None -> app_sub rule_args fargs rhs
     else
       None
   in
-  let _, b = List.unzip (Map.to_alist (Map.filter_map prules ~f)) in
-  b
+  second (List.unzip (Map.to_alist (Map.filter_map prules ~f)))
 
 let reduce (prog : t) (input : term) =
   let one_step t0 =
@@ -166,24 +175,49 @@ let reduce (prog : t) (input : term) =
   let rec apply_until_irreducible t =
     Int.incr steps;
     let t', reduced =  one_step t in
-    if reduced && !steps <  !Config.reduction_limit then apply_until_irreducible t' else t'
+    if reduced then apply_until_irreducible t' else t'
   in
   let res = apply_until_irreducible f_input in
   res
 
-
-let inverted_rule_lookup rules func args = 
-  let f (nt, args, pat, rhs) = 
-    match rhs.tkind with 
-    | TApp(rhs_func, rhs_args) -> 
-      if Terms.(rhs_func = func) then 
-        (match List.zip rhs_args args with 
-         | Ok _ -> 
+(**
+   inverted_rule_lookup searches for rules whose rhs match (func args), and return
+   a map from rule id to the lhs of the rules matching (func args), with the appropriate
+   substitutions performed.
+*)
+let inverted_rule_lookup rules (func : term) (args : term list) =
+  let list_matching l =
+    let m = List.map l ~f:(fun (rhs_arg, arg) -> matches ~pattern:rhs_arg arg) in
+    let merge_subs ~key:_ s =
+      match s with
+      | `Both (s1, s2) -> if Terms.(equal s1 s2) then Some s1 else failwith "x"
+      | `Left s1 -> Some s1
+      | `Right s2 -> Some s2
+    in
+    try
+      let fold_f subs maybe_subs =
+        match maybe_subs with
+        | Some subs' -> Map.merge subs' subs ~f:merge_subs
+        | None -> failwith "l"
+      in
+      Some (List.fold m ~init:(Map.empty (module Variable)) ~f:fold_f)
+    with _ -> None
+  in
+  let filter (nt, rule_args, rule_pat, rule_rhs) =
+    let lhs_term substs =
+      let t = lhs (nt, rule_args, rule_pat, rule_rhs) in
+      substitution (Terms.substs_of_alist (Map.to_alist substs)) t
+    in
+    match rule_rhs.tkind with
+    | TApp(rhs_func, rhs_args) ->
+      if Terms.(equal rhs_func func) then
+        (match List.zip rhs_args args with
+         | Ok l -> Option.map ~f:lhs_term (list_matching l)
          | _ -> None)
-      else None 
+      else None
     | _ -> None
   in
-  Map.filter_map ~f rules
+  Map.filter_map ~f:filter rules
 
 
 (* ============================================================================================= *)

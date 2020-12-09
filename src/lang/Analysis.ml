@@ -28,6 +28,12 @@ let unify (terms : term list) =
   | hd :: tl ->
     if List.for_all ~f:(fun x -> Terms.equal x hd) tl then Some hd else None
 
+(**
+   matches ~boundvars ~pattern t returns a map from variables in pattern to subterms of t
+   if the term t matches the pattern.
+   During the matching process the variables in boundvars cannot be substituted in the
+   pattern.
+*)
 let matches ?(boundvars = VarSet.empty) (t : term) ~(pattern : term) =
   let rec aux pat t = match pat.tkind, t.tkind with
     | TVar vpat, _ ->
@@ -35,7 +41,9 @@ let matches ?(boundvars = VarSet.empty) (t : term) ~(pattern : term) =
         if Terms.equal pat t then Ok [] else Error [pat,t]
       else
         let pat_ty = Variable.vtype_or_new vpat in
-        if Poly.equal pat_ty t.ttyp then Ok [vpat, t] else Error[pat,t]
+        (match RType.unify_one pat_ty t.ttyp with
+         | Some _ -> Ok [vpat, t]
+         | _ -> Error[pat,t])
 
     | TData (cstr, mems), TData(cstr', mems') ->
       if String.equal cstr cstr' && List.length mems = List.length mems' then
@@ -54,18 +62,22 @@ let matches ?(boundvars = VarSet.empty) (t : term) ~(pattern : term) =
          (match Result.combine_errors (f_match :: arg_match) with
           | Ok subs -> Ok (List.concat subs)
           | Error errs -> Error (List.concat errs)))
-    | _ -> Error []
+    | _ -> if Terms.equal pat t then Ok [] else Error []
   in
   match aux pattern t with
-  | Error _ -> None (* TODO: print error message *)
+  | Error _ -> None
   | Ok substs ->
     let im = Map.empty (module Variable) in
     let f accum (var, t) = Map.add_multi ~key:var ~data:t accum in
     try
-      Some
-        (Map.map
-           ~f:(fun bindings -> match unify bindings with Some e -> e | _ -> failwith "X")
-           (List.fold ~init:im ~f substs))
+      let substs =
+        Map.filter_map
+          ~f:(fun bindings ->
+              match bindings with
+              | [] -> None
+              | _ -> match unify bindings with Some e -> Some e | _ -> failwith "X")
+          (List.fold ~init:im ~f substs)
+      in Some substs
     with _ -> None
 
 let matches_subpattern ?(boundvars = VarSet.empty) (t : term) ~(pattern : term) =

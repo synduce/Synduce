@@ -45,3 +45,12 @@ let slist  a = Sexp.List a
 let blast = fun x -> Result.map_error ~f:List.concat (Result.combine_errors x)
 
 let pair a b = (a,b)
+
+let cartesian_nary_product (elts : ('a list) list) : ('a list) list =
+  let f acc l =
+    List.concat
+      (List.map l ~f:(fun elt -> List.map acc ~f:(fun acc_l -> elt :: acc_l)))
+  in
+  match elts with
+  | hd :: tl -> List.fold ~f ~init:(List.map ~f:(fun x -> [x]) hd) tl
+  | [] -> []
