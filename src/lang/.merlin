@@ -25,6 +25,7 @@ B /home/victorn/.opam/4.10.0/lib/sexplib0
 B /home/victorn/.opam/4.10.0/lib/stdio
 B /home/victorn/.opam/4.10.0/lib/stdlib-shims
 B ../../_build/default/src/lang/.lang.objs/byte
+B ../../_build/default/src/syguslib/.syguslib.objs/byte
 B ../../_build/default/src/utils/.utils.objs/byte
 S /home/victorn/.opam/4.10.0/lib/base
 S /home/victorn/.opam/4.10.0/lib/base/base_internalhash_types
@@ -52,6 +53,7 @@ S /home/victorn/.opam/4.10.0/lib/sexplib0
 S /home/victorn/.opam/4.10.0/lib/stdio
 S /home/victorn/.opam/4.10.0/lib/stdlib-shims
 S .
+S ../syguslib
 S ../utils
 FLG -ppx '/home/victorn/repos/refuns/_build/default/.ppx/99ce26c0794e45efde3013f872b0677a/ppx.exe --as-ppx --cookie '\''library-name="lang"'\'''
 FLG -open Lang -w @1..3@5..28@30..39@43@46..47@49..57@61..62-40 -strict-sequence -strict-formats -short-paths -keep-locs

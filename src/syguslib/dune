@@ -1,0 +1,4 @@
+(library
+    (name syguslib)
+    (public_name ReFunS.Lib.SygusLib)
+    (libraries base fmt sexplib str))

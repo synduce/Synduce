@@ -8,33 +8,26 @@ open AState
 (*                                                                                               *)
 (* ============================================================================================= *)
 
+let rec refinement_loop (p : psi_def) (t_set, u_set : TermSet.t * TermSet.t) =
+  let _ = t_set, u_set in 
+  let _ = p in 
+  if false then refinement_loop p (t_set, u_set) else ()
 
 let psi (p : psi_def) =
   let _ = p.target in
   let _ = p.orig in
   let _ = p.repr in
   let mgts = MGT.most_general_terms p.target in
-  let xt =
-    let reduce_and_expand_twice t =
-      let t1, t2 = Expand.maximal p t in
-      let t1', t2' =
-        List.fold ~init:(t1, TermSet.empty) ~f:(fun (a,b) (a',b') -> Set.union a a', Set.union b b')
-          (List.map ~f:(Expand.maximal p) (Set.to_list t2))
-      in
-      t1', t2'
-    in
-    List.map mgts
-      ~f:(fun ((xi_id, rule_id), t) -> (xi_id, rule_id), Option.map ~f:reduce_and_expand_twice t)
+  let t_set, u_set = 
+    List.fold mgts ~init:(TermSet.empty, TermSet.empty) 
+      ~f:(fun (t,u) (_, mgt_opt) ->
+          match mgt_opt with
+          | None -> t,u
+          | Some term ->
+            let t1, t2 = Expand.maximal p term in
+            Set.union t t1, Set.union u t2)
   in
-  List.iter xt
-    ~f:(fun (_, t) ->
-        match t with
-        | Some (terms, _) ->
-          List.iter (Set.to_list terms)
-            ~f:(fun t -> Log.debug_msg Fmt.(str "@[<hov 2>Result: %a  ⟿  %a@]@."
-                                              (box Term.pp_term) t
-                                              (box Term.pp_term) (PMRS.reduce p.orig t)))
-        | None -> ())
+  refinement_loop p (t_set, u_set)
 
 
 (* ============================================================================================= *)
