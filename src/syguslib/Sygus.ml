@@ -3,7 +3,7 @@ open Sexplib
 
 type symbol = string
 
-type literal = 
+type literal =
   | LitNum of int
   | LitDec of float
   | LitBool of bool
@@ -92,10 +92,16 @@ let valid_ident (name : string) =
   (List.for_all special_chars ~f:(fun x -> not (String.mem name x)))
 
 
+(* ============================================================================================= *)
+(*               CONVERSION BETWEEN SYGUS TYPES AND S-EXPRESSIONS                                *)
+(* ============================================================================================= *)
 let symbol_of_sexp (s : Sexp.t) : symbol =
   match s with
   | Atom symb -> symb
   | _ -> failwith "Not a symbol"
+
+
+let sexp_of_symbol (s : symbol) : Sexp.t = Atom s
 
 
 let index_of_sexp (s : Sexp.t) : index =
@@ -107,6 +113,12 @@ let index_of_sexp (s : Sexp.t) : index =
   | _ -> failwith "Not an index"
 
 
+let sexp_of_index (i : index) : Sexp.t =
+  match i with
+  | INum i -> Atom (Int.to_string i)
+  | ISym s -> Atom s
+
+
 let identifier_of_sexp (s : Sexp.t) : identifier =
   match s with
   | Atom name ->
@@ -116,6 +128,13 @@ let identifier_of_sexp (s : Sexp.t) : identifier =
   | _ -> failwith "Not an identifier."
 
 
+let sexp_of_identifier (id : identifier) : Sexp.t =
+  match id with
+  | IdSimple name -> Atom name
+  | IdIndexed (name, indices) ->
+    List (Atom "_"::(sexp_of_symbol name)::(List.map ~f:sexp_of_index indices))
+
+
 let rec sort_of_sexp (s : Sexp.t) : sort =
   try SId (identifier_of_sexp s) with
   | _ ->
@@ -123,6 +142,13 @@ let rec sort_of_sexp (s : Sexp.t) : sort =
     | List (id :: (s1 :: sorts)) ->
       SApp (identifier_of_sexp id, List.map ~f:sort_of_sexp (s1 :: sorts))
     | _ -> failwith "Not a sort"
+
+
+let rec sexp_of_sort (s : sort) : Sexp.t =
+  match s with
+  | SId s -> sexp_of_identifier s
+  | SApp (sname, sort_params) ->
+    List (sexp_of_identifier sname :: List.map ~f:sexp_of_sort sort_params)
 
 
 let char_to_bool (c : char) =
@@ -153,11 +179,29 @@ let literal_of_sexp (s : Sexp.t) : literal =
   | _ -> failwith "not a literal"
 
 
+let bool_list_to_bin_string (l : bool list) =
+  String.concat (List.map ~f:(fun b -> if b then "1" else "0") l)
+
+
+let sexp_of_literal (l : literal) : Sexp.t =
+  match l with
+  | LitNum i -> Atom (Int.to_string i)
+  | LitDec f -> Atom (Float.to_string f)
+  | LitBool b -> Atom (Bool.to_string b)
+  | LitHex s -> Atom ("#x"^s)
+  | LitBin b -> Atom ("#b"^(bool_list_to_bin_string b))
+  | LitString s -> Atom ("\""^s^"\"")
+
+
 let sorted_var_of_sexp (s : Sexp.t) : sorted_var =
   match s with
   | Sexp.(List [symb; sort]) ->
     symbol_of_sexp symb, sort_of_sexp sort
   | _ -> failwith "Not a sorted var"
+
+
+let sexp_of_sorted_var (symb, sort : sorted_var) : Sexp.t =
+  List [sexp_of_symbol symb; sexp_of_sort sort]
 
 
 let rec term_of_sexp (s : Sexp.t) : term =
@@ -178,11 +222,25 @@ let rec term_of_sexp (s : Sexp.t) : term =
     try TLit (literal_of_sexp s)
     with _ -> TId (identifier_of_sexp s)
 
-
 and binding_of_sexp (s: Sexp.t) : binding =
   match s with
   | List [symb; term] -> symbol_of_sexp symb, term_of_sexp term
   | _ -> failwith "not a binding"
+
+
+let rec sexp_of_term (t : term) : Sexp.t =
+  match t with
+  | TId s -> sexp_of_identifier s
+  | TLit l -> sexp_of_literal l
+  | TApp (f, args) -> List (sexp_of_identifier f :: List.map ~f:sexp_of_term args)
+  | TExists (vars, body) ->
+    List [Atom "exists"; List (List.map ~f:sexp_of_sorted_var vars); sexp_of_term body]
+  | TForall (vars, body) ->
+    List [Atom "forall"; List (List.map ~f:sexp_of_sorted_var vars); sexp_of_term body]
+  | TLet (bindings, body) ->
+    List [Atom "let";
+          List (List.map bindings ~f:(fun (s,t) -> Sexp.List [sexp_of_symbol s; sexp_of_term t]));
+          sexp_of_term body]
 
 
 let feature_of_sexp (s : Sexp.t) : feature =
@@ -193,10 +251,20 @@ let feature_of_sexp (s : Sexp.t) : feature =
   | _ -> failwith "Not a feature."
 
 
+let sexp_of_feature (f : feature) : Sexp.t =
+  match f with
+  | FGrammar ->   Atom "grammars"
+  | FFwdDecls ->  Atom "fwd-decls"
+  | FRecursion -> Atom "recursion"
+
+
 let sort_decl_of_sexp (s : Sexp.t) : sort_decl =
   match s with
   | List [symb; Atom num] -> symbol_of_sexp symb, Int.of_string num
   | _ -> failwith "Not a sort declaration."
+
+
+let sexp_of_sort_decl (name, id : sort_decl) : Sexp.t = List [Atom name; Atom (Int.to_string id)]
 
 
 let sort_decl_list_of_sexp (s : Sexp.t) : sort_decl list =
@@ -210,6 +278,10 @@ let dt_cons_dec_of_sexp (s : Sexp.t) : dt_cons_dec =
   match s with
   | List (symb :: args) -> symbol_of_sexp symb, List.map ~f:sorted_var_of_sexp args
   | _ -> failwith "Not a data constructor declaration."
+
+
+let sexp_of_dt_cons_dec (s, args_sorts : dt_cons_dec) : Sexp.t =
+  List (Atom s :: List.map ~f:sexp_of_sorted_var args_sorts)
 
 
 let dt_cons_dec_list_of_sexp (s : Sexp.t) : dt_cons_dec list =
@@ -226,11 +298,25 @@ let gterm_of_sexp (s : Sexp.t) : gterm =
     try GTerm (term_of_sexp t) with _ -> failwith "Not a grammar term."
 
 
+let sexp_of_gterm (t : gterm) : Sexp.t =
+  match t with
+  | GConstant c -> List [Atom "Constant"; sexp_of_sort c]
+  | GTerm t -> sexp_of_term t
+  | GVar v -> List [Atom "Variable"; sexp_of_sort v]
+
+
 let grouped_rule_of_sexp (s : Sexp.t) : grouped_rule_list =
   match s with
   | List [name; sort; List gramterms] ->
     symbol_of_sexp name, sort_of_sexp sort, List.map ~f:gterm_of_sexp gramterms
   | _ -> failwith "Not a grouped rule."
+
+
+let sexp_of_grouped_rule_list (name, sort, productions : grouped_rule_list) : Sexp.t =
+  Sexp.List [Sexp.Atom name;
+             sexp_of_sort sort;
+             Sexp.List (List.map ~f:sexp_of_gterm productions)]
+
 
 
 let grammar_def_of_sexps (sv : Sexp.t) (gr : Sexp.t) : grammar_def =
@@ -244,6 +330,10 @@ let grammar_def_of_sexps (sv : Sexp.t) (gr : Sexp.t) : grammar_def =
      | _ -> failwith "Not a grammar definition.")
   | _ -> failwith "Not a grammar definition."
 
+let sexp_of_grammar_def (gr : grammar_def) : Sexp.t =
+  let sv_list, gr_list = List.unzip gr in
+  List [List (List.map ~f:sexp_of_sorted_var sv_list);
+        List (List.map ~f:sexp_of_grouped_rule_list gr_list)]
 
 let command_of_sexp (s : Sexp.t) : command =
   let command_of_elts (sl : Sexp.t list) : command =
@@ -273,6 +363,7 @@ let command_of_sexp (s : Sexp.t) : command =
     | [Atom com_name; Atom ":"; arg1; arg2] ->
       (match com_name with
        | "set-info" -> CSetInfo (symbol_of_sexp arg1, literal_of_sexp arg2)
+       | "set-option" -> CSetOption (symbol_of_sexp arg1, literal_of_sexp arg2)
        | "set-feature" -> CSetFeature (feature_of_sexp arg1, bool_of_sexp arg2)
        | _ -> failwith "not a command")
 
@@ -293,5 +384,136 @@ let command_of_sexp (s : Sexp.t) : command =
   | List elts -> command_of_elts elts
   | _ -> failwith "Not a command."
 
+
+let sexp_of_command (c : command) : Sexp.t =
+  match c with
+  | CCheckSynth ->
+    List [Atom "check-synth"]
+
+  | CConstraint t ->
+    List [Atom "constraint"; sexp_of_term t]
+
+  | CDeclareVar (name, sort) ->
+    List [Atom "declare-var"; sexp_of_symbol name; sexp_of_sort sort]
+
+  | CInvConstraint (a, b, c, d) ->
+    List [Atom "inv-constraint";Atom a; Atom b; Atom c; Atom d]
+
+  | CSetFeature (feat, boolc) ->
+    List [Atom "set-feature"; Atom ":"; sexp_of_feature feat; Atom (Bool.to_string boolc)]
+
+  | CSynthFun (name, args, res, body) ->
+    List [Atom "synth-fun"; Atom name; List (List.map ~f:sexp_of_sorted_var args);
+          sexp_of_sort res; sexp_of_grammar_def body ]
+
+  | CSynthInv (name, args, body) ->
+    List [Atom "synth-fun"; Atom name; List (List.map ~f:sexp_of_sorted_var args);
+          sexp_of_grammar_def body ]
+
+  | CDeclareDataType (name, dtdecls) ->
+    List [Atom "declare-datatype"; Atom name; List (List.map ~f:sexp_of_dt_cons_dec dtdecls)]
+
+  | CDeclareDataTypes (sortdec, dtdecls) ->
+    List [Atom "declare-datatypes";
+          List (List.map ~f:sexp_of_sort_decl sortdec);
+          List (List.map ~f:sexp_of_dt_cons_dec dtdecls)]
+
+  | CDeclareSort (name, id) ->
+    List [Atom "declare-sort"; Atom name; Atom (Int.to_string id)]
+
+  | CDefineFun (name, args, res, body) ->
+    List [Atom "define-fun"; Atom name;
+          List (List.map ~f:sexp_of_sorted_var args);
+          sexp_of_sort res; sexp_of_term body]
+
+  | CDefineSort (name, sort) ->
+    List [Atom "define-sort"; Atom name; sexp_of_sort sort]
+
+  | CSetInfo (sym, lit) ->
+    List [Atom "set-info"; Atom ":"; Atom sym; sexp_of_literal lit]
+
+  | CSetLogic sym ->
+    List [Atom "set-logic"; Atom sym]
+
+  | CSetOption (sym, lit) ->
+    List [Atom "set-option"; Atom ":"; Atom sym; sexp_of_literal lit]
+
+
 let program_of_sexp_list (sexps : Sexp.t list) : program =
   List.map ~f:command_of_sexp sexps
+
+let sexp_list_of_program (p : program) : Sexp.t list =
+  List.map ~f:sexp_of_command p
+
+(* ============================================================================================= *)
+(*                                      WRAPPER MODULES                                          *)
+(* ============================================================================================= *)
+
+module Command = struct
+  type t = command
+  let of_sexp = command_of_sexp
+  let sexp_of = sexp_of_command
+  let pp fmt c = Sexp.pp fmt (sexp_of c)
+  let pp_hum fmt c = Sexp.pp_hum fmt (sexp_of c)
+end
+
+module Term = struct
+  type t = term
+  let of_sexp = term_of_sexp
+  let sexp_of = sexp_of_term
+  let pp fmt c = Sexp.pp fmt (sexp_of c)
+  let pp_hum fmt c = Sexp.pp_hum fmt (sexp_of c)
+end
+
+module Identifier = struct
+  type t = identifier
+  let of_sexp = identifier_of_sexp
+  let sexp_of = sexp_of_identifier
+  let pp fmt c = Sexp.pp fmt (sexp_of c)
+  let pp_hum fmt c = Sexp.pp_hum fmt (sexp_of c)
+end
+
+module Literal = struct
+  type t = literal
+  let of_sexp = literal_of_sexp
+  let sexp_of = sexp_of_literal
+  let pp fmt c = Sexp.pp fmt (sexp_of c)
+  let pp_hum fmt c = Sexp.pp_hum fmt (sexp_of c)
+end
+
+module Sort = struct
+  type t = sort
+  let of_sexp = sort_of_sexp
+  let sexp_of = sexp_of_sort
+  let pp fmt c = Sexp.pp fmt (sexp_of c)
+  let pp_hum fmt c = Sexp.pp_hum fmt (sexp_of c)
+end
+
+
+(* ============================================================================================= *)
+(*                       SEMANTIC PROPERTIES                                                     *)
+(* ============================================================================================= *)
+
+let is_setter_command (c : Command.t) =
+  match c with
+  | CSetFeature _ | CSetInfo _ | CSetLogic _ | CSetOption _ -> true
+  | _ -> false
+
+(**
+   A SyGuS input is not well-formed if it specifies a list of commands that do not meet the restrictions given
+   in this section regarding their order. The order is specified by the following regular pattern:
+   ```({set logic command})? ({setter commands})∗({other commands})∗```
+*)
+let is_well_formed (p : program) : bool =
+  let setter_then_other l =
+    let _, b =
+      (List.fold l ~init:(false, true)
+         ~f:(fun (b0, b1) c -> let b = is_setter_command c in b0 && b, b1 && (not b || (b && b0))))
+    in b
+  in
+  match p with
+  | [] -> true
+  | hd :: tl ->
+    (match hd with
+     | CSetLogic _ -> setter_then_other tl
+     | _ -> setter_then_other p)
