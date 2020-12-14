@@ -1,0 +1,10 @@
+(set-logic LIA)
+(synth-fun f ((x Int) (y Int)) Int
+        ((I Int ) (Ic Int))
+        ((I Int (0 1 x y (+ I I) (* Ic I)))
+         (Ic Int (0 1 2 ( - 1) ( - 2)))))
+(declare-var x Int )
+(declare-var y Int )
+(constraint (= (f 0 y) (* 2 y)))
+(constraint (= (f x 0) (* 2 x)))
+(check-synth)

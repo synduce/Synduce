@@ -28,9 +28,9 @@
           (run menhir %{parser} --base %{parser} --update-errors %{msg}))))
 
 ; Additional rule to add to runtest a check that the messages file is up-to-date
-(rule
-  (alias runtest)
-  (deps   (:parser parseSmtlib.mly)
-          (:new new.messages)
-          (:msg syntax.messages))
-  (action (run menhir %{parser} --base %{parser} --compare-errors %{new} --compare-errors %{msg})))
+; (rule
+;   (alias runtest)
+;   (deps   (:parser parseSmtlib.mly)
+;           (:new new.messages)
+;           (:msg syntax.messages))
+;   (action (run menhir %{parser} --base %{parser} --compare-errors %{new} --compare-errors %{msg})))

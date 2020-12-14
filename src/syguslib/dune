@@ -1,4 +1,4 @@
 (library
     (name syguslib)
     (public_name ReFunS.Lib.SygusLib)
-    (libraries base fmt sexplib str))
+    (libraries base utils fmt sexplib str lwt lwt.unix extlib stdio))

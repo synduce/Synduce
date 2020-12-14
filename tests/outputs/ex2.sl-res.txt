@@ -1,0 +1,2 @@
+unsat
+(define-fun f ((x List)) Int (ite ((_ is cons) x) (+ 1 (head x)) 0))
