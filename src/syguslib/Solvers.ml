@@ -51,26 +51,49 @@ module CVC4 = struct
     Fmt.(list ~sep:sp (fun fmt opt -> pf fmt "--%s" opt) frmt)
 
 
-  let _solver_call
-      ?(options = [])
-      (inputfile, outputfile : string * string) : string * process_out =
-    let racket_command =
+  let fetch_solution filename =
+    Log.debug_msg Fmt.(str "Fetching solution in %s" filename);
+    reponse_of_sexps (Sexp.input_sexps (Stdio.In_channel.create filename))
+
+  let exec_solver ?(options=[]) (inputfile, outputfile : string * string) : solver_response option =
+    let command =
       shell Fmt.(str "%s %a %s" Config.cvc4_binary_path print_options options inputfile)
     in
     let out_fd =
       Unix.openfile outputfile [Unix.O_RDWR; Unix.O_TRUNC; Unix.O_CREAT] 0o644
     in
-    outputfile, open_process_out ~stdout:(`FD_move out_fd) racket_command
+    match Lwt_main.run (exec ~stdout:(`FD_move out_fd) command) with
+    | Unix.WEXITED 0 -> Some (fetch_solution outputfile)
+
+    | Unix.WEXITED i ->
+      Log.error_msg Fmt.(str "Solver exited with code %i." i);
+      None
+
+    | Unix.WSIGNALED i ->
+      Log.error_msg Fmt.(str "Solver signaled with code %i." i);
+      None (* TODO error messages. *)
+
+    | Unix.WSTOPPED i ->
+      Log.error_msg Fmt.(str "Solver stopped with code %i." i);
+      None
 
 
-  let fetch_solution filename =
-    Log.debug_msg Fmt.(str "Fetching solution in %s" filename);
-    reponse_of_sexps (Sexp.input_sexps (Stdio.In_channel.create filename))
+
+  let wrapped_solver_call
+      ?(options = [])
+      (inputfile, outputfile : string * string) : string * process_out =
+    let command =
+      shell Fmt.(str "%s %a %s" Config.cvc4_binary_path print_options options inputfile)
+    in
+    let out_fd =
+      Unix.openfile outputfile [Unix.O_RDWR; Unix.O_TRUNC; Unix.O_CREAT] 0o644
+    in
+    outputfile, open_process_out ~stdout:(`FD_move out_fd) command
 
 
-  let exec_solver (filenames : (string * string) list) =
-    let processes = List.map ~f:_solver_call filenames in
-    let proc_status this _ otf =
+  let exec_solver_parallel (filenames : (string * string) list) =
+    let processes = List.map ~f:wrapped_solver_call filenames in
+    let proc_status this otf =
       let sol =
         try
           fetch_solution otf
@@ -90,7 +113,7 @@ module CVC4 = struct
     in
     let cp =
       List.map processes
-        ~f:(fun (otf, proc) -> Lwt.map (fun x -> proc_status proc x otf) proc#status)
+        ~f:(fun (otf, proc) -> Lwt.map (fun _ -> proc_status proc otf) proc#status)
     in
     Lwt_main.run (Lwt.all cp)
 

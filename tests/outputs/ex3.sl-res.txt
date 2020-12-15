@@ -1,2 +1,0 @@
-unsat
-(define-fun f ((x (_ BitVec 32))) (_ BitVec 32) (concat ((_ extract 15 0) x) #b0000000000000000))

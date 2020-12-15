@@ -1,2 +1,0 @@
-unsat
-(define-fun f ((x Int) (y Int)) Int (* 2 (+ x y)))
