@@ -122,7 +122,7 @@ logical_and_e:
 
 equality_e:
     | a=comp_e EQ b=comp_e                                                      { mk_bin $loc Term.Binop.Eq a b }
-    | a=comp_e NEQ b=comp_e                                                     { mk_bin $loc Term.Binop.Neq a b }
+    | a=comp_e NEQ b=comp_e                                                     { mk_un $loc Term.Unop.Not (mk_bin $loc Term.Binop.Eq a b) }
     | comp_e                                                                    { $1 }
 
 comp_e:

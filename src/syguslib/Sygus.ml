@@ -34,12 +34,12 @@ type sygus_sort =
   | SApp of identifier * sygus_sort list
 
 type sygus_term =
-  | TId of identifier
-  | TLit of literal
-  | TApp of identifier * sygus_term list
-  | TExists of sorted_var list * sygus_term
-  | TForall of sorted_var list * sygus_term
-  | TLet of binding list * sygus_term
+  | SyId of identifier
+  | SyLit of literal
+  | SyApp of identifier * sygus_term list
+  | SyExists of sorted_var list * sygus_term
+  | SyForall of sorted_var list * sygus_term
+  | SyLet of binding list * sygus_term
 
 and sorted_var = symbol * sygus_sort list
 
@@ -220,20 +220,20 @@ let sexp_of_sorted_var (symb, sygus_sort : sorted_var) : Sexp.t =
 let rec sygus_term_of_sexp (s : Sexp.t) : sygus_term =
   match s with
   | List [Atom "exists"; List _vars; sygus_term] ->
-    TExists (List.map ~f:sorted_var_of_sexp _vars, sygus_term_of_sexp sygus_term)
+    SyExists (List.map ~f:sorted_var_of_sexp _vars, sygus_term_of_sexp sygus_term)
 
   | List [Atom "forall"; List _vars; sygus_term] ->
-    TForall (List.map ~f:sorted_var_of_sexp _vars, sygus_term_of_sexp sygus_term)
+    SyForall (List.map ~f:sorted_var_of_sexp _vars, sygus_term_of_sexp sygus_term)
 
   | List [Atom "let"; List bindings; sygus_term] ->
-    TLet (List.map ~f:binding_of_sexp bindings, sygus_term_of_sexp sygus_term)
+    SyLet (List.map ~f:binding_of_sexp bindings, sygus_term_of_sexp sygus_term)
 
   | List (hd :: tl) ->
-    TApp(identifier_of_sexp hd, List.map ~f:sygus_term_of_sexp tl)
+    SyApp(identifier_of_sexp hd, List.map ~f:sygus_term_of_sexp tl)
 
   | _ ->
-    try TLit (literal_of_sexp s)
-    with _ -> TId (identifier_of_sexp s)
+    try SyLit (literal_of_sexp s)
+    with _ -> SyId (identifier_of_sexp s)
 
 and binding_of_sexp (s: Sexp.t) : binding =
   match s with
@@ -243,14 +243,14 @@ and binding_of_sexp (s: Sexp.t) : binding =
 
 let rec sexp_of_sygus_term (t : sygus_term) : Sexp.t =
   match t with
-  | TId s -> sexp_of_identifier s
-  | TLit l -> sexp_of_literal l
-  | TApp (f, args) -> List (sexp_of_identifier f :: List.map ~f:sexp_of_sygus_term args)
-  | TExists (vars, body) ->
+  | SyId s -> sexp_of_identifier s
+  | SyLit l -> sexp_of_literal l
+  | SyApp (f, args) -> List (sexp_of_identifier f :: List.map ~f:sexp_of_sygus_term args)
+  | SyExists (vars, body) ->
     List [Atom "exists"; List (List.map ~f:sexp_of_sorted_var vars); sexp_of_sygus_term body]
-  | TForall (vars, body) ->
+  | SyForall (vars, body) ->
     List [Atom "forall"; List (List.map ~f:sexp_of_sorted_var vars); sexp_of_sygus_term body]
-  | TLet (bindings, body) ->
+  | SyLet (bindings, body) ->
     List [Atom "let";
           List (List.map bindings ~f:(fun (s,t) -> Sexp.List [sexp_of_symbol s; sexp_of_sygus_term t]));
           sexp_of_sygus_term body]
@@ -537,7 +537,7 @@ let reponse_of_sexps (s : Sexp.t list) : solver_response =
 (*                                      WRAPPER MODULES                                          *)
 (* ============================================================================================= *)
 
-module Command = struct
+module SyCommand = struct
   type t = command
   let of_sexp = command_of_sexp
   let sexp_of = sexp_of_command
@@ -545,7 +545,7 @@ module Command = struct
   let pp_hum fmt c = Sexp.pp_hum fmt (sexp_of c)
 end
 
-module Term = struct
+module SyTerm = struct
   type t = sygus_term
   let of_sexp = sygus_term_of_sexp
   let sexp_of = sexp_of_sygus_term
@@ -553,7 +553,7 @@ module Term = struct
   let pp_hum fmt c = Sexp.pp_hum fmt (sexp_of c)
 end
 
-module Identifier = struct
+module SyIdentifier = struct
   type t = identifier
   let of_sexp = identifier_of_sexp
   let sexp_of = sexp_of_identifier
@@ -561,7 +561,7 @@ module Identifier = struct
   let pp_hum fmt c = Sexp.pp_hum fmt (sexp_of c)
 end
 
-module Literal = struct
+module SyLiteral = struct
   type t = literal
   let of_sexp = literal_of_sexp
   let sexp_of = sexp_of_literal
@@ -569,7 +569,7 @@ module Literal = struct
   let pp_hum fmt c = Sexp.pp_hum fmt (sexp_of c)
 end
 
-module Sort = struct
+module SySort = struct
   type t = sygus_sort
   let of_sexp = sygus_sort_of_sexp
   let sexp_of = sexp_of_sygus_sort
@@ -578,7 +578,7 @@ module Sort = struct
 end
 
 let write_command (out : Stdio.Out_channel.t) (c : command) : unit =
-  let comm_s = Fmt.(to_to_string Command.pp c) in
+  let comm_s = Fmt.(to_to_string SyCommand.pp c) in
   Stdio.Out_channel.(output_lines out [comm_s]; flush out;)
 
 
@@ -586,7 +586,7 @@ let write_command (out : Stdio.Out_channel.t) (c : command) : unit =
 (*                       SEMANTIC PROPERTIES                                                     *)
 (* ============================================================================================= *)
 
-let is_setter_command (c : Command.t) =
+let is_setter_command (c : SyCommand.t) =
   match c with
   | CSetFeature _ | CSetInfo _ | CSetLogic _ | CSetOption _ -> true
   | _ -> false
@@ -609,3 +609,16 @@ let is_well_formed (p : program) : bool =
     (match hd with
      | CSetLogic _ -> setter_then_other tl
      | _ -> setter_then_other p)
+
+(* ============================================================================================= *)
+(*                       STATIC DEFINITIONS                                                      *)
+(* ============================================================================================= *)
+
+let max_definition =
+  SyCommand.of_sexp
+    (Sexp.of_string "(define-fun max ((x Int) (y Int)) Int (ite (> x y) x y))")
+
+let min_definition =
+  SyCommand.of_sexp
+    (Sexp.of_string "(define-fun min ((x Int) (y Int)) Int (ite (< x y) x y))")
+

@@ -45,6 +45,18 @@ type solver_instance = {
 let online_solvers : (int * solver_instance) list ref = ref []
 
 
+let mk_tmp_sl prefix = Caml.Filename.temp_file prefix ".sl"
+
+
+let commands_to_file (commands : program) (filename : string) =
+  let out_chan = OC.create filename in
+  let fout = Stdlib.Format.formatter_of_out_channel out_chan in
+  Fmt.set_utf_8 fout false;
+  Stdlib.Format.pp_set_margin fout 100;
+  List.iter commands ~f:(fun c -> SyCommand.pp_hum fout c; Fmt.(pf fout "@."));
+  OC.close out_chan
+
+
 module CVC4 = struct
 
   let print_options (frmt : Formatter.t) =
@@ -116,6 +128,13 @@ module CVC4 = struct
         ~f:(fun (otf, proc) -> Lwt.map (fun _ -> proc_status proc otf) proc#status)
     in
     Lwt_main.run (Lwt.all cp)
+
+  let solve_commands (p : program) = 
+    let inputfile = mk_tmp_sl "in_" in 
+    let outputfile = mk_tmp_sl "out_" in
+    Log.debug_msg Fmt.(str "Solving %s -> %s." inputfile outputfile);
+    commands_to_file p inputfile;
+    exec_solver (inputfile, outputfile)
 
 end
 

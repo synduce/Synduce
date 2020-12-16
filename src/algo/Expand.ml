@@ -14,12 +14,15 @@ let maximally_reduced_app (p : psi_def) (func : term) (args : term list) : bool 
 
 
 let nonreduced_terms (p : psi_def) (t : term) : (variable * term list) list =
+  let all_nont =
+    VarSet.union_list [p.target.pnon_terminals; p.orig.pnon_terminals; p.repr.pnon_terminals]
+  in
   let join = (@) in
   let case _ t =
     match t.tkind with
     | TApp(func, args) ->
       (match func.tkind with
-       | TVar func_var ->
+       | TVar func_var when Set.mem all_nont func_var ->
          if maximally_reduced_app p func args then None
          else Some [func_var, args]
        | _ -> None)
@@ -31,17 +34,20 @@ let nonreduced_terms (p : psi_def) (t : term) : (variable * term list) list =
 let replace_nonreduced_by_main (p : psi_def) (t : term) : term =
   let nr = nonreduced_terms p t in
   let f_init_rules =
-    Map.filter ~f:(fun (nt, _, _, _) -> Variable.(nt = p.orig.pmain_symb)) p.orig.prules
+    Map.filter  p.orig.prules ~f:(fun (nt, _, _, _) -> Variable.(nt = p.orig.pmain_symb))
+  and g_init_rules =
+    Map.filter p.target.prules ~f:(fun (nt, _, _, _) -> Variable.(nt = p.target.pmain_symb))
   in
-  let replacements =
+  let replacements rule_set =
     let f (nt, args) =
-      match Map.max_elt (PMRS.inverted_rule_lookup f_init_rules (mk_var nt) args) with
+      match Map.max_elt (PMRS.inverted_rule_lookup rule_set (mk_var nt) args) with
       | Some (_, lhs) -> Some (mk_app (mk_var nt) args, lhs)
       | None -> None
     in
     List.filter_map ~f:(fun x -> x) (List.map ~f nr)
   in
-  substitution replacements t
+  let subst = (replacements g_init_rules) @ (replacements f_init_rules) in
+  substitution subst t
 
 let maximal (p : psi_def) (t : term) : TermSet.t * TermSet .t =
   let t' = replace_nonreduced_by_main p (PMRS.reduce p.orig t) in

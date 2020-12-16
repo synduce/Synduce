@@ -108,12 +108,17 @@ module Variable = struct
 
   let print_summary (frmt : Formatter.t) () =
     Utils.Log.(info (wrap "Variables in tables:"));
-    Fmt.(pf frmt "\tID\t NAME \t TYPE@.");
+    let le =
+      Hashtbl.fold (Alpha.get_ids ()) ~init:0
+        ~f:(fun ~key:_ ~data l -> max l (String.length data))
+    in
+    Fmt.(pf frmt "\t  ID | %*s : TYPE@." le "NAME");
+    Fmt.(pf frmt "\t---------------------------@.");
     Hashtbl.iteri (Alpha.get_ids ())
       ~f:(fun ~key ~data ->
           match Hashtbl.find _types key with
-          | Some t -> Fmt.(pf frmt "\t%i\t %s \t %a@." key data RType.pp t)
-          | None -> Fmt.(pf frmt "\t%i\t %s \t ??@." key data))
+          | Some t -> Fmt.(pf frmt "\t%4i | %*s : %a@." key le data RType.pp t)
+          | None -> Fmt.(pf frmt "\t%4i | %*s : ??@." key le data))
 
 end
 
@@ -185,7 +190,10 @@ struct
   let dump formatter vs =
     Fmt.Dump.(list pp_id_var formatter (elements vs))
 
-  let of_sh sh = Hashtbl.fold ~f:(fun ~key:_ ~data:v vset -> Set.add vset v) sh ~init:(Set.empty (module Variable))
+  let of_sh sh =
+    Hashtbl.fold sh
+      ~f:(fun ~key:_ ~data:v vset -> Set.add vset v)
+      ~init:(Set.empty (module Variable))
 end
 
 (* ----------------------------------------------------- *)
@@ -195,7 +203,7 @@ end
 
 module Binop = struct
   type t =
-    | Lt | Gt | Ge | Le | Eq | Neq
+    | Lt | Gt | Ge | Le | Eq
     | Max | Min
     | Plus | Minus
     | Times | Div | Mod
@@ -203,14 +211,13 @@ module Binop = struct
 
   let compare = Poly.compare
   let equal = Poly.equal
-  let to_string (op : t) =
+  let to_pp_string (op : t) =
     match op with
     | Lt -> "<"
     | Gt -> ">"
     | Ge -> "≥"
     | Le -> "≤"
     | Eq -> "="
-    | Neq -> "≠"
     | Max -> "￪"
     | Min -> "￬"
     | Plus -> "+"
@@ -220,20 +227,56 @@ module Binop = struct
     | Mod -> "%"
     | And -> "∧"
     | Or -> "∨"
+
+  let to_string (op : t) =
+    match op with
+    | Lt -> "<"
+    | Gt -> ">"
+    | Ge -> ">="
+    | Le -> "<="
+    | Eq -> "="
+    | Max -> "max"
+    | Min -> "min"
+    | Plus -> "+"
+    | Minus -> "-"
+    | Times -> "*"
+    | Div -> "/"
+    | Mod -> "mod"
+    | And -> "and"
+    | Or -> "or"
+
+  let of_string (s : string) : t option =
+    match s with
+    | "<"  ->    Some Lt
+    | ">"  ->    Some Gt
+    | ">="  ->   Some Le
+    | "<="  ->   Some Ge
+    | "="  ->    Some Eq
+    | "max"  ->  Some Max
+    | "min"  ->  Some Min
+    | "+"  ->    Some Plus
+    | "-"  ->    Some Minus
+    | "*"  ->    Some Times
+    | "/"  ->    Some Div
+    | "mod"  ->  Some Mod
+    | "and"  ->  Some And
+    | "or"  ->   Some Or
+    | _ -> None
+
   let operand_types (op : t) =
     RType.(match op with
         | Lt | Gt | Ge | Le -> TInt, TInt
-        | Eq | Neq -> TInt, TInt
+        | Eq  -> TInt, TInt
         | Max | Min| Plus | Minus | Times | Div | Mod -> TInt, TInt
         | And | Or -> TBool, TBool)
 
   let result_type (op : t) =
     RType.(match op with
         | Lt | Gt | Ge | Le -> TBool
-        | Eq| Neq -> TBool
+        | Eq -> TBool
         | Max | Min| Plus | Minus | Times | Div | Mod -> TInt
         | And | Or -> TBool)
-  let pp (frmt : Formatter.t) (op : t) = Fmt.string frmt (to_string op)
+  let pp (frmt : Formatter.t) (op : t) = Fmt.string frmt (to_pp_string op)
 end
 
 module Unop = struct
@@ -242,17 +285,27 @@ module Unop = struct
     | Abs
 
   let compare = Poly.compare
+
   let equal = Poly.equal
+
   let operand_type (op : t) =
     match op with | Neg -> RType.TInt| Not -> RType.TBool | Abs -> RType.TInt
 
   let result_type (op : t) =
     match op with | Neg -> RType.TInt| Not -> RType.TBool | Abs -> RType.TInt
 
-  let to_string (op : t) =
+  let to_pp_string (op : t) =
     match op with | Neg -> failwith "-" | Not -> failwith "¬" | Abs -> failwith "abs"
-  let pp frmt op = Fmt.string frmt (to_string op)
+
+  let to_string (op : t) =
+    match op with | Neg -> failwith "-" | Not -> failwith "not" | Abs -> failwith "abs"
+
+  let of_string (s : string) : t option =
+    match s with | "-" -> Some Neg | "not" -> Some Not | "abs " -> Some Abs | _ -> None
+
+  let pp frmt op = Fmt.string frmt (to_pp_string op)
 end
+
 
 module Constant = struct
   type t =
@@ -424,6 +477,20 @@ let fpat_sub_all fp1s fp2s =
   | _ -> None
 
 let sexp_of_term (_ : term) = Sexp.Atom "TODO"
+
+let rec mk_composite_scalar (t : RType.t) : term =
+  match t with
+  | RType.TInt -> mk_var (Variable.mk ~t:(Some t) (Alpha.fresh "i_"))
+  | RType.TBool -> mk_var (Variable.mk ~t:(Some t) (Alpha.fresh "b_"))
+  | RType.TString -> mk_var (Variable.mk ~t:(Some t) (Alpha.fresh "s_"))
+  | RType.TChar -> mk_var (Variable.mk ~t:(Some t) (Alpha.fresh "c_"))
+  | RType.TTup tl -> mk_tup (List.map ~f:mk_composite_scalar tl)
+  | RType.TNamed _
+  | RType.TFun (_, _)
+  | RType.TParam (_, _)
+  | RType.TVar _ -> failwith "not a scalar type"
+
+
 
 (* ============================================================================================= *)
 (*                             EQUALITY                                                          *)

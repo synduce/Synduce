@@ -54,3 +54,16 @@ let cartesian_nary_product (elts : ('a list) list) : ('a list) list =
   match elts with
   | hd :: tl -> List.fold ~f ~init:(List.map ~f:(fun x -> [x]) hd) tl
   | [] -> []
+
+let all_or_none (l : ('a option) list) : ('a list) option =
+  let rec aux a l =
+    Option.bind a
+      ~f:(fun y -> match l with
+          | [] -> a
+          | (Some x) :: tl -> aux (Some (x :: y)) tl
+          | None :: _ -> None)
+  in
+  match l with 
+  | [] -> Some [] 
+  | None :: _ -> None
+  | (Some a) :: tl -> aux (Some [a]) tl

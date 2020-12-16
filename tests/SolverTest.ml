@@ -23,7 +23,7 @@ let test_from_input_file ?(print=true) file =
   | Some (RSuccess synthesized_funcs) ->
     let commands = List.map ~f:(fun (a,b,c,d) -> CDefineFun (a,b,c,d)) synthesized_funcs in
     if print then
-      Log.(info (fun fmt () -> pf fmt "%a" (list Command.pp_hum) commands))
+      Log.(info (fun fmt () -> pf fmt "%a" (list SyCommand.pp_hum) commands))
     else ()
   | Some RFail -> Log.(info (wrap "Synthesis failure."))
   | Some RInfeasible -> Log.(info (wrap "Unfeasible."))
@@ -35,5 +35,7 @@ test_from_input_file "ex1.sl";
 test_from_input_file "ex2.sl";
 test_from_input_file "ex3.sl";
 test_from_input_file "ex4.sl";
+test_from_input_file "ex5.sl";
 test_from_input_file ~print:false "fg_max14.sl";
-test_from_input_file "small_linear_func.sl"
+test_from_input_file "small_linear_func.sl";
+test_from_input_file "ex_from.sl"

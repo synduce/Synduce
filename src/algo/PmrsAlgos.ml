@@ -9,17 +9,20 @@ open AState
 (* ============================================================================================= *)
 
 let rec refinement_loop (p : psi_def) (t_set, u_set : TermSet.t * TermSet.t) =
-  let _ = t_set, u_set in 
-  let _ = p in 
+  let _ = t_set, u_set in
+  let eqns = Equations.make ~p t_set in
+  let _ = Equations.solve ~p eqns in
   if false then refinement_loop p (t_set, u_set) else ()
+
 
 let psi (p : psi_def) =
   let _ = p.target in
   let _ = p.orig in
   let _ = p.repr in
   let mgts = MGT.most_general_terms p.target in
-  let t_set, u_set = 
-    List.fold mgts ~init:(TermSet.empty, TermSet.empty) 
+  (* Initialize sets with the most general terms. *)
+  let t_set, u_set =
+    List.fold mgts ~init:(TermSet.empty, TermSet.empty)
       ~f:(fun (t,u) (_, mgt_opt) ->
           match mgt_opt with
           | None -> t,u
