@@ -245,3 +245,14 @@ let func_to_pmrs (f : Variable.t) (args : fpattern list) (body : Term.term) =
     prules = prules;
     pnon_terminals = pnon_terminals;
   }
+
+let subst_rule_rhs ~(p : t) (substs : (term * term) list) = 
+  let rules' = 
+    let f (nt, args, pat, body) =
+      let body' = substitution substs body in
+      let body'', _ = infer_type body' in
+      nt, args, pat, body''
+    in
+    Map.map ~f p.prules
+  in
+  {p with prules = rules'}

@@ -71,6 +71,8 @@ let wrap (s : string) =
 
 let wrap1 f s t = fun fmt () -> pf fmt f s t
 
+let wrap2 f s1 t1 s2 t2 = fun fmt () -> pf fmt f s1 t1 s2 t2
+
 let error (msg : Formatter.t -> unit -> unit) : unit =
   pf Fmt.stdout "@[<hov 2>%a@;%a@]@." (styled (`Bg `Red) string) "[ERROR]" msg ()
 

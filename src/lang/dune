@@ -1,5 +1,5 @@
 (library
  (name lang)
  (public_name ReFunS.Lib.Lang)
- (libraries base fmt unix sexplib ppx_let utils syguslib)
+ (libraries base fmt unix sexplib ppx_let utils syguslib smtlib)
  (preprocess (pps ppx_let ppx_sexp_conv)))

@@ -74,6 +74,7 @@ B ../_build/default/src/.Lib.objs/byte
 B ../_build/default/src/algo/.algo.objs/byte
 B ../_build/default/src/lang/.lang.objs/byte
 B ../_build/default/src/parsers/.parsers.objs/byte
+B ../_build/default/src/smtlib/.smtlib.objs/byte
 B ../_build/default/src/syguslib/.syguslib.objs/byte
 B ../_build/default/src/utils/.utils.objs/byte
 S /home/victorn/.opam/4.10.0/lib/base
@@ -151,6 +152,7 @@ S ../src
 S ../src/algo
 S ../src/lang
 S ../src/parsers
+S ../src/smtlib
 S ../src/syguslib
 S ../src/utils
 FLG -open Dune__exe -w @1..3@5..28@30..39@43@46..47@49..57@61..62-40 -strict-sequence -strict-formats -short-paths -keep-locs

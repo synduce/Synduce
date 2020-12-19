@@ -39,6 +39,8 @@ let (>>!|) = Result.(>>|)
 let (>>=?) = Option.(>>=)
 let (>>=!) = Result.(>>=)
 
+let repeat n f ~init = List.fold ~init ~f:(fun acc _ -> f acc) (List.range 0 n)
+
 let satom a = Sexp.Atom a
 let slist  a = Sexp.List a
 
@@ -63,7 +65,7 @@ let all_or_none (l : ('a option) list) : ('a list) option =
           | (Some x) :: tl -> aux (Some (x :: y)) tl
           | None :: _ -> None)
   in
-  match l with 
-  | [] -> Some [] 
+  match l with
+  | [] -> Some []
   | None :: _ -> None
   | (Some a) :: tl -> aux (Some [a]) tl

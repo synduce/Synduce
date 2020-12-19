@@ -69,6 +69,7 @@ B /home/victorn/.opam/4.10.0/lib/typerep
 B /home/victorn/.opam/4.10.0/lib/variantslib
 B ../../_build/default/src/algo/.algo.objs/byte
 B ../../_build/default/src/lang/.lang.objs/byte
+B ../../_build/default/src/smtlib/.smtlib.objs/byte
 B ../../_build/default/src/syguslib/.syguslib.objs/byte
 B ../../_build/default/src/utils/.utils.objs/byte
 S /home/victorn/.opam/4.10.0/lib/base
@@ -141,6 +142,7 @@ S /home/victorn/.opam/4.10.0/lib/typerep
 S /home/victorn/.opam/4.10.0/lib/variantslib
 S .
 S ../lang
+S ../smtlib
 S ../syguslib
 S ../utils
 FLG -ppx '/home/victorn/repos/refuns/_build/default/.ppx/99ce26c0794e45efde3013f872b0677a/ppx.exe --as-ppx --cookie '\''library-name="algo"'\'''

@@ -3,15 +3,34 @@ open Lang
 open Lang.Term
 open Utils
 open AState
+open Syguslib.Sygus
 
 (* ============================================================================================= *)
 (*                                                                                               *)
 (* ============================================================================================= *)
 
 let rec refinement_loop (p : psi_def) (t_set, u_set : TermSet.t * TermSet.t) =
-  let _ = t_set, u_set in
+  let _ = u_set in
   let eqns = Equations.make ~p t_set in
-  let _ = Equations.solve ~p eqns in
+  let s_resp, solution = Equations.solve ~p eqns in
+  let sat, partial_sol =
+    match s_resp, solution with
+    | RSuccess _, Some sol ->
+      List.iter sol
+        ~f:(fun (f, args, body) ->
+            Log.debug_msg Fmt.(str "%s(%a) -> %a" f (list ~sep:comma Variable.pp) args pp_term body));
+      true, Some sol
+    | RInfeasible, _ -> false, None
+    | RUnknown, _ -> true, None
+    | RSuccess _, None -> failwith "Could not parse answer."
+    | RFail, _ -> failwith "Solver failed."
+  in
+  let _ = sat in
+  begin
+    match partial_sol with
+    | Some sol -> Verify.check_solution ~p (t_set,u_set) sol
+    | None -> ()
+  end;
   if false then refinement_loop p (t_set, u_set) else ()
 
 

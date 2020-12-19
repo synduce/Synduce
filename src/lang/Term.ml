@@ -172,7 +172,9 @@ struct
     List.map ~f:(fun elt -> elt.vname, Option.value_exn (Variable.vtype elt)) (elements vs)
 
   let to_env vs =
-    Map.of_alist (module String) (List.map ~f:(fun v -> v.vname, v) (elements vs))
+    Map.of_alist_reduce (module String)
+      ~f:(fun b1 _ -> b1)
+      (List.map ~f:(fun v -> v.vname, v) (elements vs))
 
   let add_prefix vs prefix =
     of_list (List.map ~f:(fun v -> {v with vname = prefix^v.vname}) (elements vs))
@@ -277,6 +279,11 @@ module Binop = struct
         | Max | Min| Plus | Minus | Times | Div | Mod -> TInt
         | And | Or -> TBool)
   let pp (frmt : Formatter.t) (op : t) = Fmt.string frmt (to_pp_string op)
+
+  let is_ac (op : t) =
+    match op with
+    | Max | Min| Plus |  Times | And | Or -> true
+    | _ -> false
 end
 
 module Unop = struct

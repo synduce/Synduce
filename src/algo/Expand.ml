@@ -31,8 +31,8 @@ let nonreduced_terms (p : psi_def) (t : term) : (variable * term list) list =
   let init = [] in
   reduce ~init ~join ~case t
 
-let replace_nonreduced_by_main (p : psi_def) (t : term) : term =
-  let nr = nonreduced_terms p t in
+let replace_nonreduced_by_main (p : psi_def) (t0 : term) : term =
+  let nr = nonreduced_terms p t0 in
   let f_init_rules =
     Map.filter  p.orig.prules ~f:(fun (nt, _, _, _) -> Variable.(nt = p.orig.pmain_symb))
   and g_init_rules =
@@ -47,10 +47,11 @@ let replace_nonreduced_by_main (p : psi_def) (t : term) : term =
     List.filter_map ~f:(fun x -> x) (List.map ~f nr)
   in
   let subst = (replacements g_init_rules) @ (replacements f_init_rules) in
-  substitution subst t
+  substitution subst t0
 
-let maximal (p : psi_def) (t : term) : TermSet.t * TermSet .t =
-  let t' = replace_nonreduced_by_main p (PMRS.reduce p.orig t) in
+
+let maximal (p : psi_def) (t0 : term) : TermSet.t * TermSet .t =
+  let t' = replace_nonreduced_by_main p (PMRS.reduce p.orig t0) in
   let nr = nonreduced_terms p t' in
   (* Collect all the variables that need to be expanded. *)
   let expand_reqs =
@@ -64,18 +65,17 @@ let maximal (p : psi_def) (t : term) : TermSet.t * TermSet .t =
     let expansions =
       List.map ~f:(fun x -> List.cartesian_product [mk_var x] (Analysis.expand_once (mk_var x)))
         (Set.to_list expand_reqs)
-    in
-    cartesian_nary_product expansions
+    in cartesian_nary_product expansions
   in
-  let all_ts = List.map substs ~f:(fun s -> substitution s t) in
-  (* Log.debug_msg "Terms after expansions:";
-     List.iter all_ts ~f:(fun t -> Log.debug_msg Fmt.(str "@[<hov 2>%a@]" pp_term t)); *)
+  let all_ts = List.map substs ~f:(fun s -> substitution s t0) in
+  let check_max_exp t =
+    let tr = replace_nonreduced_by_main p (PMRS.reduce p.orig t) in
+    match nonreduced_terms p tr with
+      [] -> true | _ -> false
+  in
   let mr_terms, rest =
-    List.partition_tf (t :: all_ts)
-      ~f:(fun t ->
-          let tr = replace_nonreduced_by_main p (PMRS.reduce p.orig t) in
-          match nonreduced_terms p tr with
-            [] -> true | _ -> false)
+    List.partition_tf all_ts ~f:check_max_exp
   in
+  let mr_terms = if check_max_exp t0 then t0::mr_terms else mr_terms in
   (* Expand and replace in term *)
   TermSet.of_list mr_terms, TermSet.of_list rest

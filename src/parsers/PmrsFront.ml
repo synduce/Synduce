@@ -64,7 +64,7 @@ let seek_types (prog : program) =
     prog
 
 
-let fterm_to_term rloc allv globs locs rterm =
+let fterm_to_term _ allv globs locs rterm =
   let fterm_function_args args =
     let rec f x =
       match x.kind with
@@ -86,11 +86,7 @@ let fterm_to_term rloc allv globs locs rterm =
        | Some x -> x)
     | Some x -> x
   in
-  let _env =
-    match Term.VarSet.to_env locs with
-    | `Ok env -> env
-    | `Duplicate_key s -> loc_fatal_errmsg rloc ("Rule has duplicate variable "^s)
-  in
+  let _env = Term.VarSet.to_env locs in
   let rec f env t =
     match t.kind with
     | FTConst c -> Term.mk_const ~pos:t.pos c

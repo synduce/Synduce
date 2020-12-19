@@ -2,9 +2,9 @@ open Base
 open Lang
 open Lang.Term
 open AState
-open Utils
 open Syguslib.Sygus
-open TermSynthesis
+open SygusInterface
+module SmtI = SmtInterface
 
 
 let identify_rcalls (lam : variable) (t : term) =
@@ -59,8 +59,6 @@ let make ~(p : psi_def) (tset : TermSet.t) : equation list =
     in
     List.map ~f eqns
   in
-  List.iter pure_eqns
-    ~f:(fun (lhs, rhs) -> Log.debug_msg Fmt.(str "@[<hov 2>%a = %a@]" pp_term lhs pp_term rhs));
   if List.for_all ~f:(check_equation ~p) pure_eqns then
     pure_eqns
   else
@@ -68,12 +66,21 @@ let make ~(p : psi_def) (tset : TermSet.t) : equation list =
 
 
 let solve ~(p : psi_def) (eqns : equation list) =
+  let free_vars =
+    let x =
+      List.fold eqns ~init:VarSet.empty
+        ~f:(fun s (lhs, rhs) ->
+            VarSet.union_list [s; Analysis.free_variables lhs; Analysis.free_variables rhs])
+    in
+    Set.diff x p.target.pparams
+  in
   let decompose_xi_args (xi : variable) =
     match Variable.vtype_or_new xi with
     | RType.TFun(TTup(targs), tres) -> sorted_vars_of_types targs, sort_of_rtype tres
     | RType.TFun(targ, tres) -> sorted_vars_of_types [targ], sort_of_rtype tres
     | t -> [], sort_of_rtype t
   in
+  (* Commands *)
   let set_logic = CSetLogic("DTLIA") in  (* TODO: deduce the logic from the terms. *)
   let synth_objs =
     let f xi =
@@ -83,14 +90,6 @@ let solve ~(p : psi_def) (eqns : equation list) =
     List.map ~f (Set.elements p.target.pparams)
   in
   let var_decls =
-    let free_vars =
-      let x =
-        List.fold eqns ~init:VarSet.empty
-          ~f:(fun s (lhs, rhs) ->
-              VarSet.union_list [s; Analysis.free_variables lhs; Analysis.free_variables rhs])
-      in
-      Set.diff x p.target.pparams
-    in
     List.map ~f:declaration_of_var (Set.elements free_vars)
   in
   let constraints =
@@ -105,7 +104,28 @@ let solve ~(p : psi_def) (eqns : equation list) =
   let commands =
     set_logic :: (extra_defs @ synth_objs @ var_decls @ constraints @ [CCheckSynth])
   in
-  let _ =
-    Syguslib.Solvers.CVC4.solve_commands commands
+  (* Call the solver. *)
+  let handle_response (resp : solver_response) =
+    let parse_synth_fun (fname, fargs, _, fbody) =
+      let args =
+        let f (varname, sorts) =
+          match sorts with
+          | [sort] -> Variable.mk ~t:(rtype_of_sort sort) varname
+          | _ -> failwith "more than one sort in sorted var"
+        in
+        List.map ~f fargs
+      in
+      let local_vars = VarSet.of_list args in
+      let body, _ = infer_type (term_of_sygus (VarSet.to_env local_vars) fbody) in
+      fname, args, body
+    in
+    match resp with
+    | RSuccess (resps) -> resp, Some (List.map ~f:parse_synth_fun resps)
+    | RInfeasible -> RInfeasible, None
+    | RFail -> RFail, None
+    | RUnknown -> RUnknown, None
   in
-  ()
+  match Syguslib.Solvers.CVC4.solve_commands commands with
+  | Some resp -> handle_response resp
+  | None -> RFail, None
+

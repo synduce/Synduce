@@ -130,7 +130,7 @@ let expand_once (t : term) : term list =
     let f (cstr_name, cstr_arg_types) =
       let cstr_args =
         List.map  cstr_arg_types
-          ~f:(fun ty -> mk_var (Variable.mk ~t:(Some ty) (Alpha.fresh v.vname)))
+          ~f:(fun ty -> mk_var (Variable.mk ~t:(Some ty) (Alpha.fresh "ex")))
       in
       let t, _ =
         infer_type
@@ -182,6 +182,7 @@ let reduce_term (t : term) : term =
           | Some subst -> Some (substitution subst body)
           | None -> None)
        | _ -> None)
+    |  TFun([], body) -> Some (f body)
     | _ -> None
   in
   transform ~case t
