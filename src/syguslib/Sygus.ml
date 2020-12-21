@@ -41,7 +41,7 @@ type sygus_term =
   | SyForall of sorted_var list * sygus_term
   | SyLet of binding list * sygus_term
 
-and sorted_var = symbol * sygus_sort list
+and sorted_var = symbol * sygus_sort
 
 and binding = symbol * sygus_term
 
@@ -71,7 +71,7 @@ and dt_cons_dec = symbol * sorted_var list
 
 and grammar_def = (sorted_var * grouped_rule_list) list
 
-and grouped_rule_list = symbol * sygus_sort * sygus_gsterm list
+and grouped_rule_list = sygus_gsterm list
 
 and sygus_gsterm =
   | GConstant of sygus_sort
@@ -208,13 +208,13 @@ let sexp_of_literal (l : literal) : Sexp.t =
 
 let sorted_var_of_sexp (s : Sexp.t) : sorted_var =
   match s with
-  | List (symb :: sygus_sorts) ->
-    symbol_of_sexp symb, List.map ~f:sygus_sort_of_sexp sygus_sorts
+  | List [symb ; sygus_sort] ->
+    symbol_of_sexp symb, sygus_sort_of_sexp sygus_sort
   | _ -> failwith (Fmt.str "Not a sygus_sorted var: %a" Sexp.pp_hum s)
 
 
 let sexp_of_sorted_var (symb, sygus_sort : sorted_var) : Sexp.t =
-  List (sexp_of_symbol symb :: (List.map ~f:sexp_of_sygus_sort sygus_sort))
+  List [sexp_of_symbol symb ; sexp_of_sygus_sort sygus_sort]
 
 
 let rec sygus_term_of_sexp (s : Sexp.t) : sygus_term =
@@ -319,18 +319,11 @@ let sexp_of_sygus_gsterm (t : sygus_gsterm) : Sexp.t =
   | GVar v -> List [Atom "Variable"; sexp_of_sygus_sort v]
 
 
-let grouped_rule_of_sexp (s : Sexp.t) : grouped_rule_list =
+let pre_grouped_rule_of_sexp (s : Sexp.t) =
   match s with
   | List [name; sygus_sort; List gramsygus_terms] ->
     symbol_of_sexp name, sygus_sort_of_sexp sygus_sort, List.map ~f:sygus_gsterm_of_sexp gramsygus_terms
   | _ -> failwith "Not a grouped rule."
-
-
-let sexp_of_grouped_rule_list (name, sygus_sort, productions : grouped_rule_list) : Sexp.t =
-  Sexp.List [Sexp.Atom name;
-             sexp_of_sygus_sort sygus_sort;
-             Sexp.List (List.map ~f:sexp_of_sygus_gsterm productions)]
-
 
 
 let grammar_def_of_sexps (sv : Sexp.t) (gr : Sexp.t) : grammar_def =
@@ -338,16 +331,23 @@ let grammar_def_of_sexps (sv : Sexp.t) (gr : Sexp.t) : grammar_def =
   | List sygus_sorts, List grouped_rules ->
     (match List.zip
              (List.map ~f:sorted_var_of_sexp sygus_sorts)
-             (List.map ~f:grouped_rule_of_sexp grouped_rules)
+             (List.map ~f:pre_grouped_rule_of_sexp grouped_rules)
      with
-     | Ok l -> l
+     | Ok l -> List.map ~f:(fun (s, (_,_,g)) -> s, g) l
      | _ -> failwith "Not a grammar definition.")
   | _ -> failwith "Not a grammar definition."
 
-let sexp_of_grammar_def (gr : grammar_def) : Sexp.t =
-  let sv_list, gr_list = List.unzip gr in
-  List [List (List.map ~f:sexp_of_sorted_var sv_list);
-        List (List.map ~f:sexp_of_grouped_rule_list gr_list)]
+let sexp_of_grammar_def (gr : grammar_def) : Sexp.t * Sexp.t =
+  let headers = List.map ~f:(fun (s, _) -> sexp_of_sorted_var s) gr in
+  let grammar_decls =
+    List.map gr
+      ~f:(fun ((x,y),z) ->
+          Sexp.List
+            [ sexp_of_symbol x;
+              sexp_of_sygus_sort y;
+              Sexp.List (List.map ~f:sexp_of_sygus_gsterm z) ])
+  in
+  List headers, List grammar_decls
 
 let command_of_sexp (s : Sexp.t) : command =
   let command_of_elts (sl : Sexp.t list) : command =
@@ -436,16 +436,19 @@ let sexp_of_command (c : command) : Sexp.t =
   | CSynthFun (name, args, res, body) ->
     (match body with
      | Some body ->
+       let decls, gramm = sexp_of_grammar_def body in
        List [Atom "synth-fun"; Atom name; List (List.map ~f:sexp_of_sorted_var args);
-             sexp_of_sygus_sort res; sexp_of_grammar_def body ]
+             sexp_of_sygus_sort res; decls; gramm]
      | None -> List [Atom "synth-fun"; Atom name; List (List.map ~f:sexp_of_sorted_var args);
                      sexp_of_sygus_sort res])
 
   | CSynthInv (name, args, body) ->
     (match body with
      | Some body ->
+       let decls, gramm = sexp_of_grammar_def body in
        List [Atom "synth-inv"; Atom name; List (List.map ~f:sexp_of_sorted_var args);
-             sexp_of_grammar_def body ]
+             decls; gramm]
+
      | None ->
        List [Atom "synth-inv"; Atom name; List (List.map ~f:sexp_of_sorted_var args)])
 

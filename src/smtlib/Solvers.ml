@@ -163,8 +163,8 @@ let pp_solver_response = SmtLib.pp_solver_response
 
 
 let declare_all s decls =
-  List.iter ~f:(fun decl -> ignore(exec_command s decl))
-    (remove_duplicate_decls s.declared decls)
+  List.iter ~f:(fun decl -> ignore(exec_command s decl)) decls
+(*   (remove_duplicate_decls s.declared decls) *)
 
 let load_min_max_defs s =
   silent_command s mk_max_def;

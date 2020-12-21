@@ -1,0 +1,13 @@
+type 'a ls = Nil | Cons of 'a * 'a ls
+
+pmrs spec =
+    main t -> f 0 t
+    | f s Nil -> s
+    | f s Cons(a, l) -> f (s + a) l
+
+pmrs (oplus, s0) target =
+    main t1 -> h t1
+    | h Nil -> s0
+    | h Cons(a,l) ->  oplus a (h l)
+
+let repr x = x

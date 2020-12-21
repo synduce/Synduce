@@ -1,0 +1,14 @@
+type 'a tree = Node of 'a * 'a tree * 'a tree | Leaf of 'a
+
+pmrs spec =
+    main Leaf(x) -> x
+    | main Node(a, l, r) -> max (f a l) (f a r)
+    | f s Leaf(x) -> max s x
+    | f s Node(a,l,r) -> (fun m -> max a (f m l)) (f s r)
+
+pmrs (join, f0) target =
+    main t1 -> h t1
+    | h Leaf(x) -> f0 x
+    | h Node(a,l,r) -> join a (h l) (h r)
+
+let repr x = x

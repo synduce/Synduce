@@ -107,7 +107,7 @@ module Variable = struct
   let pp (frmt : Formatter.t) (v : t) = Fmt.(pf frmt "%s" v.vname)
 
   let print_summary (frmt : Formatter.t) () =
-    Utils.Log.(info (wrap "Variables in tables:"));
+    Utils.Log.(debug (wrap "Variables in tables:"));
     let le =
       Hashtbl.fold (Alpha.get_ids ()) ~init:0
         ~f:(fun ~key:_ ~data l -> max l (String.length data))
@@ -242,7 +242,7 @@ module Binop = struct
     | Plus -> "+"
     | Minus -> "-"
     | Times -> "*"
-    | Div -> "/"
+    | Div -> "div"
     | Mod -> "mod"
     | And -> "and"
     | Or -> "or"
@@ -311,6 +311,69 @@ module Unop = struct
     match s with | "-" -> Some Neg | "not" -> Some Not | "abs " -> Some Abs | _ -> None
 
   let pp frmt op = Fmt.string frmt (to_pp_string op)
+end
+
+
+module Operator = struct
+  module T = struct
+    type t =
+      | Unary of Unop.t
+      | Binary of Binop.t
+
+    let compare op1 op2 = Poly.compare op1 op2
+    let sexp_of_t op =
+      match op with
+      | Unary op -> Sexp.Atom (Unop.to_string op)
+      | Binary op -> Sexp.Atom (Binop.to_string op)
+    let t_of_sexp s =
+      match s with
+      | Sexp.Atom s ->
+        (match Unop.of_string s with
+         | Some op -> Unary op
+         | None ->
+           match Binop.of_string s with
+           | Some op -> Binary op
+           | None -> failwith "Not an operator.")
+      | _ -> failwith "Not an operator."
+  end
+
+  module C = Comparator.Make (T)
+
+  include T
+
+  include C
+
+  let pp fmt = function Unary op -> Unop.pp fmt op | Binary op -> Binop.pp fmt op
+
+  let to_string = function Unary op -> Unop.to_string op | Binary op -> Binop.to_string op
+
+  let to_pp_string = function Unary op -> Unop.to_pp_string op | Binary op -> Binop.to_pp_string op
+
+  let is_lia =
+    function
+    | Unary (Abs | Neg | Not) -> true
+    | Binary (Plus | Minus | Max | Min | And | Or) -> true
+    | _ -> false
+
+  let is_bool =
+    function
+    | Unary Not -> true
+    | Binary (And | Or) -> true
+    | _ -> false
+end
+
+
+module OpSet = struct
+
+  include Set.M (Operator)
+
+  let empty = Set.empty (module Operator)
+
+  let singleton x = Set.singleton (module Operator) x
+
+  let of_list l = Set.of_list (module Operator) l
+
+  let pp frmt s = Fmt.(pf frmt "@[<hov 2>{%a}@]" (list Operator.pp) (Set.elements s))
 end
 
 
@@ -672,6 +735,8 @@ let transform ~(case : (term -> term) -> term -> term option) (t : term) : term 
                  | TData (cstr, args) -> TData(cstr, aux_l args))}
   and aux_l l = List.map ~f:aux l
   in aux t
+
+
 
 (* ============================================================================================= *)
 (*                                    PRETTY PRINTERS                                            *)

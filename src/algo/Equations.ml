@@ -64,42 +64,48 @@ let make ~(p : psi_def) (tset : TermSet.t) : equation list =
   else
     failwith "Equation not pure."
 
-
-let solve ~(p : psi_def) (eqns : equation list) =
-  let free_vars =
-    let x =
-      List.fold eqns ~init:VarSet.empty
-        ~f:(fun s (_, lhs, rhs) ->
-            VarSet.union_list [s; Analysis.free_variables lhs; Analysis.free_variables rhs])
-    in
-    Set.diff x p.target.pparams
+(* ============================================================================================= *)
+(*                               SOLVING SYSTEMS OF EQUATIONS                                    *)
+(* ============================================================================================= *)
+let constraints_of_eqns (eqns : equation list) : command list =
+  let eqn_to_constraint (_, lhs, rhs) =
+    CConstraint (SyApp(IdSimple "=", [sygus_of_term lhs; sygus_of_term rhs]))
   in
+  List.map ~f:eqn_to_constraint eqns
+
+
+let synthfuns_of_unknowns ?(ops = OpSet.empty) (unknowns : VarSet.t) : command list =
   let decompose_xi_args (xi : variable) =
     match Variable.vtype_or_new xi with
     | RType.TFun(TTup(targs), tres) -> sorted_vars_of_types targs, sort_of_rtype tres
     | RType.TFun(targ, tres) -> sorted_vars_of_types [targ], sort_of_rtype tres
     | t -> [], sort_of_rtype t
   in
+  let f xi =
+    let args, ret_sort = decompose_xi_args xi in
+    let grammar = Grammars.generate_grammar ops args ret_sort in
+    CSynthFun (xi.vname, args, ret_sort, grammar)
+  in
+  List.map ~f (Set.elements unknowns)
+
+
+let solve ~(p : psi_def) (eqns : equation list) =
+  let free_vars, all_operators =
+    let f (fvs, ops) (_, lhs, rhs) =
+      VarSet.union_list [fvs; Analysis.free_variables lhs; Analysis.free_variables rhs],
+      Set.union ops (Set.union (Grammars.operators_of lhs) (Grammars.operators_of rhs))
+    in
+    let fvs, ops = List.fold eqns ~f ~init:(VarSet.empty, Set.empty (module Operator)) in
+    Set.diff fvs p.target.pparams, ops
+  in
   (* Commands *)
-  let set_logic = CSetLogic("DTLIA") in  (* TODO: deduce the logic from the terms. *)
-  let synth_objs =
-    let f xi =
-      let args, ret_sort = decompose_xi_args xi in
-      CSynthFun (xi.vname, args, ret_sort, None)
-    in
-    List.map ~f (Set.elements p.target.pparams)
-  in
-  let var_decls =
-    List.map ~f:declaration_of_var (Set.elements free_vars)
-  in
-  let constraints =
-    let eqn_to_constraint (_, lhs, rhs) =
-      CConstraint (SyApp(IdSimple "=", [sygus_of_term lhs; sygus_of_term rhs]))
-    in
-    List.map ~f:eqn_to_constraint eqns
-  in
+  let set_logic = CSetLogic(Grammars.logic_of_operator all_operators) in
+  let synth_objs = synthfuns_of_unknowns ~ops:all_operators p.target.pparams in
+  let var_decls = List.map ~f:declaration_of_var (Set.elements free_vars) in
+  let constraints = constraints_of_eqns eqns in
   let extra_defs =
-    [max_definition; min_definition]
+    (if Set.mem all_operators (Binary Max) then [max_definition] else []) @
+    (if Set.mem all_operators (Binary Min) then [min_definition] else [])
   in
   let commands =
     set_logic :: (extra_defs @ synth_objs @ var_decls @ constraints @ [CCheckSynth])
@@ -108,11 +114,7 @@ let solve ~(p : psi_def) (eqns : equation list) =
   let handle_response (resp : solver_response) =
     let parse_synth_fun (fname, fargs, _, fbody) =
       let args =
-        let f (varname, sorts) =
-          match sorts with
-          | [sort] -> Variable.mk ~t:(rtype_of_sort sort) varname
-          | _ -> failwith "more than one sort in sorted var"
-        in
+        let f (varname, sort) = Variable.mk ~t:(rtype_of_sort sort) varname in
         List.map ~f fargs
       in
       let local_vars = VarSet.of_list args in

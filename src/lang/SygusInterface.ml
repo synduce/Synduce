@@ -143,6 +143,6 @@ let declaration_of_var (v : variable) =  CDeclareVar(v.vname, sort_of_rtype (Var
 
 let sorted_vars_of_types (tl : RType.t list) : sorted_var list =
   let f t =
-    Alpha.fresh "x", [sort_of_rtype t]
+    Alpha.fresh "x", sort_of_rtype t
   in
   List.map ~f tl

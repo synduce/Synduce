@@ -5,13 +5,15 @@ open Utils
 open AState
 open Syguslib.Sygus
 
+let loop_counter = ref 0
 (* ============================================================================================= *)
 (*                                                                                               *)
 (* ============================================================================================= *)
 let rec refinement_loop (p : psi_def) (t_set, u_set : TermSet.t * TermSet.t) =
+  Int.incr loop_counter;
+  Log.info (fun frmt () -> Fmt.pf frmt "Refinement step %i." !loop_counter);
   Log.debug_msg Fmt.(str "Start refinement loop with (t,u) = %a, %a"
                        pp_term_set t_set pp_term_set u_set);
-  let _ = u_set in
   let eqns = Equations.make ~p t_set in
   let s_resp, solution = Equations.solve ~p eqns in
   let sat, partial_sol =
@@ -38,12 +40,7 @@ let rec refinement_loop (p : psi_def) (t_set, u_set : TermSet.t * TermSet.t) =
   | None -> ()
 
 
-
-
 let psi (p : psi_def) =
-  let _ = p.target in
-  let _ = p.orig in
-  let _ = p.repr in
   let mgts = MGT.most_general_terms p.target in
   Log.debug
     (fun frmt () -> Fmt.(pf frmt "@[<hov 2>MGT() = %a@]"
@@ -60,6 +57,7 @@ let psi (p : psi_def) =
             let t1, t2 = Expand.maximal p term in
             Set.union t t1, Set.union u t2)
   in
+  loop_counter := 0;
   refinement_loop p (t_set, u_set)
 
 

@@ -3,8 +3,8 @@ open Base
 open Getopt
 open Fmt
 open Parsers
-
 module Config = Lib.Utils.Config
+
 
 let options = [
   ('v', "verbose", (set Config.verbose true), None);
@@ -21,7 +21,6 @@ let main () =
   let _ = seek_types prog in
   let all_pmrs = translate prog in
   Algo.PmrsAlgos.solve_problem all_pmrs;
-  Term.Variable.print_summary stdout ()
-
+  if !Config.debug then Term.Variable.print_summary stdout ()
 ;;
 main ()
