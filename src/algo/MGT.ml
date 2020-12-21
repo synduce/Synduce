@@ -2,6 +2,7 @@ open Base
 open Lang
 open Lang.Analysis
 open Lang.Term
+open Utils
 
 
 (* ============================================================================================= *)
@@ -42,9 +43,21 @@ let mgt_of_one (prog : PMRS.t) (_ : int) (rule_id : int) =
     in
     Map.filter_mapi ~f:filter prog.prules
   in
+  let sort_best (_, (_, t1)) (_,(_,t2)) =
+    let f t = Set.length (free_variables t) in
+    compare (f t1) (f t2)
+  in
   (* Recursive construction of the MGT. *)
   let rec aux visited_rules target_rhs =
-    let all_mrules = Map.to_alist (matching_rules visited_rules target_rhs) in
+    Log.verbose (fun frmt () -> Fmt.(pf frmt "Target rhs: %a.@." pp_term target_rhs));
+    let all_mrules =
+      List.sort ~compare:sort_best (Map.to_alist (matching_rules visited_rules target_rhs))
+    in
+    Log.verbose
+      (fun frmt () ->
+         Fmt.(pf frmt "@[<hov 2>Matching rules:@;%a@]@."
+                (list (parens (pair int (parens (pair ~sep:comma Variable.pp pp_term) ))))
+                all_mrules));
     match all_mrules with
     | (m_id, (m_nt, m_term)) :: _ ->
       if Variable.(m_nt = prog.pmain_symb) then

@@ -84,6 +84,7 @@ type id_kind =
   | IBinop of Binop.t
   | IUnop of Unop.t
   | INotDef
+  | IIte
 
 
 let id_kind_of_s env s =
@@ -97,7 +98,10 @@ let id_kind_of_s env s =
       | Some unop -> IUnop unop
       | None -> match RType.type_of_variant s with
         | Some _ -> ICstr s
-        | None -> INotDef
+        | None ->
+          (match s with
+           | "ite" ->  IIte
+           | _ -> INotDef)
 
 let rec term_of_sygus (env : (string, variable, String.comparator_witness) Map.t) (st : sygus_term) : term =
   match st with
@@ -120,6 +124,10 @@ let rec term_of_sygus (env : (string, variable, String.comparator_witness) Map.t
        (match args' with
         | [t1] -> mk_un op t1
         | _ -> failwith "Sygus: a unary operator with more than one argument.")
+     | IIte ->
+       (match args' with
+        | [t1; t2; t3] -> mk_ite t1 t2 t3
+        | _ -> failwith "Sygus: a binary operator with more than two arguments.")
      | INotDef -> failwith "Sygus: Undefined variable.")
   | SyExists (_, _) -> failwith "Sygus: exists-terms not supported."
   | SyForall (_, _) -> failwith "Sygus: forall-terms not supported."

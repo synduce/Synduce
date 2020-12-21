@@ -166,6 +166,10 @@ let declare_all s decls =
   List.iter ~f:(fun decl -> ignore(exec_command s decl))
     (remove_duplicate_decls s.declared decls)
 
+let load_min_max_defs s =
+  silent_command s mk_max_def;
+  silent_command s mk_min_def
+
 let smt_assert s term =
   ignore(exec_command s (Assert term))
 

@@ -246,8 +246,8 @@ let func_to_pmrs (f : Variable.t) (args : fpattern list) (body : Term.term) =
     pnon_terminals = pnon_terminals;
   }
 
-let subst_rule_rhs ~(p : t) (substs : (term * term) list) = 
-  let rules' = 
+let subst_rule_rhs ~(p : t) (substs : (term * term) list) =
+  let rules' =
     let f (nt, args, pat, body) =
       let body' = substitution substs body in
       let body'', _ = infer_type body' in
@@ -256,3 +256,16 @@ let subst_rule_rhs ~(p : t) (substs : (term * term) list) =
     Map.map ~f p.prules
   in
   {p with prules = rules'}
+
+
+let instantiate_with_solution (p : t) (soln : (string * variable list * term) list) =
+  let xi_set = p.pparams in
+  let xi_substs =
+    let f (name, args, body) =
+      match VarSet.find_by_name xi_set name with
+      | Some xi -> [Term.mk_var xi, mk_fun (List.map ~f:(fun x -> PatVar x) args) body]
+      | None -> []
+    in List.concat (List.map ~f soln)
+  in
+  let target_inst = subst_rule_rhs xi_substs ~p in
+  target_inst

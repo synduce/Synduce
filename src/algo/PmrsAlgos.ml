@@ -8,30 +8,36 @@ open Syguslib.Sygus
 (* ============================================================================================= *)
 (*                                                                                               *)
 (* ============================================================================================= *)
-
 let rec refinement_loop (p : psi_def) (t_set, u_set : TermSet.t * TermSet.t) =
+  Log.debug_msg Fmt.(str "Start refinement loop with (t,u) = %a, %a"
+                       pp_term_set t_set pp_term_set u_set);
   let _ = u_set in
   let eqns = Equations.make ~p t_set in
   let s_resp, solution = Equations.solve ~p eqns in
   let sat, partial_sol =
     match s_resp, solution with
-    | RSuccess _, Some sol ->
-      List.iter sol
-        ~f:(fun (f, args, body) ->
-            Log.debug_msg Fmt.(str "%s(%a) -> %a" f (list ~sep:comma Variable.pp) args pp_term body));
-      true, Some sol
+    | RSuccess _, Some sol -> true, Some sol
     | RInfeasible, _ -> false, None
     | RUnknown, _ -> true, None
     | RSuccess _, None -> failwith "Could not parse answer."
     | RFail, _ -> failwith "Solver failed."
   in
   let _ = sat in
-  begin
-    match partial_sol with
-    | Some sol -> Verify.check_solution ~p (t_set,u_set) sol
-    | None -> ()
-  end;
-  if false then refinement_loop p (t_set, u_set) else ()
+  match partial_sol with
+  | Some sol ->
+    (match Verify.check_solution ~p (t_set, u_set) sol with
+     | Some (new_t_set, new_u_set) ->
+       Log.debug (fun frmt () ->
+           Fmt.(pf frmt "@[<hov 2>Counterexample terms:%a."
+                  (list pp_term) (Set.elements (Set.diff new_t_set t_set))));
+       refinement_loop p (new_t_set, new_u_set)
+     | None ->
+       Log.print_ok ();
+       let target = PMRS.instantiate_with_solution p.target sol in
+       Log.info Fmt.(fun frmt () -> pf frmt "@[<hov 2>Solution found:@;%a@]" PMRS.pp target))
+  | None -> ()
+
+
 
 
 let psi (p : psi_def) =
@@ -39,6 +45,11 @@ let psi (p : psi_def) =
   let _ = p.orig in
   let _ = p.repr in
   let mgts = MGT.most_general_terms p.target in
+  Log.debug
+    (fun frmt () -> Fmt.(pf frmt "@[<hov 2>MGT() = %a@]"
+                           (list ~sep:comma
+                              (parens (pair ~sep:comma (pair ~sep:comma int int) (option pp_term))))
+                           mgts));
   (* Initialize sets with the most general terms. *)
   let t_set, u_set =
     List.fold mgts ~init:(TermSet.empty, TermSet.empty)

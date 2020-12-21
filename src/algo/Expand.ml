@@ -50,6 +50,9 @@ let replace_nonreduced_by_main (p : psi_def) (t0 : term) : term =
   substitution subst t0
 
 
+(** `maximal p t0 ` expands the term `t0 ` such that `p.orig (p.repr t0)` is a maximally
+    reduced term.
+*)
 let maximal (p : psi_def) (t0 : term) : TermSet.t * TermSet .t =
   let t' = replace_nonreduced_by_main p (PMRS.reduce p.orig t0) in
   let nr = nonreduced_terms p t' in
@@ -77,5 +80,6 @@ let maximal (p : psi_def) (t0 : term) : TermSet.t * TermSet .t =
     List.partition_tf all_ts ~f:check_max_exp
   in
   let mr_terms = if check_max_exp t0 then t0::mr_terms else mr_terms in
+  Log.debug_msg Fmt.(str "%a -> %a" pp_term t0 (list ~sep:comma pp_term) mr_terms);
   (* Expand and replace in term *)
   TermSet.of_list mr_terms, TermSet.of_list rest

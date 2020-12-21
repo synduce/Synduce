@@ -97,3 +97,13 @@ let print_ok () =
   if !Config.debug then
     pf Fmt.stdout "%a@." (styled (`Fg `Black) (styled (`Bg `Green) string)) " ✓ "
   else ()
+
+let verbose msg =
+  if !Config.verbose then
+    pf Fmt.stdout "@[<hov 2>%a@;%a@]@." (styled (`Fg `Black) (styled (`Bg `Cyan) string)) "VERB" msg ()
+  else ()
+
+let verbose_msg msg =
+  if !Config.verbose then
+    pf Fmt.stdout "@[<hov 2>%a@;%s@]@." (styled (`Fg `Black) (styled (`Bg `Cyan) string)) "VERB" msg
+  else ()

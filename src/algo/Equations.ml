@@ -22,10 +22,10 @@ let identify_rcalls (lam : variable) (t : term) =
 
 
 
-type equation = term * term
+type equation = term * term * term
 
 
-let check_equation ~(p : psi_def) (lhs, rhs : equation) : bool =
+let check_equation ~(p : psi_def) (_, lhs, rhs : equation) : bool =
   match Expand.nonreduced_terms p lhs, Expand.nonreduced_terms p rhs with
   | [], [] -> true
   | _ -> false
@@ -40,7 +40,7 @@ let make ~(p : psi_def) (tset : TermSet.t) : equation list =
       let rhs = Expand.replace_nonreduced_by_main p (PMRS.reduce p.target t) in
       let f_x = identify_rcalls fsymb lhs in
       let g_x = identify_rcalls gsymb rhs in
-      VarSet.union_list [rcalled_vars; f_x; g_x], (lhs, rhs) :: eqns
+      VarSet.union_list [rcalled_vars; f_x; g_x], (t, lhs, rhs) :: eqns
     in
     Set.fold ~init:(VarSet.empty, []) ~f:fold_f tset
   in
@@ -53,9 +53,9 @@ let make ~(p : psi_def) (tset : TermSet.t) : equation list =
     List.concat (List.map ~f (Set.elements rcalls))
   in
   let pure_eqns =
-    let f (lhs, rhs) =
+    let f (t, lhs, rhs) =
       let applic x = Analysis.reduce_term (substitution all_subs x) in
-      applic lhs, applic rhs
+      t, applic lhs, applic rhs
     in
     List.map ~f eqns
   in
@@ -69,7 +69,7 @@ let solve ~(p : psi_def) (eqns : equation list) =
   let free_vars =
     let x =
       List.fold eqns ~init:VarSet.empty
-        ~f:(fun s (lhs, rhs) ->
+        ~f:(fun s (_, lhs, rhs) ->
             VarSet.union_list [s; Analysis.free_variables lhs; Analysis.free_variables rhs])
     in
     Set.diff x p.target.pparams
@@ -93,10 +93,10 @@ let solve ~(p : psi_def) (eqns : equation list) =
     List.map ~f:declaration_of_var (Set.elements free_vars)
   in
   let constraints =
-    let eqn (lhs, rhs) =
+    let eqn_to_constraint (_, lhs, rhs) =
       CConstraint (SyApp(IdSimple "=", [sygus_of_term lhs; sygus_of_term rhs]))
     in
-    List.map ~f:eqn eqns
+    List.map ~f:eqn_to_constraint eqns
   in
   let extra_defs =
     [max_definition; min_definition]
