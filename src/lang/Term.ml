@@ -654,6 +654,7 @@ struct
   let empty = Set.empty (module Terms)
   let singleton = Set.singleton (module Terms)
   let of_list = Set.of_list (module Terms)
+  let union_list = Set.union_list (module Terms)
 end
 
 (* ============================================================================================= *)

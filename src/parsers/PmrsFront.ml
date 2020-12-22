@@ -195,8 +195,8 @@ let translate_rules loc (globs : (string, Term.variable) Hashtbl.t)
     | `Ok m -> m
   in
   let main_symb =
-    match Term.VarSet.find_by_name nont "main" with
-    | Some x -> x
+    match Map.find rules 0 with
+    | Some (x,_,_,_) -> x
     | None -> loc_fatal_errmsg loc "No main rule."
   in
   PMRS.infer_pmrs_types

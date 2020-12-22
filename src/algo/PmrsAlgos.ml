@@ -16,17 +16,8 @@ let rec refinement_loop (p : psi_def) (t_set, u_set : TermSet.t * TermSet.t) =
                        pp_term_set t_set pp_term_set u_set);
   let eqns = Equations.make ~p t_set in
   let s_resp, solution = Equations.solve ~p eqns in
-  let sat, partial_sol =
-    match s_resp, solution with
-    | RSuccess _, Some sol -> true, Some sol
-    | RInfeasible, _ -> false, None
-    | RUnknown, _ -> true, None
-    | RSuccess _, None -> failwith "Could not parse answer."
-    | RFail, _ -> failwith "Solver failed."
-  in
-  let _ = sat in
-  match partial_sol with
-  | Some sol ->
+  match s_resp, solution with
+  | RSuccess _, Some sol ->
     (match Verify.check_solution ~p (t_set, u_set) sol with
      | Some (new_t_set, new_u_set) ->
        Log.debug (fun frmt () ->
@@ -37,7 +28,16 @@ let rec refinement_loop (p : psi_def) (t_set, u_set : TermSet.t * TermSet.t) =
        Log.print_ok ();
        let target = PMRS.instantiate_with_solution p.target sol in
        Log.info Fmt.(fun frmt () -> pf frmt "@[<hov 2>Solution found:@;%a@]" PMRS.pp target))
-  | None -> ()
+  | RFail, _ -> Log.error_msg "SyGuS solver failed to find a solution."; Log.fatal ()
+  | RInfeasible, _ ->
+    (Log.info
+       Fmt.(fun frmt () ->
+           pf frmt "@[<hov 2>This problem has no solution. Counterexample set:@;%a@]"
+             (list ~sep:sp pp_term) (Set.elements t_set));
+     Caml.exit 0)
+  | RUnknown, _  -> Log.error_msg "SyGuS solver returned unknown."; Log.fatal ()
+  | _ -> failwith "Unreachable."
+
 
 
 let psi (p : psi_def) =

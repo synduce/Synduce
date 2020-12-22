@@ -213,14 +213,14 @@ let rec unify_one (s : t) (t : t) : substitution option =
             (fun u1 -> match unify_one sc tc with
                | Some u2 -> unify ((mkv u1) @ (mkv u2))
                | None ->
-                 (Log.error
+                 (Log.verbose
                     (fun frmt () ->
                        Fmt.(pf frmt "Type unification: cannot unify %a and %a.") pp s pp t);
                   None)))
   | TParam(params1, t1), TParam(params2, t2) ->
     (match List.zip (params1 @ [t1]) (params2 @ [t2]) with
      | Ok pairs -> unify pairs
-     | Unequal_lengths -> (Log.error
+     | Unequal_lengths -> (Log.verbose
                              (fun frmt () ->
                                 Fmt.(pf frmt "Type unification: cannot unify %a and %a.") pp s pp t);
                            None))
@@ -236,13 +236,13 @@ let rec unify_one (s : t) (t : t) : substitution option =
   | (TVar x, t' | t', TVar x) ->
     if occurs x t'
     then
-      (Log.error
+      (Log.verbose
          (fun frmt () ->
             Fmt.(pf frmt "Type unification: circularity %a - %a") pp s pp t);
        None)
     else Some [x, t']
   | _ -> if Poly.equal s t then Some [] else
-      (Log.debug
+      (Log.verbose
          (fun frmt () ->
             Fmt.(pf frmt "Type unification: cannot unify %a and %a") pp s pp t);
        None)

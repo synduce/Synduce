@@ -37,7 +37,7 @@ let rec sort_of_rtype (t : RType.t) : sygus_sort =
   | RType.TTup tl -> SApp (IdSimple "Tuple", List.map ~f:sort_of_rtype tl)
   | RType.TFun (tin, tout) -> SApp(IdSimple "->", [sort_of_rtype tin; sort_of_rtype tout])
   | RType.TParam (args, t) -> dec_parametric t args
-  | RType.TVar i -> SId (IdSimple ("sort"^Int.to_string i))
+  | RType.TVar _ -> SId (IdSimple ("Int")) (* TODO: declare sort? *)
 
 and dec_parametric t args =
   match t with

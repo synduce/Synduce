@@ -4,8 +4,8 @@ type 'a list = Nil | Cons of 'a * 'a list
 
 pmrs spec l =
     main l -> f l
-    | f Nil -> (0,0)
-    | f Cons(hd,tl) -> (fun (s,m) -> s + hd, max (s + hd) m) (f tl)
+    | f Nil -> 0
+    | f Cons(hd,tl) -> 1 + (main tl)
 
 pmrs (odot,f_0,s_0) target t =
     main t           -> h t

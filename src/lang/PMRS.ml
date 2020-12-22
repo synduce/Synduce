@@ -91,12 +91,12 @@ let infer_pmrs_types (prog : t) =
 (* ============================================================================================= *)
 (*                                 PRETTY PRINTING                                               *)
 (* ============================================================================================= *)
-
 let pp_pattern (frmt : Formatter.t) (t, args : pattern) : unit =
   if List.length args = 0 then
     Fmt.(pf frmt "%s" t)
   else
     Fmt.(pf frmt "%s(%a)" t (list ~sep:comma Term.pp_term) args)
+
 
 let pp_rewrite_rule (frmt : Formatter.t) (nt, vargs, pat, t : rewrite_rule) : unit =
   Fmt.(pf frmt "@[<hov 2>%s %a %a  ⟹  %a@]"
@@ -104,6 +104,7 @@ let pp_rewrite_rule (frmt : Formatter.t) (nt, vargs, pat, t : rewrite_rule) : un
          (list ~sep:comma Variable.pp) vargs
          (option pp_pattern) pat
          (box pp_term) t)
+
 
 let pp (frmt : Formatter.t) (pmrs : t) : unit =
   let pp_rules frmt () =

@@ -7,21 +7,6 @@ open SygusInterface
 module SmtI = SmtInterface
 
 
-let identify_rcalls (lam : variable) (t : term) =
-  let join = Set.union in
-  let case _ t =
-    match t.tkind with
-    (* lam x *)
-    | TApp({tkind = TVar lam';_}, [single_arg]) when Variable.(lam' = lam) ->
-      (match single_arg.tkind with
-       | TVar x -> Some (VarSet.singleton x)
-       | _ -> None)
-    | _ -> None
-  in
-  reduce ~init:VarSet.empty ~case ~join t
-
-
-
 type equation = term * term * term
 
 
@@ -32,25 +17,18 @@ let check_equation ~(p : psi_def) (_, lhs, rhs : equation) : bool =
 
 
 let make ~(p : psi_def) (tset : TermSet.t) : equation list =
-  let fsymb = p.orig.pmain_symb and gsymb = p.target.pmain_symb in
-  (* Replace recursive calls to r(x) *)
-  let rcalls, eqns =
-    let fold_f (rcalled_vars, eqns) t =
-      let lhs = Expand.replace_nonreduced_by p p.orig (PMRS.reduce p.orig t) in
-      let rhs = Expand.replace_nonreduced_by p p.target (PMRS.reduce p.target t) in
-      let f_x = identify_rcalls fsymb lhs in
-      let g_x = identify_rcalls gsymb rhs in
-      VarSet.union_list [rcalled_vars; f_x; g_x], (t, lhs, rhs) :: eqns
+  let eqns =
+    let fold_f eqns t =
+      let r_t = Expand.replace_rhs_of_main p p.repr (PMRS.reduce p.repr t) in
+      let lhs = Expand.replace_rhs_of_main p p.orig (PMRS.reduce p.orig r_t) in
+      let rhs = Expand.replace_rhs_of_main p p.target (PMRS.reduce p.target t) in
+      eqns @ [t, lhs, rhs]
     in
-    Set.fold ~init:(VarSet.empty, []) ~f:fold_f tset
+    Set.fold ~init:[] ~f:fold_f tset
   in
   let all_subs =
-    let f var =
-      let scalar_term = mk_composite_scalar !AState._alpha in
-      [mk_app (mk_var fsymb) [mk_var var], scalar_term;
-       mk_app (mk_var gsymb) [mk_var var], scalar_term]
-    in
-    List.concat (List.map ~f (Set.elements rcalls))
+    Expand.subst_recursive_calls p
+      (List.map ~f:(fun (_, lhs, rhs) -> mk_bin Binop.Eq lhs rhs) eqns)
   in
   let pure_eqns =
     let f (t, lhs, rhs) =
@@ -63,6 +41,7 @@ let make ~(p : psi_def) (tset : TermSet.t) : equation list =
     pure_eqns
   else
     failwith "Equation not pure."
+
 
 (* ============================================================================================= *)
 (*                               SOLVING SYSTEMS OF EQUATIONS                                    *)
