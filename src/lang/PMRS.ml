@@ -34,7 +34,7 @@ let lhs (nt, args, pat, rhs) =
   let all_args =
     let args = List.map ~f:mk_var args in
     match pat with
-    | Some (c, args) -> args @ [mk_data c args]
+    | Some (c, pat_args) -> args @ [mk_data c pat_args]
     | None -> args
   in
   let t, _ = infer_type (mk_app ~pos:rhs.tpos (mk_var nt) all_args) in
@@ -69,7 +69,9 @@ let infer_pmrs_types (prog : t) =
     let c_rule = RType.merge_subs cur_loc c_body c_head in
     match RType.unify ((RType.mkv (substs @ c_rule)) @ [t_head.ttyp, t_body.ttyp]) with
     | Some res -> Map.set map ~key ~data:(nt, args, pat, rewrite_types (RType.mkv res) t_body), res
-    | None -> Log.loc_fatal_errmsg cur_loc "Unification failed between head and body."
+    | None -> Log.loc_fatal_errmsg cur_loc
+                (Fmt.str "(%a) has type %a, expected type %a."
+                   pp_term body RType.pp t_body.ttyp RType.pp t_head.ttyp)
   in
   let new_rules, new_subs =
     Map.fold prog.prules ~f:infer_aux ~init:(Map.empty (module Int), [])
@@ -79,8 +81,8 @@ let infer_pmrs_types (prog : t) =
     Variable.update_var_types (RType.mkv usubs);
     let in_typ =
       match Variable.vtype_or_new prog.pmain_symb with
-      | RType.TFun (tin,_) -> tin
-      | t -> t
+      | RType.TFun (TTup [tin],_) -> tin
+      | _ -> failwith "PMRS with multiple inputs not supported."
     in
     { prog with prules = new_rules; pinput_typ = in_typ;}
   | None -> failwith "Failed infering types for pmrs."
@@ -116,7 +118,7 @@ let pp (frmt : Formatter.t) (pmrs : t) : unit =
   Fmt.(pf frmt "%s⟨%a⟩: %a = @;@[<v 2>{@;%a@;}@]"
          pmrs.pname
          VarSet.pp_var_names pmrs.pparams
-         RType.pp pmrs.pinput_typ
+         RType.pp (Variable.vtype_or_new pmrs.pmain_symb)
          pp_rules ())
 
 

@@ -20,7 +20,10 @@ let main () =
   let prog = parse_pmrs !filename in
   let _ = seek_types prog in
   let all_pmrs = translate prog in
-  Algo.PmrsAlgos.solve_problem all_pmrs;
-  if !Config.debug then Term.Variable.print_summary stdout ()
+  try
+    Algo.PmrsAlgos.solve_problem all_pmrs
+  with _ -> ();
+    if !Config.debug then Term.Variable.print_summary stdout ()
+
 ;;
 main ()

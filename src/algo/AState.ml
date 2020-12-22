@@ -2,8 +2,8 @@ open Lang
 
 type psi_def = { target : PMRS.t; orig : PMRS.t; repr : PMRS.t }
 
-let tau = ref RType.TInt
+let _tau = ref RType.TInt
 
-let theta = ref RType.TInt
+let _theta = ref RType.TInt
 
-let alpha = ref RType.TInt
+let _alpha = ref RType.TInt

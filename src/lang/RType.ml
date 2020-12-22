@@ -57,7 +57,7 @@ let rec pp (frmt : Formatter.t) (typ : t) =
   | TString -> Fmt.(pf frmt "string")
   | TChar -> Fmt.(pf frmt "char")
   | TNamed s -> Fmt.(pf frmt "%s" s)
-  | TTup tl -> Fmt.(pf frmt "%a" (parens (list ~sep:comma pp)) tl)
+  | TTup tl -> Fmt.(pf frmt "%a" (parens (list ~sep:Utils.ast pp)) tl)
   | TFun (tin, tout) -> Fmt.(pf frmt "%a -> %a" pp tin pp tout)
   | TParam (alpha, t') ->
     Fmt.(pf frmt "%a[%a]" pp t' (list ~sep:comma pp) alpha)

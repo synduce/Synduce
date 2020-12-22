@@ -48,6 +48,8 @@ let blast = fun x -> Result.map_error ~f:List.concat (Result.combine_errors x)
 
 let pair a b = (a,b)
 
+let ast frmt () = Fmt.(pf frmt "@;*@;")
+
 let cartesian_nary_product (elts : ('a list) list) : ('a list) list =
   let f acc l =
     List.concat

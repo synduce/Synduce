@@ -13,4 +13,11 @@ pmrs (odot,f_0,s_0) target t =
     | h Single(a)    -> f_0 a
     | h Concat(x, y) -> odot (h x) (h y)
 
-let repr x = x
+pmrs repr l =
+    main l -> f l
+    | f CNil -> Nil
+    | f Single(a) -> Cons(a, Nil)
+    | f Concat(x, y) -> h y x
+    | h l CNil -> main l
+    | h l Single(a) -> Cons(a, main l)
+    | h l Concat(x, y) -> h (Concat(l, y)) x

@@ -26,7 +26,7 @@ type equation = term * term * term
 
 
 let check_equation ~(p : psi_def) (_, lhs, rhs : equation) : bool =
-  match Expand.nonreduced_terms p lhs, Expand.nonreduced_terms p rhs with
+  match Expand.nonreduced_terms_all p lhs, Expand.nonreduced_terms_all p rhs with
   | [], [] -> true
   | _ -> false
 
@@ -36,8 +36,8 @@ let make ~(p : psi_def) (tset : TermSet.t) : equation list =
   (* Replace recursive calls to r(x) *)
   let rcalls, eqns =
     let fold_f (rcalled_vars, eqns) t =
-      let lhs = Expand.replace_nonreduced_by_main p (PMRS.reduce p.orig t) in
-      let rhs = Expand.replace_nonreduced_by_main p (PMRS.reduce p.target t) in
+      let lhs = Expand.replace_nonreduced_by p p.orig (PMRS.reduce p.orig t) in
+      let rhs = Expand.replace_nonreduced_by p p.target (PMRS.reduce p.target t) in
       let f_x = identify_rcalls fsymb lhs in
       let g_x = identify_rcalls gsymb rhs in
       VarSet.union_list [rcalled_vars; f_x; g_x], (t, lhs, rhs) :: eqns
@@ -46,7 +46,7 @@ let make ~(p : psi_def) (tset : TermSet.t) : equation list =
   in
   let all_subs =
     let f var =
-      let scalar_term = mk_composite_scalar !AState.alpha in
+      let scalar_term = mk_composite_scalar !AState._alpha in
       [mk_app (mk_var fsymb) [mk_var var], scalar_term;
        mk_app (mk_var gsymb) [mk_var var], scalar_term]
     in

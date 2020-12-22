@@ -853,7 +853,9 @@ let infer_type (t : term) : term * RType.substitution =
           | Some subs ->
             mk_app ~pos:t0.tpos ~typ:(Some b) t_func t_args, subs
           | None ->
-            Log.loc_fatal_errmsg eloc "Type inference failure: could not unify arguments in application.")
+            Log.loc_fatal_errmsg eloc
+              (Fmt.str "Type inference failure: could not unify types in %a(%a)"
+                 pp_term func (list ~sep:comma pp_term) fargs))
        | RType.TVar f_tvar ->
          let a = RType.get_fresh_tvar () and b = RType.get_fresh_tvar () in
          (match
