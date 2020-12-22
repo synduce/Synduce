@@ -17,7 +17,6 @@ open Smtlib.Solvers
 let check_solution ~(p : psi_def)
     (t, u : TermSet.t * TermSet.t)
     (soln : (string * variable list * term) list) =
-  if Set.is_empty u then Log.error_msg "Empty expand set.";
   let target_inst = PMRS.instantiate_with_solution p.target soln in
   let free_vars = VarSet.empty in
   let init_vardecls = decls_of_vars free_vars in

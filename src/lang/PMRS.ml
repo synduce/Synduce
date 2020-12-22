@@ -249,6 +249,14 @@ let func_to_pmrs (f : Variable.t) (args : fpattern list) (body : Term.term) =
     pnon_terminals = pnon_terminals;
   }
 
+
+let is_identity (p : t) =
+  let input_symb = Variable.mk ~t:(Some p.pinput_typ) "e" in
+  match reduce p (mk_var input_symb) with
+  | {tkind = TVar x; _} -> Variable.(x = input_symb)
+  | _ -> false
+
+
 let subst_rule_rhs ~(p : t) (substs : (term * term) list) =
   let rules' =
     let f (nt, args, pat, body) =

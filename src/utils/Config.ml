@@ -1,6 +1,9 @@
 let verbose = ref false
 
 let debug = ref false
+
+let info = ref true
+
 let reduction_limit = ref 100
 
 let num_expansions_check = 4

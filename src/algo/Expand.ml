@@ -156,15 +156,23 @@ let expand_max (p : psi_def) (f : PMRS.t) (t0 : term)
 *)
 let maximal (p : psi_def) (t0 : term) : TermSet.t * TermSet .t =
   (* Expand with repr *)
-  let tset0, uset0 = expand_max p p.repr t0 in
-  let s1 = subst_repr_calls p (List.map ~f:second tset0) in
-  let tset0 =
-    List.map tset0 ~f:(fun (tin, tout) -> tin, Analysis.reduce_term (substitution s1 tout))
+  let tset0, uset0 =
+    if p.repr_is_identity then
+      [t0, t0], []
+    else
+      let tset0, uset0 = expand_max p p.repr t0 in
+      let s1 = subst_repr_calls p (List.map ~f:second tset0) in
+      let tset0 =
+        List.map tset0 ~f:(fun (tin, tout) -> tin, Analysis.reduce_term (substitution s1 tout))
+      in
+      tset0, uset0
   in
   let f (tset, uset) (t_theta, t_tau) =
     match expand_max p p.orig t_tau with
     | [_,_], [] ->  tset @ [t_theta], uset
-    | _ -> failwith "TODO : implement repr inversion."
+    | new_ts, new_us ->
+      if p.repr_is_identity then tset @ (List.map ~f:first new_ts), uset @ new_us
+      else  failwith "TODO : implement repr inversion." (* TODO implement inversion *)
   in
   let l1, l2 = List.fold tset0 ~f ~init:([], uset0) in
   TermSet.of_list l1, TermSet.of_list l2

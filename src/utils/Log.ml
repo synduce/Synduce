@@ -84,26 +84,28 @@ let loc_fatal_errmsg loc msg =
   error (fun f () -> log_with_excerpt f !reference_text loc Fmt.string msg); fatal ()
 
 let info (msg : Formatter.t -> unit -> unit) : unit =
-  pf Fmt.stdout "@[<hov 4>%a@;%a@]@." (styled (`Bg `Blue) string) " 🛈  " msg ()
+  if !Config.info then
+    pf Fmt.stdout "@[<hov 4>%a@;%a@]@." (styled (`Bg `Blue) string) " INFO :" msg ()
+  else ()
 
 let debug (msg : Formatter.t -> unit -> unit) : unit =
   if !Config.debug then
-    pf Fmt.stdout "@[<hov 2>%a@;%a@]@." (styled (`Fg `Black) (styled (`Bg `Yellow) string)) " ⚠  " msg ()
+    pf Fmt.stdout "@[<hov 2>%a@;%a@]@." (styled (`Fg `Black) (styled (`Bg `Yellow) string)) "!DEBUG!" msg ()
   else ()
 
 let debug_msg (msg : string) = debug (fun fmt () -> pf fmt "%s" msg)
 
 let print_ok () =
   if !Config.debug then
-    pf Fmt.stdout "%a@." (styled (`Fg `Black) (styled (`Bg `Green) string)) " ✓ "
+    pf Fmt.stdout "%a@." (styled (`Fg `Black) (styled (`Bg `Green) string)) "  OK   "
   else ()
 
 let verbose msg =
   if !Config.verbose then
-    pf Fmt.stdout "@[<hov 2>%a@;%a@]@." (styled (`Fg `Black) (styled (`Bg `Cyan) string)) "VERB" msg ()
+    pf Fmt.stdout "@[<hov 2>%a@;%a@]@." (styled (`Fg `Black) (styled (`Bg `Cyan) string)) " VERB <" msg ()
   else ()
 
 let verbose_msg msg =
   if !Config.verbose then
-    pf Fmt.stdout "@[<hov 2>%a@;%s@]@." (styled (`Fg `Black) (styled (`Bg `Cyan) string)) "VERB" msg
+    pf Fmt.stdout "@[<hov 2>%a@;%s@]@." (styled (`Fg `Black) (styled (`Bg `Cyan) string)) " VERB <" msg
   else ()

@@ -27,16 +27,20 @@ let rec refinement_loop (p : psi_def) (t_set, u_set : TermSet.t * TermSet.t) =
      | None ->
        Log.print_ok ();
        let target = PMRS.instantiate_with_solution p.target sol in
-       Log.info Fmt.(fun frmt () -> pf frmt "@[<hov 2>Solution found:@;%a@]" PMRS.pp target))
-  | RFail, _ -> Log.error_msg "SyGuS solver failed to find a solution."; Log.fatal ()
+       Ok target)
+
+  | RFail, _ -> Log.error_msg "SyGuS solver failed to find a solution."; Error RFail
+
   | RInfeasible, _ ->
     (Log.info
        Fmt.(fun frmt () ->
            pf frmt "@[<hov 2>This problem has no solution. Counterexample set:@;%a@]"
              (list ~sep:sp pp_term) (Set.elements t_set));
-     Caml.exit 0)
-  | RUnknown, _  -> Log.error_msg "SyGuS solver returned unknown."; Log.fatal ()
-  | _ -> failwith "Unreachable."
+     Error RInfeasible)
+
+  | RUnknown, _  -> Log.error_msg "SyGuS solver returned unknown."; Error RUnknown
+
+  | _ -> Error s_resp
 
 
 
@@ -58,7 +62,8 @@ let psi (p : psi_def) =
             Set.union t t1, Set.union u t2)
   in
   if Set.is_empty t_set then
-    Log.error_msg "Empty set of terms for equation system."
+    (Log.error_msg "Empty set of terms for equation system.";
+     failwith "Cannot solve problem.")
   else
     (loop_counter := 0;
      refinement_loop p (t_set, u_set))
@@ -70,7 +75,7 @@ let psi (p : psi_def) =
 
 let no_synth () = failwith "No synthesis objective found."
 
-let solve_problem (pmrs : (string, PMRS.t, Base.String.comparator_witness) Map.t) : unit =
+let solve_problem (pmrs : (string, PMRS.t, Base.String.comparator_witness) Map.t) : (PMRS.t, solver_response) Result.t =
   let orig_fname = "spec" and target_fname = "target" and repr_fname = "repr" in
   (* Representation function. *)
   let repr, theta_to_tau =
@@ -162,4 +167,4 @@ let solve_problem (pmrs : (string, PMRS.t, Base.String.comparator_witness) Map.t
   AState._theta := theta;
   AState._alpha := t_out;
   (* Solve the problem. *)
-  psi { target = target_f; orig =  orig_f; repr =  repr_pmrs }
+  psi { target = target_f; orig =  orig_f; repr =  repr_pmrs; repr_is_identity = PMRS.is_identity repr_pmrs }
