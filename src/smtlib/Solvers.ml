@@ -129,7 +129,7 @@ let call_solver solver commands =
 
 (** Create a process with a Z3 sovler. *)
 (* TODO: change the path of the solver. *)
-let make_z3_solver () = make_solver "/usr/bin/z3"
+let make_z3_solver () = make_solver Utils.Config.z3_binary_path
 
 let call_solver_default solver commands =
   match solver with

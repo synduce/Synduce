@@ -11,4 +11,6 @@ let tmp_folder = ref "/tmp/"
 let root_folder = "/home/victorn/repos/refuns/"
 let base s = Filename.concat root_folder s
 
-let cvc4_binary_path = "/home/victorn/tools/cvc4-1.8-x86_64-linux-opt"
+let cvc4_binary_path = "/usr/bin/cvc4"
+
+let z3_binary_path = "/usr/bin/z3"
