@@ -10,6 +10,7 @@ let free_variables (t : term) : VarSet.t =
     | TVar v -> VarSet.singleton v
     | TIte (c, t1, t2) -> VarSet.union_list [f c; f t1; f t2]
     | TTup tl -> VarSet.union_list (List.map ~f tl)
+    | TSel (t, _) -> f t
     | TFun (vl, t1) -> let v1 = f t1 in Set.diff v1 (fpat_vars (PatTup vl))
     | TApp (ft, targs) -> Set.union (f ft) (VarSet.union_list (List.map ~f targs))
     | TData (_, mems) -> VarSet.union_list (List.map ~f mems)
@@ -182,7 +183,11 @@ let reduce_term (t : term) : term =
           | Some subst -> Some (substitution subst body)
           | None -> None)
        | _ -> None)
-    |  TFun([], body) -> Some (f body)
+    | TFun([], body) -> Some (f body)
+    | TSel(t, i) ->
+      (match f t with
+       | {tkind = TTup tl; _} -> Some (List.nth_exn tl i)
+       | _ -> None)
     | _ -> None
   in
   transform ~case t

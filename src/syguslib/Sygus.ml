@@ -28,8 +28,9 @@ type index =
 type identifier =
   | IdSimple of symbol
   | IdIndexed of symbol * index list
+  | IdQual of symbol * sygus_sort
 
-type sygus_sort =
+and sygus_sort =
   | SId of identifier
   | SApp of identifier * sygus_sort list
 
@@ -141,14 +142,16 @@ let identifier_of_sexp (s : Sexp.t) : identifier =
   | _ -> failwith "Not an identifier."
 
 
-let sexp_of_identifier (id : identifier) : Sexp.t =
+let rec sexp_of_identifier (id : identifier) : Sexp.t =
   match id with
   | IdSimple name -> Atom name
   | IdIndexed (name, indices) ->
     List (Atom "_"::(sexp_of_symbol name)::(List.map ~f:sexp_of_index indices))
+  | IdQual (name, sort) ->
+    List ([Atom "as"; sexp_of_symbol name; sexp_of_sygus_sort sort])
 
 
-let rec sygus_sort_of_sexp (s : Sexp.t) : sygus_sort =
+and sygus_sort_of_sexp (s : Sexp.t) : sygus_sort =
   try SId (identifier_of_sexp s) with
   | _ ->
     match s with
@@ -157,7 +160,7 @@ let rec sygus_sort_of_sexp (s : Sexp.t) : sygus_sort =
     | _ -> failwith "Not a sygus_sort"
 
 
-let rec sexp_of_sygus_sort (s : sygus_sort) : Sexp.t =
+and sexp_of_sygus_sort (s : sygus_sort) : Sexp.t =
   match s with
   | SId s -> sexp_of_identifier s
   | SApp (sname, sygus_sort_params) ->

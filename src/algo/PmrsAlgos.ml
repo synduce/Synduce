@@ -75,14 +75,17 @@ let psi (p : psi_def) =
 
 let no_synth () = failwith "No synthesis objective found."
 
-let solve_problem (pmrs : (string, PMRS.t, Base.String.comparator_witness) Map.t) : (PMRS.t, solver_response) Result.t =
+let solve_problem (pmrs : (string, PMRS.t, Base.String.comparator_witness) Map.t) :
+  (PMRS.t, solver_response) Result.t =
   let orig_fname = "spec" and target_fname = "target" and repr_fname = "repr" in
   (* Representation function. *)
   let repr, theta_to_tau =
     match Map.find pmrs repr_fname with
     | Some pmrs -> Either.First pmrs, Variable.vtype_or_new pmrs.pmain_symb
     | None ->
-      let reprs = Hashtbl.filter ~f:(fun (v, _, _) -> String.(v.vname = repr_fname)) Term._globals in
+      let reprs =
+        Hashtbl.filter ~f:(fun (v, _, _) -> String.(v.vname = repr_fname)) Term._globals
+      in
       (match Hashtbl.choose reprs with
        | Some (_,(f,a,b)) -> Either.Second (f,a,b), Variable.vtype_or_new f
        | None -> Log.error_msg "No representation function given."; no_synth ())
@@ -105,6 +108,7 @@ let solve_problem (pmrs : (string, PMRS.t, Base.String.comparator_witness) Map.t
   (* Match origin and target recursion scheme types. *)
   (match theta_to_tau with
    | RType.TFun (TTup [theta'], tau')
+
    | RType.TFun (theta', tau') ->
      let sb1 = RType.unify_one theta theta' in
      let sb2 = RType.unify_one tau tau' in
@@ -113,6 +117,7 @@ let solve_problem (pmrs : (string, PMRS.t, Base.String.comparator_witness) Map.t
         (match RType.unify (RType.mkv (sb1 @ sb2)) with
          | Some sb' -> Term.Variable.update_var_types (RType.mkv sb')
          | None -> Log.error_msg "Could not unify θ and τ in problem definition."; Log.fatal ())
+
       | _ ->
         Log.error_msg
           (Fmt.str "repr has type %a, expected %a." RType.pp theta_to_tau RType.pp RType.(TFun(theta, tau)));
@@ -128,6 +133,7 @@ let solve_problem (pmrs : (string, PMRS.t, Base.String.comparator_witness) Map.t
       (match RType.unify_one tout tout' with
        | Some subs -> Variable.update_var_types (RType.mkv subs)
        | None -> Log.error_msg "Failed to unify output types."; no_synth ())
+
     |_ -> Log.error_msg "Original or target is not a function."; no_synth ());
   (*  Update the type of all the components. *)
   let repr =
@@ -144,7 +150,7 @@ let solve_problem (pmrs : (string, PMRS.t, Base.String.comparator_witness) Map.t
         | TFun(_, tout) -> tout
         | _ -> failwith "Unexpected.")
   in
-  (* Print summary information about the problem. *)
+  (* Print summary information about the problem, before solving.*)
   Log.info
     Fmt.(fun fmt () -> pf fmt " Ψ (%a) := ∀ x : %a. (%s o %s)(x) = %s(x)"
             (list ~sep:comma Term.Variable.pp) (Set.elements xi) RType.pp theta
@@ -162,9 +168,18 @@ let solve_problem (pmrs : (string, PMRS.t, Base.String.comparator_witness) Map.t
     | Either.First p -> p
     | Either.Second (f,a,b) -> PMRS.func_to_pmrs f a b
   in
+  if not (List.length orig_f.pargs = List.length target_f.pargs) then
+    failwith "Specification and target recursion scheme must have the same number of parameters."
+  else  ();
   (* Set global information. *)
   AState._tau := tau;
   AState._theta := theta;
   AState._alpha := t_out;
   (* Solve the problem. *)
-  psi { target = target_f; orig =  orig_f; repr =  repr_pmrs; repr_is_identity = PMRS.is_identity repr_pmrs }
+  psi
+    {
+      target = target_f;
+      orig =  orig_f;
+      repr =  repr_pmrs;
+      repr_is_identity = PMRS.is_identity repr_pmrs
+    }

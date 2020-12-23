@@ -17,7 +17,7 @@ type top_function = variable * variable list * term
 type t = {
   pname : string;
   pinput_typ : RType.t;
-  pargs : VarSet.t;
+  pargs : variable list;
   pparams : VarSet.t;
   prules : rewrite_rule IntMap.t;
   pnon_terminals : VarSet.t;
@@ -241,7 +241,7 @@ let func_to_pmrs (f : Variable.t) (args : fpattern list) (body : Term.term) =
   {
     pname = f.vname;
     pinput_typ = tin;
-    pargs = fpat_vars (PatTup args) ;
+    pargs = Set.elements (fpat_vars (PatTup args));
     pparams = VarSet.empty; (* PMRS from a function cannot have unkowns. *)
     porder = 0;
     pmain_symb = pmain_symb;

@@ -68,6 +68,7 @@ let rec smt_of_term (t : term) : smtTerm =
   | TVar x -> mk_var x.vname
   | TIte (c, a, b) -> mk_ite (smt_of_term c) (smt_of_term a) (smt_of_term b)
   | TTup tl -> mk_simple_app "mkTuple" (List.map ~f:smt_of_term tl)
+  | TSel (t,i) -> SmtTApp(QI (IdC (SSimple "tupleSel", [INum i])), [smt_of_term t])
   | TApp ({tkind=TVar v;_}, args) -> mk_simple_app v.vname  (List.map ~f:smt_of_term args)
   | TData (cstr, args) -> mk_simple_app cstr (List.map ~f:smt_of_term args)
   | TApp(_ , _) -> failwith "Smt: application function can only be variable."
@@ -105,7 +106,7 @@ let id_kind_of_s env s =
         | None -> INotDef
 
 
-let rec term_of_sygus (env : (string, variable, String.comparator_witness) Map.t) (st : smtTerm) : term =
+let rec term_of_smt (env : (string, variable, String.comparator_witness) Map.t) (st : smtTerm) : term =
   match st with
   | SmtTQualdId (QI (Id (SSimple s))) ->
     (match Map.find env s with
@@ -114,7 +115,7 @@ let rec term_of_sygus (env : (string, variable, String.comparator_witness) Map.t
 
   | SmtTSpecConst l -> mk_const (constant_of_smtConst l)
   | SmtTApp (QI (Id (SSimple s)), args) ->
-    let args' = List.map ~f:(term_of_sygus env) args in
+    let args' = List.map ~f:(term_of_smt env) args in
     (match id_kind_of_s env s with
      | ICstr c -> mk_data c args'
      | IVar v -> mk_app (Term.mk_var v) args'
@@ -125,11 +126,11 @@ let rec term_of_sygus (env : (string, variable, String.comparator_witness) Map.t
      | IUnop op ->
        (match args' with
         | [t1] -> mk_un op t1
-        | _ -> failwith "Sygus: a unary operator with more than one argument.")
-     | INotDef -> failwith "Sygus: Undefined variable.")
-  | SmtTExists (_, _) -> failwith "Sygus: exists-terms not supported."
-  | SmtTForall (_, _) -> failwith "Sygus: forall-terms not supported."
-  | SmtTLet (_, _) -> failwith "Sygus: let-terms not supported."
+        | _ -> failwith "Smt: a unary operator with more than one argument.")
+     | INotDef -> failwith "Smt: Undefined variable.")
+  | SmtTExists (_, _) -> failwith "Smt: exists-terms not supported."
+  | SmtTForall (_, _) -> failwith "Smt: forall-terms not supported."
+  | SmtTLet (_, _) -> failwith "Smt: let-terms not supported."
   | _ -> failwith "Composite identifier not supported."
 
 

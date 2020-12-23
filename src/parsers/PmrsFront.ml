@@ -202,7 +202,7 @@ let translate_rules loc (globs : (string, Term.variable) Hashtbl.t)
   PMRS.infer_pmrs_types
     (Term.{
         pname = pname;
-        pargs = VarSet.of_list args;
+        pargs = args;
         pparams = VarSet.of_list params;
         pnon_terminals = nont;
         prules = rules;

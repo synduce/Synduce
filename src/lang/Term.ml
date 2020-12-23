@@ -296,7 +296,10 @@ module Unop = struct
   let equal = Poly.equal
 
   let operand_type (op : t) =
-    match op with | Neg -> RType.TInt| Not -> RType.TBool | Abs -> RType.TInt
+    match op with
+    | Neg -> RType.TInt
+    | Not -> RType.TBool
+    | Abs -> RType.TInt
 
   let result_type (op : t) =
     match op with | Neg -> RType.TInt| Not -> RType.TBool | Abs -> RType.TInt
@@ -419,6 +422,7 @@ type termkind =
   | TVar of variable
   | TIte of term * term * term
   | TTup of term list
+  | TSel of term * int
   | TFun of fpattern list * term
   | TApp of term * term list
   | TData of string * term list
@@ -506,6 +510,18 @@ let mk_ite ?(pos = dummy_loc) ?(typ = None) (c : term) (th : term) (el : term) =
 
 let mk_tup ?(pos = dummy_loc) (l : term list) =
   {tpos = pos; tkind = TTup(l); ttyp = RType.TTup (List.map ~f:(fun t -> t.ttyp) l) }
+
+let mk_sel ?(pos = dummy_loc) ?(typ = None) (t : term) (i : int) =
+  let typ =
+    match typ with
+    | Some t -> t
+    | None ->
+      (match t.ttyp with
+       | RType.TTup tl ->
+         (match List.nth tl i with Some x -> x | None -> RType.get_fresh_tvar ())
+       | _ -> RType.get_fresh_tvar ())
+  in
+  {tpos = pos; tkind = TSel(t,i); ttyp = typ }
 
 let mk_un ?(pos = dummy_loc) ?(typ = None) (op : Unop.t) (t : term) =
   let typ =
@@ -606,6 +622,7 @@ and substitution (substs : (term * term) list) (t : term) : term =
         | TUn (u, t1) -> TUn(u, aux t1)
         | TIte (c, tt, tf) -> TIte(aux c, aux tt, aux tf)
         | TTup tl -> TTup(List.map ~f:aux tl)
+        | TSel (t, i) -> TSel(aux t, i)
         | TFun (args, body) -> TFun(args, aux body)
         | TApp (f, args) -> TApp(aux f, List.map ~f:aux args)
         | TData (cstr, args) -> TData(cstr, List.map ~f:aux args)
@@ -671,6 +688,7 @@ let rewrite_with (f : term -> term) (t : term) =
       | TVar _ -> tk
       | TIte (c, t1, t2) -> TIte(aux c, aux t1, aux t2)
       | TTup tl -> TTup (List.map ~f:aux tl)
+      | TSel (t,i) -> TSel(aux t, i)
       | TFun (fargs, body) -> TFun(fargs, aux body)
       | TApp (func, args) -> TApp(aux func, List.map ~f:aux args)
       | TData (cstr, args) -> TData(cstr, List.map ~f:aux args)
@@ -689,6 +707,7 @@ let rewrite_top_down (f : term -> term option) (t : term) =
         | TVar _ -> t0.tkind
         | TIte (c, t1, t2) -> TIte(aux c, aux t1, aux t2)
         | TTup tl -> TTup (List.map ~f:aux tl)
+        | TSel (t,i) -> TSel(aux t, i)
         | TFun (fargs, body) -> TFun(fargs, aux body)
         | TApp (func, args) -> TApp(aux func, List.map ~f:aux args)
         | TData (cstr, args) -> TData(cstr, List.map ~f:aux args)
@@ -711,6 +730,7 @@ let reduce ~(init : 'a) ~(case : (term -> 'a) -> term -> 'a option) ~(join: 'a -
        | TVar _ -> init
        | TIte (c, a, b) -> join (aux c) (join (aux a) (aux b))
        | TTup tl -> aux_l tl
+       | TSel (t, _) -> aux t
        | TFun (_, body) -> aux body
        | TApp (func, args) -> join (aux func) (aux_l args)
        | TData (_, args) -> aux_l args)
@@ -731,6 +751,7 @@ let transform ~(case : (term -> term) -> term -> term option) (t : term) : term 
                  | TVar _ -> t.tkind
                  | TIte (c, a, b) -> TIte (aux c, aux a, aux b)
                  | TTup tl -> TTup(aux_l tl)
+                 | TSel (t, i) -> TSel(aux t, i)
                  | TFun (args, body) -> TFun(args, aux body)
                  | TApp (func, args) -> TApp(aux func, aux_l args)
                  | TData (cstr, args) -> TData(cstr, aux_l args))}
@@ -775,6 +796,9 @@ let pp_term (frmt : Formatter.t) (x : term) =
 
     | TTup tl ->
       pf frmt "@[<hov 2>(%a)@]" (list ~sep:comma (aux false)) tl
+
+    | TSel (t, i) ->
+      pf frmt "@[<hov 2>%a[%i]@]" (aux true) t i
 
     | TFun (args, body) ->
       if paren then
@@ -840,6 +864,18 @@ let infer_type (t : term) : term * RType.substitution =
     | TTup tl ->
       let term_l, c_l = List.unzip (List.map ~f:aux tl) in
       mk_tup ~pos:t0.tpos term_l, merge_subs (List.concat c_l) []
+
+    | TSel (t, i) ->
+      let t_c, c_c = aux t in
+      (match t_c.ttyp with
+       | RType.TTup tl ->
+         (match List.nth tl i with
+          | Some tout ->  mk_sel ~pos:t0.tpos ~typ:(Some tout) t_c i, c_c
+          | None -> failwith "Type inference: tuple acessor, accesed tuple of wrong type.")
+       | _ ->
+         Log.error_msg Fmt.(str "Tuple acessor argument %a of type %a." pp_term t_c RType.pp t_c.ttyp);
+         failwith "Type inference: tuple accessor on type acessor."
+      )
 
     | TFun (args, body) ->
       let t_body, c_body = aux body in  mk_fun ~pos:t0.tpos args t_body, c_body

@@ -15,15 +15,22 @@ let check_equation ~(p : psi_def) (_, lhs, rhs : equation) : bool =
   | [], [] -> true
   | _ -> false
 
+let compute_rhs p t =
+  Expand.replace_rhs_of_main p p.target (PMRS.reduce p.target t)
+
+let compute_lhs p t =
+  let r_t = Expand.replace_rhs_of_main p p.repr (PMRS.reduce p.repr t) in
+  let subst_params =
+    let l = List.zip_exn p.orig.pargs p.target.pargs in
+    List.map l ~f:(fun (v1, v2) -> mk_var v1, mk_var v2)
+  in
+  substitution subst_params
+    (Expand.replace_rhs_of_main p p.orig (PMRS.reduce p.orig r_t))
+
 
 let make ~(p : psi_def) (tset : TermSet.t) : equation list =
   let eqns =
-    let fold_f eqns t =
-      let r_t = Expand.replace_rhs_of_main p p.repr (PMRS.reduce p.repr t) in
-      let lhs = Expand.replace_rhs_of_main p p.orig (PMRS.reduce p.orig r_t) in
-      let rhs = Expand.replace_rhs_of_main p p.target (PMRS.reduce p.target t) in
-      eqns @ [t, lhs, rhs]
-    in
+    let fold_f eqns t = eqns @ [t, compute_lhs p t, compute_rhs p t] in
     Set.fold ~init:[] ~f:fold_f tset
   in
   let all_subs =
@@ -54,6 +61,8 @@ let constraints_of_eqns (eqns : equation list) : command list =
 
 
 let synthfuns_of_unknowns ?(ops = OpSet.empty) (unknowns : VarSet.t) : command list =
+  (*  Flatten the inputs (tuples) -> scalars *)
+  (*  Decompose into multiple functions for tuples. *)
   let decompose_xi_args (xi : variable) =
     match Variable.vtype_or_new xi with
     | RType.TFun(TTup(targs), tres) -> sorted_vars_of_types targs, sort_of_rtype tres
@@ -101,7 +110,13 @@ let solve ~(p : psi_def) (eqns : equation list) =
       fname, args, body
     in
     match resp with
-    | RSuccess (resps) -> resp, Some (List.map ~f:parse_synth_fun resps)
+    | RSuccess (resps) ->
+      let soln = List.map ~f:parse_synth_fun resps in
+      Utils.Log.debug_msg
+        Fmt.(str "Solution found:@[<hov 2>%a@]"
+               (list (fun fmrt (s, args, bod) ->
+                    pf fmrt "@[<hov 2>%s(%a)=%a" s (list ~sep:comma Variable.pp) args pp_term bod)) soln);
+      resp, Some  soln
     | RInfeasible -> RInfeasible, None
     | RFail -> RFail, None
     | RUnknown -> RUnknown, None

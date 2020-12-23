@@ -90,7 +90,7 @@ let instantiate_variant (vargs : type_term list) (instantiator : (ident * int) l
 *)
 let _types : (ident, t) Hashtbl.t =
   Hashtbl.of_alist_exn (module String)
-    [ "int", TInt; "bool", TBool; "char", TChar; "string", TString ]
+    [ "Int", TInt; "Bool", TBool; "Char", TChar; "String", TString ]
 
 (**
    This hashtable maps variant names to the type name.

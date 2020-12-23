@@ -26,7 +26,7 @@ let main () =
     (match Algo.PmrsAlgos.solve_problem all_pmrs with
      | Ok target ->
        let elapsed = Unix.gettimeofday () -. start_time in
-       Utils.Log.info Fmt.(fun frmt () -> pf frmt "Solution found in %2.4fs:@;%a@]" elapsed (box PMRS.pp) target);
+       Utils.Log.info Fmt.(fun frmt () -> pf frmt "Solution found in %4.4fs:@;%a@]" elapsed (box PMRS.pp) target);
        (* If no info required, output timing information. *)
        if not !Config.info then Fmt.(pf stdout "%s,%i,%.4fs@." (Caml.Filename.basename(!filename)) !Algo.PmrsAlgos.loop_counter elapsed)
 

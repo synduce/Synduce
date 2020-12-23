@@ -1,0 +1,15 @@
+type 'a tree = Nil | Node of 'a * 'a tree * 'a tree
+
+pmrs spec poly_in =
+    main t -> f (0,1) t
+    | f s Nil -> s
+    | f s (Node(a,l,r)) ->
+        (fun (y,z) -> f (y + z * a, poly_in * z) r)
+            (f s l)
+
+pmrs (join, s0) target poly_input =
+    main t1 -> h t1
+    | h Nil -> s0
+    | h Node(a,l,r) -> join poly_input a (h l) (h r)
+
+let repr x = x

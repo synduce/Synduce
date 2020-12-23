@@ -13,6 +13,11 @@ let rec rtype_of_sort (s : sygus_sort) : RType.t option =
      | RType.TParam (_, maint) -> Some maint
      | _ -> Some x)
 
+  | SApp (IdSimple("Tuple"), sorts) ->
+    (match all_or_none (List.map ~f:rtype_of_sort sorts) with
+     | Some l -> Some (RType.TTup l)
+     | _ -> None)
+
   | SApp (IdSimple(sname), sort_params) ->
     let%bind x = RType.get_type sname in
     let%bind y = all_or_none (List.map ~f:rtype_of_sort sort_params) in
@@ -23,8 +28,8 @@ let rec rtype_of_sort (s : sygus_sort) : RType.t option =
         | _ -> None )
      | _ -> None)
 
-  | SId (IdIndexed (_, _)) ->  Log.error_msg "Indexed sorts not implemented."; None
-  | SApp (IdIndexed (_, _), _) ->  Log.error_msg "Indexed sorts not implemented."; None
+  | SId (_) ->  Log.error_msg "Indexed / qualified sorts not implemented."; None
+  | SApp (_, _) ->  Log.error_msg "Indexed sorts not implemented."; None
 
 
 let rec sort_of_rtype (t : RType.t) : sygus_sort =
@@ -62,6 +67,7 @@ let rec sygus_of_term (t : term) : sygus_term =
   | TVar x -> SyId (IdSimple x.vname)
   | TIte (c, a, b) -> SyApp( IdSimple "ite", List.map ~f:sygus_of_term [c;a;b])
   | TTup tl -> SyApp(IdSimple "mkTuple", List.map ~f:sygus_of_term tl)
+  | TSel (t,i) -> SyApp(IdIndexed("tupleSel",[INum i]), [sygus_of_term t])
   | TApp ({tkind=TVar v;_}, args) -> SyApp(IdSimple v.vname, List.map ~f:sygus_of_term args)
   | TData (cstr, args) -> SyApp(IdSimple cstr, List.map ~f:sygus_of_term args)
   | TApp(_ , _) -> failwith "Sygus: application function can only be variable."
@@ -83,11 +89,22 @@ type id_kind =
   | IVar of variable
   | IBinop of Binop.t
   | IUnop of Unop.t
+  | ITupleAccessor of int
   | INotDef
+  | ITupleCstr
   | IIte
 
 
 let id_kind_of_s env s =
+  let string_case s =
+    match s with
+    | "ite" ->  IIte
+    | "mkTuple" -> ITupleCstr
+    | s when String.is_prefix ~prefix:"__cvc4_tuple_" s ->
+      let i = Int.of_string (Str.last_chars s 1) in
+      ITupleAccessor i
+    | _ -> INotDef
+  in
   match Map.find env s with
   | Some v -> IVar v
   | None ->
@@ -98,10 +115,8 @@ let id_kind_of_s env s =
       | Some unop -> IUnop unop
       | None -> match RType.type_of_variant s with
         | Some _ -> ICstr s
-        | None ->
-          (match s with
-           | "ite" ->  IIte
-           | _ -> INotDef)
+        | None -> string_case s
+
 
 let rec term_of_sygus (env : (string, variable, String.comparator_witness) Map.t) (st : sygus_term) : term =
   match st with
@@ -128,7 +143,12 @@ let rec term_of_sygus (env : (string, variable, String.comparator_witness) Map.t
        (match args' with
         | [t1; t2; t3] -> mk_ite t1 t2 t3
         | _ -> failwith "Sygus: a binary operator with more than two arguments.")
-     | INotDef -> failwith "Sygus: Undefined variable.")
+     | ITupleAccessor i ->
+       (match args' with
+        | [arg] -> mk_sel arg i
+        | _ -> failwith "Sygus: a tuple acessor with wrong number of arguments")
+     | ITupleCstr -> mk_tup args'
+     | INotDef -> failwith Fmt.(str "Sygus: Undefined variable %s" s))
   | SyExists (_, _) -> failwith "Sygus: exists-terms not supported."
   | SyForall (_, _) -> failwith "Sygus: forall-terms not supported."
   | SyLet (_, _) -> failwith "Sygus: let-terms not supported."
@@ -143,6 +163,8 @@ let declaration_of_var (v : variable) =  CDeclareVar(v.vname, sort_of_rtype (Var
 
 let sorted_vars_of_types (tl : RType.t list) : sorted_var list =
   let f t =
-    Alpha.fresh "x", sort_of_rtype t
+    (* Declare var for future parsing. *)
+    let varname = Alpha.fresh "x" in
+    varname, sort_of_rtype t
   in
   List.map ~f tl

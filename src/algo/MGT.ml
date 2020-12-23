@@ -15,7 +15,9 @@ let mgt_of_one (prog : PMRS.t) (_ : int) (rule_id : int) =
     | Some r -> r
     | None -> failwith (Fmt.str "mgt_of_one : could not find rule %i" i)
   in
-  let boundvars = ref (VarSet.union_list [prog.pnon_terminals; prog.pparams]) in
+  let boundvars = 
+    ref (VarSet.union_list [prog.pnon_terminals; prog.pparams; VarSet.of_list prog.pargs])
+  in
   let unbound x =
     Set.diff (free_variables x) !boundvars
   in
@@ -56,7 +58,7 @@ let mgt_of_one (prog : PMRS.t) (_ : int) (rule_id : int) =
     Log.verbose
       (fun frmt () ->
          Fmt.(pf frmt "@[<hov 2>Matching rules:@;%a@]@."
-                (list (parens (pair int (parens (pair ~sep:comma Variable.pp pp_term) ))))
+                (list ~sep:sp (brackets (pair ~sep:sp int (parens (pair ~sep:comma Variable.pp pp_term) ))))
                 all_mrules));
     match all_mrules with
     | (m_id, (m_nt, m_term)) :: _ ->
