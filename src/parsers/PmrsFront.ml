@@ -9,6 +9,7 @@ module L = Pmrs_lexer
 exception SyntaxError of string
 
 let verbose = ref true
+
 let text = ref ""
 
 let loc_fatal_errmsg loc msg =
@@ -38,6 +39,7 @@ let parsefile filename =
   in
   I.loop_handle succeed fail supplier checkpoint
 
+
 (**
    Iterates through the toplevel declarations of the program and adds the type declaration
    to the global type environment in Lang.RType.
@@ -64,6 +66,10 @@ let seek_types (prog : program) =
     prog
 
 
+(**
+   ```fterm_to_term loc v g l t``` transforms fterm t at location loc into a term,
+    using the variables in v, the global variables in g and the local variables in l.
+*)
 let fterm_to_term _ allv globs locs rterm =
   let fterm_function_args args =
     let rec f x =
@@ -111,7 +117,7 @@ let fterm_to_term _ allv globs locs rterm =
 let translate_rules loc (globs : (string, Term.variable) Hashtbl.t)
     (params : Term.variable list) (args : Term.variable list)
     (pname : string)
-    (invariant : term)
+    (invariant : term option)
     (body : pmrs_body)
   : PMRS.t =
   (* Check that params and args do not have variables with the same name.
@@ -200,6 +206,12 @@ let translate_rules loc (globs : (string, Term.variable) Hashtbl.t)
     | Some (x,_,_,_) -> x
     | None -> loc_fatal_errmsg loc "No main rule."
   in
+  let invariant =
+    let f x =
+      fterm_to_term x.pos allv globs Term.VarSet.empty x
+    in
+    Option.map invariant ~f
+  in
   PMRS.infer_pmrs_types
     (Term.{
         pname = pname;
@@ -210,15 +222,16 @@ let translate_rules loc (globs : (string, Term.variable) Hashtbl.t)
         porder = -1;
         pmain_symb = main_symb;
         pinput_typ = RType.TInt; (* Will be replaced during type inference. *)
-        poutput_typ = RType.TInt, None; (* Will be replace during type inference. *)
+        poutput_typ = RType.TInt, invariant; (* Will be replace during type inference. *)
       })
 
 let translate_function loc globs
     (f : Term.Variable.t)
-    (args : Term.Variable.t list) (body : term) =
-  let body =
-    fterm_to_term loc (Term.VarSet.empty) globs (Term.VarSet.of_list (f::args))  body
-  in
+    (args : Term.Variable.t list)
+    (invariant : term option)
+    (body : term) =
+  let arg_set = Term.VarSet.of_list (f::args) in
+  let body = fterm_to_term loc (Term.VarSet.empty) globs arg_set  body in
   let typed_body, _ = Term.infer_type body in
   let f_type =
     match args with
@@ -226,8 +239,15 @@ let translate_function loc globs
     | [a] -> RType.TFun(Term.Variable.vtype_or_new a, typed_body.ttyp)
     | _ -> RType.(TFun (TTup (List.map ~f:(fun a -> Term.Variable.vtype_or_new a) args), typed_body.ttyp))
   in
+  let t_invar =
+    Option.map invariant
+      ~f:(fun x ->
+          let x = fterm_to_term x.pos (Term.VarSet.empty) globs arg_set x in
+          first (Term.infer_type x))
+  in
   Term.Variable.update_var_types [Term.Variable.vtype_or_new f, f_type];
-  f, List.map ~f:(fun v -> Term.PatVar v) args, typed_body
+  f, List.map ~f:(fun v -> Term.PatVar v) args, t_invar, typed_body
+
 
 let translate (prog : program) =
   let globals : (string, Term.variable) Hashtbl.t = Hashtbl.create (module String) in
@@ -246,11 +266,11 @@ let translate (prog : program) =
   List.fold ~init:(Map.empty (module String)) prog
     ~f:(fun pmrses decl ->
         match decl with
-        | PMRSDecl(loc, params, pname, args, invariants, body) ->
+        | PMRSDecl(loc, params, pname, args, invariant, body) ->
           let vparams = List.map ~f:Term.Variable.mk params in
           let vargs = List.map ~f:Term.Variable.mk args in
           Map.set pmrses ~key:pname ~data:(translate_rules loc globals vparams vargs pname invariant body)
-        | FunDecl (loc, fname, args, invariants, body) ->
+        | FunDecl (loc, fname, args, invariant, body) ->
           let vargs = List.map ~f:Term.Variable.mk args in
           let fvar = Hashtbl.find_exn globals fname in
           let func_info = translate_function loc globals fvar vargs invariant body in

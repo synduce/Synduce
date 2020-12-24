@@ -430,7 +430,7 @@ type termkind =
 and term = { tpos: position * position; tkind : termkind; ttyp : RType.t }
 
 
-let _globals : (int, Variable.t * fpattern list * term) Hashtbl.t = Hashtbl.create (module Int)
+let _globals : (int, Variable.t * fpattern list * term option * term) Hashtbl.t = Hashtbl.create (module Int)
 
 (* F-Patterns helpers *)
 

@@ -18,6 +18,7 @@ let keywords =
         "min", MIN;
         "of", OF;
         "type", TYPE;
+        "true", TRUE
     ]
 
 let keyword_tbl = Hashtbl.create 256
@@ -60,6 +61,8 @@ rule token = parse
   | ","               { COMMA }
   | "("               { LPAR }
   | ")"               { RPAR }
+  | "{"               { LBRACE }
+  | "}"               { RBRACE }
   | "+"               { PLUS }
   | "-"               { MINUS }
   | "*"               { TIMES }

@@ -84,10 +84,10 @@ let solve_problem (pmrs : (string, PMRS.t, Base.String.comparator_witness) Map.t
     | Some pmrs -> Either.First pmrs, Variable.vtype_or_new pmrs.pmain_symb
     | None ->
       let reprs =
-        Hashtbl.filter ~f:(fun (v, _, _) -> String.(v.vname = repr_fname)) Term._globals
+        Hashtbl.filter ~f:(fun (v, _,_, _) -> String.(v.vname = repr_fname)) Term._globals
       in
       (match Hashtbl.choose reprs with
-       | Some (_,(f,a,b)) -> Either.Second (f,a,b), Variable.vtype_or_new f
+       | Some (_,(f,a,_,b)) -> Either.Second (f,a,b), Variable.vtype_or_new f
        | None -> Log.error_msg "No representation function given."; no_synth ())
   in
   (* Original function. *)
@@ -145,11 +145,7 @@ let solve_problem (pmrs : (string, PMRS.t, Base.String.comparator_witness) Map.t
   let target_f = PMRS.infer_pmrs_types target_f in
   let orig_f = PMRS.infer_pmrs_types orig_f in
   let theta = target_f.pinput_typ in
-  let t_out =
-    Term.(match Variable.vtype_or_new orig_f.pmain_symb with
-        | TFun(_, tout) -> tout
-        | _ -> failwith "Unexpected.")
-  in
+  let t_out = orig_f.poutput_typ in
   (* Print summary information about the problem, before solving.*)
   Log.info
     Fmt.(fun fmt () -> pf fmt " Ψ (%a) := ∀ x : %a. (%s o %s)(x) = %s(x)"

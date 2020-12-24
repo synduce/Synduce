@@ -7,13 +7,16 @@ open SygusInterface
 module SmtI = SmtInterface
 
 
-type equation = term * term * term
+type equation = term * term option * term * term
 
 
-let check_equation ~(p : psi_def) (_, lhs, rhs : equation) : bool =
-  match Expand.nonreduced_terms_all p lhs, Expand.nonreduced_terms_all p rhs with
-  | [], [] -> true
-  | _ -> false
+let check_equation ~(p : psi_def) (_, pre, lhs, rhs : equation) : bool =
+  (match Expand.nonreduced_terms_all p lhs, Expand.nonreduced_terms_all p rhs with
+   | [], [] -> true
+   | _ -> false) &&
+  (match pre with
+   | None -> true
+   | Some t -> match Expand.nonreduced_terms_all p t with | [] -> true | _ -> false)
 
 let compute_rhs p t =
   Expand.replace_rhs_of_main p p.target (PMRS.reduce p.target t)
@@ -33,14 +36,15 @@ let make ~(p : psi_def) (tset : TermSet.t) : equation list =
     let fold_f eqns t = eqns @ [t, compute_lhs p t, compute_rhs p t] in
     Set.fold ~init:[] ~f:fold_f tset
   in
-  let all_subs =
+  let all_subs, invariants =
     Expand.subst_recursive_calls p
       (List.map ~f:(fun (_, lhs, rhs) -> mk_bin Binop.Eq lhs rhs) eqns)
   in
+  Fmt.(pf stdout "Invariants: %a.@." (list ~sep:comma pp_term) (Set.elements invariants));
   let pure_eqns =
     let f (t, lhs, rhs) =
       let applic x = Analysis.reduce_term (substitution all_subs x) in
-      t, applic lhs, applic rhs
+      t, None, applic lhs, applic rhs
     in
     List.map ~f eqns
   in
@@ -54,8 +58,16 @@ let make ~(p : psi_def) (tset : TermSet.t) : equation list =
 (*                               SOLVING SYSTEMS OF EQUATIONS                                    *)
 (* ============================================================================================= *)
 let constraints_of_eqns (eqns : equation list) : command list =
-  let eqn_to_constraint (_, lhs, rhs) =
-    CConstraint (SyApp(IdSimple "=", [sygus_of_term lhs; sygus_of_term rhs]))
+  let eqn_to_constraint (_, pre, lhs, rhs) =
+    match pre with
+    | Some precondition ->
+      CConstraint (
+        SyApp(IdSimple "or",
+              [
+                SyApp(IdSimple "not", [sygus_of_term precondition]);
+                SyApp(IdSimple "=", [sygus_of_term lhs; sygus_of_term rhs])
+              ]))
+    | None -> CConstraint (SyApp(IdSimple "=", [sygus_of_term lhs; sygus_of_term rhs]))
   in
   List.map ~f:eqn_to_constraint eqns
 
@@ -79,7 +91,7 @@ let synthfuns_of_unknowns ?(ops = OpSet.empty) (unknowns : VarSet.t) : command l
 
 let solve ~(p : psi_def) (eqns : equation list) =
   let free_vars, all_operators =
-    let f (fvs, ops) (_, lhs, rhs) =
+    let f (fvs, ops) (_, _, lhs, rhs) =
       VarSet.union_list [fvs; Analysis.free_variables lhs; Analysis.free_variables rhs],
       Set.union ops (Set.union (Grammars.operators_of lhs) (Grammars.operators_of rhs))
     in

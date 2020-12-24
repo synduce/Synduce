@@ -2,7 +2,8 @@ type 'a clist = CNil | Single of 'a | Concat of 'a clist * 'a clist
 
 type 'a list = Nil | Cons of 'a * 'a list
 
-pmrs spec =
+
+pmrs spec {fun (x,y) -> true, y >= 0} =
     main l -> f l
     | f Nil -> (0, 0)
     | f Cons(hd, tl) -> (fun (sum, mps) -> max (sum + hd) mps, sum + hd) (f tl)

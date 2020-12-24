@@ -25,7 +25,7 @@ let identify_rcalls (p : psi_def) (lam : variable) (t : term) : VarSet.t =
   reduce ~init:VarSet.empty ~case ~join t
 
 
-let subst_recursive_calls (p : psi_def) (tl : term list) : (term * term) list =
+let subst_recursive_calls (p : psi_def) (tl : term list) :  (term * term) list * TermSet.t =
   let fsymb = p.orig.pmain_symb and  gsymb = p.target.pmain_symb in
   let rcalls =
     let fold_f rcalled_vars t =
@@ -35,13 +35,20 @@ let subst_recursive_calls (p : psi_def) (tl : term list) : (term * term) list =
     in
     List.fold ~init:VarSet.empty ~f:fold_f tl
   in
-  let f var =
-    let scalar_term = mk_composite_scalar !AState._alpha in
-    [mk_app (mk_var fsymb) [mk_var var], scalar_term;
-     mk_app (mk_var gsymb) [mk_var var], scalar_term;
-     mk_app (mk_var fsymb) [mk_app (mk_var p.repr.pmain_symb) [mk_var var]], scalar_term]
+  let f (substs, invariants) var =
+    let scalar_term = mk_composite_scalar (first !AState._alpha) in
+    let invariant =
+      Option.map  (second !AState._alpha)
+        ~f:(fun inv -> first (infer_type (Analysis.reduce_term (mk_app inv [scalar_term]))))
+    in
+    substs @ [mk_app (mk_var fsymb) [mk_var var], scalar_term;
+              mk_app (mk_var gsymb) [mk_var var], scalar_term;
+              mk_app (mk_var fsymb) [mk_app (mk_var p.repr.pmain_symb) [mk_var var]], scalar_term],
+    (match invariant with
+     | Some inv -> Set.add invariants inv
+     | None -> invariants)
   in
-  List.concat (List.map ~f (Set.elements rcalls))
+  List.fold ~f ~init:([], TermSet.empty) (Set.elements rcalls)
 
 
 let subst_repr_calls (p : psi_def) (tl : term list) : (term * term) list =

@@ -6,4 +6,4 @@ let _tau = ref RType.TInt
 
 let _theta = ref RType.TInt
 
-let _alpha = ref RType.TInt
+let _alpha : (RType.t * (Term.term option)) ref = ref (RType.TInt, None)

@@ -150,7 +150,7 @@ let resolve_func (func : term) =
   match func.tkind with
   | TVar x ->
     (match Hashtbl.find Term._globals x.vid with
-     | Some (_, vargs, body) -> Some (vargs, body)
+     | Some (_, vargs, _, body) -> Some (vargs, body)
      | None -> None)
   | TFun(vargs, body) -> Some (vargs, body)
   | _ -> None

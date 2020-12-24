@@ -21,6 +21,7 @@
 %token INTSORT
 %token LET LETPMRS
 %token LPAR RPAR
+%token LBRACE RBRACE
 %token LT GT LE GE NEQ
 %token MAX
 %token MIN
@@ -52,7 +53,7 @@ main: f=list(decl); EOF                                                         
 decl:
     | TYPE t=typedecl                                                            { TypeDecl($loc, t) }
     | LETPMRS p=pmrsdecl                                                         { p }
-    | LET f=IDENT args=list(IDENT) COLON t=expr EQ body=expr                     { FunDecl($loc, f, args, Some t, body) }
+    | LET f=IDENT args=list(IDENT) LBRACE t=expr RBRACE EQ body=expr                     { FunDecl($loc, f, args, Some t, body) }
     | LET f=IDENT args=list(IDENT) EQ body=expr                                  { FunDecl($loc, f, args, None, body) }
 
 
@@ -98,10 +99,10 @@ pmrsdecl:
 
     | n=IDENT args=list(IDENT) EQ b=pbody                           { PMRSDecl($loc, [], n, args, None, b) }
 
-    | LPAR p=separated_list(COMMA,IDENT) RPAR n=IDENT args=list(IDENT) COLON e=expr EQ b=pbody
+    | LPAR p=separated_list(COMMA,IDENT) RPAR n=IDENT args=list(IDENT) LBRACE e=expr RBRACE EQ b=pbody
                                                                     { PMRSDecl($loc, p, n, args, Some e, b)}
 
-    | n=IDENT args=list(IDENT) COLON e=expr EQ b=pbody              { PMRSDecl($loc, [], n, args, Some e, b) }
+    | n=IDENT args=list(IDENT) LBRACE e=expr RBRACE EQ b=pbody              { PMRSDecl($loc, [], n, args, Some e, b) }
 
 
 pbody: separated_list(VBAR, prule)                                               { $1 }

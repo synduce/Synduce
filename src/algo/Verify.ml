@@ -37,10 +37,13 @@ let check_solution ~(p : psi_def)
     let t_set, u_set = Expand.maximal p t0 in
     let sys_eqns = Equations.make ~p:{ p with target=target_inst} t_set in
     let smt_eqns = List.map sys_eqns
-        ~f:(fun (_, lhs, rhs) -> mk_eq (smt_of_term lhs) (smt_of_term rhs))
+        ~f:(fun (_, pre, lhs, rhs) ->
+            match pre with
+            | Some _ -> failwith "TODO : invariants in verification."
+            | None -> mk_eq (smt_of_term lhs) (smt_of_term rhs))
     in
     let new_free_vars =
-      let f fv (_, lhs, rhs) =
+      let f fv (_, _, lhs, rhs) =
         Set.union fv (Set.union (Analysis.free_variables lhs) (Analysis.free_variables rhs))
       in
       Set.diff (List.fold ~f ~init:VarSet.empty sys_eqns) free_vars
