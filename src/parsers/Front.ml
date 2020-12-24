@@ -44,8 +44,8 @@ type pmrs_body = pmrs_rule list
 
 type decl =
   | TypeDecl of loc * type_decl
-  | FunDecl of loc * id * (id list) * term
-  | PMRSDecl of loc * (id list) * id * (id list) * pmrs_body
+  | FunDecl of loc * id * (id list) * term option * term
+  | PMRSDecl of loc * (id list) * id * (id list) * term option * pmrs_body
 
 type program = decl list
 

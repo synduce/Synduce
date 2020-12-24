@@ -104,13 +104,14 @@ let fterm_to_term _ allv globs locs rterm =
     | FTBin (op, t1, t2) -> Term.(mk_bin ~pos:t.pos op (f env t1) (f env t2))
     | FTUn (op, t1) -> Term.(mk_un ~pos:t.pos op (f env t1))
     | FTIte (c, a, b) -> Term.(mk_ite ~pos:t.pos (f env c) (f env a) (f env b))
-    | FTHOBin _ -> failwith "<case>"
+    | FTHOBin _ -> failwith "Higher order binary operator not supported."
   in
   f _env rterm
 
 let translate_rules loc (globs : (string, Term.variable) Hashtbl.t)
     (params : Term.variable list) (args : Term.variable list)
     (pname : string)
+    (invariant : term)
     (body : pmrs_body)
   : PMRS.t =
   (* Check that params and args do not have variables with the same name.
@@ -208,7 +209,8 @@ let translate_rules loc (globs : (string, Term.variable) Hashtbl.t)
         prules = rules;
         porder = -1;
         pmain_symb = main_symb;
-        pinput_typ = Variable.vtype_or_new main_symb;
+        pinput_typ = RType.TInt; (* Will be replaced during type inference. *)
+        poutput_typ = RType.TInt, None; (* Will be replace during type inference. *)
       })
 
 let translate_function loc globs
@@ -233,8 +235,8 @@ let translate (prog : program) =
   List.iter prog
     ~f:(fun decl ->
         match decl with
-        | FunDecl (loc, fname, _,_)
-        | PMRSDecl(loc, _, fname, _, _) ->
+        | FunDecl (loc, fname, _,_,_)
+        | PMRSDecl(loc, _, fname, _, _, _) ->
           (match Hashtbl.add globals ~key:fname ~data:(Term.Variable.mk fname) with
            | `Ok -> ()
            | `Duplicate ->
@@ -244,14 +246,14 @@ let translate (prog : program) =
   List.fold ~init:(Map.empty (module String)) prog
     ~f:(fun pmrses decl ->
         match decl with
-        | PMRSDecl(loc, params, pname, args, body) ->
+        | PMRSDecl(loc, params, pname, args, invariants, body) ->
           let vparams = List.map ~f:Term.Variable.mk params in
           let vargs = List.map ~f:Term.Variable.mk args in
-          Map.set pmrses ~key:pname ~data:(translate_rules loc globals vparams vargs pname body)
-        | FunDecl (loc, fname, args, body) ->
+          Map.set pmrses ~key:pname ~data:(translate_rules loc globals vparams vargs pname invariant body)
+        | FunDecl (loc, fname, args, invariants, body) ->
           let vargs = List.map ~f:Term.Variable.mk args in
           let fvar = Hashtbl.find_exn globals fname in
-          let func_info = translate_function loc globals fvar vargs body in
+          let func_info = translate_function loc globals fvar vargs invariant body in
           Hashtbl.add_exn Term._globals ~key:fvar.vid ~data:func_info;
           pmrses
         | _ -> pmrses)

@@ -5,7 +5,7 @@ type 'a list = Nil | Cons of 'a * 'a list
 pmrs spec =
     main l -> f l
     | f Nil -> (0, 0)
-    | f Cons(hd,tl) -> (fun (sum,mps) -> max (sum + hd) mps, sum + hd) (f tl)
+    | f Cons(hd, tl) -> (fun (sum, mps) -> max (sum + hd) mps, sum + hd) (f tl)
 
 pmrs (odot) target =
     main t           -> h t

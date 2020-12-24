@@ -17,6 +17,7 @@ type top_function = variable * variable list * term
 type t = {
   pname : string;
   pinput_typ : RType.t;
+  poutput_typ : RType.t * term option;
   pargs : variable list;
   pparams : VarSet.t;
   prules : rewrite_rule IntMap.t;
@@ -228,7 +229,7 @@ let inverted_rule_lookup rules (func : term) (args : term list) =
 (* ============================================================================================= *)
 
 let func_to_pmrs (f : Variable.t) (args : fpattern list) (body : Term.term) =
-  let tin, _ = match Variable.vtype_or_new f with
+  let tin, tout = match Variable.vtype_or_new f with
     | RType.TFun (tin, tout) -> tin, tout
     | _ -> failwith "Cannot make pmrs of non-function."
   in
@@ -241,6 +242,7 @@ let func_to_pmrs (f : Variable.t) (args : fpattern list) (body : Term.term) =
   {
     pname = f.vname;
     pinput_typ = tin;
+    poutput_typ = tout, None;
     pargs = Set.elements (fpat_vars (PatTup args));
     pparams = VarSet.empty; (* PMRS from a function cannot have unkowns. *)
     porder = 0;
