@@ -1,12 +1,11 @@
 type 'a clist = CNil | Single of 'a | Concat of 'a clist * 'a clist
 
-
 type 'a list = Nil | Cons of 'a * 'a list
 
 pmrs spec l =
     main l -> f l
     | f Nil -> 0
-    | f Cons(hd,tl) -> max hd (f tl)
+    | f Cons(hd,tl) -> hd + (f tl)
 
 pmrs (odot,f_0,s_0) target t =
     target t           -> h t

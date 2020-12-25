@@ -32,14 +32,34 @@ let compute_lhs p t =
     (Expand.replace_rhs_of_main p p.orig (PMRS.reduce p.orig r_t))
 
 
+let projection_eqns (lhs : term) (rhs : term) =
+  match lhs.tkind, rhs.tkind with
+  | TTup lhs_tl, TTup rhs_tl -> List.map ~f:(fun (r,l) -> r,l) (List.zip_exn lhs_tl rhs_tl)
+  | _ -> [lhs, rhs]
+
+let invar invariants lhs_e rhs_e =
+  let f inv_expr =
+    not (Set.is_empty
+           (Set.inter
+              (Set.union (Analysis.free_variables lhs_e) (Analysis.free_variables rhs_e))
+              (Analysis.free_variables inv_expr)))
+  in
+  let conjs = List.filter ~f (Set.elements invariants) in
+  mk_assoc Binop.And conjs
+
+
 let make ~(p : psi_def) (tset : TermSet.t) : equation list =
   let eqns =
-    let fold_f eqns t = eqns @ [t, compute_lhs p t, compute_rhs p t] in
+    let fold_f eqns t =
+      let lhs = compute_lhs p t in
+      let rhs = compute_rhs p t in
+      eqns @ [t, lhs, rhs]
+    in
     Set.fold ~init:[] ~f:fold_f tset
   in
   let all_subs, invariants =
     Expand.subst_recursive_calls p
-      (List.map ~f:(fun (_, lhs, rhs) -> mk_bin Binop.Eq lhs rhs) eqns)
+      (List.concat (List.map ~f:(fun (_, lhs, rhs) -> [lhs; rhs]) eqns))
   in
   Log.debug Fmt.(fun frmt () -> pf frmt "Invariants:@[<hov 2>%a@]@."
                     (list ~sep:comma pp_term) (Set.elements invariants));
@@ -47,19 +67,10 @@ let make ~(p : psi_def) (tset : TermSet.t) : equation list =
     let f (t, lhs, rhs) =
       let applic x = Analysis.reduce_term (substitution all_subs x) in
       let lhs' = applic lhs and rhs' = applic rhs in
-      let invar =
-        let f inv_expr =
-          not (Set.is_empty
-                 (Set.inter
-                    (Set.union (Analysis.free_variables lhs') (Analysis.free_variables rhs'))
-                    (Analysis.free_variables inv_expr)))
-        in
-        let conjs = List.filter ~f (Set.elements invariants) in
-        mk_assoc Binop.And conjs
-      in
-      t, invar, applic lhs, applic rhs
+      let projs = projection_eqns lhs' rhs' in
+      List.map ~f:(fun (lhs,rhs) -> t, invar invariants lhs rhs, lhs, rhs) projs
     in
-    List.map ~f eqns
+    List.concat (List.map ~f eqns)
   in
   if List.for_all ~f:(check_equation ~p) pure_eqns then
     pure_eqns
@@ -85,8 +96,23 @@ let constraints_of_eqns (eqns : equation list) : command list =
   List.map ~f:eqn_to_constraint eqns
 
 
+(* let mk_projs (tin : RType.t) (tl : RType.t list) (xi : Variable.t) =
+   let f t =
+    Variable.mk
+   in
+   in List.map ~f tl *)
+
+
 let synthfuns_of_unknowns ?(ops = OpSet.empty) (unknowns : VarSet.t) : command list =
   (*  Flatten the inputs (tuples) -> scalars *)
+  (* let proj_unknowns =
+     let f xi =
+      match xi.ttyp with
+      | TFun(tin, TTup tl) -> xi, mk_projs tin tl xi
+      | _ -> xi, xi
+     in
+     List.map ~f (Set.elements unknowns)
+     in *)
   (*  Decompose into multiple functions for tuples. *)
   let decompose_xi_args (xi : variable) =
     match Variable.vtype_or_new xi with

@@ -3,16 +3,16 @@ type 'a clist = CNil | Single of 'a | Concat of 'a clist * 'a clist
 type 'a list = Nil | Cons of 'a * 'a list
 
 
-pmrs spec {fun (x,y) -> x >= 0 && x >= y} =
+pmrs spec {fun (mps, pos, i, sum) -> mps >= 0 && mps >= sum && i >= 0 && pos >= 0 } =
     main l -> f l
-    | f Nil -> (0, 0)
-    | f Cons(hd, tl) -> (fun (mts, sum) -> max mts (sum + hd), sum + hd) (f tl)
+    | f Nil -> (0, 0, 0, 0)
+    | f Cons(hd, tl) -> (fun (mps, pos, i, sum) -> max (mps + hd) 0, (mps + hd > 0) ? i : pos, i + 1, sum + hd) (f tl)
 
-pmrs (o1, o2) target =
+pmrs (odot) target =
     main t           -> h t
-    | h CNil          -> (0, 0)
-    | h Single(a)    -> (max a 0, a)
-    | h Concat(y, z) -> (fun l r -> o1 l r, o2 l r) (h y) (h z)
+    | h CNil          -> (0, 0, 0, 0)
+    | h Single(a)    -> (max a 0, a, 1, 1)
+    | h Concat(y, z) -> odot (h y) (h z)
 
 pmrs repr l =
     main l -> c l

@@ -102,7 +102,7 @@ let pp_pattern (frmt : Formatter.t) (t, args : pattern) : unit =
 
 
 let pp_rewrite_rule (frmt : Formatter.t) (nt, vargs, pat, t : rewrite_rule) : unit =
-  Fmt.(pf frmt "@[<hov 2>%s %a %a  ⟹  %a@]"
+  Fmt.(pf frmt "@[<hov 2>@[<hov 2>%s %a %a  ⟹@] @;%a@]"
          nt.vname
          (list ~sep:comma Variable.pp) vargs
          (option pp_pattern) pat
@@ -275,6 +275,16 @@ let subst_rule_rhs ~(p : t) (substs : (term * term) list) =
   {p with prules = rules'}
 
 
+let reduce_rules (p : t) =
+  let reduced_rules =
+    let f (nt, args, pat, body) =
+      nt, args, pat, Analysis.reduce_term body
+    in
+    Map.map ~f p.prules
+  in
+  { p with prules = reduced_rules }
+
+
 let instantiate_with_solution (p : t) (soln : (string * variable list * term) list) =
   let xi_set = p.pparams in
   let xi_substs =
@@ -285,4 +295,4 @@ let instantiate_with_solution (p : t) (soln : (string * variable list * term) li
     in List.concat (List.map ~f soln)
   in
   let target_inst = subst_rule_rhs xi_substs ~p in
-  target_inst
+  reduce_rules (target_inst)

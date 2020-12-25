@@ -815,9 +815,9 @@ let pp_term (frmt : Formatter.t) (x : term) =
 
     | TFun (args, body) ->
       if paren then
-        pf frmt "@[<hov 2>(fun (%a) -> @;%a)@]" (list ~sep:comma pp_fpattern) args (aux false) body
+        pf frmt "@[<hov 2>(fun %a -> @;%a)@]" (list ~sep:sp pp_fpattern) args (aux false) body
       else
-        pf frmt "@[<hov 2>fun (%a) -> %a@]" (list ~sep:comma pp_fpattern) args (aux false) body
+        pf frmt "@[<hov 2>fun %a -> %a@]" (list ~sep:sp pp_fpattern) args (aux false) body
 
     | TApp (func, args) ->
       if paren then
