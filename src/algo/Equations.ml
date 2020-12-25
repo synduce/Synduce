@@ -4,6 +4,7 @@ open Lang.Term
 open AState
 open Syguslib.Sygus
 open SygusInterface
+open Utils
 module SmtI = SmtInterface
 
 
@@ -40,11 +41,23 @@ let make ~(p : psi_def) (tset : TermSet.t) : equation list =
     Expand.subst_recursive_calls p
       (List.map ~f:(fun (_, lhs, rhs) -> mk_bin Binop.Eq lhs rhs) eqns)
   in
-  Fmt.(pf stdout "Invariants: %a.@." (list ~sep:comma pp_term) (Set.elements invariants));
+  Log.debug Fmt.(fun frmt () -> pf frmt "Invariants:@[<hov 2>%a@]@."
+                    (list ~sep:comma pp_term) (Set.elements invariants));
   let pure_eqns =
     let f (t, lhs, rhs) =
       let applic x = Analysis.reduce_term (substitution all_subs x) in
-      t, None, applic lhs, applic rhs
+      let lhs' = applic lhs and rhs' = applic rhs in
+      let invar =
+        let f inv_expr =
+          not (Set.is_empty
+                 (Set.inter
+                    (Set.union (Analysis.free_variables lhs') (Analysis.free_variables rhs'))
+                    (Analysis.free_variables inv_expr)))
+        in
+        let conjs = List.filter ~f (Set.elements invariants) in
+        mk_assoc Binop.And conjs
+      in
+      t, invar, applic lhs, applic rhs
     in
     List.map ~f eqns
   in
@@ -89,6 +102,9 @@ let synthfuns_of_unknowns ?(ops = OpSet.empty) (unknowns : VarSet.t) : command l
   List.map ~f (Set.elements unknowns)
 
 
+(* let pre_solve ~(p : psi_def) (eqns : equation list) = *)
+
+
 let solve ~(p : psi_def) (eqns : equation list) =
   let free_vars, all_operators =
     let f (fvs, ops) (_, _, lhs, rhs) =
@@ -125,9 +141,9 @@ let solve ~(p : psi_def) (eqns : equation list) =
     | RSuccess (resps) ->
       let soln = List.map ~f:parse_synth_fun resps in
       Utils.Log.debug_msg
-        Fmt.(str "Solution found:@[<hov 2>%a@]"
+        Fmt.(str "@[<hov 2>Solution found: @;%a"
                (list (fun fmrt (s, args, bod) ->
-                    pf fmrt "@[<hov 2>%s(%a)=%a" s (list ~sep:comma Variable.pp) args pp_term bod)) soln);
+                    pf fmrt "@[<hov 2>@[%s(%a)@] = @[%a@]@]" s (list ~sep:comma Variable.pp) args pp_term bod)) soln);
       resp, Some  soln
     | RInfeasible -> RInfeasible, None
     | RFail -> RFail, None

@@ -7,7 +7,11 @@ input_files = [
     "tree/mintree.pmrs",
     "tree/maxtree2.pmrs",
     "list/sumhom.pmrs",
-    "list/lenhom.pmrs"
+    "list/lenhom.pmrs",
+    "list/prodhom.pmrs",
+    "list/mtshom.pmrs",
+    "list/mpshom.pmrs",
+    "list/mts_and_mps_hom.pmrs"
 ]
 
 root = os.getcwd()

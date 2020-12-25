@@ -392,6 +392,7 @@ let mk_sub t1 t2 = mk_simple_app "-" [t1;t2]
 let mk_mul t1 t2 = mk_simple_app "*" [t1;t2]
 let mk_div t1 t2 = mk_simple_app "/" [t1;t2]
 let mk_and t1 t2 = mk_simple_app "and" [t1; t2]
+let mk_assoc_and tl = mk_simple_app "and" tl
 let mk_or t1 t2 = mk_simple_app "or" [t1; t2]
 let mk_eq t1 t2 = mk_simple_app "=" [t1;t2]
 let mk_lt t1 t2 = mk_simple_app "<" [t1;t2]
@@ -472,7 +473,7 @@ type solver_response =
 
 
 type solver_kind =
-  | Z3_SMT2 of int              (* Z3 smt2 soler with timeout *)
+  | Z3_SMT2 of int              (* Z3 smt2 solver with timeout *)
   | Z3_SMT2_Timeout_Fast        (* Z3 smt2 soler with fast timeout (1 sec) *)
   | CVC4_Default                (* CVC4 solver *)
 

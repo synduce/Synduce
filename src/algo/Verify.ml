@@ -6,6 +6,19 @@ open Utils
 open SmtInterface
 open Smtlib.Solvers
 
+let constr_eqn (_, pre, lhs, rhs) =
+  let rec mk_eqn (lhs, rhs) =
+    match lhs.tkind, rhs.tkind with
+    | TTup ltl, TTup rtl ->
+      (match List.zip ltl rtl with
+       | Ok rt_lt -> mk_assoc_and (List.map ~f:mk_eqn rt_lt)
+       | _ -> failwith "Verification failed because unexpected tuple size.")
+    | _ -> mk_eq (smt_of_term lhs) (smt_of_term rhs)
+  in
+  let eqn = mk_eqn (lhs, rhs) in
+  match pre with
+  | Some inv -> mk_or (mk_not (smt_of_term inv)) eqn
+  | None -> eqn
 
 (**
    `check_solution ~p (t,u) soln`
@@ -36,12 +49,7 @@ let check_solution ~(p : psi_def)
   let expand_and_check (t0 : term) =
     let t_set, u_set = Expand.maximal p t0 in
     let sys_eqns = Equations.make ~p:{ p with target=target_inst} t_set in
-    let smt_eqns = List.map sys_eqns
-        ~f:(fun (_, pre, lhs, rhs) ->
-            match pre with
-            | Some _ -> failwith "TODO : invariants in verification."
-            | None -> mk_eq (smt_of_term lhs) (smt_of_term rhs))
-    in
+    let smt_eqns = List.map sys_eqns ~f:constr_eqn in
     let new_free_vars =
       let f fv (_, _, lhs, rhs) =
         Set.union fv (Set.union (Analysis.free_variables lhs) (Analysis.free_variables rhs))

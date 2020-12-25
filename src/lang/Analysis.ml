@@ -191,3 +191,4 @@ let reduce_term (t : term) : term =
     | _ -> None
   in
   transform ~case t
+

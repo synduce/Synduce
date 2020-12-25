@@ -3,6 +3,16 @@ open Lang.Term
 open Syguslib.Sygus
 
 
+type grammar_parameters =
+  {
+    g_opset : OpSet.t;
+    g_fixed_constants : bool;
+    g_mul_constant : bool;
+    g_linear : bool;
+    g_locals : (sygus_term * sygus_sort) list;
+    g_bools : bool;
+  }
+
 let operators_of (t : term) : OpSet.t =
   let init = OpSet.empty in
   let join = Set.union in
@@ -50,44 +60,40 @@ let int_base : grammar_def =
    ]]
 
 
-let int_parametric
-    ?(fixed_constants = true)
-    ?(boolean_predicates = false)
-    ?(linear = true)
-    (opset : OpSet.t) (locals : (sygus_term * sygus_sort) list) =
+let int_parametric (params : grammar_parameters) =
   let ic =  (SyId (IdSimple "Ic")) in
   let ix =  (SyId (IdSimple "Ix")) in
   let ipred = (SyId (IdSimple "Ipred")) in
   [("Ix", int_sort),
    [ GTerm ic] @
-   (List.filter_map locals
+   (List.filter_map params.g_locals
       ~f:(fun (t,s) ->
           match s with SId (IdSimple "Int") -> Some (GTerm t) | _ -> None)) @
    [GTerm (SyApp(IdSimple "-",[ix]))] @
    [GTerm (SyApp(IdSimple "+",[ix; ix]))] @
-   (if linear then
+   (if params.g_linear && params.g_mul_constant then
       [GTerm (SyApp(IdSimple "*",[ic;ix])); GTerm (SyApp(IdSimple "div",[ix;ic]))]
     else [] ) @
-   (if Set.mem opset (Binary Min) then [GTerm (SyApp(IdSimple "min",[ix;ix]))] else []) @
-   (if Set.mem opset (Binary Max) then [GTerm (SyApp(IdSimple "max",[ix;ix]))] else [] )@
-   (if Set.mem opset (Binary Times) || Set.mem opset (Binary Div) || not linear
+   (if Set.mem params.g_opset (Binary Min) then [GTerm (SyApp(IdSimple "min",[ix;ix]))] else []) @
+   (if Set.mem params.g_opset (Binary Max) then [GTerm (SyApp(IdSimple "max",[ix;ix]))] else [] )@
+   (if Set.mem params.g_opset (Binary Times) || Set.mem params.g_opset (Binary Div) || not params.g_linear
     then [GTerm (SyApp(IdSimple "*",[ix;ix])); GTerm (SyApp(IdSimple "div",[ix;ix]))]
     else [])@
-   (if Set.mem opset (Unary Abs) then [GTerm (SyApp(IdSimple "abs",[ix]))] else [] )@
-   (if Set.mem opset (Binary Div) then [GTerm (SyApp(IdSimple "div",[ix;ic]))] else [] ) @
-   (if boolean_predicates then [GTerm (SyApp(IdSimple "ite",[ipred;ix;ix]))] else [])
+   (if Set.mem params.g_opset (Unary Abs) then [GTerm (SyApp(IdSimple "abs",[ix]))] else [] )@
+   (if Set.mem params.g_opset (Binary Div) then [GTerm (SyApp(IdSimple "div",[ix;ic]))] else [] ) @
+   (if params.g_bools then [GTerm (SyApp(IdSimple "ite",[ipred;ix;ix]))] else [])
   ]
   @
   [
     ("Ic", int_sort),
-    (if fixed_constants then
+    (if params.g_fixed_constants then
        [GTerm (SyLit (LitNum 0)); GTerm (SyLit (LitNum 1))]
      else [GConstant int_sort])
   ]
   @
-  (if boolean_predicates then
+  (if params.g_bools then
      [("Ipred", bool_sort),
-      (List.filter_map locals
+      (List.filter_map params.g_locals
          ~f:(fun (t,s) ->
              match s with SId (IdSimple "Bool") -> Some (GTerm t) | _ -> None)) @
       [GTerm (SyApp(IdSimple "=",[ix;ix]));
@@ -98,18 +104,16 @@ let int_parametric
    else [] )
 
 
-let bool_parametric
-    ?(fixed_constants = true)
-    (opset : OpSet.t) (locals : (sygus_term * sygus_sort) list) =
+let bool_parametric (params : grammar_parameters) =
   let has_ints =
-    List.exists locals ~f:(fun (_, s) -> match s with SId (IdSimple "Int") -> true | _ -> false)
+    List.exists params.g_locals ~f:(fun (_, s) -> match s with SId (IdSimple "Int") -> true | _ -> false)
   in
   let ic =  (SyId (IdSimple "Ic")) in
   let ix =  (SyId (IdSimple "Ix")) in
   let ipred = (SyId (IdSimple "Ipred")) in
   let bool_section =
     [("Ipred", bool_sort),
-     (List.filter_map locals
+     (List.filter_map params.g_locals
         ~f:(fun (t,s) ->
             match s with SId (IdSimple "Bool") -> Some (GTerm t) | _ -> None)) @
      [GTerm (SyApp(IdSimple "not",[ipred]));
@@ -123,23 +127,23 @@ let bool_parametric
   let int_section =
     [("Ix", int_sort),
      [ GTerm ic] @
-     (List.filter_map locals
+     (List.filter_map params.g_locals
         ~f:(fun (t,s) ->
             match s with SId (IdSimple "Int") -> Some (GTerm t) | _ -> None)) @
      [GTerm (SyApp(IdSimple "-",[ix]))] @
      [GTerm (SyApp(IdSimple "+",[ix; ix]))] @
-     (if Set.mem opset (Binary Min) then [GTerm (SyApp(IdSimple "min",[ix;ix]))] else []) @
-     (if Set.mem opset (Binary Max) then [GTerm (SyApp(IdSimple "max",[ix;ix]))] else [] )@
-     (if Set.mem opset (Binary Times) then [GTerm (SyApp(IdSimple "*",[ic;ix]))] else [] )@
-     (if Set.mem opset (Binary Div) then [GTerm (SyApp(IdSimple "div",[ix;ic]))] else [] )@
-     (if Set.mem opset (Unary Abs) then [GTerm (SyApp(IdSimple "abs",[ix]))] else [] )@
-     (if Set.mem opset (Binary Div) then [GTerm (SyApp(IdSimple "div",[ix;ic]))] else [] ) @
+     (if Set.mem params.g_opset (Binary Min) then [GTerm (SyApp(IdSimple "min",[ix;ix]))] else []) @
+     (if Set.mem params.g_opset (Binary Max) then [GTerm (SyApp(IdSimple "max",[ix;ix]))] else [] )@
+     (if Set.mem params.g_opset (Binary Times) then [GTerm (SyApp(IdSimple "*",[ic;ix]))] else [] )@
+     (if Set.mem params.g_opset (Binary Div) then [GTerm (SyApp(IdSimple "div",[ix;ic]))] else [] )@
+     (if Set.mem params.g_opset (Unary Abs) then [GTerm (SyApp(IdSimple "abs",[ix]))] else [] )@
+     (if Set.mem params.g_opset (Binary Div) then [GTerm (SyApp(IdSimple "div",[ix;ic]))] else [] ) @
      [GTerm (SyApp(IdSimple "ite",[ipred;ix;ix]))]
     ]
     @
     [
       ("Ic", int_sort),
-      (if fixed_constants then
+      (if params.g_fixed_constants then
          [GTerm (SyLit (LitNum 0)); GTerm (SyLit (LitNum 1))]
        else [GConstant int_sort])
     ]
@@ -147,10 +151,7 @@ let bool_parametric
   if has_ints then bool_section @ int_section else bool_section
 
 
-let tuple_grammar_constr
-    ?(fixed_constants = true)
-    (sorts : sygus_sort list)
-    (opset : OpSet.t) (locals : (sygus_term * sygus_sort) list) =
+let tuple_grammar_constr (params : grammar_parameters) (sorts : sygus_sort list) =
   let tuple_args =
     List.map sorts
       ~f:(function
@@ -161,7 +162,7 @@ let tuple_grammar_constr
   let head_rule =
     ("Tr", SApp(IdSimple "Tuple", sorts)), [GTerm (SyApp (IdSimple "mkTuple", tuple_args))]
   in
-  head_rule :: (int_parametric ~fixed_constants opset locals)
+  head_rule :: (int_parametric params)
 
 
 
@@ -189,8 +190,18 @@ and tuple_sel i projs =
 
 let generate_grammar (opset : OpSet.t) (args : sorted_var list) (ret_sort : sygus_sort) =
   let locals_of_scalar_type = List.concat (List.map ~f:project args) in
+  let params =
+    {
+      g_opset = opset;
+      g_fixed_constants = true;
+      g_mul_constant = false;
+      g_linear = true;
+      g_locals = locals_of_scalar_type;
+      g_bools = false;
+    }
+  in
   match ret_sort with
-  | SId (IdSimple "Int") -> Some (int_parametric opset locals_of_scalar_type)
-  | SId (IdSimple "Bool") -> Some (bool_parametric opset locals_of_scalar_type)
-  | SApp(IdSimple "Tuple", sorts) -> Some (tuple_grammar_constr sorts opset locals_of_scalar_type)
+  | SId (IdSimple "Int") -> Some (int_parametric params)
+  | SId (IdSimple "Bool") -> Some (bool_parametric params)
+  | SApp(IdSimple "Tuple", sorts) -> Some (tuple_grammar_constr params sorts)
   | _ -> None

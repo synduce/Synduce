@@ -486,6 +486,19 @@ let mk_bin ?(pos = dummy_loc) ?(typ = None) (op : Binop.t) (t1 : term) (t2 : ter
   in
   {tpos = pos; tkind = TBin(op, t1, t2); ttyp = typ }
 
+
+let mk_assoc (op : Binop.t) (tl : term list) : term option =
+  let rec aux t rest =
+    match rest with
+    | hd :: tl -> aux (mk_bin ~pos:hd.tpos ~typ:(Some hd.ttyp) op t hd) tl
+    | [] -> t
+  in
+  match tl with
+  | [] -> None
+  | [x] -> Some x
+  | hd :: tl -> Some (aux hd tl)
+
+
 let mk_data ?(pos = dummy_loc) (c : string) (xs : term list) =
   let typ =
     match RType.type_of_variant c with
