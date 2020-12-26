@@ -1,0 +1,21 @@
+type 'a tree = TNil | TNode of 'a * 'a tree * 'a tree
+
+type 'a list = LNil | Cons of 'a * 'a list
+
+type 'a ptree = PNil | PNode of 'a * ('a ptree) list
+
+pmrs (join, j2) target =
+    main PNil -> 1
+    | main PNode(a, l) -> join a (sum l)
+    | sum LNil -> 1
+    | sum Cons(hd, tl) -> j2 (main hd) (sum tl)
+
+pmrs spec =
+    main TNil -> 1
+    | main TNode(a, l, r) -> a * (main l) * (main r)
+
+pmrs repr =
+    main PNil -> TNil
+    | main PNode(a, l) -> TNode(a, TNil, f l)
+    | f LNil -> TNil
+    | f Cons(hd, tl) -> TNode(1, main hd, f tl)

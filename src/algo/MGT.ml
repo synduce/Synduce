@@ -15,7 +15,7 @@ let mgt_of_one (prog : PMRS.t) (_ : int) (rule_id : int) =
     | Some r -> r
     | None -> failwith (Fmt.str "mgt_of_one : could not find rule %i" i)
   in
-  let boundvars = 
+  let boundvars =
     ref (VarSet.union_list [prog.pnon_terminals; prog.pparams; VarSet.of_list prog.pargs])
   in
   let unbound x =
@@ -51,13 +51,13 @@ let mgt_of_one (prog : PMRS.t) (_ : int) (rule_id : int) =
   in
   (* Recursive construction of the MGT. *)
   let rec aux visited_rules target_rhs =
-    Log.verbose (fun frmt () -> Fmt.(pf frmt "Target rhs: %a.@." pp_term target_rhs));
+    Log.verbose (fun frmt () -> Fmt.(pf frmt "MGT > Target rhs: %a.@." pp_term target_rhs));
     let all_mrules =
       List.sort ~compare:sort_best (Map.to_alist (matching_rules visited_rules target_rhs))
     in
     Log.verbose
       (fun frmt () ->
-         Fmt.(pf frmt "@[<hov 2>Matching rules:@;%a@]@."
+         Fmt.(pf frmt "@[<hov 2>MGT > Matching rules:@;%a@]@."
                 (list ~sep:sp (brackets (pair ~sep:sp int (parens (pair ~sep:comma Variable.pp pp_term) ))))
                 all_mrules));
     match all_mrules with
@@ -66,7 +66,7 @@ let mgt_of_one (prog : PMRS.t) (_ : int) (rule_id : int) =
         m_term
       else
         aux (Set.add visited_rules m_id) m_term
-    | [] -> failwith (Fmt.str "No matching rule for %a." pp_term target_rhs)
+    | [] -> failwith (Fmt.str "MGT > No matching rule for %a." pp_term target_rhs)
   in
   let init_term =
     let _, _, _, init_t =
@@ -82,7 +82,7 @@ let mgt_of_one (prog : PMRS.t) (_ : int) (rule_id : int) =
   in
   (* The result of seeking the mgt should be (main t) where t is the mgt. *)
   match aux (Set.empty (module Int)) init_term with
-  | { tkind = TApp(_, [arg]); _ } -> Some arg
+  | { tkind = TApp(_, [arg]); _ } -> Some (Analysis.replace_calls_to prog.pnon_terminals arg)
   | _ -> None
 
 let mgt (prog : PMRS.t) : ((int * int) * term option) list =

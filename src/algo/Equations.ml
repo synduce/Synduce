@@ -10,6 +10,11 @@ module SmtI = SmtInterface
 
 type equation = term * term option * term * term
 
+let pp_equation (f : Formatter.t) (orig, inv, lhs, rhs : equation) =
+  match inv with
+  | Some inv -> Fmt.(pf f "@[<hov 2>{%a}@[%a =>@;%a = %a@]@]" pp_term orig pp_term inv pp_term lhs pp_term rhs)
+  | None -> Fmt.(pf f "@[<hov 2>{%a}@;@[%a = %a@]@]" pp_term orig pp_term lhs pp_term rhs)
+
 
 let check_equation ~(p : psi_def) (_, pre, lhs, rhs : equation) : bool =
   (match Expand.nonreduced_terms_all p lhs, Expand.nonreduced_terms_all p rhs with
@@ -72,10 +77,11 @@ let make ~(p : psi_def) (tset : TermSet.t) : equation list =
     in
     List.concat (List.map ~f eqns)
   in
-  if List.for_all ~f:(check_equation ~p) pure_eqns then
-    pure_eqns
-  else
+  match List.find ~f:(fun eq -> not (check_equation ~p eq)) pure_eqns with
+  | Some not_pure ->
+    Log.error_msg Fmt.(str "Not pure: %a" pp_equation not_pure);
     failwith "Equation not pure."
+  | None ->  pure_eqns
 
 
 (* ============================================================================================= *)
@@ -103,7 +109,7 @@ let constraints_of_eqns (eqns : equation list) : command list =
    in List.map ~f tl *)
 
 
-let synthfuns_of_unknowns ?(ops = OpSet.empty) (unknowns : VarSet.t) : command list =
+let synthfuns_of_unknowns ?(bools = false) ?(ops = OpSet.empty) (unknowns : VarSet.t) : command list =
   (*  Flatten the inputs (tuples) -> scalars *)
   (* let proj_unknowns =
      let f xi =
@@ -122,7 +128,7 @@ let synthfuns_of_unknowns ?(ops = OpSet.empty) (unknowns : VarSet.t) : command l
   in
   let f xi =
     let args, ret_sort = decompose_xi_args xi in
-    let grammar = Grammars.generate_grammar ops args ret_sort in
+    let grammar = Grammars.generate_grammar ~bools ops args ret_sort in
     CSynthFun (xi.vname, args, ret_sort, grammar)
   in
   List.map ~f (Set.elements unknowns)
@@ -132,17 +138,18 @@ let synthfuns_of_unknowns ?(ops = OpSet.empty) (unknowns : VarSet.t) : command l
 
 
 let solve ~(p : psi_def) (eqns : equation list) =
-  let free_vars, all_operators =
-    let f (fvs, ops) (_, _, lhs, rhs) =
+  let free_vars, all_operators, has_ite =
+    let f (fvs, ops, hi) (_, _, lhs, rhs) =
       VarSet.union_list [fvs; Analysis.free_variables lhs; Analysis.free_variables rhs],
-      Set.union ops (Set.union (Grammars.operators_of lhs) (Grammars.operators_of rhs))
+      Set.union ops (Set.union (Grammars.operators_of lhs) (Grammars.operators_of rhs)),
+      hi || (Analysis.has_ite lhs) || (Analysis.has_ite rhs)
     in
-    let fvs, ops = List.fold eqns ~f ~init:(VarSet.empty, Set.empty (module Operator)) in
-    Set.diff fvs p.target.pparams, ops
+    let fvs, ops, hi = List.fold eqns ~f ~init:(VarSet.empty, Set.empty (module Operator), false) in
+    Set.diff fvs p.target.pparams, ops, hi
   in
   (* Commands *)
   let set_logic = CSetLogic(Grammars.logic_of_operator all_operators) in
-  let synth_objs = synthfuns_of_unknowns ~ops:all_operators p.target.pparams in
+  let synth_objs = synthfuns_of_unknowns ~bools:has_ite ~ops:all_operators p.target.pparams in
   let var_decls = List.map ~f:declaration_of_var (Set.elements free_vars) in
   let constraints = constraints_of_eqns eqns in
   let extra_defs =

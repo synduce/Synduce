@@ -126,6 +126,7 @@ let rec term_of_sygus (env : (string, variable, String.comparator_witness) Map.t
      | None -> failwith "Variable not found.")
 
   | SyLit l -> mk_const (constant_of_literal l)
+
   | SyApp (IdSimple s, args) ->
     let args' = List.map ~f:(term_of_sygus env) args in
     (match id_kind_of_s env s with
@@ -149,9 +150,13 @@ let rec term_of_sygus (env : (string, variable, String.comparator_witness) Map.t
         | _ -> failwith "Sygus: a tuple acessor with wrong number of arguments")
      | ITupleCstr -> mk_tup args'
      | INotDef -> failwith Fmt.(str "Sygus: Undefined variable %s" s))
+
   | SyExists (_, _) -> failwith "Sygus: exists-terms not supported."
+
   | SyForall (_, _) -> failwith "Sygus: forall-terms not supported."
+
   | SyLet (_, _) -> failwith "Sygus: let-terms not supported."
+
   | _ -> failwith "Composite identifier not supported."
 
 

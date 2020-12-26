@@ -9,7 +9,8 @@ module Config = Lib.Utils.Config
 let options = [
   ('v', "verbose", (set Config.verbose true), None);
   ('d', "debug", (set Config.debug true), None);
-  ('i', "info-off", (set Config.info false), None)
+  ('i', "info-off", (set Config.info false), None);
+  ('s', "show-type", (set Config.show_vars true), None);
 ]
 
 
@@ -31,7 +32,7 @@ let main () =
        if not !Config.info then Fmt.(pf stdout "%s,%i,%.4fs@." (Caml.Filename.basename(!filename)) !Algo.PmrsAlgos.loop_counter elapsed)
 
      | Error _ -> Utils.Log.error_msg "No solution found.")
-  with s -> (if !Config.debug then Term.Variable.print_summary stdout (); raise s)
+  with s -> (if !Config.show_vars then Term.Variable.print_summary stdout (); raise s)
 
 ;;
 main ()

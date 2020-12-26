@@ -106,6 +106,9 @@ module Variable = struct
 
   let pp (frmt : Formatter.t) (v : t) = Fmt.(pf frmt "%s" v.vname)
 
+  let pp_typed (frmt : Formatter.t) (v : t) =
+    Fmt.(pf frmt "%s : %a" v.vname RType.pp (vtype_or_new v))
+
   let print_summary (frmt : Formatter.t) () =
     Utils.Log.(debug (wrap "Variables in tables:"));
     let le =
@@ -187,7 +190,7 @@ struct
     Fmt.(list ~sep:comma pp_variable formatter (elements vs))
 
   let pp formatter vs =
-    Fmt.(list ~sep:sp pp_id_var formatter (elements vs))
+    Fmt.(list ~sep:sp (parens Variable.pp_typed) formatter (elements vs))
 
   let dump formatter vs =
     Fmt.Dump.(list pp_id_var formatter (elements vs))
@@ -269,7 +272,7 @@ module Binop = struct
     RType.(match op with
         | Lt | Gt | Ge | Le -> TInt, TInt
         | Eq  -> TInt, TInt
-        | Max | Min| Plus | Minus | Times | Div | Mod -> TInt, TInt
+        | Max | Min | Plus | Minus | Times | Div | Mod -> TInt, TInt
         | And | Or -> TBool, TBool)
 
   let result_type (op : t) =
@@ -377,6 +380,9 @@ module OpSet = struct
   let of_list l = Set.of_list (module Operator) l
 
   let pp frmt s = Fmt.(pf frmt "@[<hov 2>{%a}@]" (list Operator.pp) (Set.elements s))
+
+  let comparison_operators : t =
+    of_list Binop.([Binary Gt; Binary Ge; Binary Le; Binary Lt; Binary Eq])
 end
 
 
@@ -835,6 +841,10 @@ let pp_term (frmt : Formatter.t) (x : term) =
 let pp_term_set (f : Formatter.t) (s : TermSet.t) =
   (braces (list ~sep:comma pp_term)) f (Set.elements s)
 
+let pp_subs (f : Formatter.t) (subs : (term * term) list) : unit =
+  Fmt.(pf f "@[<hov 2>%a@]"
+         (fun f l -> List.iter ~f:(fun (t1,t2) -> pf f "@[[%a -> %a]@]" pp_term t1 pp_term t2) l) subs)
+
 (* ============================================================================================= *)
 (*                                  TYPE INFERENCE                                               *)
 (* ============================================================================================= *)
@@ -850,14 +860,22 @@ let infer_type (t : term) : term * RType.substitution =
       (match RType.unify [t_t1.ttyp, ta; t_t2.ttyp, tb] with
        | Some subs -> mk_bin ~pos:t0.tpos ~typ:(Some (Binop.result_type op)) op t_t1 t_t2,
                       merge_subs subs (merge_subs c_t1 c_t2)
-       | None -> failwith "Type inference failure")
+       | None ->
+         Log.error_msg Fmt.(str "Cannot infer type of binary expression %a." pp_term t0);
+         Log.error_msg Fmt.(str "%a has type %a, expected type %a. %a has type %a, expected %a."
+                              pp_term t1 RType.pp t_t1.ttyp RType.pp ta pp_term t2 RType.pp t_t2.ttyp RType.pp tb);
+         failwith "Type inference failure.")
 
     | TUn (op, t1) ->
       let t_t1, c_t1 = aux t1 in
       (match RType.unify [t_t1.ttyp, Unop.operand_type op] with
        | Some subs -> mk_un ~pos:t0.tpos ~typ:(Some (Unop.result_type op)) op t_t1,
                       merge_subs subs c_t1
-       | None -> Log.loc_fatal_errmsg eloc "Type inference failure.")
+       | None ->
+         Log.error_msg Fmt.(str "Cannot infer type of unary expression %a." pp_term t0);
+         Log.error_msg Fmt.(str "%a has type %a, expected type %a."
+                              pp_term t1 RType.pp t_t1.ttyp RType.pp (Unop.operand_type op));
+         Log.loc_fatal_errmsg eloc "Type inference failure.")
 
     | TConst c -> {t0 with ttyp = Constant.type_of c }, []
 
@@ -884,7 +902,9 @@ let infer_type (t : term) : term * RType.substitution =
        | RType.TTup tl ->
          (match List.nth tl i with
           | Some tout ->  mk_sel ~pos:t0.tpos ~typ:(Some tout) t_c i, c_c
-          | None -> failwith "Type inference: tuple acessor, accesed tuple of wrong type.")
+          | None ->
+            Log.error_msg Fmt.(str "In tuple acessor %a, index out of bounds." pp_term t0);
+            failwith "Type inference: tuple acessor, accesed tuple of wrong type.")
        | _ ->
          Log.error_msg Fmt.(str "Tuple acessor argument %a of type %a." pp_term t_c RType.pp t_c.ttyp);
          failwith "Type inference: tuple accessor on type acessor."

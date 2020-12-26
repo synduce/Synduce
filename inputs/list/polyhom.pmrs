@@ -20,4 +20,4 @@ pmrs repr l =
     | c Concat(x, y) -> dec y x
     | dec l CNil -> main l
     | dec l Single(a) -> Cons(a, main l)
-    | dec l Concat(x, y) -> dec (Concat(l, y)) x
+    | dec l Concat(x, y) -> dec (Concat(y, l)) x

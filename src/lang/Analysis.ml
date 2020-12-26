@@ -17,6 +17,10 @@ let free_variables (t : term) : VarSet.t =
   in
   f t
 
+let has_ite (t : term) : bool =
+  reduce t
+    ~init:false ~join:(||)
+    ~case:(fun _ t -> match t.tkind with TIte _ -> Some true | _ -> None)
 
 
 (* ============================================================================================= *)
@@ -131,7 +135,7 @@ let expand_once (t : term) : term list =
     let f (cstr_name, cstr_arg_types) =
       let cstr_args =
         List.map  cstr_arg_types
-          ~f:(fun ty -> mk_var (Variable.mk ~t:(Some ty) (Alpha.fresh "ex")))
+          ~f:(fun ty -> mk_var (Variable.mk ~t:(Some ty) (Alpha.fresh "new")))
       in
       let t, _ =
         infer_type
@@ -141,6 +145,8 @@ let expand_once (t : term) : term list =
     List.map ~f v_expan
   in
   List.concat (List.map ~f:aux expansions)
+
+
 
 
 (* ============================================================================================= *)
@@ -192,3 +198,11 @@ let reduce_term (t : term) : term =
   in
   transform ~case t
 
+let replace_calls_to (funcs : VarSet.t) =
+  let case _ t =
+    match t.tkind with
+    | TApp({tkind = TVar x; _}, _) when Set.mem funcs x ->
+      Some (mk_var (Variable.mk ~t:(Some t.ttyp) (Alpha.fresh x.vname)))
+    | _ -> None
+  in
+  transform ~case

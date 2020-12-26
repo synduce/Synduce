@@ -188,7 +188,7 @@ and tuple_sel i projs =
   List.map projs ~f:(fun (t, s) -> SyApp(IdIndexed("tupSel", [INum i]), [t]), s)
 
 
-let generate_grammar (opset : OpSet.t) (args : sorted_var list) (ret_sort : sygus_sort) =
+let generate_grammar ?(bools = false) (opset : OpSet.t) (args : sorted_var list) (ret_sort : sygus_sort) =
   let locals_of_scalar_type = List.concat (List.map ~f:project args) in
   let params =
     {
@@ -197,7 +197,7 @@ let generate_grammar (opset : OpSet.t) (args : sorted_var list) (ret_sort : sygu
       g_mul_constant = false;
       g_linear = true;
       g_locals = locals_of_scalar_type;
-      g_bools = false;
+      g_bools = bools || (not (Set.are_disjoint opset OpSet.comparison_operators));
     }
   in
   match ret_sort with

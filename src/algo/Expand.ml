@@ -119,6 +119,7 @@ let expand_max (p : psi_def) (f : PMRS.t) (t0 : term)
   : (term * term) list * term list =
   let f_of_t0 = PMRS.reduce f t0 in
   let simpl_f_of_t0 = replace_rhs_of_main p f f_of_t0 in
+  Log.verbose_msg Fmt.(str "@[<hov 2>f(t0) = %a@]" pp_term simpl_f_of_t0);
   let nr = nonreduced_terms p f.pnon_terminals simpl_f_of_t0 in
   (* Collect all the variables that need to be expanded. *)
   let expand_reqs =
@@ -128,12 +129,16 @@ let expand_max (p : psi_def) (f : PMRS.t) (t0 : term)
       | None -> c
     in List.fold ~f:collect ~init:VarSet.empty nr
   in
+  Log.verbose_msg Fmt.(str "@[Expand %a@]" VarSet.pp expand_reqs);
   let substs =
     let expansions =
       List.map ~f:(fun x -> List.cartesian_product [mk_var x] (Analysis.expand_once (mk_var x)))
         (Set.to_list expand_reqs)
-    in cartesian_nary_product expansions
+    in
+    cartesian_nary_product expansions
   in
+  List.iteri substs
+    ~f:(fun i sub -> Log.verbose_msg Fmt.(str "@[Substs %i: %a@]" i Term.pp_subs sub));
   let all_ts = List.map substs ~f:(fun s -> substitution s t0) in
   let check_max_exp t =
     let tr = replace_rhs_of_main p f (PMRS.reduce f t) in

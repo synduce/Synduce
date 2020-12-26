@@ -4,9 +4,8 @@ type 'a list = Nil | Cons of 'a * 'a list
 
 
 pmrs spec {fun (mps, pos, i, sum) -> mps >= 0 && mps >= sum && i >= 0 && pos >= 0 } =
-    main l -> f l
-    | f Nil -> (0, 0, 0, 0)
-    | f Cons(hd, tl) -> (fun (mps, pos, i, sum) -> max (mps + hd) 0, (mps + hd > 0) ? i : pos, i + 1, sum + hd) (f tl)
+    | main Nil -> (0, 0, 0, 0)
+    | main Cons(hd, tl) -> (fun (mps, pos, i, sum) -> max (mps + hd) 0, (mps + hd > 0) ? i : pos, i + 1, sum + hd) (main tl)
 
 pmrs (odot) target =
     main t           -> h t

@@ -4,6 +4,8 @@ let debug = ref false
 
 let info = ref true
 
+let show_vars = ref false
+
 let reduction_limit = ref 100
 
 let num_expansions_check = 4
