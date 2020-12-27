@@ -839,7 +839,7 @@ let pp_term (frmt : Formatter.t) (x : term) =
   in aux false frmt x
 
 let pp_term_set (f : Formatter.t) (s : TermSet.t) =
-  (braces (list ~sep:comma pp_term)) f (Set.elements s)
+  (braces (list ~sep:comma (box pp_term))) f (Set.elements s)
 
 let pp_subs (f : Formatter.t) (subs : (term * term) list) : unit =
   Fmt.(pf f "@[<hov 2>%a@]"

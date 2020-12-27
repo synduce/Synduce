@@ -147,20 +147,6 @@ let expand_once (t : term) : term list =
   List.concat (List.map ~f:aux expansions)
 
 
-
-
-(* ============================================================================================= *)
-(*                                  TERM REDUCTION                                               *)
-(* ============================================================================================= *)
-let resolve_func (func : term) =
-  match func.tkind with
-  | TVar x ->
-    (match Hashtbl.find Term._globals x.vid with
-     | Some (_, vargs, _, body) -> Some (vargs, body)
-     | None -> None)
-  | TFun(vargs, body) -> Some (vargs, body)
-  | _ -> None
-
 let subst_args fpatterns args =
   let rec f (fpat, t) =
     match fpat, t.tkind with
@@ -176,27 +162,6 @@ let subst_args fpatterns args =
   | Ok l -> (try Some (List.concat (List.map ~f l)) with _ -> None)
   | _ -> None
 
-
-let reduce_term (t : term) : term =
-  let case f t =
-    match t.tkind with
-    | TApp(func, args) ->
-      let func' = f func in
-      let args' = List.map ~f args in
-      (match resolve_func func' with
-       | Some (fpatterns, body) ->
-         (match subst_args fpatterns args' with
-          | Some subst -> Some (substitution subst body)
-          | None -> None)
-       | _ -> None)
-    | TFun([], body) -> Some (f body)
-    | TSel(t, i) ->
-      (match f t with
-       | {tkind = TTup tl; _} -> Some (List.nth_exn tl i)
-       | _ -> None)
-    | _ -> None
-  in
-  transform ~case t
 
 let replace_calls_to (funcs : VarSet.t) =
   let case _ t =

@@ -30,7 +30,8 @@ let constr_eqn (_, pre, lhs, rhs) =
 let check_solution ~(p : psi_def)
     (t, u : TermSet.t * TermSet.t)
     (soln : (string * variable list * term) list) =
-  let target_inst = PMRS.instantiate_with_solution p.target soln in
+  Log.info (fun f () -> Fmt.(pf f "Check solution."));
+  let target_inst = Reduce.instantiate_with_solution p.target soln in
   let free_vars = VarSet.empty in
   let init_vardecls = decls_of_vars free_vars in
   let solver = make_z3_solver () in

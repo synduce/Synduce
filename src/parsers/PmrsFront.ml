@@ -114,7 +114,7 @@ let fterm_to_term _ allv globs locs rterm =
   in
   f _env rterm
 
-let translate_rules loc (globs : (string, Term.variable) Hashtbl.t)
+let pmrs_of_rules loc (globs : (string, Term.variable) Hashtbl.t)
     (params : Term.variable list) (args : Term.variable list)
     (pname : string)
     (invariant : term option)
@@ -269,11 +269,18 @@ let translate (prog : program) =
         | PMRSDecl(loc, params, pname, args, invariant, body) ->
           let vparams = List.map ~f:Term.Variable.mk params in
           let vargs = List.map ~f:Term.Variable.mk args in
-          Map.set pmrses ~key:pname ~data:(translate_rules loc globals vparams vargs pname invariant body)
+          let pmrs = pmrs_of_rules loc globals vparams vargs pname invariant body in
+          (match Hashtbl.add PMRS._globals ~key:pname ~data:pmrs with
+           | `Ok -> Log.verbose_msg ("Parsed "^pname)
+           | `Duplicate -> Log.error_msg (pname^" already declared."));
+          Map.set pmrses ~key:pname ~data:pmrs
+
         | FunDecl (loc, fname, args, invariant, body) ->
           let vargs = List.map ~f:Term.Variable.mk args in
           let fvar = Hashtbl.find_exn globals fname in
           let func_info = translate_function loc globals fvar vargs invariant body in
-          Hashtbl.add_exn Term._globals ~key:fvar.vid ~data:func_info;
+          (match Hashtbl.add Term._globals ~key:fvar.vid ~data:func_info with
+           | `Ok -> Log.verbose_msg ("Parsed "^fvar.vname)
+           | `Duplicate -> Log.error_msg (fvar.vname^" already declared."));
           pmrses
         | _ -> pmrses)

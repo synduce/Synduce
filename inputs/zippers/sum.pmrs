@@ -1,0 +1,21 @@
+// The type of labelled binary trees
+type 'a btree = Empty | Node of 'a * 'a btree * 'a btree
+// Zipper for labelled binary trees
+type sel = Left | Right
+type 'c zipper = Top | Zip of sel * 'c * 'c btree * 'c zipper
+
+
+pmrs spec =
+    sum Empty -> 0
+    | sum Node(a, l, r) -> a + (sum l) + (sum r)
+
+pmrs (join) target =
+    main Top -> 0
+    | main Zip(x, a, child, z) -> join a (spec child) (main z)
+
+
+pmrs repr =
+    main Top -> Empty
+    | main Zip(w, val, child, z) -> h val child z w
+    | h val child z Left -> Node (val, child, main z)
+    | h val child z Right -> Node (val, main z, child)

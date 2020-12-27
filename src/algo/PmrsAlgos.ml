@@ -5,14 +5,16 @@ open Utils
 open AState
 open Syguslib.Sygus
 
-let loop_counter = ref 0
+
 (* ============================================================================================= *)
 (*                                                                                               *)
 (* ============================================================================================= *)
+let loop_counter = ref 0
+
 let rec refinement_loop (p : psi_def) (t_set, u_set : TermSet.t * TermSet.t) =
   Int.incr loop_counter;
   Log.info (fun frmt () -> Fmt.pf frmt "Refinement step %i." !loop_counter);
-  Log.debug_msg Fmt.(str "Start refinement loop with (t,u) = %a, %a"
+  Log.debug_msg Fmt.(str "Start refinement loop with (t,u) =@[<hov 2>%a,@;%a@]"
                        pp_term_set t_set pp_term_set u_set);
   let eqns = Equations.make ~p t_set in
   let s_resp, solution = Equations.solve ~p eqns in
@@ -26,7 +28,7 @@ let rec refinement_loop (p : psi_def) (t_set, u_set : TermSet.t * TermSet.t) =
        refinement_loop p (new_t_set, new_u_set)
      | None ->
        Log.print_ok ();
-       let target = PMRS.instantiate_with_solution p.target sol in
+       let target = Reduce.instantiate_with_solution p.target sol in
        Ok target)
 
   | RFail, _ -> Log.error_msg "SyGuS solver failed to find a solution."; Error RFail
@@ -177,5 +179,5 @@ let solve_problem (pmrs : (string, PMRS.t, Base.String.comparator_witness) Map.t
       target = target_f;
       orig =  orig_f;
       repr =  repr_pmrs;
-      repr_is_identity = PMRS.is_identity repr_pmrs
+      repr_is_identity = Reduce.is_identity repr_pmrs
     }

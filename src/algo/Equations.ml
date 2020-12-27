@@ -25,16 +25,17 @@ let check_equation ~(p : psi_def) (_, pre, lhs, rhs : equation) : bool =
    | Some t -> match Expand.nonreduced_terms_all p t with | [] -> true | _ -> false)
 
 let compute_rhs p t =
-  Expand.replace_rhs_of_main p p.target (PMRS.reduce p.target t)
+  Fmt.()
+    (Expand.replace_rhs_of_main p p.target (Reduce.reduce_pmrs p.target t))
 
 let compute_lhs p t =
-  let r_t = Expand.replace_rhs_of_main p p.repr (PMRS.reduce p.repr t) in
+  let r_t = Expand.replace_rhs_of_main p p.repr (Reduce.reduce_pmrs p.repr t) in
   let subst_params =
     let l = List.zip_exn p.orig.pargs p.target.pargs in
     List.map l ~f:(fun (v1, v2) -> mk_var v1, mk_var v2)
   in
   substitution subst_params
-    (Expand.replace_rhs_of_main p p.orig (PMRS.reduce p.orig r_t))
+    (Expand.replace_rhs_of_main p p.orig (Reduce.reduce_pmrs p.orig r_t))
 
 
 let projection_eqns (lhs : term) (rhs : term) =
@@ -70,13 +71,14 @@ let make ~(p : psi_def) (tset : TermSet.t) : equation list =
                     (list ~sep:comma pp_term) (Set.elements invariants));
   let pure_eqns =
     let f (t, lhs, rhs) =
-      let applic x = Analysis.reduce_term (substitution all_subs x) in
+      let applic x = Reduce.reduce_term (substitution all_subs x) in
       let lhs' = applic lhs and rhs' = applic rhs in
       let projs = projection_eqns lhs' rhs' in
       List.map ~f:(fun (lhs,rhs) -> t, invar invariants lhs rhs, lhs, rhs) projs
     in
     List.concat (List.map ~f eqns)
   in
+  Log.verbose_msg Fmt.(str "Equations > make@;@[%a@]" (list ~sep:sp pp_equation) pure_eqns);
   match List.find ~f:(fun eq -> not (check_equation ~p eq)) pure_eqns with
   | Some not_pure ->
     Log.error_msg Fmt.(str "Not pure: %a" pp_equation not_pure);

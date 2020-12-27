@@ -31,6 +31,10 @@ type 'a xresult = ('a, (string * Sexp.t) list) Result.t
 type 'a sresult = ('a, (string * term) list) Result.t
 type variables = variable Map.M(String).t
 
+
+let _globals : (string, t) Hashtbl.t = Hashtbl.create (module String)
+
+
 let lhs (nt, args, pat, rhs) =
   let all_args =
     let args = List.map ~f:mk_var args in
@@ -40,6 +44,7 @@ let lhs (nt, args, pat, rhs) =
   in
   let t, _ = infer_type (mk_app ~pos:rhs.tpos (mk_var nt) all_args) in
   t
+
 
 (* ============================================================================================= *)
 (*                             BASIC PROPERTIES AND TYPE INFERENCE                               *)
@@ -128,66 +133,41 @@ let pp (frmt : Formatter.t) (pmrs : t) : unit =
          pp_rules ())
 
 
+
+
+
 (* ============================================================================================= *)
-(*                                       REDUCTION                                               *)
+(*                             TRANSLATION FROM FUNCTION to PMRS                                 *)
 (* ============================================================================================= *)
 
-(** Looks for a set of applicable rules in prules to rewrite (f fargs) and return
-    the result of applying the possible rules.
-    If there is no rule that is applicable, then return an empty list.
-*)
-let rule_lookup prules (f : variable) (fargs : term list) : term list =
-  let app_sub bindv bindto expr =
-    let bindt = List.map ~f:mk_var bindv in
-    match List.map2 ~f:Utils.pair bindt bindto with
-    | Ok x -> Some (substitution x expr)
-    | _ -> None
+let func_to_pmrs (f : Variable.t) (args : fpattern list) (body : Term.term) =
+  let tin, tout = match Variable.vtype_or_new f with
+    | RType.TFun (tin, tout) -> tin, tout
+    | _ -> failwith "Cannot make pmrs of non-function."
   in
-  let f (nt, rule_args, rule_pat, rhs) =
-    if Variable.(nt = f) then
-      match rule_pat with
-      (* We have a pattern, try to match it. *)
-      | Some (cstr, pat_args) ->
-        (match List.last fargs, List.drop_last fargs with
-         | Some pat_match, Some first_args ->
-           (match matches pat_match ~pattern:(mk_data cstr pat_args) with
-            | Some  bindto_map  ->
-              let bindto_list = Map.to_alist bindto_map in
-              let pat_v, pat_bto = List.unzip bindto_list in
-              app_sub (rule_args @ pat_v) (first_args @ pat_bto) rhs
-            | None -> None)
-         | _ -> None)
-      (* Pattern is empty. Simple substitution. *)
-      | None -> app_sub rule_args fargs rhs
-    else
-      None
+  let pmain_symb, prules, pnon_terminals =
+    match args, body with
+    | [PatVar x], {tkind = TVar(x_v); _} when Variable.(x = x_v) ->
+      f, Map.singleton (module Int) 0 (f, [x], None, body), VarSet.singleton x
+    | _ -> failwith "TODO: only identity supported by func_to_pmrs"
   in
-  second (List.unzip (Map.to_alist (Map.filter_map prules ~f)))
+  {
+    pname = f.vname;
+    pinput_typ = tin;
+    poutput_typ = tout, None;
+    pargs = Set.elements (fpat_vars (PatTup args));
+    pparams = VarSet.empty; (* PMRS from a function cannot have unkowns. *)
+    porder = 0;
+    pmain_symb = pmain_symb;
+    prules = prules;
+    pnon_terminals = pnon_terminals;
+  }
 
-let reduce (prog : t) (input : term) =
-  let one_step t0 =
-    let rstep = ref false in
-    let rewrite_rule _t =
-      match _t.tkind with
-      | TApp({tkind=(TVar(f)); _}, fargs) ->
-        (match rule_lookup prog.prules f fargs with
-         | [] -> _t
-         | hd :: _ -> rstep := true; hd)
-      | _ -> _t
-    in
-    let t0' = reduce_term (rewrite_with rewrite_rule t0) in
-    t0', !rstep
-  in
-  let f_input = mk_app (mk_var prog.pmain_symb) [input] in
-  let steps = ref 0 in
-  let rec apply_until_irreducible t =
-    Int.incr steps;
-    let t', reduced =  one_step t in
-    if reduced then apply_until_irreducible t' else t'
-  in
-  let res = apply_until_irreducible f_input in
-  res
 
+
+(* ============================================================================================= *)
+(*                                           UTILS FOR PMRS                                      *)
+(* ============================================================================================= *)
 (**
    inverted_rule_lookup searches for rules whose rhs match (func args), and return
    a map from rule id to the lhs of the rules matching (func args), with the appropriate
@@ -227,42 +207,6 @@ let inverted_rule_lookup rules (func : term) (args : term list) =
   in
   Map.filter_map ~f:filter rules
 
-
-(* ============================================================================================= *)
-(*                             TRANSLATION FROM FUNCTION to PMRS                                 *)
-(* ============================================================================================= *)
-
-let func_to_pmrs (f : Variable.t) (args : fpattern list) (body : Term.term) =
-  let tin, tout = match Variable.vtype_or_new f with
-    | RType.TFun (tin, tout) -> tin, tout
-    | _ -> failwith "Cannot make pmrs of non-function."
-  in
-  let pmain_symb, prules, pnon_terminals =
-    match args, body with
-    | [PatVar x], {tkind = TVar(x_v); _} when Variable.(x = x_v) ->
-      f, Map.singleton (module Int) 0 (f, [x], None, body), VarSet.singleton x
-    | _ -> failwith "TODO: only identity supported by func_to_pmrs"
-  in
-  {
-    pname = f.vname;
-    pinput_typ = tin;
-    poutput_typ = tout, None;
-    pargs = Set.elements (fpat_vars (PatTup args));
-    pparams = VarSet.empty; (* PMRS from a function cannot have unkowns. *)
-    porder = 0;
-    pmain_symb = pmain_symb;
-    prules = prules;
-    pnon_terminals = pnon_terminals;
-  }
-
-
-let is_identity (p : t) =
-  let input_symb = Variable.mk ~t:(Some p.pinput_typ) "e" in
-  match reduce p (mk_var input_symb) with
-  | {tkind = TVar x; _} -> Variable.(x = input_symb)
-  | _ -> false
-
-
 let subst_rule_rhs ~(p : t) (substs : (term * term) list) =
   let rules' =
     let f (nt, args, pat, body) =
@@ -273,26 +217,3 @@ let subst_rule_rhs ~(p : t) (substs : (term * term) list) =
     Map.map ~f p.prules
   in
   {p with prules = rules'}
-
-
-let reduce_rules (p : t) =
-  let reduced_rules =
-    let f (nt, args, pat, body) =
-      nt, args, pat, Analysis.reduce_term body
-    in
-    Map.map ~f p.prules
-  in
-  { p with prules = reduced_rules }
-
-
-let instantiate_with_solution (p : t) (soln : (string * variable list * term) list) =
-  let xi_set = p.pparams in
-  let xi_substs =
-    let f (name, args, body) =
-      match VarSet.find_by_name xi_set name with
-      | Some xi -> [Term.mk_var xi, mk_fun (List.map ~f:(fun x -> PatVar x) args) body]
-      | None -> []
-    in List.concat (List.map ~f soln)
-  in
-  let target_inst = subst_rule_rhs xi_substs ~p in
-  reduce_rules (target_inst)

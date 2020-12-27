@@ -13,6 +13,8 @@ type 'n s = S : 'n -> 'n s
 let first (a,_) = a
 let second (_, b) = b
 
+let (<|) (f1 : 'a -> 'b) (f2 : 'c -> 'a) = (fun x -> f1(f2(x)))
+
 let rec product (l : 'a list list) : 'a list list  =
   let rec aux ~acc l1 l2 = match l1, l2 with
     | [], _ | _, [] -> acc
