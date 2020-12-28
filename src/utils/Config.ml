@@ -10,10 +10,11 @@ let reduction_limit = ref 100
 
 let num_expansions_check = 4
 
-let tmp_folder = ref "/tmp/"
+let tmp_folder = Caml.Filename.get_temp_dir_name ()
 
 (* TODO automate this *)
-let root_folder = "/home/victorn/repos/refuns/"
+let root_folder = Caml.Filename.current_dir_name
+
 let base s = Filename.concat root_folder s
 
 let cvc4_binary_path = "/usr/bin/cvc4"

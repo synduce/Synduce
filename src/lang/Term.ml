@@ -67,7 +67,7 @@ module Variable = struct
 
   let _types : (int, RType.t) Hashtbl.t = Hashtbl.create (module Int)
 
-  let assign_vtype (v : variable) (t : RType.t) = Hashtbl.set _types ~key:v.vid ~data:t
+  let vtype_assign (v : variable) (t : RType.t) = Hashtbl.set _types ~key:v.vid ~data:t
 
   let vtype (v : variable) = Hashtbl.find _types v.vid
 
@@ -76,7 +76,7 @@ module Variable = struct
     | Some x -> x
     | None ->
       let new_t = RType.get_fresh_tvar () in
-      assign_vtype v new_t;
+      vtype_assign v new_t;
       new_t
 
   let update_var_types  (tsubs : (RType.t * RType.t) list) =
@@ -85,8 +85,8 @@ module Variable = struct
   let mk ?(attrs = Attributes.empty) ?(t = None) (name : string) =
     let v = Alpha.mk_with_id (-1) name (fun vid -> { vname = name; vid = vid; vattrs = attrs }) in
     (match t with
-     | Some t -> assign_vtype v t
-     | None -> assign_vtype v (RType.get_fresh_tvar ()));
+     | Some t -> vtype_assign v t
+     | None -> vtype_assign v (RType.get_fresh_tvar ()));
     v
 
   let is_anonymous (v : t) : bool = Set.mem v.vattrs Anonymous
@@ -604,22 +604,28 @@ let rec mk_composite_scalar (t : RType.t) : term =
 let rec term_compare (t1 : term) (t2 : term) : int =
   match t1.tkind, t2.tkind with
   | TConst c1, TConst c2 -> Constant.compare c1 c2
+
   | TVar v1, TVar v2 -> Variable.compare v1 v2
+
   | TData(c1, args1), TData(c2, args2) ->
     let c = String.compare c1 c2 in
     if c = 0 then List.compare term_compare args1 args2 else c
+
   | TApp(f1, args1), TApp(f2, args2) ->
     let c = term_compare f1 f2 in
     if c = 0 then List.compare term_compare args1 args2 else c
+
   | TBin(b1, t11, t12), TBin(b2, t21, t22) ->
     let c = Binop.compare b1 b2 in
     if c = 0 then
       let c' = term_compare t11 t21 in
       if c' = 0 then term_compare t12 t22 else c'
     else c
+
   | TUn(u1, t11), TUn(u2, t21) ->
     let c = Unop.compare u1 u2 in
     if c = 0 then term_compare t11 t21 else c
+
   | TFun(fargs1, body1), TFun(fargs2, body2) ->
     let c = compare (List.length fargs1) (List.length fargs2) in
     if c = 0 then
@@ -627,16 +633,19 @@ let rec term_compare (t1 : term) (t2 : term) : int =
        | Some subs -> term_compare body1 (substitution subs body2)
        | None -> -1)
     else c
+
   | TTup tl1, TTup tl2 -> List.compare term_compare tl1 tl2
+
   | _, _ -> Poly.compare t1 t2
 
-and substitution (substs : (term * term) list) (t : term) : term =
-  let rec aux (t : term) =
-    match List.Assoc.find substs ~equal:term_equal t with
+
+and substitution (substs : (term * term) list) (term : term) : term =
+  let rec aux (_t : term) =
+    match List.Assoc.find substs ~equal:term_equal _t with
     | Some t' -> t'
     | None ->
       let new_kind =
-        match t.tkind with
+        match _t.tkind with
         | TBin (b1, t1, t2) -> TBin (b1, aux t1, aux t2)
         | TUn (u, t1) -> TUn(u, aux t1)
         | TIte (c, tt, tf) -> TIte(aux c, aux tt, aux tf)
@@ -645,9 +654,10 @@ and substitution (substs : (term * term) list) (t : term) : term =
         | TFun (args, body) -> TFun(args, aux body)
         | TApp (f, args) -> TApp(aux f, List.map ~f:aux args)
         | TData (cstr, args) -> TData(cstr, List.map ~f:aux args)
-        | TVar _ | TConst _ -> t.tkind
-      in { t with tkind = new_kind; }
-  in aux t
+        | TVar _ | TConst _ -> _t.tkind
+      in { _t with tkind = new_kind; }
+  in aux term
+
 
 and term_equal t1 t2 = term_compare t1 t2 = 0
 

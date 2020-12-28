@@ -45,7 +45,7 @@ let (@!) (msg : Sexp.t) (loc : position * position) =
   let locstring = str "%s (%i:%i)-(%i:%i)" _start.pos_fname start_line start_col end_lin end_col in
   Sexp.List([Atom locstring; msg])
 
-let width = 30
+let width = 40
 
 let range text (loc : position * position) : string =
   (* Extract the start and positions of this stack element. *)

@@ -1,5 +1,6 @@
 open Base
 open Term
+open Utils
 
 let free_variables (t : term) : VarSet.t =
   let rec f t =
@@ -21,6 +22,51 @@ let has_ite (t : term) : bool =
   reduce t
     ~init:false ~join:(||)
     ~case:(fun _ t -> match t.tkind with TIte _ -> Some true | _ -> None)
+
+
+let subst_args fpatterns args =
+  let rec f (fpat, t) =
+    match fpat, t.tkind with
+    | PatVar x, _ -> [mk_var x, t]
+    | PatTup pl, TTup tl ->
+      (match List.zip pl tl with
+       | Ok ptl -> List.concat (List.map ~f ptl)
+       | _ -> failwith "no sub")
+    | _ -> failwith "no sub"
+
+  in
+  match List.zip fpatterns args with
+  | Ok l -> (try Some (List.concat (List.map ~f l)) with _ -> None)
+  | _ -> None
+
+
+let replace_calls_to (funcs : VarSet.t) =
+  let case _ t =
+    match t.tkind with
+    | TApp({tkind = TVar x; _}, _) when Set.mem funcs x ->
+      Some (mk_var (Variable.mk ~t:(Some t.ttyp) (Alpha.fresh x.vname)))
+    | _ -> None
+  in
+  transform ~case
+
+
+let apply_projections (projs : (int, variable list, Int.comparator_witness) Map.t) (t : term) =
+  let pack xlist args =
+    List.map xlist
+      ~f:(fun newx -> first (infer_type (mk_app (mk_var newx) args)))
+  in
+  let case f t0 =
+    match t0.tkind with
+    | TApp({tkind=TVar(x); _}, args) ->
+      (match Map.find projs x.vid with
+       | Some xlist ->
+         let args' = List.map ~f args in
+         let projected = pack xlist args' in
+         Some (mk_tup projected)
+       | None -> None)
+
+    | _ -> None
+  in transform ~case t
 
 
 (* ============================================================================================= *)
@@ -145,29 +191,3 @@ let expand_once (t : term) : term list =
     List.map ~f v_expan
   in
   List.concat (List.map ~f:aux expansions)
-
-
-let subst_args fpatterns args =
-  let rec f (fpat, t) =
-    match fpat, t.tkind with
-    | PatVar x, _ -> [mk_var x, t]
-    | PatTup pl, TTup tl ->
-      (match List.zip pl tl with
-       | Ok ptl -> List.concat (List.map ~f ptl)
-       | _ -> failwith "no sub")
-    | _ -> failwith "no sub"
-
-  in
-  match List.zip fpatterns args with
-  | Ok l -> (try Some (List.concat (List.map ~f l)) with _ -> None)
-  | _ -> None
-
-
-let replace_calls_to (funcs : VarSet.t) =
-  let case _ t =
-    match t.tkind with
-    | TApp({tkind = TVar x; _}, _) when Set.mem funcs x ->
-      Some (mk_var (Variable.mk ~t:(Some t.ttyp) (Alpha.fresh x.vname)))
-    | _ -> None
-  in
-  transform ~case

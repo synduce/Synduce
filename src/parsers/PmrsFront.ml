@@ -116,7 +116,7 @@ let fterm_to_term _ allv globs locs rterm =
 
 let pmrs_of_rules loc (globs : (string, Term.variable) Hashtbl.t)
     (params : Term.variable list) (args : Term.variable list)
-    (pname : string)
+    (pvar : Term.variable)
     (invariant : term option)
     (body : pmrs_body)
   : PMRS.t =
@@ -214,7 +214,7 @@ let pmrs_of_rules loc (globs : (string, Term.variable) Hashtbl.t)
   in
   PMRS.infer_pmrs_types
     (Term.{
-        pname = pname;
+        pvar = pvar;
         pargs = args;
         pparams = VarSet.of_list params;
         pnon_terminals = nont;
@@ -268,11 +268,17 @@ let translate (prog : program) =
         match decl with
         | PMRSDecl(loc, params, pname, args, invariant, body) ->
           let vparams = List.map ~f:Term.Variable.mk params in
+          let pvar = Hashtbl.find_exn globals pname in
           let vargs = List.map ~f:Term.Variable.mk args in
-          let pmrs = pmrs_of_rules loc globals vparams vargs pname invariant body in
-          (match Hashtbl.add PMRS._globals ~key:pname ~data:pmrs with
+          let pmrs = pmrs_of_rules loc globals vparams vargs pvar invariant body in
+          (match Hashtbl.add PMRS._globals ~key:pvar.vid ~data:pmrs with
            | `Ok -> Log.verbose_msg ("Parsed "^pname)
-           | `Duplicate -> Log.error_msg (pname^" already declared."));
+           | `Duplicate -> Log.error_msg (pname^" already declared, ignoring."));
+          Set.iter pmrs.pnon_terminals
+            ~f:(fun x ->
+                match Hashtbl.add PMRS._nonterminals ~key:x.vid ~data:pmrs with
+                | `Ok -> Log.verbose_msg ("Referenced "^x.vname)
+                | `Duplicate -> ());
           Map.set pmrses ~key:pname ~data:pmrs
 
         | FunDecl (loc, fname, args, invariant, body) ->

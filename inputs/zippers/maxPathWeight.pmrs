@@ -6,8 +6,8 @@ type 'c zipper = Top | Zip of sel * 'c * 'c btree * 'c zipper
 
 
 pmrs spec =
-    sum Empty -> 0
-    | sum Node(a, l, r) -> a + (sum l) + (sum r)
+    mpath Empty -> 0
+    | mpath Node(a, l, r) -> a + (max (mpath l) (mpath r))
 
 pmrs (join) target =
     main Top -> 0

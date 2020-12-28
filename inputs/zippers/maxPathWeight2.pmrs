@@ -6,12 +6,14 @@ type 'c zipper = Top | Zip of sel * 'c * 'c btree * 'c zipper
 
 
 pmrs spec =
-    sum Empty -> 0
-    | sum Node(a, l, r) -> a + (sum l) + (sum r)
+    mpath Empty -> 0
+    | mpath Node(a, l, r) -> a + (max (mpath l) (mpath r))
 
-pmrs (join) target =
+pmrs (jleft, jright) target =
     main Top -> 0
-    | main Zip(x, a, child, z) -> join a (spec child) (main z)
+    | main Zip(x, a, child, z) -> deci a child z x
+    | deci a child z Left ->  jleft a (spec child) (main z)
+    | deci a child z Right -> jright a (spec child) (main z)
 
 pmrs repr =
     main Top -> Empty

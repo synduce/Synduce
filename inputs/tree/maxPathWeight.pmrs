@@ -1,0 +1,16 @@
+// This example is adapted from:
+// The third homomorphism theorem on trees: upwards and downwards
+// lead to divide-and-conquer
+type 'a tree = Node of 'a * 'a tree * 'a tree | Nil
+
+pmrs spec =
+    main t -> mp 0 t
+    | mp s Nil -> s
+    | mp s Node(a,l,r) -> (fun m -> max m (mp (s + a) l)) (mp (s + a) r)
+
+pmrs (join, s0) target =
+    main t1 -> h t1
+    | h Nil -> s0
+    | h Node(a,l,r) -> join a (h l) (h r)
+
+let repr x = x

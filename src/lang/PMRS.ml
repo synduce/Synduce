@@ -15,7 +15,7 @@ type rewrite_rule = variable * variable list * pattern option * term
 type top_function = variable * variable list * term
 
 type t = {
-  pname : string;
+  pvar : Variable.t;
   pinput_typ : RType.t;
   poutput_typ : RType.t * term option;
   pargs : variable list;
@@ -31,9 +31,15 @@ type 'a xresult = ('a, (string * Sexp.t) list) Result.t
 type 'a sresult = ('a, (string * term) list) Result.t
 type variables = variable Map.M(String).t
 
+(** Table of all the PMRS in the file, indexed by the function
+    variable id.
+*)
+let _globals : (int, t) Hashtbl.t = Hashtbl.create (module Int)
 
-let _globals : (string, t) Hashtbl.t = Hashtbl.create (module String)
-
+(** Mapping nonterminals to the PMRS they belong to, index by the nonterminal
+    variable id.
+*)
+let _nonterminals : (int, t) Hashtbl.t = Hashtbl.create (module Int)
 
 let lhs (nt, args, pat, rhs) =
   let all_args =
@@ -90,9 +96,14 @@ let infer_pmrs_types (prog : t) =
       | RType.TFun (TTup [t_in], t_out) -> t_in, t_out
       | _ -> failwith "PMRS with multiple inputs not supported."
     in
+    Variable.update_var_types
+      [Variable.vtype_or_new prog.pvar, Variable.vtype_or_new prog.pmain_symb];
     let invariant = Option.map ~f:(fun x -> first (infer_type x)) (second prog.poutput_typ) in
     let output_type = typ_out, invariant in
-    { prog with prules = new_rules; pinput_typ = typ_in; poutput_typ = output_type}
+    { prog with
+      prules = new_rules;
+      pinput_typ = typ_in;
+      poutput_typ = output_type}
   | None -> failwith "Failed infering types for pmrs."
 
 
@@ -125,7 +136,7 @@ let pp (frmt : Formatter.t) (pmrs : t) : unit =
         ) pmrs.prules
   in
   Fmt.(pf frmt "%s⟨%a⟩: %a -> %a%a = @;@[<v 2>{@;%a@;}@]"
-         pmrs.pname
+         pmrs.pvar.vname
          VarSet.pp_var_names pmrs.pparams
          RType.pp pmrs.pinput_typ
          RType.pp(first pmrs.poutput_typ)
@@ -152,7 +163,7 @@ let func_to_pmrs (f : Variable.t) (args : fpattern list) (body : Term.term) =
     | _ -> failwith "TODO: only identity supported by func_to_pmrs"
   in
   {
-    pname = f.vname;
+    pvar = f;
     pinput_typ = tin;
     poutput_typ = tout, None;
     pargs = Set.elements (fpat_vars (PatTup args));

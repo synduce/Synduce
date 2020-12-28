@@ -8,7 +8,9 @@ open Utils
 type func_resolution =
   | FRFun of fpattern list * term
   | FRPmrs of PMRS.t
+  | FRNonT of PMRS.t
   | FRUnknown
+
 
 let resolve_func (func : term) =
   match func.tkind with
@@ -16,9 +18,12 @@ let resolve_func (func : term) =
     (match Hashtbl.find Term._globals x.vid with
      | Some (_, vargs, _, body) -> FRFun (vargs, body)
      | None ->
-       (match Hashtbl.find PMRS._globals x.vname with
+       (match Hashtbl.find PMRS._globals x.vid with
         | Some pm -> FRPmrs pm
-        | None -> FRUnknown))
+        | None ->
+          (match Hashtbl.find PMRS._nonterminals x.vid with
+           | Some pm -> FRNonT pm
+           | None -> FRUnknown)))
   | TFun(vargs, body) -> FRFun (vargs, body)
   | _ -> FRUnknown
 
@@ -71,6 +76,7 @@ let rec reduce_term (t : term) : term =
          (match args' with
           | [tp] -> Some (f (reduce_pmrs pm tp))
           | _ -> None) (* PMRS are defined only with one argument for now. *)
+       | FRNonT p -> Some (pmrs_until_irreducible p t)
        | FRUnknown -> None)
     | TFun([], body) -> Some (f body)
     | TSel(t, i) ->
@@ -81,7 +87,7 @@ let rec reduce_term (t : term) : term =
   in
   transform ~case t
 
-and  reduce_pmrs (prog : PMRS.t) (input : term) =
+and pmrs_until_irreducible (prog : PMRS.t) (input : term) =
   let one_step t0 =
     let rstep = ref false in
     let rewrite_rule _t =
@@ -92,18 +98,20 @@ and  reduce_pmrs (prog : PMRS.t) (input : term) =
          | hd :: _ -> rstep := true; hd)
       | _ -> _t
     in
-    let t0' = reduce_term (rewrite_with rewrite_rule t0) in
+    let t0' = rewrite_with rewrite_rule t0 in
     t0', !rstep
   in
-  let f_input = mk_app (mk_var prog.pmain_symb) [input] in
   let steps = ref 0 in
   let rec apply_until_irreducible t =
     Int.incr steps;
     let t', reduced =  one_step t in
     if reduced then apply_until_irreducible t' else t'
   in
-  let res = apply_until_irreducible f_input in
-  res
+  apply_until_irreducible input
+
+and reduce_pmrs (prog : PMRS.t) (input : term) =
+  let f_input = mk_app (mk_var prog.pmain_symb) [input] in
+  pmrs_until_irreducible prog f_input
 
 
 (* ============================================================================================= *)

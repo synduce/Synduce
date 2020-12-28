@@ -112,9 +112,13 @@ let replace_rhs_of_main (p : psi_def) (f : PMRS.t) (t0 : term) : term =
     in
     List.filter_map ~f:(fun x -> x) (List.map ~f nr)
   in
-  substitution replacements t0
+  let t_out = substitution replacements t0 in
+  t_out
 
 
+(* ============================================================================================= *)
+(*                               MAIN ENTRY POINTS: MR_TERMS                                     *)
+(* ============================================================================================= *)
 let expand_max (p : psi_def) (f : PMRS.t) (t0 : term)
   : (term * term) list * term list =
   let f_of_t0 = Reduce.reduce_pmrs f t0 in

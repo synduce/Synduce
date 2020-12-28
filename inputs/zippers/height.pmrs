@@ -6,10 +6,10 @@ type 'c zipper = Top | Zip of sel * 'c * 'c btree * 'c zipper
 
 
 pmrs spec =
-    sum Empty -> 0
-    | sum Node(a, l, r) -> a + (sum l) + (sum r)
+    height Empty -> 0
+    | height Node(a, l, r) -> 1 + (max (height l) (height r))
 
-pmrs (join) target =
+pmrs (s0, join) target =
     main Top -> 0
     | main Zip(x, a, child, z) -> join a (spec child) (main z)
 

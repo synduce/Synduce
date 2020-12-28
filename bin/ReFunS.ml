@@ -32,7 +32,9 @@ let main () =
        let elapsed = Unix.gettimeofday () -. start_time in
        Utils.Log.info Fmt.(fun frmt () -> pf frmt "Solution found in %4.4fs:@;%a@]" elapsed (box PMRS.pp) target);
        (* If no info required, output timing information. *)
-       if not !Config.info then Fmt.(pf stdout "%s,%i,%.4fs@." !filename !Algo.PmrsAlgos.loop_counter elapsed)
+       if not !Config.info then
+         let short_filename = Utils.relative_to_root !filename in
+         Fmt.(pf stdout "%s,%i,%.4fs@." short_filename !Algo.PmrsAlgos.loop_counter elapsed)
 
      | Error _ -> Utils.Log.error_msg "No solution found.")
   with s -> (if !Config.show_vars then Term.Variable.print_summary stdout (); raise s)
