@@ -24,3 +24,5 @@ let z3_binary_path = "/usr/bin/z3"
 
 (* Optimization flags *)
 let detupling_on = ref true
+
+let stratify_on = ref true

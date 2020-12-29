@@ -13,7 +13,8 @@ let options = [
   ('i', "info-off", (set Config.info false), None);
   ('s', "show-vars", (set Config.show_vars true), None);
   ('p', "parse-only", (set parse_only true), None);
-  ('\000',"detupling-off", (set Config.detupling_on false), None )
+  ('\000',"detupling-off", (set Config.detupling_on false), None);
+  ('\000',"stratify-off", (set Config.stratify_on false), None)
 ]
 
 

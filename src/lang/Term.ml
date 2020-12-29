@@ -459,6 +459,10 @@ let mk_var ?(pos = dummy_loc) (v : variable) : term =
   { tpos = pos; tkind = TVar v; ttyp = Variable.vtype_or_new v }
 
 
+let var_or_none (t : term) : variable option =
+  match t.tkind with | TVar x -> Some x | _ -> None
+
+
 let mk_const ?(pos = dummy_loc) (c : Constant.t) =
   let ctyp =
     match c with

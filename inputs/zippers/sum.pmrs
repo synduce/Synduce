@@ -9,8 +9,8 @@ pmrs spec =
     sum Empty -> 0
     | sum Node(a, l, r) -> a + (sum l) + (sum r)
 
-pmrs (join) target =
-    main Top -> 0
+pmrs (s0, join) target =
+    main Top -> s0
     | main Zip(x, a, child, z) -> join a (spec child) (main z)
 
 pmrs repr =

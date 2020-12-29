@@ -5,9 +5,9 @@ pmrs spec { fun (x,y) -> y >= 0 && y >= x }  =
     | f s Nil -> s
     | f s (Node(a,l,r)) -> (fun (sum1, m1) -> f (sum1 + a, max (sum1 + a)  m1) r) (f s l)
 
-pmrs (join1) target =
+pmrs (join1, s0) target =
     main t1 -> h t1
-    | h Nil -> (0, 0)
+    | h Nil -> s0
     | h Node(a,l,r) -> join1 a (h l) (h r)
 
 let repr x = x

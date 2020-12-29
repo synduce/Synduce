@@ -8,11 +8,11 @@ pmrs spec {fun (x,y) -> x >= 0 && x >= y} =
     | f Nil -> (0, 0)
     | f Cons(hd, tl) -> (fun (mts, sum) -> max mts (sum + hd), sum + hd) (f tl)
 
-pmrs (o1, o2) target =
+pmrs (join, s0, f0) target =
     main t           -> h t
-    | h CNil          -> (0, 0)
-    | h Single(a)    -> (max a 0, a)
-    | h Concat(y, z) -> (fun l r -> o1 l r, o2 l r) (h y) (h z)
+    | h CNil          -> s0
+    | h Single(a)    -> f0 a
+    | h Concat(y, z) -> join (h y) (h z)
 
 pmrs repr l =
     main l -> c l

@@ -7,9 +7,9 @@ pmrs spec l =
     | f Nil -> 0
     | f Cons(hd1, hd2, tl) -> (hd1 = hd2 ? 0 : 1) + (f tl)
 
-pmrs (odot,f0) target t =
+pmrs (odot,f0, s0) target t =
     target t           -> h t
-    | h CNil          -> 0
+    | h CNil          -> s0
     | h Single(a1, a2)  -> f0 a1 a2
     | h Concat(x, y) -> odot (h x) (h y)
 

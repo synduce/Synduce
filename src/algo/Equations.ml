@@ -78,21 +78,6 @@ let proj_unknowns (unknowns : VarSet.t) =
   new_unknowns, proj_map
 
 
-let synthfuns_of_unknowns ?(bools = false) ?(ops = OpSet.empty) (unknowns : VarSet.t) =
-  let xi_formals (xi : variable) : sorted_var list * sygus_sort =
-    match Variable.vtype_or_new xi with
-    | RType.TFun(TTup(targs), tres) -> sorted_vars_of_types targs, sort_of_rtype tres
-    | RType.TFun(targ, tres) -> sorted_vars_of_types [targ], sort_of_rtype tres
-    | t -> [], sort_of_rtype t
-  in
-  let f xi =
-    let args, ret_sort = xi_formals xi in
-    let grammar = Grammars.generate_grammar ~bools ops args ret_sort in
-    CSynthFun (xi.vname, args, ret_sort, grammar)
-  in
-  List.map ~f (Set.elements unknowns)
-
-
 (* ============================================================================================= *)
 (*                               BUILDING SYSTEMS OF EQUATIONS                                   *)
 (* ============================================================================================= *)
@@ -217,6 +202,27 @@ let revert_projs
 (* ============================================================================================= *)
 (*                               SOLVING SYSTEMS OF EQUATIONS                                    *)
 (* ============================================================================================= *)
+let pp_soln (f : Formatter.t) soln =
+  Fmt.(list ~sep:comma (fun fmrt (s, args, bod) ->
+      pf fmrt "@[<hov 2>@[%s(%a)@] = @[%a@]@]"
+        s (list ~sep:comma Variable.pp) args pp_term bod)) f soln
+
+
+let synthfuns_of_unknowns ?(bools = false) ?(ops = OpSet.empty) (unknowns : VarSet.t) =
+  let xi_formals (xi : variable) : sorted_var list * sygus_sort =
+    match Variable.vtype_or_new xi with
+    | RType.TFun(TTup(targs), tres) -> sorted_vars_of_types targs, sort_of_rtype tres
+    | RType.TFun(targ, tres) -> sorted_vars_of_types [targ], sort_of_rtype tres
+    | t -> [], sort_of_rtype t
+  in
+  let f xi =
+    let args, ret_sort = xi_formals xi in
+    let grammar = Grammars.generate_grammar ~bools ops args ret_sort in
+    CSynthFun (xi.vname, args, ret_sort, grammar)
+  in
+  List.map ~f (Set.elements unknowns)
+
+
 let constraints_of_eqns (eqns : equation list) : command list =
   let detupled_equations =
     let f (_, pre, lhs, rhs) =
@@ -275,12 +281,6 @@ let solve_eqns (unknowns : VarSet.t) (eqns : equation list) =
     match resp with
     | RSuccess (resps) ->
       let soln = List.map ~f:parse_synth_fun resps in
-      Utils.Log.debug_msg
-        Fmt.(str "@[<hov 2>Solution found: @;%a"
-               (list ~sep:comma (fun fmrt (s, args, bod) ->
-                    pf fmrt "@[<hov 2>@[%s(%a)@] = @[%a@]@]"
-                      s (list ~sep:comma Variable.pp) args pp_term bod)) soln);
-
       resp, Some soln
 
     | RInfeasible -> RInfeasible, None
@@ -293,18 +293,138 @@ let solve_eqns (unknowns : VarSet.t) (eqns : equation list) =
   | Some resp -> handle_response resp
   | None -> RFail, None
 
+
+(* Solve the trivial equations first, avoiding the overhead from the
+   sygus solver.
+*)
+let solve_constant_eqns (unknowns : VarSet.t) (eqns : equation list) =
+  let constant_soln, other_eqns =
+    let f (t, inv, lhs, rhs) =
+      match rhs.tkind with
+      | TVar x when Set.mem unknowns x ->
+        (* TODO check that lhs is a constant term. (Should be the case if wf) *)
+        Either.first (x, lhs)
+      | _ -> Either.Second (t, inv, lhs, rhs)
+    in
+    List.partition_map ~f eqns
+  in
+  let resolved = VarSet.of_list (List.map ~f:first constant_soln) in
+  let new_eqns =
+    let substs = List.map ~f:(fun (x, lhs) -> mk_var x, lhs) constant_soln in
+    List.map other_eqns
+      ~f:(fun (t, inv, lhs, rhs) -> t, inv, substitution substs lhs, substitution substs rhs)
+  in
+  let partial_soln =
+    List.map ~f:(fun (x, lhs) -> x.vname, [], lhs) constant_soln
+  in
+  Log.debug_msg Fmt.(str "Partial solution:@;@[<hov 2>%a@]" pp_soln partial_soln);
+  partial_soln,
+  Set.diff unknowns resolved,
+  new_eqns
+
+
+let solve_full_definitions (unknowns : VarSet.t) (eqns : equation list) =
+  (* Is lhs, args a full definition of the function? *)
+  let ok_args lhs args =
+    let argv =  List.filter_map args ~f:var_or_none in
+    let argset = VarSet.of_list argv in
+    if Set.length argset = List.length args &&
+       (Set.is_empty (Set.diff argset (Analysis.free_variables lhs)))
+    then
+      Some argv
+    else
+      None
+  in
+  let mk_lam lhs args =
+    let pre_subst =
+      List.map args
+        ~f:(fun arg ->
+            let t = Variable.vtype_or_new arg in
+            let v = Variable.mk ~t:(Some t) (Alpha.fresh "x") in
+            v, (mk_var arg, mk_var v))
+    in
+    let new_args, subst = List.unzip pre_subst in
+    new_args, substitution subst lhs
+  in
+  let full_defs, other_eqns =
+    let f (t, inv, lhs, rhs) =
+      match rhs.tkind with
+      | TApp({tkind=TVar x; _}, args) when Set.mem unknowns x ->
+        (match ok_args lhs args with
+         | Some argv ->
+           let lam_args, lam_body = mk_lam lhs argv in
+           Either.First (x, (lam_args, lam_body))
+         | None ->
+           Either.Second (t, inv, lhs, rhs))
+
+      | _ -> Either.Second (t, inv, lhs, rhs)
+    in
+    List.partition_map ~f eqns
+  in
+  let resolved = VarSet.of_list (List.map ~f:first full_defs) in
+  let new_eqns =
+    let substs =
+      List.map full_defs
+        ~f:(fun (x, (lhs_args, lhs_body)) ->
+            let t, _ = infer_type (mk_fun (List.map ~f:(fun x -> PatVar x) lhs_args) lhs_body) in
+            mk_var x, t)
+    in
+    List.map other_eqns
+      ~f:(fun (t, inv, lhs, rhs) ->
+          let new_lhs = Reduce.reduce_term (substitution substs lhs) in
+          let new_rhs = Reduce.reduce_term (substitution substs rhs) in
+          t, inv, new_lhs, new_rhs)
+  in
+  let partial_soln =
+    List.map
+      ~f:(fun (x, (lhs_args, lhs_body)) -> x.vname, lhs_args, lhs_body)
+      full_defs
+  in
+  Log.debug_msg Fmt.(str "Partial solution:@;@[<hov 2>%a@]" pp_soln partial_soln);
+  partial_soln,
+  Set.diff unknowns resolved,
+  new_eqns
+
+
+
+let solve_stratified (unknowns : VarSet.t) (eqns : equation list) =
+  let psol, u, e =
+    if !Config.stratify_on then
+      let partial_soln, new_unknowns, new_eqns =
+        solve_constant_eqns unknowns eqns
+      in
+      let partial_soln', new_unknowns, new_eqns =
+        solve_full_definitions new_unknowns new_eqns
+      in
+      partial_soln @ partial_soln', new_unknowns, new_eqns
+    else
+      [], unknowns, eqns
+  in
+  match solve_eqns u e with
+  | resp, Some soln -> resp, Some (psol @ soln)
+  | resp, None -> resp, None
+
+
 let solve ~(p : psi_def) (eqns : equation list) =
   let unknowns = p.target.pparams in
-  if !Config.detupling_on then
-    let new_unknowns, projections = proj_unknowns p.target.pparams in
-    let new_eqns = proj_and_detuple_eqns projections eqns in
-    match solve_eqns new_unknowns new_eqns with
-    | resp, Some soln0 ->
-      let soln =
-        if Map.length projections > 0 then
-          revert_projs unknowns projections soln0
-        else soln0
-      in resp, Some soln
-    | resp, None -> resp, None
-  else
-    solve_eqns unknowns eqns
+  let soln_final =
+    if !Config.detupling_on then
+      let new_unknowns, projections = proj_unknowns p.target.pparams in
+      let new_eqns = proj_and_detuple_eqns projections eqns in
+      match solve_stratified new_unknowns new_eqns with
+      | resp, Some soln0 ->
+        let soln =
+          if Map.length projections > 0 then
+            revert_projs unknowns projections soln0
+          else soln0
+        in resp, Some soln
+      | resp, None -> resp, None
+    else
+      solve_stratified unknowns eqns
+  in
+  (match soln_final with
+   | _, Some soln ->
+     Utils.Log.debug_msg
+       Fmt.(str "@[<hov 2>Solution found: @;%a" pp_soln soln);
+   | _ -> ());
+  soln_final

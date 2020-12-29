@@ -18,6 +18,7 @@ input_files = [
     ["list/lenhom.pmrs", ""],
     ["list/prodhom.pmrs", ""],
     ["list/polyhom.pmrs", ""],
+    ["list/hamming.pmrs", ""],
     ["list/maxhom.pmrs", ""],
     ["list/minhom.pmrs", ""],
     ["list/issorted.pmrs", "--detupling-off"],

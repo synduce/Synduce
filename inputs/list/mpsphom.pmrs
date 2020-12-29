@@ -13,10 +13,10 @@ pmrs spec {fun (mps, pos, i, sum) -> mps >= 0 && mps >= sum && i >= 0 && pos >= 
              sum + hd)
              (main tl)
 
-pmrs (odot) target =
+pmrs (odot, f0, s0) target =
     main t           -> h t
-    | h CNil          -> (0, 0, 0, 0)
-    | h Single(a)    -> (max a 0, a, 1, 1)
+    | h CNil          -> s0
+    | h Single(a)    -> f0 a
     | h Concat(y, z) -> odot (h y) (h z)
 
 pmrs repr l =
