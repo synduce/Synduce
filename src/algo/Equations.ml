@@ -7,7 +7,6 @@ open SygusInterface
 open Utils
 module SmtI = SmtInterface
 
-
 type equation = term * term option * term * term
 
 let pp_equation (f : Formatter.t) (orig, inv, lhs, rhs : equation) =
@@ -15,6 +14,88 @@ let pp_equation (f : Formatter.t) (orig, inv, lhs, rhs : equation) =
   | Some inv -> Fmt.(pf f "@[<hov 2>{%a}@[%a =>@;%a = %a@]@]" pp_term orig pp_term inv pp_term lhs pp_term rhs)
   | None -> Fmt.(pf f "@[<hov 2>{%a}@;@[%a = %a@]@]" pp_term orig pp_term lhs pp_term rhs)
 
+
+(* ============================================================================================= *)
+(*                        PROJECTION : OPTIMIZATION FOR TUPLES                                   *)
+(* ============================================================================================= *)
+
+let mk_projs (tin : RType.t) (tl : RType.t list) (xi : Variable.t) =
+  let f i t =
+    Variable.mk ~t:(Some RType.(TFun(tin, t))) (xi.vname^(Int.to_string i))
+  in List.mapi ~f tl
+
+
+let projection_eqns (lhs : term) (rhs : term) =
+  match lhs.tkind, rhs.tkind with
+  | TTup lhs_tl, TTup rhs_tl -> List.map ~f:(fun (r,l) -> r,l) (List.zip_exn lhs_tl rhs_tl)
+  | _ -> [lhs, rhs]
+
+let invar invariants lhs_e rhs_e =
+  let f inv_expr =
+    not (Set.is_empty
+           (Set.inter
+              (Set.union (Analysis.free_variables lhs_e) (Analysis.free_variables rhs_e))
+              (Analysis.free_variables inv_expr)))
+  in
+  let conjs = List.filter ~f (Set.elements invariants) in
+  mk_assoc Binop.And conjs
+let proj_and_detuple_eqns (projections : (int, variable list, Int.comparator_witness) Map.t)
+    (eqns : equation list) =
+  let apply_p = Analysis.apply_projections projections in
+  let f (t, pre, lhs, rhs) =
+    let lhs' = apply_p lhs and rhs' = apply_p rhs in
+    let eqs = projection_eqns lhs' rhs' in
+    List.map ~f:(fun (_l, _r) ->  t, pre, _l, _r) eqs
+  in
+  List.concat (List.map ~f eqns)
+
+
+let proj_unknowns (unknowns : VarSet.t) =
+  let unknowns_projs, new_unknowns =
+    let f (l, vs) xi =
+      match Variable.vtype_or_new xi with
+      | RType.TFun(tin, TTup tl) ->
+        let new_vs = mk_projs tin tl xi in
+        l @ [xi, Some new_vs], Set.union vs (VarSet.of_list new_vs)
+      | _ ->
+        l @ [xi, None], Set.add vs xi
+    in
+    List.fold ~f ~init:([], VarSet.empty) (Set.elements unknowns)
+  in
+  let proj_map =
+    let mmap =
+      Map.of_alist (module Int)
+        (List.map ~f:(fun (x, p) -> x.vid, p)
+           (* Only select relevant xi for projection *)
+           (List.filter_map
+              ~f:(fun (_x, _o) -> match _o with Some o -> Some (_x, o) | None -> None)
+              unknowns_projs))
+    in
+    match mmap with
+    | `Ok x -> x
+    | `Duplicate_key _ -> failwith "Unexpected error while projecting."
+  in
+  new_unknowns, proj_map
+
+
+let synthfuns_of_unknowns ?(bools = false) ?(ops = OpSet.empty) (unknowns : VarSet.t) =
+  let xi_formals (xi : variable) : sorted_var list * sygus_sort =
+    match Variable.vtype_or_new xi with
+    | RType.TFun(TTup(targs), tres) -> sorted_vars_of_types targs, sort_of_rtype tres
+    | RType.TFun(targ, tres) -> sorted_vars_of_types [targ], sort_of_rtype tres
+    | t -> [], sort_of_rtype t
+  in
+  let f xi =
+    let args, ret_sort = xi_formals xi in
+    let grammar = Grammars.generate_grammar ~bools ops args ret_sort in
+    CSynthFun (xi.vname, args, ret_sort, grammar)
+  in
+  List.map ~f (Set.elements unknowns)
+
+
+(* ============================================================================================= *)
+(*                               BUILDING SYSTEMS OF EQUATIONS                                   *)
+(* ============================================================================================= *)
 
 let check_equation ~(p : psi_def) (_, pre, lhs, rhs : equation) : bool =
   (match Expand.nonreduced_terms_all p lhs, Expand.nonreduced_terms_all p rhs with
@@ -46,20 +127,6 @@ let compute_lhs p t =
   Expand.replace_rhs_of_main p p.orig final
 
 
-let projection_eqns (lhs : term) (rhs : term) =
-  match lhs.tkind, rhs.tkind with
-  | TTup lhs_tl, TTup rhs_tl -> List.map ~f:(fun (r,l) -> r,l) (List.zip_exn lhs_tl rhs_tl)
-  | _ -> [lhs, rhs]
-
-let invar invariants lhs_e rhs_e =
-  let f inv_expr =
-    not (Set.is_empty
-           (Set.inter
-              (Set.union (Analysis.free_variables lhs_e) (Analysis.free_variables rhs_e))
-              (Analysis.free_variables inv_expr)))
-  in
-  let conjs = List.filter ~f (Set.elements invariants) in
-  mk_assoc Binop.And conjs
 
 
 let make ~(p : psi_def) (tset : TermSet.t) : equation list =
@@ -94,12 +161,6 @@ let make ~(p : psi_def) (tset : TermSet.t) : equation list =
     Log.error_msg Fmt.(str "Not pure: %a" pp_equation not_pure);
     failwith "Equation not pure."
   | None ->  pure_eqns
-
-
-let mk_projs (tin : RType.t) (tl : RType.t list) (xi : Variable.t) =
-  let f i t =
-    Variable.mk ~t:(Some RType.(TFun(tin, t))) (xi.vname^(Int.to_string i))
-  in List.mapi ~f tl
 
 
 let revert_projs
@@ -176,63 +237,6 @@ let constraints_of_eqns (eqns : equation list) : command list =
     | None -> CConstraint (SyApp(IdSimple "=", [sygus_of_term lhs; sygus_of_term rhs]))
   in
   List.map ~f:eqn_to_constraint detupled_equations
-
-
-let proj_and_detuple_eqns (projections : (int, variable list, Int.comparator_witness) Map.t)
-    (eqns : equation list) =
-  let apply_p = Analysis.apply_projections projections in
-  let f (t, pre, lhs, rhs) =
-    let lhs' = apply_p lhs and rhs' = apply_p rhs in
-    let eqs = projection_eqns lhs' rhs' in
-    List.map ~f:(fun (_l, _r) ->  t, pre, _l, _r) eqs
-  in
-  List.concat (List.map ~f eqns)
-
-
-let proj_unknowns (unknowns : VarSet.t) =
-  let unknowns_projs, new_unknowns =
-    let f (l, vs) xi =
-      match Variable.vtype_or_new xi with
-      | RType.TFun(tin, TTup tl) ->
-        let new_vs = mk_projs tin tl xi in
-        l @ [xi, Some new_vs], Set.union vs (VarSet.of_list new_vs)
-      | _ ->
-        l @ [xi, None], Set.add vs xi
-    in
-    List.fold ~f ~init:([], VarSet.empty) (Set.elements unknowns)
-  in
-  let proj_map =
-    let mmap =
-      Map.of_alist (module Int)
-        (List.map ~f:(fun (x, p) -> x.vid, p)
-           (* Only select relevant xi for projection *)
-           (List.filter_map
-              ~f:(fun (_x, _o) -> match _o with Some o -> Some (_x, o) | None -> None)
-              unknowns_projs))
-    in
-    match mmap with
-    | `Ok x -> x
-    | `Duplicate_key _ -> failwith "Unexpected error while projecting."
-  in
-  new_unknowns, proj_map
-
-
-let synthfuns_of_unknowns ?(bools = false) ?(ops = OpSet.empty) (unknowns : VarSet.t) =
-  let xi_formals (xi : variable) : sorted_var list * sygus_sort =
-    match Variable.vtype_or_new xi with
-    | RType.TFun(TTup(targs), tres) -> sorted_vars_of_types targs, sort_of_rtype tres
-    | RType.TFun(targ, tres) -> sorted_vars_of_types [targ], sort_of_rtype tres
-    | t -> [], sort_of_rtype t
-  in
-  let f xi =
-    let args, ret_sort = xi_formals xi in
-    let grammar = Grammars.generate_grammar ~bools ops args ret_sort in
-    CSynthFun (xi.vname, args, ret_sort, grammar)
-  in
-  List.map ~f (Set.elements unknowns)
-
-
-(* let pre_solve ~(p : psi_def) (eqns : equation list) = *)
 
 
 let solve_eqns (unknowns : VarSet.t) (eqns : equation list) =
