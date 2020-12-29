@@ -12,7 +12,8 @@ let options = [
   ('d', "debug", (set Config.debug true), None);
   ('i', "info-off", (set Config.info false), None);
   ('s', "show-vars", (set Config.show_vars true), None);
-  ('p', "parse-only", (set parse_only true), None)
+  ('p', "parse-only", (set parse_only true), None);
+  ('\000',"detupling-off", (set Config.detupling_on false), None )
 ]
 
 
@@ -33,8 +34,13 @@ let main () =
        Utils.Log.info Fmt.(fun frmt () -> pf frmt "Solution found in %4.4fs:@;%a@]" elapsed (box PMRS.pp) target);
        (* If no info required, output timing information. *)
        if not !Config.info then
-         let short_filename = Utils.relative_to_root !filename in
-         Fmt.(pf stdout "%s,%i,%.4fs@." short_filename !Algo.PmrsAlgos.loop_counter elapsed)
+         let dir =
+           match List.last (String.split ~on:'/'
+                              (Caml.Filename.dirname !filename))
+           with Some x -> x | None -> ""
+         in
+         let file = Caml.Filename.basename !filename in
+         Fmt.(pf stdout "%s,%s,%i,%.4fs@." dir file !Algo.PmrsAlgos.loop_counter elapsed)
 
      | Error _ -> Utils.Log.error_msg "No solution found.")
   with s -> (if !Config.show_vars then Term.Variable.print_summary stdout (); raise s)

@@ -108,10 +108,10 @@ let revert_projs
     (soln : (string * (variable list) * term) list) :
   (string * variable list * term) list =
   (* Helper functions *)
-  let find_soln s = 
+  let find_soln s =
     List.find_exn ~f:(fun (s', _, _) -> String.equal s.vname s') soln
-  in 
-  let join_bodies main_args first_body rest = 
+  in
+  let join_bodies main_args first_body rest =
     let f accum (_, args, body) =
       let subst =
         match List.zip args main_args with
@@ -156,15 +156,10 @@ let revert_projs
 (* ============================================================================================= *)
 (*                               SOLVING SYSTEMS OF EQUATIONS                                    *)
 (* ============================================================================================= *)
-let constraints_of_eqns
-    (projections : (int, variable list, Int.comparator_witness) Map.t)
-    (eqns : equation list)
-  : command list =
-  let apply_p = Analysis.apply_projections projections in
+let constraints_of_eqns (eqns : equation list) : command list =
   let detupled_equations =
     let f (_, pre, lhs, rhs) =
-      let lhs' = apply_p lhs and rhs' = apply_p rhs in
-      let eqs = projection_eqns lhs' rhs' in
+      let eqs = projection_eqns lhs rhs in
       List.map ~f:(fun (_l, _r) -> pre, _l, _r) eqs
     in
     List.concat (List.map ~f eqns)
@@ -183,31 +178,28 @@ let constraints_of_eqns
   List.map ~f:eqn_to_constraint detupled_equations
 
 
-let synthfuns_of_unknowns ?(bools = false) ?(ops = OpSet.empty) (unknowns : VarSet.t) =
-  (*  Flatten the inputs (tuples) -> scalars *)
-  let unknowns_projs =
-    let f xi =
+let proj_and_detuple_eqns (projections : (int, variable list, Int.comparator_witness) Map.t)
+    (eqns : equation list) =
+  let apply_p = Analysis.apply_projections projections in
+  let f (t, pre, lhs, rhs) =
+    let lhs' = apply_p lhs and rhs' = apply_p rhs in
+    let eqs = projection_eqns lhs' rhs' in
+    List.map ~f:(fun (_l, _r) ->  t, pre, _l, _r) eqs
+  in
+  List.concat (List.map ~f eqns)
+
+
+let proj_unknowns (unknowns : VarSet.t) =
+  let unknowns_projs, new_unknowns =
+    let f (l, vs) xi =
       match Variable.vtype_or_new xi with
-      | RType.TFun(tin, TTup tl) -> xi, Some (mk_projs tin tl xi)
-      | _ -> xi, None
+      | RType.TFun(tin, TTup tl) ->
+        let new_vs = mk_projs tin tl xi in
+        l @ [xi, Some new_vs], Set.union vs (VarSet.of_list new_vs)
+      | _ ->
+        l @ [xi, None], Set.add vs xi
     in
-    List.map ~f (Set.elements unknowns)
-  in
-  let xi_formals (xi : variable) : sorted_var list * sygus_sort =
-    match Variable.vtype_or_new xi with
-    | RType.TFun(TTup(targs), tres) -> sorted_vars_of_types targs, sort_of_rtype tres
-    | RType.TFun(targ, tres) -> sorted_vars_of_types [targ], sort_of_rtype tres
-    | t -> [], sort_of_rtype t
-  in
-  let f (xi, xi_projs) =
-    let f xi =
-      let args, ret_sort = xi_formals xi in
-      let grammar = Grammars.generate_grammar ~bools ops args ret_sort in
-      CSynthFun (xi.vname, args, ret_sort, grammar)
-    in
-    match xi_projs with
-    | None -> [f xi]
-    | Some projs -> List.map ~f projs
+    List.fold ~f ~init:([], VarSet.empty) (Set.elements unknowns)
   in
   let proj_map =
     let mmap =
@@ -218,17 +210,32 @@ let synthfuns_of_unknowns ?(bools = false) ?(ops = OpSet.empty) (unknowns : VarS
               ~f:(fun (_x, _o) -> match _o with Some o -> Some (_x, o) | None -> None)
               unknowns_projs))
     in
-    match mmap with 
+    match mmap with
     | `Ok x -> x
     | `Duplicate_key _ -> failwith "Unexpected error while projecting."
   in
-  List.concat (List.map ~f unknowns_projs), proj_map
+  new_unknowns, proj_map
+
+
+let synthfuns_of_unknowns ?(bools = false) ?(ops = OpSet.empty) (unknowns : VarSet.t) =
+  let xi_formals (xi : variable) : sorted_var list * sygus_sort =
+    match Variable.vtype_or_new xi with
+    | RType.TFun(TTup(targs), tres) -> sorted_vars_of_types targs, sort_of_rtype tres
+    | RType.TFun(targ, tres) -> sorted_vars_of_types [targ], sort_of_rtype tres
+    | t -> [], sort_of_rtype t
+  in
+  let f xi =
+    let args, ret_sort = xi_formals xi in
+    let grammar = Grammars.generate_grammar ~bools ops args ret_sort in
+    CSynthFun (xi.vname, args, ret_sort, grammar)
+  in
+  List.map ~f (Set.elements unknowns)
 
 
 (* let pre_solve ~(p : psi_def) (eqns : equation list) = *)
 
 
-let solve ~(p : psi_def) (eqns : equation list) =
+let solve_eqns (unknowns : VarSet.t) (eqns : equation list) =
   let free_vars, all_operators, has_ite =
     let f (fvs, ops, hi) (_, _, lhs, rhs) =
       VarSet.union_list [fvs; Analysis.free_variables lhs; Analysis.free_variables rhs],
@@ -236,15 +243,13 @@ let solve ~(p : psi_def) (eqns : equation list) =
       hi || (Analysis.has_ite lhs) || (Analysis.has_ite rhs)
     in
     let fvs, ops, hi = List.fold eqns ~f ~init:(VarSet.empty, Set.empty (module Operator), false) in
-    Set.diff fvs p.target.pparams, ops, hi
+    Set.diff fvs unknowns, ops, hi
   in
   (* Commands *)
   let set_logic = CSetLogic(Grammars.logic_of_operator all_operators) in
-  let synth_objs, projections =
-    synthfuns_of_unknowns ~bools:has_ite ~ops:all_operators p.target.pparams
-  in
+  let synth_objs = synthfuns_of_unknowns ~bools:has_ite ~ops:all_operators unknowns in
   let var_decls = List.map ~f:declaration_of_var (Set.elements free_vars) in
-  let constraints = constraints_of_eqns projections eqns in
+  let constraints = constraints_of_eqns eqns in
   let extra_defs =
     (if Set.mem all_operators (Binary Max) then [max_definition] else []) @
     (if Set.mem all_operators (Binary Min) then [min_definition] else [])
@@ -265,12 +270,7 @@ let solve ~(p : psi_def) (eqns : equation list) =
     in
     match resp with
     | RSuccess (resps) ->
-      let soln0 = List.map ~f:parse_synth_fun resps in
-      let soln =
-        if Map.length projections > 0 then
-          revert_projs p.target.pparams projections soln0
-        else soln0
-      in
+      let soln = List.map ~f:parse_synth_fun resps in
       Utils.Log.debug_msg
         Fmt.(str "@[<hov 2>Solution found: @;%a"
                (list ~sep:comma (fun fmrt (s, args, bod) ->
@@ -289,3 +289,18 @@ let solve ~(p : psi_def) (eqns : equation list) =
   | Some resp -> handle_response resp
   | None -> RFail, None
 
+let solve ~(p : psi_def) (eqns : equation list) =
+  let unknowns = p.target.pparams in
+  if !Config.detupling_on then
+    let new_unknowns, projections = proj_unknowns p.target.pparams in
+    let new_eqns = proj_and_detuple_eqns projections eqns in
+    match solve_eqns new_unknowns new_eqns with
+    | resp, Some soln0 ->
+      let soln =
+        if Map.length projections > 0 then
+          revert_projs unknowns projections soln0
+        else soln0
+      in resp, Some soln
+    | resp, None -> resp, None
+  else
+    solve_eqns unknowns eqns

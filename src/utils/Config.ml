@@ -20,3 +20,7 @@ let base s = Filename.concat root_folder s
 let cvc4_binary_path = "/usr/bin/cvc4"
 
 let z3_binary_path = "/usr/bin/z3"
+
+
+(* Optimization flags *)
+let detupling_on = ref true
