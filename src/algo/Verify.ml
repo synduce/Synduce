@@ -49,7 +49,7 @@ let check_solution ~(p : psi_def)
   in
   let expand_and_check (t0 : term) =
     let t_set, u_set = Expand.maximal p t0 in
-    let sys_eqns = Equations.make ~p:{ p with target=target_inst} t_set in
+    let sys_eqns = Equations.make ~force_replace_off:true ~p:{ p with target=target_inst} t_set in
     let smt_eqns = List.map sys_eqns ~f:constr_eqn in
     let new_free_vars =
       let f fv (_, _, lhs, rhs) =
@@ -64,7 +64,7 @@ let check_solution ~(p : psi_def)
     if has_ctex then true, t_set, u_set else false, TermSet.empty, u_set
   in
   let rec find_ctex num_checks terms_to_expand =
-    if num_checks > Config.num_expansions_check then None
+    if num_checks > !Config.num_expansions_check then None
     else match terms_to_expand with
       | [] -> None
       | hd :: tl ->

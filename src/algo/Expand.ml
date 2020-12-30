@@ -196,3 +196,4 @@ let maximal (p : psi_def) (t0 : term) : TermSet.t * TermSet .t =
   let l1, l2 = List.fold tset0 ~f ~init:([], uset0) in
   TermSet.of_list l1, TermSet.of_list l2
 
+

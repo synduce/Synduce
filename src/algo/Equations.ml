@@ -5,14 +5,25 @@ open AState
 open Syguslib.Sygus
 open SygusInterface
 open Utils
+open Either
 module SmtI = SmtInterface
 
 type equation = term * term option * term * term
 
 let pp_equation (f : Formatter.t) (orig, inv, lhs, rhs : equation) =
   match inv with
-  | Some inv -> Fmt.(pf f "@[<hov 2>{%a}@[%a =>@;%a = %a@]@]" pp_term orig pp_term inv pp_term lhs pp_term rhs)
-  | None -> Fmt.(pf f "@[<hov 2>{%a}@;@[%a = %a@]@]" pp_term orig pp_term lhs pp_term rhs)
+  | Some inv -> Fmt.(pf f "@[<hov 2>E(%a) := @;@[<hov 2>%a %a@;@[%a@;%a@;%a@]@]@]"
+                       (styled `Italic  pp_term) orig
+                       pp_term inv
+                       (styled (`Fg `Red) string) "=>"
+                       pp_term lhs
+                       (styled (`Fg `Red) string) "="
+                       pp_term rhs)
+  | None -> Fmt.(pf f "@[<hov 2>E(%a) := @;@[<hov 2>%a %a %a@]@]"
+                   (styled `Italic pp_term) orig
+                   pp_term lhs
+                   (styled (`Fg `Red) string) "="
+                   pp_term rhs)
 
 
 (* ============================================================================================= *)
@@ -91,34 +102,90 @@ let check_equation ~(p : psi_def) (_, pre, lhs, rhs : equation) : bool =
    | Some t -> match Expand.nonreduced_terms_all p t with | [] -> true | _ -> false)
 
 
-let compute_rhs p t =
-  Expand.replace_rhs_of_main p p.target (Reduce.reduce_pmrs p.target t)
-
-
+(**
+   Compute the left hand side of an equation of p from term t.
+   The result is a maximally reduced term with some applicative
+   terms of the form (p.orig x) where x is a variable.
+*)
 let compute_lhs p t =
-  Log.verbose (fun f () -> Fmt.(pf f "LHS t  = %a." pp_term t));
   let t' = Reduce.reduce_pmrs p.repr t in
-  Log.verbose (fun f () -> Fmt.(pf f "LHS t' = %a." pp_term t'));
   let r_t = Expand.replace_rhs_of_main p p.repr t' in
-  Log.verbose (fun f () -> Fmt.(pf f "LHS r_t = %a." pp_term r_t));
   let subst_params =
     let l = List.zip_exn p.orig.pargs p.target.pargs in
     List.map l ~f:(fun (v1, v2) -> mk_var v1, mk_var v2)
   in
   let f_r_t = Reduce.reduce_pmrs p.orig r_t in
-  Log.verbose (fun f () -> Fmt.(pf f "LHS f_r_t = %a." pp_term f_r_t));
   let final = substitution subst_params f_r_t in
-  Log.verbose (fun f () -> Fmt.(pf f "LHS final = %a." pp_term final));
   Expand.replace_rhs_of_main p p.orig final
 
 
+let remap_rec_calls p t =
+  let g = p.target in
+  let t' = Expand.replace_rhs_of_main p g t in
+  let f a _t =
+    match _t.tkind with
+    | TApp({tkind = TVar x; _}, args) ->
+      (if a && Variable.equal x g.pmain_symb then
+         (match args with
+          | [arg] -> First  (compute_lhs p arg)
+          | _ -> Second a)
+       else if Set.mem g.pparams x then
+         Second true
+       else Second a
+      )
+    | _ -> Second a
+  in
+  let res = rewrite_accum ~init:false ~f t' in
+  if Term.term_equal res t' then t (* Don't revert step taken before *)
+  else res
 
 
-let make ~(p : psi_def) (tset : TermSet.t) : equation list =
+let compute_rhs_with_replacing p t =
+  let g = p.target in
+  let custom_reduce x =
+    let one_step t0 =
+      let rstep = ref false in
+      let rewrite_rule _t =
+        match _t.tkind with
+        | TApp({tkind=(TVar(f)); _}, fargs) ->
+          (match Reduce.rule_lookup g.prules f fargs with
+           | [] -> None
+           | hd :: _ ->
+             let hd' = remap_rec_calls p hd in
+             rstep := true;
+             Some hd')
+        (* Replace recursive calls to g by calls to f circ g,
+           if recursive call appear under unknown. *)
+        | _ -> None
+      in
+      let t0' = rewrite_top_down rewrite_rule t0 in
+      t0', !rstep
+    in
+    let steps = ref 0 in
+    let rec apply_until_irreducible t =
+      Int.incr steps;
+      let t', reduced =  one_step t in
+      if reduced then apply_until_irreducible t' else t'
+    in
+    apply_until_irreducible x
+  in
+  let app_t = mk_app (mk_var g.pmain_symb) [t] in
+  let t' = custom_reduce app_t in
+  Expand.replace_rhs_of_main p p.target t'
+
+
+let compute_rhs ?(force_replace_off=false) p t =
+  if !Config.replace_recursion && (not force_replace_off) then
+    compute_rhs_with_replacing p t
+  else
+    Expand.replace_rhs_of_main p p.target (Reduce.reduce_pmrs p.target t)
+
+
+let make ?(force_replace_off = false) ~(p : psi_def) (tset : TermSet.t) : equation list =
   let eqns =
     let fold_f eqns t =
       let lhs = compute_lhs p t in
-      let rhs = compute_rhs p t in
+      let rhs = compute_rhs ~force_replace_off p t in
       eqns @ [t, lhs, rhs]
     in
     Set.fold ~init:[] ~f:fold_f tset
@@ -308,7 +375,7 @@ let solve_constant_eqns (unknowns : VarSet.t) (eqns : equation list) =
     in
     List.partition_map ~f eqns
   in
-  let resolved = VarSet.of_list (List.map ~f:first constant_soln) in
+  let resolved = VarSet.of_list (List.map ~f:Utils.first constant_soln) in
   let new_eqns =
     let substs = List.map ~f:(fun (x, lhs) -> mk_var x, lhs) constant_soln in
     List.map other_eqns
@@ -361,7 +428,7 @@ let solve_full_definitions (unknowns : VarSet.t) (eqns : equation list) =
     in
     List.partition_map ~f eqns
   in
-  let resolved = VarSet.of_list (List.map ~f:first full_defs) in
+  let resolved = VarSet.of_list (List.map ~f:Utils.first full_defs) in
   let new_eqns =
     let substs =
       List.map full_defs

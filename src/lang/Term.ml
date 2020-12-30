@@ -747,6 +747,27 @@ let rewrite_top_down (f : term -> term option) (t : term) =
       in {t0 with tkind = tk';}
   in aux t
 
+
+let rewrite_accum ~(init : 'a) ~(f : 'a -> term -> (term, 'a) Either.t ) (t : term) =
+  let rec aux a t0 =
+    match f a t0 with
+    | Either.First t0' -> t0'
+    | Either.Second a' ->
+      let tk' = match t0.tkind with
+        | TBin (op, t1, t2) -> TBin(op, aux a' t1, aux a' t2)
+        | TUn (op, t1) -> TUn(op, aux a' t1)
+        | TConst _ -> t0.tkind
+        | TVar _ -> t0.tkind
+        | TIte (c, t1, t2) -> TIte(aux a' c, aux a' t1, aux a' t2)
+        | TTup tl -> TTup (List.map ~f:(aux a') tl)
+        | TSel (t,i) -> TSel(aux a' t, i)
+        | TFun (fargs, body) -> TFun(fargs, aux a' body)
+        | TApp (func, args) -> TApp(aux a' func, List.map ~f:(aux a') args)
+        | TData (cstr, args) -> TData(cstr, List.map ~f:(aux a') args)
+      in {t0 with tkind = tk';}
+  in aux init t
+
+
 let rewrite_types t_subs =
   Variable.update_var_types t_subs;
   rewrite_with (fun _t -> { _t with ttyp = RType.sub_all t_subs _t.ttyp })

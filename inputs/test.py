@@ -12,7 +12,6 @@ input_files = [
     ["tree/maxtree.pmrs", ""],
     ["tree/mintree.pmrs", ""],
     ["tree/maxtree2.pmrs", ""],
-    ["tree/sorted.pmrs", "--detupling-off"],
     ["tree/maxPathWeight.pmrs", ""],
     ["list/sumhom.pmrs", ""],
     ["list/lenhom.pmrs", ""],
@@ -21,10 +20,12 @@ input_files = [
     ["list/hamming.pmrs", ""],
     ["list/maxhom.pmrs", ""],
     ["list/minhom.pmrs", ""],
-    ["list/issorted.pmrs", "--detupling-off"],
     ["list/mtshom.pmrs", ""],
     ["list/mpshom.pmrs", ""],
     ["list/mts_and_mps_hom.pmrs", ""],
+    ["list/issorted.pmrs", "--detupling-off"],
+    ["tree/sorted.pmrs", "--detupling-off"],
+    ["tree/mips.pmrs", ""],
 ]
 
 root = os.getcwd()

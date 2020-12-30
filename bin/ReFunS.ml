@@ -14,7 +14,9 @@ let options = [
   ('s', "show-vars", (set Config.show_vars true), None);
   ('p', "parse-only", (set parse_only true), None);
   ('\000',"detupling-off", (set Config.detupling_on false), None);
-  ('\000',"stratify-off", (set Config.stratify_on false), None)
+  ('\000',"stratifying-off", (set Config.stratify_on false), None);
+  ('\000',"replacing-recursion-off", (set Config.replace_recursion false), None);
+  ('\000',"verif-level", None, Some (Config.set_num_expansions_check));
 ]
 
 
