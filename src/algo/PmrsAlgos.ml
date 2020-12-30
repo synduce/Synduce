@@ -23,8 +23,8 @@ let rec refinement_loop (p : psi_def) (t_set, u_set : TermSet.t * TermSet.t) =
     (match Verify.check_solution ~p (t_set, u_set) sol with
      | Some (new_t_set, new_u_set) ->
        Log.debug (fun frmt () ->
-           Fmt.(pf frmt "@[<hov 2>Counterexample terms:%a."
-                  (list pp_term) (Set.elements (Set.diff new_t_set t_set))));
+           Fmt.(pf frmt "@[<hov 2>Counterexample terms:@;@[<hov 2>%a@]"
+                  (list ~sep:comma pp_term) (Set.elements (Set.diff new_t_set t_set))));
        refinement_loop p (new_t_set, new_u_set)
      | None ->
        Log.print_ok ();
