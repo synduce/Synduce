@@ -9,7 +9,7 @@ input_files = [
     ["ptree/sum.pmrs", ""],
     ["ptree/mul.pmrs", ""],
     ["ptree/maxheads.pmrs", ""],
-    ["ptree/maxtails.pmrs", ""],
+    ["ptree/maxlast.pmrs", ""],
     ["ptree/maxsum.pmrs", ""],
     ["tree/sumtree.pmrs", ""],
     ["tree/maxtree.pmrs", ""],
@@ -42,4 +42,4 @@ for filename_with_opt in input_files:
     filename = filename_with_opt[0]
     opt = filename_with_opt[1]
     os.system("%s %s -i %s" %
-              (path, os.path.realpath(os.path.join("inputs", filename)), opt))
+              (path, os.path.realpath(os.path.join("benchmarks", filename)), opt))
