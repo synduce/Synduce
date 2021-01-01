@@ -1,0 +1,23 @@
+type 'a tree = TElt of 'a | TNode of 'a * 'a tree * 'a tree
+
+type 'a list = Elt of 'a | Cons of 'a * 'a list
+
+type 'a ptree = PElt of 'a | PNode of 'a * ('a ptree) list
+
+pmrs spec =
+    maxs PElt(a) -> a
+    | maxs PNode(a, l) -> max a (maxs_aux l)
+    | maxs_aux Elt(a_tree) -> maxs a_tree
+    | maxs_aux Cons(hd, tl) -> (maxs hd) + (maxs_aux tl)
+
+pmrs (join1, join2, f0) target =
+    main TElt(a) -> f0 a
+    | main TNode(a, l, r) -> join1 a (main l) (aux r)
+    | aux TElt(a) -> f0 a
+    | aux TNode(a, l, r) -> join2 a (main l) (aux r)
+
+pmrs repr =
+    repr TElt(x) -> PElt(x)
+    | repr TNode(a,l,r) -> PNode(a, Cons(repr l, repr_list r))
+    | repr_list TElt(x) -> Elt (PElt(x))
+    | repr_list TNode(a, l, r) -> Cons (PElt(a), Cons(repr l, repr_list r))

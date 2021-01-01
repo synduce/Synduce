@@ -201,7 +201,8 @@ let make ?(force_replace_off = false) ~(p : psi_def) (tset : TermSet.t) : equati
   let pure_eqns =
     let f (t, lhs, rhs) =
       let applic x = substitution all_subs (Reduce.reduce_term (substitution all_subs x)) in
-      let lhs' = applic lhs and rhs' = applic rhs in
+      let lhs' = Reduce.reduce_term (applic lhs)
+      and rhs' = Reduce.reduce_term (applic rhs) in
       let projs = projection_eqns lhs' rhs' in
       List.map ~f:(fun (lhs,rhs) -> t, invar invariants lhs rhs, lhs, rhs) projs
     in

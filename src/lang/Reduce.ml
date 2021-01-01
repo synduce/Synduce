@@ -79,6 +79,11 @@ let rec reduce_term (t : term) : term =
        | FRNonT p -> Some (pmrs_until_irreducible p t)
        | FRUnknown -> None)
     | TFun([], body) -> Some (f body)
+    | TIte(c, tt, tf) ->
+      (match c.tkind with
+       | TConst (Constant.CFalse) -> Some (f tt)
+       | TConst (Constant.CTrue) -> Some (f tf)
+       | _ -> None)
     | TSel(t, i) ->
       (match f t with
        | {tkind = TTup tl; _} -> Some (List.nth_exn tl i)

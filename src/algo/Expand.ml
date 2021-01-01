@@ -168,23 +168,36 @@ let expand_max (p : psi_def) (f : PMRS.t) (t0 : term)
   mr_terms, rest
 
 
-(** `maximal p t0 ` expands the term `t0 ` such that `p.orig (p.repr t0)` is a maximally
-    reduced term.
+(** `maximal p t0 ` expands the term `t0 ` such that `p.orig (p.repr t0)` and 'p.target t0`
+    are maximally reduced terms.
 *)
 let maximal (p : psi_def) (t0 : term) : TermSet.t * TermSet .t =
+  let tset_target, uset_target =
+    let g = p.target in
+    (* Expand only if there are non-reduced terms *)
+    let t0' = replace_rhs_of_main p g (Reduce.reduce_pmrs g t0) in
+    let nr = nonreduced_terms p p.target.pnon_terminals t0' in
+    match nr with
+    | [] -> [t0, t0], []
+    | _ -> expand_max p g t0
+  in
   (* Expand with repr *)
   let tset0, uset0 =
-    if p.repr_is_identity then
-      [t0, t0], []
-    else
-      (Log.verbose_msg Fmt.(str "Expand > repr.");
-       let tset0, uset0 = expand_max p p.repr t0 in
-       let s1 = subst_repr_calls p (List.map ~f:second tset0) in
-       let tset0 =
-         List.map tset0 ~f:(fun (tin, tout) -> tin, Reduce.reduce_term (substitution s1 tout))
-       in
-       tset0, uset0)
+    let f (tset, uset) (t_theta, _) =
+      if p.repr_is_identity then
+        [t0, t0], []
+      else
+        (Log.verbose_msg Fmt.(str "Expand > repr.");
+         let tset0, new_uset = expand_max p p.repr t_theta in
+         let s1 = subst_repr_calls p (List.map ~f:second tset0) in
+         let new_tset =
+           List.map tset0 ~f:(fun (tin, tout) -> tin, Reduce.reduce_term (substitution s1 tout))
+         in
+         tset @ new_tset, uset @ new_uset)
+    in
+    List.fold ~init:([], uset_target) ~f tset_target
   in
+  (* Expand with orig (f) *)
   let f (tset, uset) (t_theta, t_tau) =
     Log.verbose_msg Fmt.(str "Expand > orig.");
     match expand_max p p.orig t_tau with

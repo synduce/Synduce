@@ -8,6 +8,9 @@ input_files = [
     ["zippers/maxPathWeight2.pmrs", ""],
     ["ptree/sum.pmrs", ""],
     ["ptree/mul.pmrs", ""],
+    ["ptree/maxheads.pmrs", ""],
+    ["ptree/maxtails.pmrs", ""],
+    ["ptree/maxsum.pmrs", ""],
     ["tree/sumtree.pmrs", ""],
     ["tree/maxtree.pmrs", ""],
     ["tree/mintree.pmrs", ""],
@@ -26,7 +29,7 @@ input_files = [
     ["list/issorted.pmrs", "--detupling-off"],
     ["tree/sorted.pmrs", "--detupling-off"],
     ["tree/mips.pmrs", ""],
-    ["tree/mpps.pmrs", ""]
+    ["tree/mits.pmrs", ""]
 ]
 
 root = os.getcwd()

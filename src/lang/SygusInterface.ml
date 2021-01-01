@@ -135,6 +135,7 @@ let rec term_of_sygus (env : (string, variable, String.comparator_witness) Map.t
      | IBinop op ->
        (match args' with
         | [t1; t2] -> mk_bin op t1 t2
+        | [t1] when Operator.(equal (Binary op) (Binary Minus)) -> mk_un Unop.Neg t1
         | _ -> failwith "Sygus: a binary operator with more than two arguments.")
      | IUnop op ->
        (match args' with

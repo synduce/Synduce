@@ -1,0 +1,13 @@
+type 'a tree = Nil | Node of 'a * 'a tree * 'a tree
+
+pmrs spec { fun (x,y) -> y >= 0 && y >= x }  =
+    main t -> f (0,0) t
+    | f s Nil -> s
+    | f s (Node(a,l,r)) -> f ((fun (sum1, m1) -> f (sum1 + a, max m1 (sum1 + a)) l) s) r
+
+pmrs (join1, s0) target =
+    main_mpps t1 -> mpps t1
+    | mpps Nil -> s0
+    | mpps Node(a,l,r) -> join1 a (mpps l) (mpps r)
+
+let repr x = x

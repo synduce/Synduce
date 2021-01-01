@@ -308,10 +308,10 @@ module Unop = struct
     match op with | Neg -> RType.TInt| Not -> RType.TBool | Abs -> RType.TInt
 
   let to_pp_string (op : t) =
-    match op with | Neg -> failwith "-" | Not -> failwith "¬" | Abs -> failwith "abs"
+    match op with | Neg -> "-" | Not ->  "¬" | Abs -> "abs"
 
   let to_string (op : t) =
-    match op with | Neg -> failwith "-" | Not -> failwith "not" | Abs -> failwith "abs"
+    match op with | Neg -> "-" | Not -> "not" | Abs -> "abs"
 
   let of_string (s : string) : t option =
     match s with | "-" -> Some Neg | "not" -> Some Not | "abs " -> Some Abs | _ -> None
@@ -325,8 +325,8 @@ module Operator = struct
     type t =
       | Unary of Unop.t
       | Binary of Binop.t
-
     let compare op1 op2 = Poly.compare op1 op2
+    let equal op1 op2 = compare op1 op2 = 0
     let sexp_of_t op =
       match op with
       | Unary op -> Sexp.Atom (Unop.to_string op)
