@@ -357,7 +357,7 @@ let solve_eqns (unknowns : VarSet.t) (eqns : equation list) =
 
     | RUnknown -> RUnknown, None
   in
-  match Syguslib.Solvers.CVC4.solve_commands commands with
+  match Syguslib.Solvers.SygusSolver.solve_commands commands with
   | Some resp -> handle_response resp
   | None -> RFail, None
 

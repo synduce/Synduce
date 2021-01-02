@@ -17,6 +17,7 @@ let options = [
   ('\000',"stratifying-off", (set Config.stratify_on false), None);
   ('\000',"replacing-recursion-off", (set Config.replace_recursion false), None);
   ('\000',"verif-level", None, Some (Config.set_num_expansions_check));
+  ('\000',"use-dryadsynth", (set Syguslib.Solvers.SygusSolver.default_solver DryadSynth), None)
 ]
 
 
@@ -25,6 +26,9 @@ let main () =
   parse_cmdline options (fun s -> filename := s);
   set_style_renderer stdout `Ansi_tty;
   Caml.Format.set_margin 100;
+  (match !Syguslib.Solvers.SygusSolver.default_solver with
+   | CVC4 -> ()
+   | DryadSynth -> Syguslib.Sygus.use_v1 := true);
   let start_time = Unix.gettimeofday () in
   let prog = parse_pmrs !filename in
   let _ = seek_types prog in

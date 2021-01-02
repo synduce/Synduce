@@ -57,7 +57,15 @@ let commands_to_file (commands : program) (filename : string) =
   OC.close out_chan
 
 
-module CVC4 = struct
+module SygusSolver =  struct
+
+  type t = CVC4 | DryadSynth | EUSolver
+
+  let default_solver = ref CVC4
+
+  let binary_path =
+    function CVC4 -> Config.cvc4_binary_path | DryadSynth -> Config.dryadsynth_binary_path
+           | EUSolver -> Config.eusolver_binary_path
 
   let print_options (frmt : Formatter.t) =
     Fmt.(list ~sep:sp (fun fmt opt -> pf fmt "--%s" opt) frmt)
@@ -67,9 +75,10 @@ module CVC4 = struct
     Log.debug_msg Fmt.(str "Fetching solution in %s" filename);
     reponse_of_sexps (Sexp.input_sexps (Stdio.In_channel.create filename))
 
-  let exec_solver ?(options=[]) (inputfile, outputfile : string * string) : solver_response option =
+
+  let exec_solver ?(which = !default_solver) ?(options=[]) (inputfile, outputfile : string * string) : solver_response option =
     let command =
-      shell Fmt.(str "%s %a %s" Config.cvc4_binary_path print_options options inputfile)
+      shell Fmt.(str "%s %a %s" (binary_path which) print_options options inputfile)
     in
     let out_fd =
       Unix.openfile outputfile [Unix.O_RDWR; Unix.O_TRUNC; Unix.O_CREAT] 0o644
@@ -90,12 +99,12 @@ module CVC4 = struct
       None
 
 
-
   let wrapped_solver_call
+      ?(which = !default_solver)
       ?(options = [])
       (inputfile, outputfile : string * string) : string * process_out =
     let command =
-      shell Fmt.(str "%s %a %s" Config.cvc4_binary_path print_options options inputfile)
+      shell Fmt.(str "%s %a %s" (binary_path which) print_options options inputfile)
     in
     let out_fd =
       Unix.openfile outputfile [Unix.O_RDWR; Unix.O_TRUNC; Unix.O_CREAT] 0o644
@@ -129,12 +138,11 @@ module CVC4 = struct
     in
     Lwt_main.run (Lwt.all cp)
 
-  let solve_commands (p : program) = 
-    let inputfile = mk_tmp_sl "in_" in 
+  let solve_commands (p : program) =
+    let inputfile = mk_tmp_sl "in_" in
     let outputfile = mk_tmp_sl "out_" in
     Log.debug_msg Fmt.(str "Solving %s -> %s." inputfile outputfile);
     commands_to_file p inputfile;
     exec_solver (inputfile, outputfile)
 
 end
-

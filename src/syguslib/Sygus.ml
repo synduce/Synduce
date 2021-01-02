@@ -6,6 +6,7 @@ open Sexplib
    Documentation can be found at https://sygus.org/language/
 *)
 
+let use_v1 = ref false
 
 (* ============================================================================================= *)
 (*                               TYPES FOR SYGUS SYNTAX                                          *)
@@ -440,10 +441,16 @@ let sexp_of_command (c : command) : Sexp.t =
     (match body with
      | Some body ->
        let decls, gramm = sexp_of_grammar_def body in
+       if !use_v1 then 
+         (* No predeclaration in v1 *)
+         List [Atom "synth-fun"; Atom name; List (List.map ~f:sexp_of_sorted_var args);
+               sexp_of_sygus_sort res; gramm]
+       else
+         List [Atom "synth-fun"; Atom name; List (List.map ~f:sexp_of_sorted_var args);
+               sexp_of_sygus_sort res; decls; gramm]
+     | None ->
        List [Atom "synth-fun"; Atom name; List (List.map ~f:sexp_of_sorted_var args);
-             sexp_of_sygus_sort res; decls; gramm]
-     | None -> List [Atom "synth-fun"; Atom name; List (List.map ~f:sexp_of_sorted_var args);
-                     sexp_of_sygus_sort res])
+             sexp_of_sygus_sort res])
 
   | CSynthInv (name, args, body) ->
     (match body with

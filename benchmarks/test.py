@@ -29,7 +29,8 @@ input_files = [
     ["list/issorted.pmrs", "--detupling-off"],
     ["tree/sorted.pmrs", "--detupling-off"],
     ["tree/mips.pmrs", ""],
-    ["tree/mits.pmrs", ""]
+    ["tree/mits.pmrs", ""],
+    ["tree/mpps.pmrs", ""]
 ]
 
 root = os.getcwd()

@@ -27,6 +27,11 @@ let cvc4_binary_path = "/usr/bin/cvc4"
 let z3_binary_path = "/usr/bin/z3"
 
 
+(* TODO fix this. *)
+let dryadsynth_binary_path = "/home/victorn/tools/DryadSynth/exec.sh"
+let eusolver_binary_path = "/home/victorn/tools/DryadSynth/exec.sh"
+
+
 (* Optimization flags *)
 let detupling_on = ref true
 

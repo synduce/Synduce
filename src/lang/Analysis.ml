@@ -79,7 +79,7 @@ let unify (terms : term list) =
   | hd :: tl ->
     if List.for_all ~f:(fun x -> Terms.equal x hd) tl then Some hd else None
 
-(**
+(**cat /tmt
    matches ~boundvars ~pattern t returns a map from variables in pattern to subterms of t
    if the term t matches the pattern.
    During the matching process the variables in boundvars cannot be substituted in the
