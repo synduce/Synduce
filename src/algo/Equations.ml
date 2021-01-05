@@ -385,7 +385,8 @@ let solve_constant_eqns (unknowns : VarSet.t) (eqns : equation list) =
   let partial_soln =
     List.map ~f:(fun (x, lhs) -> x.vname, [], lhs) constant_soln
   in
-  Log.debug_msg Fmt.(str "Partial solution:@;@[<hov 2>%a@]" pp_soln partial_soln);
+  if List.length partial_soln > 0 then
+    Log.debug_msg Fmt.(str "Partial solution:@;@[<hov 2>%a@]" pp_soln partial_soln);
   partial_soln,
   Set.diff unknowns resolved,
   new_eqns
@@ -448,11 +449,55 @@ let solve_full_definitions (unknowns : VarSet.t) (eqns : equation list) =
       ~f:(fun (x, (lhs_args, lhs_body)) -> x.vname, lhs_args, lhs_body)
       full_defs
   in
-  Log.debug_msg Fmt.(str "Partial solution:@;@[<hov 2>%a@]" pp_soln partial_soln);
+  if List.length partial_soln > 0 then
+    Log.debug_msg Fmt.(str "Partial solution:@;@[<hov 2>%a@]" pp_soln partial_soln);
   partial_soln,
   Set.diff unknowns resolved,
   new_eqns
 
+
+
+let split_solve partial_soln (unknowns : VarSet.t) (eqns : equation list) =
+  (* If an unknown depends only on itself, it can be split from the rest *)
+  let split_eqn_systems =
+    let f (l, u, e) xi =
+      (* Separate in set of equation where u appears and rest *)
+      let eqn_u, rest =
+        List.partition_tf e
+          ~f:(fun (_, _, lhs, rhs) ->
+              let fv = Set.union (Analysis.free_variables lhs)
+                  (Analysis.free_variables rhs)
+              in Set.mem fv xi)
+      in
+      let eqn_only_u, eqn_u =
+        List.partition_tf eqn_u
+          ~f:(fun (_, _, lhs, rhs) ->
+              let fv = Set.union (Analysis.free_variables lhs)
+                  (Analysis.free_variables rhs)
+              in
+              Set.is_empty (Set.inter fv (Set.diff unknowns (VarSet.singleton xi))))
+      in
+      match eqn_u with
+      | [] ->
+        Log.debug_msg Fmt.(str "Solve for %s independently." xi.vname);
+        l @ [VarSet.singleton xi, eqn_only_u], u, rest
+      | _ -> l, Set.add u xi, e
+    in
+    let sl, u , e =
+      List.fold (Set.elements unknowns) ~f ~init:([], VarSet.empty, eqns)
+    in sl @ [u,e]
+  in
+  let combine prev_sol new_response =
+    match prev_sol, new_response with
+    | Some soln, (resp, Some soln') ->
+      Log.debug_msg Fmt.(str "Partial solution:@;@[<hov 2>%a@]" pp_soln soln');
+      resp, Some (soln @ soln')
+    | _, (resp, None) -> resp, None
+    | None, (resp, _) -> resp, None
+  in
+  List.fold split_eqn_systems
+    ~init:(RSuccess [], Some partial_soln)
+    ~f:(fun (_, prev_sol) (u, e) -> combine prev_sol (solve_eqns u e))
 
 
 let solve_stratified (unknowns : VarSet.t) (eqns : equation list) =
@@ -468,9 +513,12 @@ let solve_stratified (unknowns : VarSet.t) (eqns : equation list) =
     else
       [], unknowns, eqns
   in
-  match solve_eqns u e with
-  | resp, Some soln -> resp, Some (psol @ soln)
-  | resp, None -> resp, None
+  if !Config.split_solve_on then
+    split_solve psol u e
+  else
+    match solve_eqns u e with
+    | resp, Some soln -> resp, Some (psol @ soln)
+    | resp, None -> resp, None
 
 
 let solve ~(p : psi_def) (eqns : equation list) =

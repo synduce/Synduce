@@ -93,7 +93,9 @@ let debug (msg : Formatter.t -> unit -> unit) : unit =
     pf Fmt.stdout "@[<hov 2>%a@;%a@]@." (styled (`Fg `Black) (styled (`Bg `Yellow) string)) "!DEBUG!" msg ()
   else ()
 
-let debug_msg (msg : string) = debug (fun fmt () -> pf fmt "%s" msg)
+let debug_msg (msg : string) =
+  debug (fun fmt () -> pf fmt "%s"
+            (String.prefix msg !Config.debug_msg_max_chars))
 
 let print_ok () =
   if !Config.debug then

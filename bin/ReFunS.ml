@@ -16,6 +16,7 @@ let options = [
   ('\000',"detupling-off", (set Config.detupling_on false), None);
   ('\000',"stratifying-off", (set Config.stratify_on false), None);
   ('\000',"replacing-recursion-off", (set Config.replace_recursion false), None);
+  ('\000',"split-solving-off", (set Config.split_solve_on false), None);
   ('\000',"verif-level", None, Some (Config.set_num_expansions_check));
   ('\000',"use-dryadsynth", (set Syguslib.Solvers.SygusSolver.default_solver DryadSynth), None)
 ]
@@ -28,6 +29,7 @@ let main () =
   Caml.Format.set_margin 100;
   (match !Syguslib.Solvers.SygusSolver.default_solver with
    | CVC4 -> ()
+   | EUSolver -> failwith "EUSolver unsupported."
    | DryadSynth -> Syguslib.Sygus.use_v1 := true);
   let start_time = Unix.gettimeofday () in
   let prog = parse_pmrs !filename in

@@ -3,13 +3,15 @@ let verbose = ref false
 
 let debug = ref false
 
+let debug_msg_max_chars = ref 400
+
 let info = ref true
 
 let show_vars = ref false
 
 let reduction_limit = ref 100
 
-let num_expansions_check = ref 10
+let num_expansions_check = ref 20
 
 let set_num_expansions_check (s : string) =
   let i = Int.of_string s in
@@ -36,5 +38,7 @@ let eusolver_binary_path = "/home/victorn/tools/DryadSynth/exec.sh"
 let detupling_on = ref true
 
 let stratify_on = ref true
+
+let split_solve_on = ref true
 
 let replace_recursion = ref true

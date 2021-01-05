@@ -25,12 +25,12 @@ input_files = [
     ["list/minhom.pmrs", ""],
     ["list/mtshom.pmrs", ""],
     ["list/mpshom.pmrs", ""],
+    ["list/msshom.pmrs", ""],
     ["list/mts_and_mps_hom.pmrs", ""],
     ["list/issorted.pmrs", "--detupling-off"],
     ["tree/sorted.pmrs", "--detupling-off"],
     ["tree/mips.pmrs", ""],
-    ["tree/mits.pmrs", ""],
-    ["tree/mpps.pmrs", ""]
+    ["tree/mits.pmrs", ""]
 ]
 
 root = os.getcwd()
