@@ -195,9 +195,9 @@ let make ?(force_replace_off = false) ~(p : psi_def) (tset : TermSet.t) : equati
       (List.concat (List.map ~f:(fun (_, lhs, rhs) -> [lhs; rhs]) eqns))
   in
   (if Set.length invariants > 0 then
-     Log.debug Fmt.(fun frmt () -> pf frmt "Invariants:@[<hov 2>%a@]"
-                       (list ~sep:comma pp_term) (Set.elements invariants))
-   else Log.debug_msg "No invariants.");
+     Log.verbose Fmt.(fun frmt () -> pf frmt "Invariants:@[<hov 2>%a@]"
+                         (list ~sep:comma pp_term) (Set.elements invariants))
+   else Log.verbose_msg "No invariants.");
   let pure_eqns =
     let f (t, lhs, rhs) =
       let applic x = substitution all_subs (Reduce.reduce_term (substitution all_subs x)) in

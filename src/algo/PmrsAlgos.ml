@@ -49,18 +49,13 @@ let psi (p : psi_def) =
   let mgts = MGT.most_general_terms p.target in
   Log.debug
     (fun frmt () -> Fmt.(pf frmt "@[<hov 2>MGT() = %a@]"
-                           (list ~sep:comma
-                              (parens (pair ~sep:comma (pair ~sep:comma int int) (option pp_term))))
-                           mgts));
+                           (list ~sep:comma pp_term) (Set.elements mgts)));
   (* Initialize sets with the most general terms. *)
   let t_set, u_set =
-    List.fold mgts ~init:(TermSet.empty, TermSet.empty)
-      ~f:(fun (t,u) (_, mgt_opt) ->
-          match mgt_opt with
-          | None -> t,u
-          | Some term ->
-            let t1, t2 = Expand.maximal p term in
-            Set.union t t1, Set.union u t2)
+    Set.fold mgts ~init:(TermSet.empty, TermSet.empty)
+      ~f:(fun (t,u) mgt ->
+          let t1, t2 = Expand.maximal p mgt in
+          Set.union t t1, Set.union u t2)
   in
   if Set.is_empty t_set then
     (Log.error_msg "Empty set of terms for equation system.";
@@ -89,7 +84,12 @@ let solve_problem (pmrs : (string, PMRS.t, Base.String.comparator_witness) Map.t
       in
       (match Hashtbl.choose reprs with
        | Some (_,(f,a,_,b)) -> Either.Second (f,a,b), Variable.vtype_or_new f
-       | None -> Log.error_msg "No representation function given."; no_synth ())
+       (* No repr specified: assume identity. *)
+       | None ->
+         let x = Variable.mk "x" in
+         let xt = Variable.vtype_or_new x in
+         let repr_fun = Variable.mk ~t:(Some (TFun(xt, xt))) repr_fname in
+         Either.Second (repr_fun, [PatVar x], mk_var x), RType.TFun(xt, xt))
   in
   (* Original function. *)
   let orig_f, tau =

@@ -168,8 +168,8 @@ let matches_subpattern ?(boundvars = VarSet.empty) (t : term) ~(pattern : term) 
 
 let expand_once (t : term) : term list =
   let fvt = free_variables t in
-  (* Pick a variable to expand on *)
-  let expansions =
+  (* Pick variables to expand on *)
+  let expandable =
     let filter v =
       match RType.get_variants (Variable.vtype_or_new v) with
       | [] -> None
@@ -190,4 +190,4 @@ let expand_once (t : term) : term list =
     in
     List.map ~f v_expan
   in
-  List.concat (List.map ~f:aux expansions)
+  List.concat (List.map ~f:aux expandable)

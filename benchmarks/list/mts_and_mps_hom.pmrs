@@ -11,11 +11,11 @@ pmrs spec {fun (sum, mps, mts) -> mts >= 0 && mps >= 0 && mps >= sum && mts >= s
             (f tl)
 
 
-pmrs (odot1, odot2, odot3) target =
+pmrs (odot, f0, s0) target =
     main t           -> h t
-    | h CNil          -> 0, 0, 0
-    | h Single(a)    -> a, max a 0, max a 0
-    | h Concat(y, z) -> (fun a b -> odot1 a b, odot2 a b, odot3 a b) (h y) (h z)
+    | h CNil          -> s0
+    | h Single(a)    -> f0 a
+    | h Concat(y, z) -> odot (h y) (h z)
 
 pmrs repr l =
     main l -> c l
