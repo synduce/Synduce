@@ -172,6 +172,7 @@ let expand_max (p : psi_def) (f : PMRS.t) (t0 : term)
     are maximally reduced terms.
 *)
 let maximal (p : psi_def) (t0 : term) : TermSet.t * TermSet .t =
+  Log.verbose_msg Fmt.(str "@[Expand > t0 = %a@]" pp_term t0);
   let tset_target, uset_target =
     let g = p.target in
     (* Expand only if there are non-reduced terms *)
@@ -181,11 +182,13 @@ let maximal (p : psi_def) (t0 : term) : TermSet.t * TermSet .t =
     | [] -> [t0, t0], []
     | _ -> expand_max p g t0
   in
+  Log.verbose_msg Fmt.(str "@[Expand > tset_target = %a@]" (list ~sep:comma pp_term)
+                         (List.map ~f:first tset_target));
   (* Expand with repr *)
   let tset0, uset0 =
     let f (tset, uset) (t_theta, _) =
       if p.repr_is_identity then
-        [t0, t0], []
+        [t_theta, t_theta], uset
       else
         (Log.verbose_msg Fmt.(str "Expand > repr.");
          let tset0, new_uset = expand_max p p.repr t_theta in
@@ -197,6 +200,8 @@ let maximal (p : psi_def) (t0 : term) : TermSet.t * TermSet .t =
     in
     List.fold ~init:([], uset_target) ~f tset_target
   in
+  Log.verbose_msg Fmt.(str "@[Expand > tset0 = %a@]" (list ~sep:comma pp_term)
+                         (List.map ~f:first tset0));
   (* Expand with orig (f) *)
   let f (tset, uset) (t_theta, t_tau) =
     Log.verbose_msg Fmt.(str "Expand > orig.");

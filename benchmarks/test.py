@@ -2,6 +2,9 @@ import os
 import sys
 
 input_files = [
+    ["tailopt/sum.pmrs", ""],
+    ["tailopt/mts.pmrs", ""],
+    ["tailopt/mps.pmrs", ""],
     ["zippers/sum.pmrs", ""],
     ["zippers/height.pmrs", ""],
     ["zippers/maxPathWeight.pmrs", ""],

@@ -14,7 +14,8 @@ let loop_counter = ref 0
 let rec refinement_loop (p : psi_def) (t_set, u_set : TermSet.t * TermSet.t) =
   Int.incr loop_counter;
   Log.info (fun frmt () -> Fmt.pf frmt "Refinement step %i." !loop_counter);
-  Log.debug_msg Fmt.(str "Start refinement loop with %i terms in T." (Set.length t_set));
+  Log.debug_msg Fmt.(str "Start refinement loop with %i terms in T, %i terms in U."
+                       (Set.length t_set) (Set.length u_set));
   let eqns = Equations.make ~p t_set in
   let s_resp, solution = Equations.solve ~p eqns in
   match s_resp, solution with

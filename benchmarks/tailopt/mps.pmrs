@@ -1,8 +1,8 @@
 type 'a list = Nil | Cons of 'a * 'a list
 
 pmrs spec l =
-    sum Nil -> 0
-    | sum Cons(hd,tl) -> hd + (sum tl)
+    f_mps Nil -> 0, 0
+    | f_mps Cons(hd,tl) -> (fun (sum, mps) -> sum + hd, max (mps + hd) 0) (f_mps tl)
 
 pmrs (oplus, s0) target t =
     main l -> f s0 l

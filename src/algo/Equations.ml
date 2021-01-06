@@ -272,8 +272,12 @@ let revert_projs
 (* ============================================================================================= *)
 let pp_soln (f : Formatter.t) soln =
   Fmt.(list ~sep:comma (fun fmrt (s, args, bod) ->
-      pf fmrt "@[<hov 2>@[%s(%a)@] = @[%a@]@]"
-        s (list ~sep:comma Variable.pp) args pp_term bod)) f soln
+      match args with
+      | [] -> pf fmrt "@[<hov 2>@[%s@] = @[%a@]@]"
+                s pp_term bod
+      | _ -> pf fmrt "@[<hov 2>@[%s(%a)@] = @[%a@]@]"
+               s (list ~sep:comma Variable.pp) args pp_term bod))
+    f soln
 
 
 let synthfuns_of_unknowns ?(bools = false) ?(ops = OpSet.empty) (unknowns : VarSet.t) =
@@ -495,9 +499,13 @@ let split_solve partial_soln (unknowns : VarSet.t) (eqns : equation list) =
     | _, (resp, None) -> resp, None
     | None, (resp, _) -> resp, None
   in
+  let solve_eqn_aux prev_resp prev_sol u e =
+    if Set.length u > 0 then combine prev_sol (solve_eqns u e)
+    else prev_resp, prev_sol
+  in
   List.fold split_eqn_systems
     ~init:(RSuccess [], Some partial_soln)
-    ~f:(fun (_, prev_sol) (u, e) -> combine prev_sol (solve_eqns u e))
+    ~f:(fun (prev_resp, prev_sol) (u, e) -> solve_eqn_aux prev_resp prev_sol u e)
 
 
 let solve_stratified (unknowns : VarSet.t) (eqns : equation list) =

@@ -139,7 +139,10 @@ let instantiate_with_solution (p : PMRS.t) (soln : (string * variable list * ter
   let xi_substs =
     let f (name, args, body) =
       match VarSet.find_by_name xi_set name with
-      | Some xi -> [Term.mk_var xi, mk_fun (List.map ~f:(fun x -> PatVar x) args) body]
+      | Some xi ->
+        (match args with
+         |[] -> [Term.mk_var xi, body]
+         | _ -> [Term.mk_var xi, mk_fun (List.map ~f:(fun x -> PatVar x) args) body])
       | None -> []
     in List.concat (List.map ~f soln)
   in
