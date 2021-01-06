@@ -8,7 +8,7 @@ pmrs spec {fun (mps, pos, i, sum) -> mps >= 0 && mps >= sum && i >= 0 && pos >= 
     | main Cons(hd, tl) ->
         (fun (mps, pos, i, sum) ->
             max (mps + hd) 0,
-             ((mps + hd > 0) ? i : pos),
+             ((mps + hd > 0) ? i + 1 : pos),
              i + 1,
              sum + hd)
              (main tl)

@@ -81,9 +81,18 @@ let rec reduce_term (t : term) : term =
     | TFun([], body) -> Some (f body)
     | TIte(c, tt, tf) ->
       (match c.tkind with
+       (* Resolve constants *)
        | TConst (Constant.CFalse) -> Some (f tt)
        | TConst (Constant.CTrue) -> Some (f tf)
-       | _ -> None)
+       (* Distribute ite on tuples *)
+       |_ ->
+         match tt.tkind, tf.tkind with
+         | TTup tlt, TTup tlf ->
+           (match List.zip tlt tlf with
+            | Ok zip ->
+              (Some (mk_tup (List.map zip ~f:(fun (tt', tf') -> mk_ite c tt' tf'))))
+            | Unequal_lengths -> None)
+         | _, _ -> None)
     | TSel(t, i) ->
       (match f t with
        | {tkind = TTup tl; _} -> Some (List.nth_exn tl i)

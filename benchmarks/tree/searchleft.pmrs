@@ -1,0 +1,14 @@
+
+type 'a tree = Nil | Node of 'a * 'a * 'a tree * 'a tree
+
+pmrs spec x =
+    main t -> f t
+    | f Nil -> false
+    | f Node(a,l,r) -> a = x ? true : f l ? true : f r
+
+pmrs (join, s0) target x =
+    main t1 -> h t1
+    | h Nil -> s0
+    | h Node(a,l,r) -> join x a (h l) (h r)
+
+let repr x = x
