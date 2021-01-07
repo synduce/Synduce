@@ -1,9 +1,9 @@
 type 'a list = Nil | Cons of 'a * 'a list
 
 pmrs spec l {fun (x,y,z) -> y >= 0 && z >= 0 }=
-    f l -> sum l, mts l, mps l
-    | mts Nil -> 0
-    | mts Cons(hd,tl) -> max (hd + (sum tl)) (mts tl)
+    f l -> sum l, mts 0 l, mps l
+    | mts s Nil -> s
+    | mts s Cons(hd,tl) -> mts (max (s + hd) 0) tl
     | sum Nil -> 0
     | sum Cons(hd, tl) -> hd + (sum tl)
     | mps Nil -> 0

@@ -15,7 +15,7 @@ let num_expansions_check = ref 20
 
 let set_num_expansions_check (s : string) =
   let i = Int.of_string s in
-  if i > 5 && i < 1024 then num_expansions_check := i
+  if i > 0 && i < 1024 then num_expansions_check := i
 
 let tmp_folder = Caml.Filename.get_temp_dir_name ()
 
