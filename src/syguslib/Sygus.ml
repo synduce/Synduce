@@ -441,7 +441,7 @@ let sexp_of_command (c : command) : Sexp.t =
     (match body with
      | Some body ->
        let decls, gramm = sexp_of_grammar_def body in
-       if !use_v1 then 
+       if !use_v1 then
          (* No predeclaration in v1 *)
          List [Atom "synth-fun"; Atom name; List (List.map ~f:sexp_of_sorted_var args);
                sexp_of_sygus_sort res; gramm]
@@ -629,9 +629,9 @@ let is_well_formed (p : program) : bool =
 
 let max_definition =
   SyCommand.of_sexp
-    (Sexp.of_string "(define-fun max ((x Int) (y Int)) Int (ite (> x y) x y))")
+    (Sexp.of_string "(define-fun max ((x Int) (y Int)) Int (ite (>= x y) x y))")
 
 let min_definition =
   SyCommand.of_sexp
-    (Sexp.of_string "(define-fun min ((x Int) (y Int)) Int (ite (< x y) x y))")
+    (Sexp.of_string "(define-fun min ((x Int) (y Int)) Int (ite (<= x y) x y))")
 

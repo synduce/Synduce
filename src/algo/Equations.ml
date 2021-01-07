@@ -420,7 +420,7 @@ let solve_full_definitions (unknowns : VarSet.t) (eqns : equation list) =
             v, (mk_var arg, mk_var v))
     in
     let new_args, subst = List.unzip pre_subst in
-    new_args, substitution subst lhs
+    new_args, Reduce.reduce_term (substitution subst lhs)
   in
   let full_defs, other_eqns =
     let f (t, inv, lhs, rhs) =

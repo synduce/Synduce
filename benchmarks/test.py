@@ -3,8 +3,10 @@ import sys
 
 input_files = [
     ["tailopt/sum.pmrs", ""],
-    ["tailopt/mts.pmrs", "--ver=5"],
-    ["tailopt/mps.pmrs", "--ver=5"],
+    ["tailopt/mts.pmrs", "--ver=10"],
+    ["tailopt/mps.pmrs", "--ver=10"],
+    ["combine/mts.pmrs", "--ver=10"],
+    ["combine/mts_and_mps.pmrs", "--ver=10"],
     ["zippers/sum.pmrs", ""],
     ["zippers/height.pmrs", ""],
     ["zippers/maxPathWeight.pmrs", ""],
@@ -31,11 +33,13 @@ input_files = [
     ["list/mpshom.pmrs", ""],
     ["list/msshom.pmrs", ""],
     ["list/search.pmrs", ""],
+    ["list/line_of_sight.pmrs", ""],
     ["list/mts_and_mps_hom.pmrs", ""],
     ["list/issorted.pmrs", "--detupling-off"],
     ["tree/sorted.pmrs", "--detupling-off"],
     ["tree/mips.pmrs", ""],
-    ["tree/mits.pmrs", ""]
+    ["tree/mits.pmrs", ""],
+    ["tree/mpps.pmrs", ""]
 ]
 
 root = os.getcwd()

@@ -792,6 +792,15 @@ let reduce ~(init : 'a) ~(case : (term -> 'a) -> term -> 'a option) ~(join: 'a -
   in
   aux t
 
+let size (t : term) =
+  let case _ t =
+    match t.tkind with
+    | TVar _ | TConst _ -> Some 1 | _ -> None
+  in
+  reduce ~init:0 ~case ~join:(fun a b -> a + b + 1) t
+
+let term_size_compare (t1 : term) (t2 : term) = compare (size t1) (size t2)
+
 let transform ~(case : (term -> term) -> term -> term option) (t : term) : term =
   let rec aux (t : term) : 'a =
     match case aux t with

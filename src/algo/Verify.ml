@@ -65,7 +65,7 @@ let check_solution ~(p : psi_def)
   in
   let rec find_ctex num_checks terms_to_expand =
     if num_checks > !Config.num_expansions_check then None
-    else match terms_to_expand with
+    else match List.sort ~compare:term_size_compare terms_to_expand with
       | [] -> None
       | hd :: tl ->
         let has_ctex, t_set, u_set = expand_and_check hd in
@@ -75,6 +75,9 @@ let check_solution ~(p : psi_def)
   in
   (* Declare all variables *)
   declare_all solver init_vardecls;
+  (match find_ctex 0 (Set.elements t) with
+   | Some _ -> failwith "Synthesized and solver disagree on solution. That's unexpected!"
+   | None -> ());
   let ctex_or_none = find_ctex 0 (Set.elements u) in
   close_solver solver;
   ctex_or_none
