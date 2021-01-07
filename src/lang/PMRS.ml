@@ -184,9 +184,9 @@ let func_to_pmrs (f : Variable.t) (args : fpattern list) (body : Term.term) =
    a map from rule id to the lhs of the rules matching (func args), with the appropriate
    substitutions performed.
 *)
-let inverted_rule_lookup rules (func : term) (args : term list) =
+let inverted_rule_lookup ?(boundvars = VarSet.empty) rules (func : term) (args : term list) =
   let list_matching l =
-    let m = List.map l ~f:(fun (rhs_arg, arg) -> matches ~pattern:rhs_arg arg) in
+    let m = List.map l ~f:(fun (rhs_arg, arg) -> matches ~boundvars ~pattern:rhs_arg arg) in
     let merge_subs ~key:_ s =
       match s with
       | `Both (s1, s2) -> if Terms.(equal s1 s2) then Some s1 else failwith "x"

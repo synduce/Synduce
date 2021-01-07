@@ -3,8 +3,8 @@ import sys
 
 input_files = [
     ["tailopt/sum.pmrs", ""],
-    ["tailopt/mts.pmrs", ""],
-    ["tailopt/mps.pmrs", ""],
+    ["tailopt/mts.pmrs", "--ver=5"],
+    ["tailopt/mps.pmrs", "--ver=5"],
     ["zippers/sum.pmrs", ""],
     ["zippers/height.pmrs", ""],
     ["zippers/maxPathWeight.pmrs", ""],

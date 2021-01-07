@@ -123,7 +123,7 @@ let rec term_of_sygus (env : (string, variable, String.comparator_witness) Map.t
   | SyId (IdSimple s) ->
     (match Map.find env s with
      | Some v -> mk_var v
-     | None -> failwith "Variable not found.")
+     | None -> failwith Fmt.(str "term_of_sygus: variable %s not found." s))
 
   | SyLit l -> mk_const (constant_of_literal l)
 

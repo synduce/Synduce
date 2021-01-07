@@ -1,0 +1,15 @@
+type 'a list = Nil | Cons of 'a * 'a list
+
+pmrs spec l =
+    f l -> sum l, mts l
+    | mts Nil -> 0
+    | mts Cons(hd,tl) -> max (hd + (sum tl)) (mts tl)
+    | sum Nil -> 0
+    | sum Cons(hd, tl) -> hd + (sum tl)
+
+
+pmrs (oplus, s0) target t =
+    main l -> f s0 l
+    | f s Nil -> s
+    | f s Cons(hd, tl) -> f (oplus s hd) tl
+

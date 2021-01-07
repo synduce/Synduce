@@ -190,4 +190,4 @@ let expand_once (t : term) : term list =
     in
     List.map ~f v_expan
   in
-  List.concat (List.map ~f:aux expandable)
+  List.rev (List.concat (List.map ~f:aux expandable))

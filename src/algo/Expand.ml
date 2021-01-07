@@ -104,9 +104,10 @@ let replace_rhs_of_main (p : psi_def) (f : PMRS.t) (t0 : term) : term =
   let rule_set =
     Map.filter  f.prules ~f:(fun (nt, _, _, _) -> Variable.(nt = f.pmain_symb))
   in
+  let bound_params = Set.union f.pparams (VarSet.of_list f.pargs) in
   let replacements =
     let f (nt, args) =
-      match Map.max_elt (PMRS.inverted_rule_lookup rule_set (mk_var nt) args) with
+      match Map.max_elt (PMRS.inverted_rule_lookup ~boundvars:bound_params rule_set (mk_var nt) args) with
       | Some (_, lhs) -> Some (mk_app (mk_var nt) args, lhs)
       | None -> None
     in
@@ -176,8 +177,9 @@ let maximal (p : psi_def) (t0 : term) : TermSet.t * TermSet .t =
   let tset_target, uset_target =
     let g = p.target in
     (* Expand only if there are non-reduced terms *)
-    let t0' = replace_rhs_of_main p g (Reduce.reduce_pmrs g t0) in
-    let nr = nonreduced_terms p p.target.pnon_terminals t0' in
+    let g_t0 = Reduce.reduce_pmrs g t0 in
+    let g_t0 = replace_rhs_of_main p g g_t0 in
+    let nr = nonreduced_terms p p.target.pnon_terminals g_t0 in
     match nr with
     | [] -> [t0, t0], []
     | _ -> expand_max p g t0
