@@ -27,7 +27,9 @@ let constr_eqn (_, pre, lhs, rhs) =
    expansion continuation `u`.
    Returns the set (t,u) for the next step in the ctex-guided refinement loop.
 *)
-let check_solution ~(p : psi_def)
+let check_solution
+    ?(use_naive = false)
+    ~(p : psi_def)
     (t, u : TermSet.t * TermSet.t)
     (soln : (string * variable list * term) list) =
   Log.info (fun f () -> Fmt.(pf f "Check solution."));
@@ -48,7 +50,12 @@ let check_solution ~(p : psi_def)
     x
   in
   let expand_and_check (t0 : term) =
-    let t_set, u_set = Expand.to_maximally_reducible p t0 in
+    let t_set, u_set =
+      if use_naive then
+        Expand.simple t0
+      else
+        Expand.to_maximally_reducible p t0
+    in
     let sys_eqns = Equations.make ~force_replace_off:true ~p:{ p with target=target_inst} t_set in
     let smt_eqns = List.map sys_eqns ~f:constr_eqn in
     let new_free_vars =

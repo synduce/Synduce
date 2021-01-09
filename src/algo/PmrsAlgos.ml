@@ -76,11 +76,11 @@ let rec expansion_loop (p : psi_def) (t_set, u_set : TermSet.t * TermSet.t) =
   Log.info (fun frmt () -> Fmt.pf frmt "<NAIVE> Expansion step %i." !loop_counter);
   Log.debug_msg Fmt.(str "<NAIVE> Start expansion loop with %i terms in T, %i terms in U."
                        (Set.length t_set) (Set.length u_set));
-  let eqns = Equations.make ~p t_set in
+  let eqns = Equations.make ~force_replace_off:true ~p t_set in
   let s_resp, solution = Equations.solve ~p eqns in
   match s_resp, solution with
   | RSuccess _, Some sol ->
-    (match Verify.check_solution ~p (t_set, u_set) sol with
+    (match Verify.check_solution ~use_naive:true ~p (t_set, u_set) sol with
      | Some (new_t_set, new_u_set) ->
        Log.debug (fun frmt () ->
            Fmt.(pf frmt "@[<hov 2><NAIVE> Counterexample terms:@;@[<hov 2>%a@]"
@@ -108,17 +108,14 @@ let rec expansion_loop (p : psi_def) (t_set, u_set : TermSet.t * TermSet.t) =
 
 let psi_naive (p : psi_def) =
   let t0 = mk_var (Variable.mk ~t:(Some !AState._theta) "t0") in
-  Log.debug
-    (fun frmt () -> Fmt.(pf frmt "@[<hov 2>MGT() = %a@]"
-                           (list ~sep:comma pp_term) (Set.elements mgts)));
   (* Initialize sets with the most general terms. *)
   let t_set, u_set = Expand.simple t0 in
   if Set.is_empty t_set then
-    (Log.error_msg "Empty set of terms for equation system.";
-     failwith "Cannot solve problem.")
+    (Log.error_msg "<NAIVE> Empty set of terms for equation system.";
+     failwith "<NAIVE> Cannot solve problem.")
   else
     (loop_counter := 0;
-     refinement_loop p (t_set, u_set))
+     expansion_loop p (t_set, u_set))
 
 
 
@@ -230,10 +227,15 @@ let solve_problem (pmrs : (string, PMRS.t, Base.String.comparator_witness) Map.t
   AState._theta := theta;
   AState._alpha := t_out;
   (* Solve the problem. *)
-  psi
-    {
-      target = target_f;
-      orig =  orig_f;
-      repr =  repr_pmrs;
-      repr_is_identity = Reduce.is_identity repr_pmrs
-    }
+  let problem = {
+    target = target_f;
+    orig =  orig_f;
+    repr =  repr_pmrs;
+    repr_is_identity = Reduce.is_identity repr_pmrs
+  }
+  in
+  if !Config.use_naive then
+    psi_naive problem
+  else
+    psi problem
+

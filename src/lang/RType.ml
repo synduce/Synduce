@@ -297,13 +297,20 @@ let get_variants (typ : t) : (string * t list) list =
   | TNamed tname -> variantnames [] tname
   | _ -> []
 
+let is_recursive_variant (_, types : (string * t list)) =
+  let f t =
+    match get_variants t with
+    | [] -> false
+    | _ -> true
+  in
+  List.exists types ~f
 
 (* ============================================================================================= *)
 (*                                  REDUCTION / TRANSFORMATION                                   *)
 (* ============================================================================================= *)
 
-let reduce ~(case : (t -> t) -> t -> 'a option) ~(init :'a) ~(join: 'a -> 'a -> 'a) t :'a =
-  let rec aux t =
+let reduce ~(case : (t -> 'a) -> t -> 'a option) ~(init :'a) ~(join: 'a -> 'a -> 'a) t :'a =
+  let rec aux t : 'a =
     match case aux t with
     | Some value -> value
     | None ->
@@ -318,10 +325,11 @@ let reduce ~(case : (t -> t) -> t -> 'a option) ~(init :'a) ~(join: 'a -> 'a -> 
   aux t
 
 let is_recursive =
-  let case f t =
-    match get_variants t with 
+  let case _ t =
+    match get_variants t with
     | [] -> None
-    | l -> 
-      (if List.exists l ~f:(is_recursive_variant t)
+    | l ->
+      (if List.exists l ~f:is_recursive_variant then Some true
+       else None)
   in
   reduce ~case ~init:false ~join:(||)

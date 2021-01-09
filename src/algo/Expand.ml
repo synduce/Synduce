@@ -123,15 +123,22 @@ let replace_rhs_of_main (p : psi_def) (f : PMRS.t) (t0 : term) : term =
 
 
 let simple (t0 : term) =
+  Log.verbose_msg Fmt.(str "Expand %a." pp_term t0);
   let rec aux (t, u) =
     match t with
     | _ :: _ -> t, u
     | [] ->
       let t_exp = List.concat (List.map ~f:Analysis.expand_once u) in
-      let t', u' = List.partition_tf ~f:is_norec_term t_exp in
-      aux (t', List.sort (u @ u') ~compare:term_size_compare)
+      let t', u' = List.partition_tf ~f:is_norec t_exp in
+      aux (t', List.sort u' ~compare:term_size_compare)
   in
-  aux ([], [t0])
+  if is_norec t0 then
+    TermSet.singleton t0, TermSet.empty
+  else
+    let t,u = aux ([], [t0]) in
+    Log.verbose Fmt.(fun f () -> pf f "t = @[<hov 2>%a@]" (list ~sep:comma pp_term) t);
+    Log.verbose Fmt.(fun f () -> pf f "u = @[<hov 2>%a@]" (list ~sep:comma pp_term) u);
+    TermSet.of_list t, TermSet.of_list u
 
 
 (* ============================================================================================= *)

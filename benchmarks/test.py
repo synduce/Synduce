@@ -1,12 +1,14 @@
 import os
 import sys
 
+naive_opt = "--use-naive -st"
+
 input_files = [
     ["tailopt/sum.pmrs", ""],
-    ["tailopt/mts.pmrs", "--n=5"],
-    ["tailopt/mps.pmrs", "--n=5"],
-    ["combine/mts.pmrs", "--n=5"],
-    ["combine/mts_and_mps.pmrs", "--n=5"],
+    ["tailopt/mts.pmrs", "--verification=5"],
+    ["tailopt/mps.pmrs", "--verification=5"],
+    ["combine/mts.pmrs", "--verification=5"],
+    ["combine/mts_and_mps.pmrs", "--verification=5"],
     ["zippers/sum.pmrs", ""],
     ["zippers/height.pmrs", ""],
     ["zippers/maxPathWeight.pmrs", ""],
@@ -45,11 +47,14 @@ input_files = [
 root = os.getcwd()
 path = os.path.join(root, "_build/default/bin/ReFunS.exe")
 
-print("folder,file,# refinements, synthesis time")
 sys.stdout.flush()
 
 for filename_with_opt in input_files:
     filename = filename_with_opt[0]
     opt = filename_with_opt[1]
+    print("%s, requation" % filename)
     os.system("%s %s -i %s" %
               (path, os.path.realpath(os.path.join("benchmarks", filename)), opt))
+    print("%s, naive" % filename)
+    os.system("%s %s -i %s %s" %
+              (path, os.path.realpath(os.path.join("benchmarks", filename)), opt, naive_opt))

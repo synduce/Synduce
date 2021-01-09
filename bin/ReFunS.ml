@@ -18,7 +18,7 @@ let options = [
   ('\000', "show-vars", (set Config.show_vars true), None);
   ('\000',"stratifying-off", (set Config.stratify_on false), None);
   ('s',"split-solving-off", (set Config.split_solve_on false), None);
-  ('n',"verification-steps", None, Some (Config.set_num_expansions_check));
+  ('n',"verification", None, Some (Config.set_num_expansions_check));
   ('\000',"use-dryadsynth", (set Syguslib.Solvers.SygusSolver.default_solver DryadSynth), None)
 ]
 
@@ -44,13 +44,7 @@ let main () =
        Utils.Log.info Fmt.(fun frmt () -> pf frmt "Solution found in %4.4fs:@;%a@]" elapsed (box PMRS.pp) target);
        (* If no info required, output timing information. *)
        if not !Config.info then
-         let dir =
-           match List.last (String.split ~on:'/'
-                              (Caml.Filename.dirname !filename))
-           with Some x -> x | None -> ""
-         in
-         let file = Caml.Filename.basename !filename in
-         Fmt.(pf stdout "%s,%s,%i,%.4fs@." dir file !Algo.PmrsAlgos.loop_counter elapsed)
+         Fmt.(pf stdout "%i,%.4fs@." !Algo.PmrsAlgos.loop_counter elapsed)
 
      | Error _ -> Utils.Log.error_msg "No solution found.")
   with s -> (if !Config.show_vars then Term.Variable.print_summary stdout (); raise s)
