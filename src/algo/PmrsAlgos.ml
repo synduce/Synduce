@@ -5,11 +5,11 @@ open Utils
 open AState
 open Syguslib.Sygus
 
+let loop_counter = ref 0
 
 (* ============================================================================================= *)
 (*                             MAIN REFINEMENT LOOP                                              *)
 (* ============================================================================================= *)
-let loop_counter = ref 0
 
 let rec refinement_loop (p : psi_def) (t_set, u_set : TermSet.t * TermSet.t) =
   Int.incr loop_counter;
@@ -68,8 +68,6 @@ let psi (p : psi_def) =
 (* ============================================================================================= *)
 (*                             NAIVE REFINEMENT LOOP                                              *)
 (* ============================================================================================= *)
-
-let loop_counter = ref 0
 
 let rec expansion_loop (p : psi_def) (t_set, u_set : TermSet.t * TermSet.t) =
   Int.incr loop_counter;

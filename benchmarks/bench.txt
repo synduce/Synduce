@@ -1,0 +1,49 @@
+B:tailopt/sum.pmrs, requation
+0,0.0383
+B:tailopt/sum.pmrs, naive
+3,0.0452
+B:tailopt/mts.pmrs, requation
+0,19.8616
+B:tailopt/mts.pmrs, naive
+CVC4 interrupted by SIGTERM.
+B:tailopt/mps.pmrs, requation
+0,2.0524
+B:tailopt/mps.pmrs, naive
+3,0.3659
+B:combine/mts.pmrs, requation
+0,1.2597
+B:combine/mts.pmrs, naive
+3,4.7979
+B:combine/mts_and_mps.pmrs, requation
+0,0.8888
+B:combine/mts_and_mps.pmrs, naive
+CVC4 interrupted by SIGTERM.
+B:zippers/sum.pmrs, requation
+0,0.0689
+B:zippers/sum.pmrs, naive
+2,1.9841
+B:zippers/height.pmrs, requation
+0,0.1348
+B:zippers/height.pmrs, naive
+3,2.9910
+B:zippers/maxPathWeight.pmrs, requation
+0,0.1412
+B:zippers/maxPathWeight.pmrs, naive
+2,1.9361
+B:zippers/maxPathWeight2.pmrs, requation
+0,0.0085
+B:zippers/maxPathWeight2.pmrs, naive
+2,2.1592
+B:ptree/sum.pmrs, requation
+0,0.1075
+B:ptree/sum.pmrs, naive
+3,0.3513
+B:ptree/mul.pmrs, requation
+0,0.1702
+B:ptree/mul.pmrs, naive
+3,0.4096
+B:ptree/maxheads.pmrs, requation
+0,0.1070
+B:ptree/maxheads.pmrs, naive
+B:ptree/maxlast.pmrs, requation
+0,0.2601

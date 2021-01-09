@@ -14,7 +14,7 @@ pmrs (s0, join) target =
     | main Zip(x, a, child, z) -> join a (spec child) (main z)
 
 pmrs repr =
-    main Top -> Empty
-    | main Zip(w, val, child, z) -> h val child z w
-    | h val child z Left -> Node (val, child, main z)
-    | h val child z Right -> Node (val, main z, child)
+    repr Top -> Empty
+    | repr Zip(w, val, child, z) -> h val child z w
+    | h val child z Left -> Node (val, child, repr z)
+    | h val child z Right -> Node (val, repr z, child)

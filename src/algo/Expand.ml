@@ -120,7 +120,8 @@ let replace_rhs_of_main (p : psi_def) (f : PMRS.t) (t0 : term) : term =
 (*                                   NAIVE TERM EXPANSION                                        *)
 (* ============================================================================================= *)
 
-
+let is_max_expanded (t : term) =
+  match Analysis.expand_once t with [] -> true | _ -> false
 
 let simple (t0 : term) =
   Log.verbose_msg Fmt.(str "Expand %a." pp_term t0);
@@ -129,7 +130,7 @@ let simple (t0 : term) =
     | _ :: _ -> t, u
     | [] ->
       let t_exp = List.concat (List.map ~f:Analysis.expand_once u) in
-      let t', u' = List.partition_tf ~f:is_norec t_exp in
+      let t', u' = List.partition_tf ~f:is_max_expanded t_exp in
       aux (t', List.sort u' ~compare:term_size_compare)
   in
   if is_norec t0 then

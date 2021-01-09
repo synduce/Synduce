@@ -152,17 +152,18 @@ let bool_parametric (params : grammar_parameters) =
 
 
 let tuple_grammar_constr (params : grammar_parameters) (sorts : sygus_sort list) =
+  let use_bool = ref params.g_bools in
   let tuple_args =
     List.map sorts
       ~f:(function
           | SId (IdSimple "Int") ->  SyId (IdSimple "Ix")
-          | SId (IdSimple "Bool") -> SyId (IdSimple "Ipred")
+          | SId (IdSimple "Bool") -> use_bool := true; SyId (IdSimple "Ipred")
           | _ -> failwith "TODO: complex tuples not supported.")
   in
   let head_rule =
     ("Tr", SApp(IdSimple "Tuple", sorts)), [GTerm (SyApp (IdSimple "mkTuple", tuple_args))]
   in
-  head_rule :: (int_parametric params)
+  head_rule :: (int_parametric {params with g_bools = !use_bool; })
 
 
 

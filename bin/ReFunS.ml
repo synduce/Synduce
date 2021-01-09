@@ -44,7 +44,7 @@ let main () =
        Utils.Log.info Fmt.(fun frmt () -> pf frmt "Solution found in %4.4fs:@;%a@]" elapsed (box PMRS.pp) target);
        (* If no info required, output timing information. *)
        if not !Config.info then
-         Fmt.(pf stdout "%i,%.4fs@." !Algo.PmrsAlgos.loop_counter elapsed)
+         Fmt.(pf stdout "%i,%.4f@." !Algo.PmrsAlgos.loop_counter elapsed)
 
      | Error _ -> Utils.Log.error_msg "No solution found.")
   with s -> (if !Config.show_vars then Term.Variable.print_summary stdout (); raise s)
