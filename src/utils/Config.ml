@@ -42,3 +42,5 @@ let stratify_on = ref true
 let split_solve_on = ref true
 
 let replace_recursion = ref true
+
+let use_naive = ref false

@@ -7,7 +7,7 @@ open Syguslib.Sygus
 
 
 (* ============================================================================================= *)
-(*                                                                                               *)
+(*                             MAIN REFINEMENT LOOP                                              *)
 (* ============================================================================================= *)
 let loop_counter = ref 0
 
@@ -55,7 +55,7 @@ let psi (p : psi_def) =
   let t_set, u_set =
     Set.fold mgts ~init:(TermSet.empty, TermSet.empty)
       ~f:(fun (t,u) mgt ->
-          let t1, t2 = Expand.maximal p mgt in
+          let t1, t2 = Expand.to_maximally_reducible p mgt in
           Set.union t t1, Set.union u t2)
   in
   if Set.is_empty t_set then
@@ -64,6 +64,62 @@ let psi (p : psi_def) =
   else
     (loop_counter := 0;
      refinement_loop p (t_set, u_set))
+
+(* ============================================================================================= *)
+(*                             NAIVE REFINEMENT LOOP                                              *)
+(* ============================================================================================= *)
+
+let loop_counter = ref 0
+
+let rec expansion_loop (p : psi_def) (t_set, u_set : TermSet.t * TermSet.t) =
+  Int.incr loop_counter;
+  Log.info (fun frmt () -> Fmt.pf frmt "<NAIVE> Expansion step %i." !loop_counter);
+  Log.debug_msg Fmt.(str "<NAIVE> Start expansion loop with %i terms in T, %i terms in U."
+                       (Set.length t_set) (Set.length u_set));
+  let eqns = Equations.make ~p t_set in
+  let s_resp, solution = Equations.solve ~p eqns in
+  match s_resp, solution with
+  | RSuccess _, Some sol ->
+    (match Verify.check_solution ~p (t_set, u_set) sol with
+     | Some (new_t_set, new_u_set) ->
+       Log.debug (fun frmt () ->
+           Fmt.(pf frmt "@[<hov 2><NAIVE> Counterexample terms:@;@[<hov 2>%a@]"
+                  (list ~sep:comma pp_term) (Set.elements (Set.diff new_t_set t_set))));
+       expansion_loop p (new_t_set, new_u_set)
+     | None ->
+       Log.print_ok ();
+       let target = Reduce.instantiate_with_solution p.target sol in
+       Ok target)
+
+  | RFail, _ -> Log.error_msg "<NAIVE> SyGuS solver failed to find a solution."; Error RFail
+
+  | RInfeasible, _ ->
+    (Log.info
+       Fmt.(fun frmt () ->
+           pf frmt "@[<hov 2><NAIVE> This problem has no solution. Counterexample set:@;%a@]"
+             (list ~sep:sp pp_term) (Set.elements t_set));
+     Error RInfeasible)
+
+  | RUnknown, _  -> Log.error_msg "<NAIVE> SyGuS solver returned unknown."; Error RUnknown
+
+  | _ -> Error s_resp
+
+
+
+let psi_naive (p : psi_def) =
+  let t0 = mk_var (Variable.mk ~t:(Some !AState._theta) "t0") in
+  Log.debug
+    (fun frmt () -> Fmt.(pf frmt "@[<hov 2>MGT() = %a@]"
+                           (list ~sep:comma pp_term) (Set.elements mgts)));
+  (* Initialize sets with the most general terms. *)
+  let t_set, u_set = Expand.simple t0 in
+  if Set.is_empty t_set then
+    (Log.error_msg "Empty set of terms for equation system.";
+     failwith "Cannot solve problem.")
+  else
+    (loop_counter := 0;
+     refinement_loop p (t_set, u_set))
+
 
 
 (* ============================================================================================= *)

@@ -708,9 +708,12 @@ struct
 end
 
 (* ============================================================================================= *)
-(*                              TRANFORMATION / REDUCTION                                        *)
+(*                              TRANFORMATION / REDUCTION  UTILS                                 *)
 (* ============================================================================================= *)
 
+(**
+   `rewrite_with f t` rewrites the term t by applying the rule f bottom-up.
+*)
 let rewrite_with (f : term -> term) (t : term) =
   let rec aux t0 =
     let tk = t0.tkind in
@@ -728,6 +731,9 @@ let rewrite_with (f : term -> term) (t : term) =
     in f {t0 with tkind = tk';}
   in aux t
 
+(**
+   `rewrite_top_down f t` rewrites the term t by applying the rule f top-down.
+*)
 let rewrite_top_down (f : term -> term option) (t : term) =
   let rec aux t0 =
     match f t0 with
@@ -748,6 +754,11 @@ let rewrite_top_down (f : term -> term option) (t : term) =
   in aux t
 
 
+(**
+   `rewrite_accum ~init ~f t` rewrites the term t by applying the rule f in a top-down manner,
+   but as opposed to `rewrite_top_down` the function `f` can use an accumulator that accumulates
+   information during the traversal.
+*)
 let rewrite_accum ~(init : 'a) ~(f : 'a -> term -> (term, 'a) Either.t ) (t : term) =
   let rec aux a t0 =
     match f a t0 with
@@ -772,6 +783,12 @@ let rewrite_types t_subs =
   Variable.update_var_types t_subs;
   rewrite_with (fun _t -> { _t with ttyp = RType.sub_all t_subs _t.ttyp })
 
+
+(** 
+   `reduce ~init ~case ~join t` reduces the term by reducing each leaf to `init`, and at each node
+    of the syntax tree, using `join` to merge the values. In a top-down traversal, if `case` returns 
+    `Some a` then the subterm is not recrusively reduced, but the value `a` is used instead.
+*)
 let reduce ~(init : 'a) ~(case : (term -> 'a) -> term -> 'a option) ~(join: 'a -> 'a -> 'a) (t : term) : 'a =
   let rec aux (t : term) : 'a =
     match case aux t with
@@ -792,14 +809,6 @@ let reduce ~(init : 'a) ~(case : (term -> 'a) -> term -> 'a option) ~(join: 'a -
   in
   aux t
 
-let size (t : term) =
-  let case _ t =
-    match t.tkind with
-    | TVar _ | TConst _ -> Some 1 | _ -> None
-  in
-  reduce ~init:0 ~case ~join:(fun a b -> a + b + 1) t
-
-let term_size_compare (t1 : term) (t2 : term) = compare (size t1) (size t2)
 
 let transform ~(case : (term -> term) -> term -> term option) (t : term) : term =
   let rec aux (t : term) : 'a =
@@ -822,6 +831,23 @@ let transform ~(case : (term -> term) -> term -> term option) (t : term) : term 
   in aux t
 
 
+let size (t : term) =
+  let case _ t =
+    match t.tkind with
+    | TVar _ | TConst _ -> Some 1 | _ -> None
+  in
+  reduce ~init:0 ~case ~join:(fun a b -> a + b + 1) t
+
+let term_size_compare (t1 : term) (t2 : term) = compare (size t1) (size t2)
+
+
+let is_norec = 
+  let case _ t =
+    match t.tkind with 
+    | TVar x -> Some (not (RType.is_recursive (Variable.vtype_or_new x)))
+    | _ -> None
+  in
+  reduce ~init:true ~join:(&&) ~case
 
 (* ============================================================================================= *)
 (*                                    PRETTY PRINTERS                                            *)

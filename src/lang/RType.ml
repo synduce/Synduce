@@ -296,3 +296,32 @@ let get_variants (typ : t) : (string * t list) list =
   | TParam (params, TNamed tname) -> variantnames params tname
   | TNamed tname -> variantnames [] tname
   | _ -> []
+
+
+(* ============================================================================================= *)
+(*                                  REDUCTION / TRANSFORMATION                                   *)
+(* ============================================================================================= *)
+
+let reduce ~(case : (t -> t) -> t -> 'a option) ~(init :'a) ~(join: 'a -> 'a -> 'a) t :'a =
+  let rec aux t =
+    match case aux t with
+    | Some value -> value
+    | None ->
+      (match t with
+       | TInt | TBool | TString | TChar -> init
+       | TNamed _ -> init
+       | TVar _ -> init
+       | TTup tl -> List.fold ~init ~f:(fun acc t' -> join acc (aux t')) tl
+       | TFun (tin, tout) -> join (aux tin) (aux tout)
+       | TParam (_, t) -> aux t)
+  in
+  aux t
+
+let is_recursive =
+  let case f t =
+    match get_variants t with 
+    | [] -> None
+    | l -> 
+      (if List.exists l ~f:(is_recursive_variant t)
+  in
+  reduce ~case ~init:false ~join:(||)

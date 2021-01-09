@@ -116,6 +116,23 @@ let replace_rhs_of_main (p : psi_def) (f : PMRS.t) (t0 : term) : term =
   let t_out = substitution replacements t0 in
   t_out
 
+(* ============================================================================================= *)
+(*                                   NAIVE TERM EXPANSION                                        *)
+(* ============================================================================================= *)
+
+
+
+let simple (t0 : term) =
+  let rec aux (t, u) =
+    match t with
+    | _ :: _ -> t, u
+    | [] ->
+      let t_exp = List.concat (List.map ~f:Analysis.expand_once u) in
+      let t', u' = List.partition_tf ~f:is_norec_term t_exp in
+      aux (t', List.sort (u @ u') ~compare:term_size_compare)
+  in
+  aux ([], [t0])
+
 
 (* ============================================================================================= *)
 (*                               MAIN ENTRY POINTS: MR_TERMS                                     *)
@@ -172,7 +189,7 @@ let expand_max (p : psi_def) (f : PMRS.t) (t0 : term)
 (** `maximal p t0 ` expands the term `t0 ` such that `p.orig (p.repr t0)` and 'p.target t0`
     are maximally reduced terms.
 *)
-let maximal (p : psi_def) (t0 : term) : TermSet.t * TermSet .t =
+let to_maximally_reducible (p : psi_def) (t0 : term) : TermSet.t * TermSet .t =
   Log.verbose_msg Fmt.(str "@[Expand > t0 = %a@]" pp_term t0);
   let tset_target, uset_target =
     let g = p.target in
