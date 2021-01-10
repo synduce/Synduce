@@ -1,7 +1,7 @@
 import os
 import sys
 
-timeout = 300
+timeout = 600  # 10min timeout
 
 naive_opt = "--use-naive -st"
 
@@ -55,8 +55,10 @@ for filename_with_opt in input_files:
     filename = filename_with_opt[0]
     opt = filename_with_opt[1]
     print("B:%s,requation" % filename)
+    sys.stdout.flush()
     os.system("timeout %i %s %s -i %s" %
               (timeout, path, os.path.realpath(os.path.join("benchmarks", filename)), opt))
     print("B:%s,naive" % filename)
+    sys.stdout.flush()
     os.system("timeout %i %s %s -i %s %s" %
               (timeout, path, os.path.realpath(os.path.join("benchmarks", filename)), opt, naive_opt))
