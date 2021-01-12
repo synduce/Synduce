@@ -3,7 +3,7 @@ import sys
 
 timeout = 600  # 10min timeout
 
-naive_opt = "--use-naive -st"
+naive_opt = "--use-naive"
 
 input_files = [
     ["tailopt/sum.pmrs", ""],

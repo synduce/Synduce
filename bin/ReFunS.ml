@@ -23,6 +23,7 @@ let options = [
 ]
 
 
+
 let main () =
   let filename = ref "" in
   parse_cmdline options (fun s -> filename := s);
@@ -33,6 +34,7 @@ let main () =
    | EUSolver -> failwith "EUSolver unsupported."
    | DryadSynth -> Syguslib.Sygus.use_v1 := true);
   let start_time = Unix.gettimeofday () in
+  Config.glob_start := start_time;
   let prog = parse_pmrs !filename in
   let _ = seek_types prog in
   let all_pmrs = translate prog in
@@ -44,7 +46,7 @@ let main () =
        Utils.Log.info Fmt.(fun frmt () -> pf frmt "Solution found in %4.4fs:@;%a@]" elapsed (box PMRS.pp) target);
        (* If no info required, output timing information. *)
        if not !Config.info then
-         Fmt.(pf stdout "%i,%.4f@." !Algo.PmrsAlgos.loop_counter elapsed)
+         Fmt.(pf stdout "%i,%.4f@." !Algo.PmrsAlgos.refinement_steps elapsed)
 
      | Error _ -> Utils.Log.error_msg "No solution found.")
   with s -> (if !Config.show_vars then Term.Variable.print_summary stdout (); raise s)

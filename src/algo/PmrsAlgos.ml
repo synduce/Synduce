@@ -5,17 +5,22 @@ open Utils
 open AState
 open Syguslib.Sygus
 
-let loop_counter = ref 0
+let refinement_steps = ref 0
 
 (* ============================================================================================= *)
 (*                             MAIN REFINEMENT LOOP                                              *)
 (* ============================================================================================= *)
 
 let rec refinement_loop (p : psi_def) (t_set, u_set : TermSet.t * TermSet.t) =
-  Int.incr loop_counter;
-  Log.info (fun frmt () -> Fmt.pf frmt "Refinement step %i." !loop_counter);
+  Int.incr refinement_steps;
+  (* Output status information before entering process. *)
+  let elapsed = Unix.gettimeofday () -. !Config.glob_start in
+  Log.info (fun frmt () -> Fmt.pf frmt "Refinement step %i." !refinement_steps);
+  if not !Config.info then Fmt.(pf stdout "%i,%3.3f,%i,%i@."
+                                  !refinement_steps elapsed (Set.length t_set) (Set.length u_set));
   Log.debug_msg Fmt.(str "Start refinement loop with %i terms in T, %i terms in U."
                        (Set.length t_set) (Set.length u_set));
+  (* Refinement of t_set, u_set. *)
   let eqns = Equations.make ~p t_set in
   let s_resp, solution = Equations.solve ~p eqns in
   match s_resp, solution with
@@ -62,7 +67,7 @@ let psi (p : psi_def) =
     (Log.error_msg "Empty set of terms for equation system.";
      failwith "Cannot solve problem.")
   else
-    (loop_counter := 0;
+    (refinement_steps := 0;
      refinement_loop p (t_set, u_set))
 
 (* ============================================================================================= *)
@@ -70,10 +75,14 @@ let psi (p : psi_def) =
 (* ============================================================================================= *)
 
 let rec expansion_loop (p : psi_def) (t_set, u_set : TermSet.t * TermSet.t) =
-  Int.incr loop_counter;
-  Log.info (fun frmt () -> Fmt.pf frmt "<NAIVE> Expansion step %i." !loop_counter);
+  Int.incr refinement_steps;
+  let elapsed = Unix.gettimeofday () -. !Config.glob_start in
+  Log.info (fun frmt () -> Fmt.pf frmt "Refinement step %i." !refinement_steps);
+  if not !Config.info then Fmt.(pf stdout "%i,%3.3f,%i,%i@."
+                                  !refinement_steps elapsed (Set.length t_set) (Set.length u_set));
   Log.debug_msg Fmt.(str "<NAIVE> Start expansion loop with %i terms in T, %i terms in U."
                        (Set.length t_set) (Set.length u_set));
+  (* Start of the algorithm. *)
   let eqns = Equations.make ~force_replace_off:true ~p t_set in
   let s_resp, solution = Equations.solve ~p eqns in
   match s_resp, solution with
@@ -112,7 +121,7 @@ let psi_naive (p : psi_def) =
     (Log.error_msg "<NAIVE> Empty set of terms for equation system.";
      failwith "<NAIVE> Cannot solve problem.")
   else
-    (loop_counter := 0;
+    (refinement_steps := 0;
      expansion_loop p (t_set, u_set))
 
 

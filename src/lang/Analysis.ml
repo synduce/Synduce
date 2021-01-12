@@ -191,3 +191,19 @@ let expand_once (t : term) : term list =
     List.map ~f v_expan
   in
   List.rev (List.concat (List.map ~f:aux expandable))
+
+let terms_of_max_depth (depth : int) (typ : RType.t) : term list =
+  let rec constr_t d _typ : term list =
+    match RType.get_variants _typ with
+    | [] -> [mk_var (Variable.mk ~t:(Some _typ) "a")]
+    | l ->
+      if d > depth then []
+      else List.concat (List.map ~f:(constr_variant d) l)
+  and constr_variant d (cname, cargs) : term list =
+    let subterms =
+      List.map ~f:(constr_t (d + 1)) cargs
+    in
+    List.map (Utils.cartesian_nary_product subterms)
+      ~f:(mk_data cname)
+  in
+  constr_t 0 typ

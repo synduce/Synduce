@@ -784,9 +784,9 @@ let rewrite_types t_subs =
   rewrite_with (fun _t -> { _t with ttyp = RType.sub_all t_subs _t.ttyp })
 
 
-(** 
+(**
    `reduce ~init ~case ~join t` reduces the term by reducing each leaf to `init`, and at each node
-    of the syntax tree, using `join` to merge the values. In a top-down traversal, if `case` returns 
+    of the syntax tree, using `join` to merge the values. In a top-down traversal, if `case` returns
     `Some a` then the subterm is not recrusively reduced, but the value `a` is used instead.
 *)
 let reduce ~(init : 'a) ~(case : (term -> 'a) -> term -> 'a option) ~(join: 'a -> 'a -> 'a) (t : term) : 'a =
@@ -831,19 +831,31 @@ let transform ~(case : (term -> term) -> term -> term option) (t : term) : term 
   in aux t
 
 
-let size (t : term) =
+let var_count (typ : RType.t) (t : term) =
   let case _ t =
     match t.tkind with
-    | TVar _ | TConst _ -> Some 1 | _ -> None
+    | TVar v ->
+      Some (if Poly.equal (Variable.vtype_or_new v) typ then 1 else 0)
+    | _ -> None
+  in
+  reduce ~init:0 ~case ~join:(fun a b -> a + b) t
+
+let var_count_compare typ (t1 : term) (t2 : term) = compare (var_count typ t1) (var_count typ t2)
+
+
+let term_size (t : term) =
+  let case _ t =
+    match t.tkind with
+    | TConst _ | TVar _ -> Some 1 | _ -> None
   in
   reduce ~init:0 ~case ~join:(fun a b -> a + b + 1) t
 
-let term_size_compare (t1 : term) (t2 : term) = compare (size t1) (size t2)
+let term_size_compare (t1 : term) (t2 : term) = compare (term_size t1) (term_size t2)
 
 
-let is_norec = 
+let is_norec =
   let case _ t =
-    match t.tkind with 
+    match t.tkind with
     | TVar x -> Some (not (RType.is_recursive (Variable.vtype_or_new x)))
     | _ -> None
   in

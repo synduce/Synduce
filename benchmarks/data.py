@@ -156,42 +156,29 @@ def raw_to_csv():
     with open("benchmarks/bench.txt") as raw:
         lines = raw.readlines()
         num_lines = len(lines)
-        i = 0
-        while i < num_lines:
+        benchfile, method = "none", "none"
+        for i in range(num_lines):
             s = lines[i]
             if s.startswith("B:"):
-                inst = lines[i].strip().strip("B:").split(",")
-                if len(inst) == 2:
-                    i = i + 1
-                    if i < num_lines:
-                        result = lines[i].strip().split(",")
-                        benchfile, method = inst[0], inst[1].strip(" ")
-                        if len(result) == 2:
-                            try:
-                                iterations, time = int(
-                                    result[0]), float(result[1])
-                                benchmark_data.setdefault(
-                                    (benchfile, method), []).append([iterations, time])
-                            except:
-                                benchmark_data.setdefault(
-                                    (benchfile, method), []).append(["TIMEOUT"])
-                                i = i - 1
+                inst = s.strip().strip("B:").split(",")
+                benchfile, method = inst[0], inst[1].strip(" ")
+                benchmark_data[benchfile, method] = {}
+                benchmark_data[benchfile, method]["max"] = 0
+            else:
+                infos = s.strip().split(",")
 
-                        else:  # this is a TIMEOUT
-                            benchmark_data.setdefault(
-                                (benchfile, method), []).append(["TIMEOUT"])
-                    else:
-                        benchmark_data.setdefault(
-                            (benchfile, method), []).append(["TIMEOUT"])
-            i = i + 1
+                if len(infos) == 4:
+                    step, time, tnum, unum = infos[0], float(
+                        infos[1]), int(infos[2]), int(infos[3])
+                    benchmark_data[benchfile, method][step] = time, tnum, unum
+                    benchmark_data[benchfile, method]["max"] = max(
+                        benchmark_data[benchfile, method]["max"], int(step))
 
-    averaged = {}
-    for k, v in benchmark_data.items():
-        if all_timeout(v):
-            averaged[k] = -1, -1
-        else:
-            averaged[k] = means(v)
-    return averaged
+                if len(infos) == 2:
+                    benchmark_data[benchfile, method]["res"] = int(
+                        infos[0]), float(infos[1])
+
+    return benchmark_data
 
 
 def benchsort(x):
@@ -205,7 +192,10 @@ if __name__ == "__main__":
         k0 = k[0].split("/")
         subfolder = k0[0].strip()
         benchmark = k0[1].split(".")[0].strip()
-        results.append([subfolder, benchmark, k[1], v[0], v[1]])
+        if "res" in v.keys():
+            iters = v["res"][0]
+            time = v["res"][1]
+        results.append([subfolder, benchmark, k[1], iters, time])
 
     results.sort(key=benchsort)
 

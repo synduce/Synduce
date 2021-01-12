@@ -7,6 +7,9 @@ let debug_msg_max_chars = ref 400
 
 let info = ref true
 
+
+let glob_start = ref 0.0
+
 let show_vars = ref false
 
 let reduction_limit = ref 100
@@ -16,6 +19,8 @@ let num_expansions_check = ref 20
 let set_num_expansions_check (s : string) =
   let i = Int.of_string s in
   if i > 0 && i < 1024 then num_expansions_check := i
+
+let expand_cut = ref 124
 
 let tmp_folder = Caml.Filename.get_temp_dir_name ()
 

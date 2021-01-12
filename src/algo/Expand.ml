@@ -124,14 +124,18 @@ let is_max_expanded (t : term) =
   match Analysis.expand_once t with [] -> true | _ -> false
 
 let simple (t0 : term) =
-  Log.verbose_msg Fmt.(str "Expand %a." pp_term t0);
+  Log.verbose_msg Fmt.(str "Simple expansion of %a." pp_term t0);
   let rec aux (t, u) =
     match t with
     | _ :: _ -> t, u
     | [] ->
-      let t_exp = List.concat (List.map ~f:Analysis.expand_once u) in
-      let t', u' = List.partition_tf ~f:is_max_expanded t_exp in
-      aux (t', List.sort u' ~compare:term_size_compare)
+      (match List.sort ~compare:(var_count_compare !AState._theta) u with
+       | uhd :: utl ->
+         let t_exp = Analysis.expand_once uhd in
+         Log.verbose_msg Fmt.(str "Expand once %a -> %i" pp_term uhd (List.length t_exp));
+         let t', u' = List.partition_tf ~f:is_max_expanded t_exp in
+         aux (t', utl @ u')
+       | [] -> t, u)
   in
   if is_norec t0 then
     TermSet.singleton t0, TermSet.empty
