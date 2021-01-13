@@ -14,6 +14,7 @@ let show_vars = ref false
 
 let reduction_limit = ref 100
 
+let expand_depth = ref 2
 
 let check_depth = ref 3
 
@@ -23,7 +24,6 @@ let set_check_depth (s : string) =
 
 
 let num_expansions_check = ref 15
-
 
 let set_num_expansions_check (s : string) =
   let i = Int.of_string s in

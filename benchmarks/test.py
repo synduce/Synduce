@@ -25,6 +25,7 @@ input_files = [
     ["tree/min.pmrs", ""],
     ["tree/minmax.pmrs", ""],
     ["tree/maxtree2.pmrs", ""],
+    ["tree/poly.pmrs", ""],
     ["tree/maxPathWeight.pmrs", ""],
     ["list/sumhom.pmrs", ""],
     ["list/lenhom.pmrs", ""],
@@ -59,7 +60,8 @@ for filename_with_opt in input_files:
     sys.stdout.flush()
     os.system("timeout %i %s %s -i %s" %
               (timeout, path, os.path.realpath(os.path.join("benchmarks", filename)), opt))
-    print("B:%s,naive" % filename)
-    sys.stdout.flush()
-    os.system("timeout %i %s %s -i %s %s" %
-              (timeout, path, os.path.realpath(os.path.join("benchmarks", filename)), opt, naive_opt))
+    if len(sys.argv) < 2:
+        print("B:%s,naive" % filename)
+        sys.stdout.flush()
+        os.system("timeout %i %s %s -i %s %s" %
+                  (timeout, path, os.path.realpath(os.path.join("benchmarks", filename)), opt, naive_opt))

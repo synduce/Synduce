@@ -67,24 +67,30 @@ let subst_repr_calls (p : psi_def) (tl : term list) : (term * term) list =
 
 
 let maximally_reduced_app (p : psi_def) (func : term) (args : term list) : bool =
-  (match func.tkind with
-   | TVar x ->
-     Variable.(x = p.orig.pmain_symb || x = p.target.pmain_symb || x = p.repr.pmain_symb)
-   | _ -> false)
-  &&
-  (List.for_all args ~f:(fun x -> match x.tkind with TVar _ -> true | _ -> false))
+  match func.tkind, args with
+  | TVar f, [{tkind = TApp({tkind =TVar r; _}, [x]); _}] ->
+    Variable.(f = p.orig.pmain_symb && r = p.repr.pmain_symb)
+    && (match x.tkind with TVar _ -> true | _ -> false)
+  | TVar x, args ->
+    Variable.(x = p.orig.pmain_symb || x = p.target.pmain_symb || x = p.repr.pmain_symb)
+    &&
+    (List.for_all args ~f:(fun x -> match x.tkind with TVar _ -> true | _ -> false))
+  | _ -> false
 
 
 let nonreduced_terms (p : psi_def) (non_terms : VarSet.t) (t : term)
   : (variable * term list) list =
   let join = (@) in
-  let case _ t =
+  let case f t =
     match t.tkind with
     | TApp(func, args) ->
       (match func.tkind with
        | TVar func_var when Set.mem non_terms func_var ->
-         if maximally_reduced_app p func args then None
-         else Some [func_var, args]
+         (match List.concat (List.map ~f args) with
+          | [] ->
+            if maximally_reduced_app p func args then None
+            else Some [func_var, args]
+          | l -> Some l)
        | _ -> None)
     | _ -> None
   in
@@ -115,6 +121,12 @@ let replace_rhs_of_main (p : psi_def) (f : PMRS.t) (t0 : term) : term =
   in
   let t_out = substitution replacements t0 in
   t_out
+
+let replace_rhs_of_mains (p : psi_def) (t0 : term) : term =
+  let _t0 = replace_rhs_of_main p p.repr t0 in
+  let __t0 = replace_rhs_of_main p p.orig _t0 in
+  replace_rhs_of_main p p.target __t0
+
 
 (* ============================================================================================= *)
 (*                                   NAIVE TERM EXPANSION                                        *)
@@ -151,7 +163,9 @@ let simple (t0 : term) =
 (* ============================================================================================= *)
 let expand_max (p : psi_def) (f : PMRS.t) (t0 : term)
   : (term * term) list * term list =
-  let f_of_t0 = Reduce.reduce_pmrs f t0 in
+  let f_of_t0 =
+    Reduce.reduce_pmrs f t0
+  in
   let simpl_f_of_t0 = replace_rhs_of_main p f f_of_t0 in
   Log.verbose_msg Fmt.(str "@[<hov 2>Expand > f(t0) = %a@]" pp_term simpl_f_of_t0);
   let nr = nonreduced_terms p f.pnon_terminals simpl_f_of_t0 in
@@ -178,7 +192,7 @@ let expand_max (p : psi_def) (f : PMRS.t) (t0 : term)
   let check_max_exp t =
     let tr = replace_rhs_of_main p f (Reduce.reduce_pmrs f t) in
     match nonreduced_terms p f.pnon_terminals tr with
-      [] -> First(t, tr)
+      [] -> First (t, tr)
     | _ -> Second t
   in
   let mr_terms, rest =
@@ -198,12 +212,86 @@ let expand_max (p : psi_def) (f : PMRS.t) (t0 : term)
   mr_terms, rest
 
 
+let composed_reduction_sequence (p : psi_def) (f : PMRS.t) (g : PMRS.t) (t0 : term) =
+  let _t0 = Reduce.reduce_pmrs g t0 in
+  let _t1 = Reduce.reduce_pmrs f _t0 in
+  let _t2 = replace_rhs_of_main p g _t1 in
+  replace_rhs_of_main p f _t2
+
+
+let check_max_exp p f g t =
+  let _t3 = composed_reduction_sequence p f g t in
+  match
+    nonreduced_terms p (Set.union f.pnon_terminals g.pnon_terminals) _t3
+  with
+    [] -> First(t, _t3)
+  | _ -> Second t
+
+
+let rec expand_max_main (p : psi_def) (f : PMRS.t) (g : PMRS.t) (t0 : term)
+  : (term * term) list * term list =
+  let non_terminals = Set.union f.pnon_terminals g.pnon_terminals in
+  let t3 = composed_reduction_sequence p f g t0 in
+  Log.verbose_msg Fmt.(str "@[<hov 2>Expand > f(%a) = %a@]" pp_term t0 pp_term t3);
+  let nr = nonreduced_terms p non_terminals t3 in
+  Log.verbose_msg Fmt.(str "@[<hov 2>Expand > Non reduced terms = %a@]"
+                         (list pp_term) (List.map ~f:(fun (a,b) -> mk_app (mk_var a) b) nr));
+  (* Collect all the variables that need to be expanded. *)
+  let expand_reqs =
+    let collect c (_, args) =
+      match List.last args with
+      | Some arg -> Set.union c (Analysis.free_variables arg)
+      | None -> c
+    in List.fold ~f:collect ~init:VarSet.empty nr
+  in
+  Log.verbose_msg Fmt.(str "@[Expand > Reqs: %a@]" VarSet.pp expand_reqs);
+  let substs =
+    let expansions =
+      List.map ~f:(fun x -> List.cartesian_product [mk_var x] (Analysis.expand_once (mk_var x)))
+        (Set.to_list expand_reqs)
+    in
+    cartesian_nary_product (List.filter ~f:(not <| List.is_empty) expansions)
+  in
+  List.iteri substs
+    ~f:(fun i sub -> Log.verbose_msg Fmt.(str "@[Expand > Substs %i: %a@]" i Term.pp_subs sub));
+  let all_ts = List.map substs ~f:(fun s -> substitution s t0) in
+  Log.verbose
+    (fun frmt () -> Fmt.(pf frmt "Expand > All ts:@;@[%a ->@;@[%a@]@]"
+                           pp_term t0
+                           (list ~sep:comma pp_term)
+                           all_ts));
+  let mr_terms, rest =
+    List.partition_map all_ts ~f:(check_max_exp p f g)
+  in
+  Log.verbose
+    (fun frmt () -> Fmt.(pf frmt "Expand > Result:@;@[%a ->@;@[%a@]@]"
+                           pp_term t0
+                           (list ~sep:comma (parens (pair ~sep:comma pp_term pp_term)))
+                           mr_terms));
+  (* Expand and replace in term *)
+  match mr_terms with
+  | [] ->
+    (match all_ts with
+     | hd :: tl ->
+       let expanded_ts, rest' = expand_max_main p f g hd in
+       expanded_ts, tl @ rest'
+     | [] -> [], [])
+  | _ -> mr_terms, rest
+
+
+let expand_max2 (p : psi_def) (f : PMRS.t) (g : PMRS.t) (t0 : term)
+  : (term * term) list * term list =
+  match check_max_exp p f g t0 with
+  | First x -> [x], []
+  | _ -> expand_max_main p f g t0
+
+
 (** `maximal p t0 ` expands the term `t0 ` such that `p.orig (p.repr t0)` and 'p.target t0`
     are maximally reduced terms.
 *)
 let to_maximally_reducible (p : psi_def) (t0 : term) : TermSet.t * TermSet .t =
   Log.verbose_msg Fmt.(str "@[Expand > t0 = %a@]" pp_term t0);
-  let tset_target, uset_target =
+  let tset0, uset0 =
     let g = p.target in
     (* Expand only if there are non-reduced terms *)
     let g_t0 = Reduce.reduce_pmrs g t0 in
@@ -214,37 +302,15 @@ let to_maximally_reducible (p : psi_def) (t0 : term) : TermSet.t * TermSet .t =
     | _ -> expand_max p g t0
   in
   Log.verbose_msg Fmt.(str "@[Expand > tset_target = %a@]" (list ~sep:comma pp_term)
-                         (List.map ~f:first tset_target));
-  (* Expand with repr *)
-  let tset0, uset0 =
-    let f (tset, uset) (t_theta, _) =
-      if p.repr_is_identity then
-        [t_theta, t_theta], uset
-      else
-        (Log.verbose_msg Fmt.(str "Expand > repr.");
-         let tset0, new_uset = expand_max p p.repr t_theta in
-         let s1 = subst_repr_calls p (List.map ~f:second tset0) in
-         let new_tset =
-           List.map tset0 ~f:(fun (tin, tout) -> tin, Reduce.reduce_term (substitution s1 tout))
-         in
-         tset @ new_tset, uset @ new_uset)
-    in
-    List.fold ~init:([], uset_target) ~f tset_target
-  in
-  Log.verbose_msg Fmt.(str "@[Expand > tset0 = %a@]" (list ~sep:comma pp_term)
                          (List.map ~f:first tset0));
   (* Expand with orig (f) *)
-  let f (tset, uset) (t_theta, t_tau) =
-    Log.verbose_msg Fmt.(str "Expand > orig.");
-    match expand_max p p.orig t_tau with
-    | [_,_], [] ->  tset @ [t_theta], uset
-    | new_ts, new_us ->
-      if p.repr_is_identity then tset @ (List.map ~f:first new_ts), uset @ new_us
-      else
-        (Log.error_msg Fmt.(str "Invert %a." (list ~sep:comma pp_term) (List.map ~f:fst new_ts));
-         failwith "TODO : implement repr inversion.") (* TODO implement inversion *)
+  let f (tset, uset) (t_theta, _) =
+    Log.verbose_msg Fmt.(str "===== Expand step: orig =====");
+    let new_ts, new_us =  expand_max2 p p.orig p.repr t_theta in
+    tset @ (List.map ~f:first new_ts), uset @ new_us
   in
   let l1, l2 = List.fold tset0 ~f ~init:([], uset0) in
   TermSet.of_list l1, TermSet.of_list l2
+
 
 

@@ -116,7 +116,7 @@ let compute_lhs p t =
   in
   let f_r_t = Reduce.reduce_pmrs p.orig r_t in
   let final = substitution subst_params f_r_t in
-  Expand.replace_rhs_of_main p p.orig final
+  Expand.replace_rhs_of_mains p (Reduce.reduce_term final)
 
 
 let remap_rec_calls p t =
@@ -170,15 +170,18 @@ let compute_rhs_with_replacing p t =
     apply_until_irreducible x
   in
   let app_t = mk_app (mk_var g.pmain_symb) [t] in
-  let t' = custom_reduce app_t in
-  Expand.replace_rhs_of_main p p.target t'
+  let t' = Reduce.reduce_term (custom_reduce app_t) in
+  let _res = Expand.replace_rhs_of_mains p t' in
+  _res
 
 
 let compute_rhs ?(force_replace_off=false) p t =
   if !Config.replace_recursion && (not force_replace_off) then
     compute_rhs_with_replacing p t
   else
-    Expand.replace_rhs_of_main p p.target (Reduce.reduce_pmrs p.target t)
+    let res = Expand.replace_rhs_of_mains p
+        (Reduce.reduce_term (Reduce.reduce_pmrs p.target t))
+    in res
 
 
 let make ?(force_replace_off = false) ~(p : psi_def) (tset : TermSet.t) : equation list =
