@@ -14,11 +14,21 @@ let show_vars = ref false
 
 let reduction_limit = ref 100
 
-let num_expansions_check = ref 20
+
+let check_depth = ref 3
+
+let set_check_depth (s : string) =
+  let i = Int.of_string s in
+  if i > 0 && i < 1024 then check_depth := i
+
+
+let num_expansions_check = ref 15
+
 
 let set_num_expansions_check (s : string) =
   let i = Int.of_string s in
   if i > 0 && i < 1024 then num_expansions_check := i
+
 
 let expand_cut = ref 124
 

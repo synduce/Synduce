@@ -106,7 +106,9 @@ let fterm_to_term _ allv globs locs rterm =
         Set.fold new_vs ~init:env ~f:(fun a v -> Map.set a ~key:v.Term.vname ~data:v)
       in
       Term.(mk_fun ~pos:t.pos fargs (f new_env body))
-
+    | FTLet (args, e, body) ->
+      let _fun = {pos = t.pos; kind = FTFun([args], body)} in
+      f env {pos = t.pos; kind = FTApp(_fun, [e])}
     | FTBin (op, t1, t2) -> Term.(mk_bin ~pos:t.pos op (f env t1) (f env t2))
     | FTUn (op, t1) -> Term.(mk_un ~pos:t.pos op (f env t1))
     | FTIte (c, a, b) -> Term.(mk_ite ~pos:t.pos (f env c) (f env a) (f env b))

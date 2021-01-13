@@ -17,6 +17,7 @@ type termkind =
   | FTData of id * term list
   | FTVar of id
   | FTTup of term list
+  | FTLet of term * term * term
   | FTFun of term list * term
   | FTBin of Binop.t * term * term
   | FTHOBin of Binop.t
@@ -37,6 +38,7 @@ let mk_ite pos c t f = {pos; kind=FTIte(c,t,f)}
 let mk_tup pos tl = {pos; kind=FTTup tl}
 let mk_fun pos args t = {pos; kind=FTFun(args,t)}
 
+let mk_let pos v e body = {pos;kind=FTLet(v, e, body)}
 
 type pmrs_rule = loc * term * term
 
@@ -58,6 +60,8 @@ let rec pp_fterm (frmt : Formatter.t) (t : term) =
   | FTData (c, t2) -> Fmt.(pf frmt "%s(%a)" c (list ~sep:comma pp_fterm) t2)
   | FTVar v -> Fmt.string frmt v
   | FTTup l -> Fmt.(pf frmt "(%a)" (list ~sep:comma pp_fterm) l)
+  | FTLet (x, e, body) -> Fmt.(pf frmt "let %a = @[<hov 2>%a@]@;in@;@[<hov 2>%a@]"
+                                 pp_fterm x pp_fterm e pp_fterm body)
   | FTFun (args, body) -> Fmt.(pf frmt "(%a)->%a" (list ~sep:comma pp_fterm) args pp_fterm body)
   | FTBin (op, t1, t2) -> Fmt.(pf frmt "%a %a %a" pp_fterm t1 Binop.pp op pp_fterm t2)
   | FTUn (op, t1) -> Fmt.(pf frmt "%a %a" Unop.pp op pp_fterm t1)

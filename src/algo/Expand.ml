@@ -240,7 +240,9 @@ let to_maximally_reducible (p : psi_def) (t0 : term) : TermSet.t * TermSet .t =
     | [_,_], [] ->  tset @ [t_theta], uset
     | new_ts, new_us ->
       if p.repr_is_identity then tset @ (List.map ~f:first new_ts), uset @ new_us
-      else  failwith "TODO : implement repr inversion." (* TODO implement inversion *)
+      else
+        (Log.error_msg Fmt.(str "Invert %a." (list ~sep:comma pp_term) (List.map ~f:fst new_ts));
+         failwith "TODO : implement repr inversion.") (* TODO implement inversion *)
   in
   let l1, l2 = List.fold tset0 ~f ~init:([], uset0) in
   TermSet.of_list l1, TermSet.of_list l2

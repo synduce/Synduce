@@ -19,6 +19,7 @@ let options = [
   ('\000',"stratifying-off", (set Config.stratify_on false), None);
   ('s',"split-solving-off", (set Config.split_solve_on false), None);
   ('n',"verification", None, Some (Config.set_num_expansions_check));
+  ('b',"bmc", None, Some (Config.set_check_depth));
   ('\000',"use-dryadsynth", (set Syguslib.Solvers.SygusSolver.default_solver DryadSynth), None)
 ]
 
@@ -39,17 +40,16 @@ let main () =
   let _ = seek_types prog in
   let all_pmrs = translate prog in
   if !parse_only then Caml.exit 1;
-  try
-    (match Algo.PmrsAlgos.solve_problem all_pmrs with
-     | Ok target ->
-       let elapsed = Unix.gettimeofday () -. start_time in
-       Utils.Log.info Fmt.(fun frmt () -> pf frmt "Solution found in %4.4fs:@;%a@]" elapsed (box PMRS.pp) target);
-       (* If no info required, output timing information. *)
-       if not !Config.info then
-         Fmt.(pf stdout "%i,%.4f@." !Algo.PmrsAlgos.refinement_steps elapsed)
+  (match Algo.PmrsAlgos.solve_problem all_pmrs with
+   | Ok target ->
+     let elapsed = Unix.gettimeofday () -. start_time in
+     Utils.Log.info Fmt.(fun frmt () -> pf frmt "Solution found in %4.4fs:@;%a@]" elapsed (box PMRS.pp) target);
+     (* If no info required, output timing information. *)
+     if not !Config.info then
+       Fmt.(pf stdout "%i,%.4f@." !Algo.PmrsAlgos.refinement_steps elapsed)
 
-     | Error _ -> Utils.Log.error_msg "No solution found.")
-  with s -> (if !Config.show_vars then Term.Variable.print_summary stdout (); raise s)
+   | Error _ -> Utils.Log.error_msg "No solution found.");
+  if !Config.show_vars then Term.Variable.print_summary stdout ()
 
 ;;
 main ()

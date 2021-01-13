@@ -1,51 +1,56 @@
 % ====================================
-% This table has been automatically produced by the tool on 2021-01-10 15:06:33.029367.
+% This table has been automatically produced by the tool on 2021-01-12 20:00:01.617264.
 % ====================================
 \begin{table}
-	\caption{Benchmarks. }\label{table:experiments}
+	\caption{Benchmarks. A '-' indicates that synthesis timed out ($>$ 10min).}\label{table:experiments}
 	{
-		\begin{tabular}[h]{|c|c|c|c|c|c|c|}
+		\begin{tabular}[h]{|c|c|c|c|c|c|c|c|}
 			\hline
-			 &   & Inv. & \# steps & \tool  & Opt. off & Naive \\ 
+			 &   & Inv. & \# steps & \tool  & Naive & \# steps & T_\{last\}\\ 
 			\hline
-			 & min & no & 1 & 0.03 & - & -\\ 
-			 & max & no & 1 & 0.03 & - & -\\ 
-			 & polynomial & no & 1 & 0.06 & 2 & 11.62\\ 
-			 & mps & yes & 1 & 0.06 & 2 & 2.64\\ 
-			 & line of sight &  & 2 & 0.70 & - & -\\ 
-			 & product & no & 1 & 0.03 & 2 & 1.16\\ 
-			 & mts + mps & yes & 2 & 0.29 & - & -\\ 
-			 & sum & no & 1 & 0.02 & 2 & 1.14\\ 
-			 & mss & yes & 2 & 1.77 & - & -\\ 
-			 & mts & yes & 1 & 0.07 & 2 & 2.70\\ 
-			 & length & no & 1 & 0.03 & 2 & 0.40\\ 
-			 & hamming & no & 1 & 0.04 & 2 & 1.38\\ 
-			 & is sorted & no & 2 & 3.17 & - & -\\ 
+			Tail & sum & no & 2 & 0.04 & 0.03 & 3 & 0.02\\ 
+			Recursive & mts & no & 2 & 1.05 & 27.31 & 3 & 0.04\\ 
+			 & mps & no & 2 & 1.78 & 4.98 & 3 & 0.03\\ 
 			\hline
-			 & max & no & 1 & 0.23 & - & -\\ 
-			Tree & min & no & 0 & 0.00 & - & -\\ 
-			Change & max 2 & no & 1 & 0.04 & - & -\\ 
-			 & sorted in-order & no & 1 & 41.93 & - & -\\ 
-			 & sum & no & 2 & 0.05 & 3 & 0.70\\ 
-			Traversal & max weighted path & no & 3 & 0.09 & 3 & 0.74\\ 
+			Combine & mts & no & 2 & 1.83 & 206.98 & 3 & 0.03\\ 
+			 & mts + mps & no & 3 & 0.90 & - & 3 & 0.05\\ 
 			\hline
-			Combine & mts & no & 2 & 1.27 & 3 & 4.76\\ 
-			 & mts + mps & no & 3 & 0.89 & - & -\\ 
+			 & sum & no & 2 & 0.06 & 0.07 & 3 & 0.04\\ 
+			Tree to & height & no & 1 & 0.12 & 0.21 & 5 & 0.13\\ 
+			Zipper & max weighted path & no & 2 & 0.12 & 0.12 & 3 & 0.04\\ 
+			 & max w. path (hom) & no & 1 & 0.01 & 2.83 & 5 & 0.14\\ 
+			 & leftmost odd & no & 1 & 0.01 & - & 4 & 0.14\\ 
 			\hline
-			Recursive & mts & no & 2 & 19.94 & 3 & 44.79\\ 
-			Tail & sum & no & 2 & 0.07 & 3 & 0.04\\ 
-			 & mps & no & 2 & 2.06 & 3 & 0.36\\ 
+			 & sum & no & 3 & 0.12 & 0.07 & 2 & 0.01\\ 
+			Flat & product & no & 3 & 0.19 & 0.06 & 2 & 0.01\\ 
+			Tree & max of heads & no & 2 & 0.11 & 0.24 & 3 & 0.04\\ 
+			 & max of lasts & no & 2 & 0.26 & 0.12 & 3 & 0.04\\ 
+			 & max sibling sum & no & 2 & 1.82 & 5.35 & 3 & 0.05\\ 
 			\hline
-			 & sum & no & 2 & 0.07 & 2 & 1.97\\ 
-			 & max w. path (hom) & no & 1 & 0.01 & 2 & 2.19\\ 
-			Zipper & max weighted path & no & 2 & 0.14 & 2 & 1.94\\ 
-			Tree to & height & no & 1 & 0.13 & 3 & 3.12\\ 
+			 & sum & no & 2 & 0.04 & 0.04 & 3 & 0.03\\ 
+			 & max & no & 1 & 0.17 & 0.33 & 2 & 0.01\\ 
+			Change & max 2 & no & 1 & 0.13 & 0.31 & 2 & 0.01\\ 
+			Tree & min & no & 1 & 0.01 & 0.04 & 2 & 0.01\\ 
+			Traversal & max weighted path & no & 3 & 0.08 & 0.08 & 3 & 0.03\\ 
+			 & sorted in-order & no & 1 & 0.01 & 47.31 & 4 & 2.14\\ 
+			 & in-order mps & yes & 2 & 0.37 & - & 4 & 3.31\\ 
+			 & in-order mts & yes & 2 & 0.48 & - & 4 & 2.06\\ 
+			 & post-order mps & yes & 5 & 137.93 & - & 6 & 42.41\\ 
 			\hline
-			Flat & product & no & 3 & 0.17 & 3 & 0.41\\ 
-			Flat & sum & no & 3 & 0.11 & 3 & 0.36\\ 
-			Tree & max of heads & no & 2 & 0.11 & - & -\\ 
-			 & max sibling sum & no & 2 & 1.84 & - & -\\ 
-			 & max of lasts & no & 2 & 0.26 & - & -\\ 
+			 & sum & no & 1 & 0.03 & 0.38 & 3 & 0.18\\ 
+			 & length & no & 1 & 0.03 & 0.45 & 4 & 0.25\\ 
+			Parallelize & product & no & 1 & 0.03 & 0.39 & 3 & 0.18\\ 
+			List & polynomial & no & 1 & 0.07 & - & 253 & 49.19\\ 
+			Functions & hamming & no & 1 & 0.05 & 0.53 & 3 & 0.24\\ 
+			 & max & no & 1 & 0.08 & 0.10 & 2 & 0.02\\ 
+			 & min & no & 1 & 0.08 & 0.11 & 2 & 0.02\\ 
+			 & is sorted & no & 2 & 3.30 & 3.23 & 4 & 0.14\\ 
+			 & lin. search & no & 1 & 0.03 & 0.44 & 3 & 0.20\\ 
+			 & line of sight & no & 2 & 0.72 & - & 5 & 484.03\\ 
+			 & mts & yes & 1 & 0.08 & 5.55 & 4 & 0.67\\ 
+			 & mps & yes & 1 & 0.08 & 5.63 & 4 & 0.68\\ 
+			 & mts + mps & yes & 2 & 0.37 & 67.15 & 6 & 19.29\\ 
+			 & mss & yes & 3 & 6.46 & - & 7 & 582.95\\ 
 			\hline
 		\end{tabular}
 	}

@@ -19,7 +19,7 @@
 %token FALSE
 %token FUN
 %token INTSORT
-%token LET LETPMRS
+%token IN LET LETPMRS
 %token LPAR RPAR
 %token LBRACE RBRACE
 %token LT GT LE GE NEQ
@@ -38,9 +38,10 @@
 %token VBAR
 %token EOF
 
+
+%nonassoc IN
 %nonassoc QUESTION
 %nonassoc COLON
-%left RIGHTARROW
 
 
 %start <program> main
@@ -113,6 +114,9 @@ prule: args=fun_app_e RIGHTARROW t=expr                                    { $lo
 
 expr:
     | FUN args=list(primary_e) RIGHTARROW t=tuple_e                             { mk_fun $loc args t }
+    | LET arg=primary_e EQ t=expr IN b = expr                                   { mk_let $loc arg t b }
+    | LET arg1=primary_e COMMA rest=separated_nonempty_list(COMMA, primary_e) EQ t=expr IN b=expr
+                                                                                { mk_let $loc (mk_tup $loc (arg1::rest)) t b }
     | c=expr QUESTION t=expr; COLON f=expr                                      { mk_ite $loc c t f}
     | tuple_e                                                                   { $1 }
 
@@ -156,6 +160,7 @@ fun_app_e:
     | MAX a=primary_e b=primary_e                                               { mk_bin $loc Term.Binop.Max a b}
     | MIN a=primary_e b=primary_e                                               { mk_bin $loc Term.Binop.Min a b}
     | primary_e                                                                 { $1 }
+
 
 primary_e:
     | CIDENT LPAR l=separated_list(COMMA, fun_app_e) RPAR                       { mk_data $loc $1 l  }

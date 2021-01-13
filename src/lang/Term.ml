@@ -462,6 +462,16 @@ let mk_var ?(pos = dummy_loc) (v : variable) : term =
 let var_or_none (t : term) : variable option =
   match t.tkind with | TVar x -> Some x | _ -> None
 
+let ext_var_or_none (t : term) : (variable list) option =
+  match t.tkind with
+  | TVar x -> Some [x]
+  | TTup tl ->
+    let tl' = List.map ~f:var_or_none tl in
+    if List.for_all ~f:Option.is_some tl' then
+      Some (List.filter_opt tl')
+    else None
+  | _ -> None
+
 
 let mk_const ?(pos = dummy_loc) (c : Constant.t) =
   let ctyp =
@@ -681,31 +691,7 @@ let mk_with_fresh_vars (vs : VarSet.t) (t : term) : VarSet.t * term =
   substitution (List.map ~f:second substs) t
 
 
-module Terms =
-struct
-  module E = struct
-    type t = term
-    let compare = term_compare
-    let equal = term_equal
-    let sexp_of_t = sexp_of_term
-  end
-  include E
-  module C = Comparator.Make (E)
-  include C
 
-  let substs_of_alist (alist : (variable * term) list) : (term * term) list=
-    List.map ~f:(fun (a,b) -> mk_var a, b) alist
-end
-
-module TermSet =
-struct
-  module S = Set.M (Terms)
-  include S
-  let empty = Set.empty (module Terms)
-  let singleton = Set.singleton (module Terms)
-  let of_list = Set.of_list (module Terms)
-  let union_list = Set.union_list (module Terms)
-end
 
 (* ============================================================================================= *)
 (*                              TRANFORMATION / REDUCTION  UTILS                                 *)
@@ -920,8 +906,6 @@ let pp_term (frmt : Formatter.t) (x : term) =
         pf frmt "%s(%a)" cstr (list ~sep:comma (aux false)) args
   in aux false frmt x
 
-let pp_term_set (f : Formatter.t) (s : TermSet.t) =
-  (braces (list ~sep:comma (box pp_term))) f (Set.elements s)
 
 let pp_subs (f : Formatter.t) (subs : (term * term) list) : unit =
   Fmt.(pf f "@[<hov 2>%a@]"
@@ -972,7 +956,10 @@ let infer_type (t : term) : term * RType.substitution =
       (match RType.unify [t_c.ttyp, RType.TBool; t_t1.ttyp, t_t2.ttyp] with
        | Some subs -> mk_ite ~pos:t0.tpos ~typ:(Some t_t1.ttyp) t_c t_t1 t_t2,
                       merge_subs subs (merge_subs c_c (merge_subs c_t1 c_t2))
-       | None -> failwith "Type inference failure.")
+       | None ->
+         Log.error_msg
+           Fmt.(str "ite(%a, %a, %a)." RType.pp c.ttyp RType.pp t1.ttyp RType.pp t2.ttyp);
+         failwith "Type inference failure.")
 
     | TTup tl ->
       let term_l, c_l = List.unzip (List.map ~f:aux tl) in
@@ -1043,3 +1030,40 @@ let infer_type (t : term) : term * RType.substitution =
     let tsubs = RType.mkv merge_subs in
     rewrite_types tsubs t', merge_subs
   | None -> Log.loc_fatal_errmsg t'.tpos "Could not infer type."
+
+
+
+(* ============================================================================================= *)
+(*                                  SETS OF TERMS                                                *)
+(* ============================================================================================= *)
+
+module Terms =
+struct
+  module E = struct
+    type t = term
+    let compare t1 t2 =
+      let c = compare (term_size t1) (term_size t2) in
+      if c = 0 then term_compare t1 t2 else c
+    let equal = term_equal
+    let sexp_of_t = sexp_of_term
+  end
+  include E
+  module C = Comparator.Make (E)
+  include C
+
+  let substs_of_alist (alist : (variable * term) list) : (term * term) list=
+    List.map ~f:(fun (a,b) -> mk_var a, b) alist
+end
+
+module TermSet =
+struct
+  module S = Set.M (Terms)
+  include S
+  let empty = Set.empty (module Terms)
+  let singleton = Set.singleton (module Terms)
+  let of_list = Set.of_list (module Terms)
+  let union_list = Set.union_list (module Terms)
+end
+
+let pp_term_set (f : Formatter.t) (s : TermSet.t) =
+  (braces (list ~sep:comma (box pp_term))) f (Set.elements s)

@@ -71,7 +71,9 @@ let rec smt_of_term (t : term) : smtTerm =
   | TSel (t,i) -> SmtTApp(QI (IdC (SSimple "tupleSel", [INum i])), [smt_of_term t])
   | TApp ({tkind=TVar v;_}, args) -> mk_simple_app v.vname  (List.map ~f:smt_of_term args)
   | TData (cstr, args) -> mk_simple_app cstr (List.map ~f:smt_of_term args)
-  | TApp(_ , _) -> failwith "Smt: application function can only be variable."
+  | TApp(_ , _) ->
+    Log.error_msg Fmt.(str "Smt of term %a impossible." pp_term t);
+    failwith "Smt: application function can only be variable."
   | TFun (_, _) -> failwith "Smt: functions in terms not supported."
 
 

@@ -11,6 +11,7 @@ let keywords =
         "boolean", BOOLSORT;
         "false", FALSE;
         "fun", FUN;
+        "in", IN;
         "int", INTSORT;
         "let", LET;
         "pmrs", LETPMRS;

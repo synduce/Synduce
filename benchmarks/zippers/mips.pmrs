@@ -4,12 +4,13 @@ type 'a btree = Empty | Node of 'a * 'a btree * 'a btree
 type sel = Left | Right
 type 'c zipper = Top | Zip of sel * 'c * 'c btree * 'c zipper
 
+pmrs spec { fun (x,y) -> y >= 0 && y >= x }  =
+    main t -> f (0,0) t
+    | f s Empty -> s
+    | f s (Node(a,l,r)) ->
+        let sum1, m1 = f s l in
+        f (sum1 + a, max (sum1 + a) m1) r
 
-pmrs spec {fun (b, x) -> !b || (x % 2 = 0)} =
-    leftOdd Empty -> false, 1
-    | leftOdd Node(a, l, r) ->
-            let b1, x1 = leftOdd l in
-            (b1 ? b1, x1 :(a % 2 = 0 ? true, a : leftOdd r))
 
 pmrs (s0, joinl, joinr) target =
     main Top -> s0
@@ -17,7 +18,7 @@ pmrs (s0, joinl, joinr) target =
     | main Zip(Right, a, child, z) -> joinr a (spec child) (main z)
 
 pmrs repr =
-    main Top -> Empty
-    | main Zip(w, val, child, z) -> h val child z w
-    | h val child z Left -> Node (val, child, main z)
-    | h val child z Right -> Node (val, main z, child)
+    repr Top -> Empty
+    | repr Zip(w, val, child, z) -> h val child z w
+    | h val child z Left -> Node (val, child, repr z)
+    | h val child z Right -> Node (val, repr z, child)

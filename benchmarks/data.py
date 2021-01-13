@@ -77,57 +77,50 @@ def produce_tex_table(tex_output_file, data):
         tex.write("\\begin{table}\n")
         tex.write("\t\caption{%s}\label{table:experiments}\n" % caption)
         tex.write("\t{\n")
-        tex.write("\t\t\\begin{tabular}[h]{|c|c|c|c|c|c|}\n")
+        tex.write("\t\t\\begin{tabular}[h]{|c|c|c|c|c|c|c|c|}\n")
         tex.write("\t\t\t\\hline\n")
         tex.write(
-            "\t\t\t &   & Inv. & \\# steps & \\tool  & Naive \\\\ \n")
+            "\t\t\t &   & Inv. & \\tool & \# steps & Naive & \# steps & $T_{last}$\\\\ \n")
         for benchmark_class, benchmarks in show_benchmarks:
             if len(benchmarks) > 0:
                 tex.write("\t\t\t\\hline\n")
             for benchmark_file, benchmark_info in benchmarks:
-                req_iters = 0
-                req_time = 0.0
-                nai_iters = 0
-                nai_time = 0.0
+                req_t = "?"
+                req_iters = "?"
+                nai_t = "?"
+                nai_iters = "?"
+                nai_last = "?"
 
-                if (benchmark_class, benchmark_file, "requation") not in data.keys():
-                    print("No data for %s, %s, requation" %
-                          (benchmark_class, benchmark_file))
+                bkey = benchmark_class + "/" + benchmark_file + ".pmrs"
+
+                if (bkey, "requation") not in data.keys():
+                    print("No data for %s, requation" % bkey)
                 else:
-                    req_iters, req_time = data[benchmark_class,
-                                               benchmark_file, "requation"]
+                    b_data = data[bkey, "requation"]
+                    if "res" in b_data:
+                        req_iters, req_time = b_data["res"]
+                        req_t = "%3.2f" % float(req_time)
+                    else:
+                        req_t = "-"
+                        req_iters = b_data["max"]
 
-                if (benchmark_class, benchmark_file, "naive") not in data.keys():
-                    print("No data for %s, %s, naive" %
-                          (benchmark_class, benchmark_file))
+                if (bkey, "naive") not in data.keys():
+                    print("No data for %s, naive" % bkey)
 
                 else:
-                    nai_iters, nai_time = data[benchmark_class,
-                                               benchmark_file, "naive"]
+                    b_data = data[bkey, "naive"]
+                    if "res" in b_data:
+                        nai_iters, nai_time = b_data["res"]
+                        nai_t = "%3.2f" % float(nai_time)
+                    else:
+                        nai_t = "-"
+                        nai_iters = b_data["max"]
+                    if str(b_data["max"]) in b_data:
+                        nai_last = "%3.2f" % b_data[str(b_data["max"])][0]
 
-                if req_time < 0:
-                    req_t = "-"
-                    req_iters = "-"
-                elif req_time == 0.0:
-                    req_t = "?"
-                    req_iters = "?"
-                else:
-                    req_t = "%3.2f" % req_time
-                    req_iters = "%i" % req_iters
-
-                if nai_time < 0:
-                    nai_t = "-"
-                    nai_iters = "-"
-                elif nai_time == 0.0:
-                    nai_t = "?"
-                    nai_iters = "?"
-                else:
-                    nai_t = "%3.2f" % nai_time
-                    nai_iters = "%i" % nai_iters
-
-                tex.write("\t\t\t%s & %s & %s & %s & %s & %s\\\\ \n" % (
+                tex.write("\t\t\t%s & %s & %s & %s & %s & %s & %s & %s\\\\ \n" % (
                     benchmark_info[0], benchmark_info[1], benchmark_info[2],
-                    req_iters, req_t, nai_t))
+                    req_t, req_iters, nai_t, nai_iters, nai_last))
 
             # close table
         tex.write("\t\t\t\\hline\n")
@@ -158,6 +151,7 @@ def raw_to_csv():
         num_lines = len(lines)
         benchfile, method = "none", "none"
         for i in range(num_lines):
+            infos = ""
             s = lines[i]
             if s.startswith("B:"):
                 inst = s.strip().strip("B:").split(",")
@@ -165,7 +159,7 @@ def raw_to_csv():
                 benchmark_data[benchfile, method] = {}
                 benchmark_data[benchfile, method]["max"] = 0
             else:
-                infos = s.strip().split(",")
+                infos = lines[i].strip().split(",")
 
                 if len(infos) == 4:
                     step, time, tnum, unum = infos[0], float(
@@ -189,13 +183,14 @@ if __name__ == "__main__":
     thedict = raw_to_csv()
     results = []
     for k, v in thedict.items():
+        print(k, v)
         k0 = k[0].split("/")
         subfolder = k0[0].strip()
         benchmark = k0[1].split(".")[0].strip()
         if "res" in v.keys():
             iters = v["res"][0]
             time = v["res"][1]
-        results.append([subfolder, benchmark, k[1], iters, time])
+            results.append([subfolder, benchmark, k[1], iters, time])
 
     results.sort(key=benchsort)
 
@@ -205,8 +200,4 @@ if __name__ == "__main__":
 
     if len(sys.argv) > 1:
         tex_out = sys.argv[1]
-        data = {}
-        for a, b, c, d, e in results:
-            data[a, b, c] = d, e
-
-        produce_tex_table(tex_out, data)
+        produce_tex_table(tex_out, thedict)

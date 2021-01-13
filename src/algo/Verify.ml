@@ -8,6 +8,7 @@ open Smtlib.Solvers
 
 let constr_eqn (_, pre, lhs, rhs) =
   let rec mk_eqn (lhs, rhs) =
+    let lhs, rhs = Reduce.reduce_term lhs, Reduce.reduce_term rhs in
     match lhs.tkind, rhs.tkind with
     | TTup ltl, TTup rtl ->
       (match List.zip ltl rtl with
@@ -98,5 +99,62 @@ let check_solution
   let ctex_or_none = find_ctex 0 u in
   close_solver solver;
   let elapsed = Unix.gettimeofday () -. start_time in
-  Log.info (fun f () -> Fmt.(pf f "Finished in %3.4fs" elapsed));
+  Log.info (fun f () -> Fmt.(pf f "... finished in %3.4fs" elapsed));
+  ctex_or_none
+
+
+(* Perform a bounded check of the solution *)
+let bounded_check
+    ~(p : psi_def)
+    (soln : (string * variable list * term) list) =
+  Log.info (fun f () -> Fmt.(pf f "Checking solution (bounded check)..."));
+  let start_time = Unix.gettimeofday () in
+  let target_inst = Reduce.instantiate_with_solution p.target soln in
+  let free_vars = VarSet.empty in
+  let init_vardecls = decls_of_vars free_vars in
+  let solver = make_z3_solver () in
+  load_min_max_defs solver;
+  let check_eqn eqn =
+    let formula = mk_not eqn in
+    spush solver;
+    smt_assert solver formula;
+    let x =
+      match check_sat solver with
+      | Sat -> true | _ -> false
+    in
+    spop solver;
+    x
+  in
+  let termset =
+    Analysis.terms_of_max_depth !Config.check_depth !AState._theta
+  in
+  Log.debug_msg Fmt.(str "%i constraints." (List.length termset));
+  let sys_eqns =
+    Equations.make
+      ~force_replace_off:true
+      ~p:{ p with target=target_inst}
+      (TermSet.of_list termset)
+  in
+  let smt_eqns = List.map sys_eqns ~f:(fun t -> t, constr_eqn t) in
+  let new_free_vars =
+    let f fv (_, _, lhs, rhs) =
+      Set.union fv (Set.union (Analysis.free_variables lhs) (Analysis.free_variables rhs))
+    in
+    Set.diff (List.fold ~f ~init:VarSet.empty sys_eqns) free_vars
+  in
+  declare_all solver init_vardecls;
+  spush solver;
+  declare_all solver (decls_of_vars new_free_vars);
+  let rec has_ctex _eqns =
+    match _eqns with
+    | [] -> None
+    | (eqn, smt_eqn) :: tl ->
+      if check_eqn smt_eqn then Some eqn
+      else has_ctex tl
+  in
+  let ctex_or_none = has_ctex smt_eqns in
+  spop solver;
+  close_solver solver;
+  let elapsed = Unix.gettimeofday () -. start_time in
+  Log.info (fun f () -> Fmt.(pf f "... finished in %3.4fs" elapsed));
   ctex_or_none

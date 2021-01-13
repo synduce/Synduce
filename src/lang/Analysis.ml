@@ -192,18 +192,43 @@ let expand_once (t : term) : term list =
   in
   List.rev (List.concat (List.map ~f:aux expandable))
 
+let variant_no_recurse (variants : (string * RType.t list) list) : term list =
+  let inst_or_none t =
+    match RType.get_variants t with
+    | [] -> Some (mk_var (Variable.mk ~t:(Some t) (Alpha.fresh "l")))
+    | _ -> None
+  in
+  let f (variant, targs) =
+    match targs with
+    | [] -> Some (mk_data variant [])
+    | targs ->
+      let l = List.map ~f:inst_or_none targs in
+      if List.for_all ~f:Option.is_some l then
+        Some (mk_data variant (List.filter_opt l))
+      else None
+  in
+  List.filter_opt (List.map ~f variants)
+
+
+
 let terms_of_max_depth (depth : int) (typ : RType.t) : term list =
   let rec constr_t d _typ : term list =
     match RType.get_variants _typ with
-    | [] -> [mk_var (Variable.mk ~t:(Some _typ) "a")]
+    | [] -> [mk_var (Variable.mk ~t:(Some _typ) (Alpha.fresh "a"))]
     | l ->
-      if d > depth then []
+      if d >= depth then variant_no_recurse l
       else List.concat (List.map ~f:(constr_variant d) l)
   and constr_variant d (cname, cargs) : term list =
-    let subterms =
-      List.map ~f:(constr_t (d + 1)) cargs
-    in
-    List.map (Utils.cartesian_nary_product subterms)
-      ~f:(mk_data cname)
+    match cargs with
+    | [] -> [mk_data cname []]
+    | _ ->
+      let subterms =
+        List.map ~f:(constr_t (d + 1)) cargs
+      in
+      let choices =
+        List.map (Utils.cartesian_nary_product subterms)
+          ~f:(fun cargs -> mk_data cname (List.rev cargs))
+      in
+      choices
   in
   constr_t 0 typ

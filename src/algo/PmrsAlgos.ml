@@ -74,25 +74,23 @@ let psi (p : psi_def) =
 (*                             NAIVE REFINEMENT LOOP                                              *)
 (* ============================================================================================= *)
 
-let rec expansion_loop (p : psi_def) (t_set, u_set : TermSet.t * TermSet.t) =
+let rec expansion_loop (p : psi_def) (t_set : TermSet.t) =
   Int.incr refinement_steps;
   let elapsed = Unix.gettimeofday () -. !Config.glob_start in
   Log.info (fun frmt () -> Fmt.pf frmt "Refinement step %i." !refinement_steps);
-  if not !Config.info then Fmt.(pf stdout "%i,%3.3f,%i,%i@."
-                                  !refinement_steps elapsed (Set.length t_set) (Set.length u_set));
-  Log.debug_msg Fmt.(str "<NAIVE> Start expansion loop with %i terms in T, %i terms in U."
-                       (Set.length t_set) (Set.length u_set));
+  if not !Config.info then Fmt.(pf stdout "%i,%3.3f,%i,0@."
+                                  !refinement_steps elapsed (Set.length t_set));
+  Log.debug_msg Fmt.(str "<NAIVE> Start expansion loop with %i terms in T." (Set.length t_set));
   (* Start of the algorithm. *)
   let eqns = Equations.make ~force_replace_off:true ~p t_set in
   let s_resp, solution = Equations.solve ~p eqns in
   match s_resp, solution with
   | RSuccess _, Some sol ->
-    (match Verify.check_solution ~use_naive:true ~p (t_set, u_set) sol with
-     | Some (new_t_set, new_u_set) ->
+    (match Verify.bounded_check ~p sol with
+     | Some (t, _, _, _) ->
        Log.debug (fun frmt () ->
-           Fmt.(pf frmt "@[<hov 2><NAIVE> Counterexample terms:@;@[<hov 2>%a@]"
-                  (list ~sep:comma pp_term) (Set.elements (Set.diff new_t_set t_set))));
-       expansion_loop p (new_t_set, new_u_set)
+           Fmt.(pf frmt "@[<hov 2><NAIVE> Counterexample term:@;@[<hov 2>%a@]" pp_term t));
+       expansion_loop p (Set.add t_set t)
      | None ->
        Log.print_ok ();
        let target = Reduce.instantiate_with_solution p.target sol in
@@ -114,15 +112,10 @@ let rec expansion_loop (p : psi_def) (t_set, u_set : TermSet.t * TermSet.t) =
 
 
 let psi_naive (p : psi_def) =
-  let t0 = mk_var (Variable.mk ~t:(Some !AState._theta) "t0") in
-  (* Initialize sets with the most general terms. *)
-  let t_set, u_set = Expand.simple t0 in
-  if Set.is_empty t_set then
-    (Log.error_msg "<NAIVE> Empty set of terms for equation system.";
-     failwith "<NAIVE> Cannot solve problem.")
-  else
-    (refinement_steps := 0;
-     expansion_loop p (t_set, u_set))
+  let t_set =
+    TermSet.of_list (Analysis.terms_of_max_depth 0 !AState._theta)
+  in
+  (refinement_steps := 0; expansion_loop p t_set)
 
 
 

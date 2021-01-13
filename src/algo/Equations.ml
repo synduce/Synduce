@@ -393,34 +393,41 @@ let solve_constant_eqns (unknowns : VarSet.t) (eqns : equation list) =
     List.map ~f:(fun (x, lhs) -> x.vname, [], lhs) constant_soln
   in
   if List.length partial_soln > 0 then
-    Log.debug_msg Fmt.(str "Partial solution:@;@[<hov 2>%a@]" pp_soln partial_soln);
+    Log.debug_msg Fmt.(str "Constant:@;@[<hov 2>%a@]" pp_soln partial_soln);
   partial_soln,
   Set.diff unknowns resolved,
   new_eqns
 
 
-let solve_full_definitions (unknowns : VarSet.t) (eqns : equation list) =
+let solve_syntactic_definitions (unknowns : VarSet.t) (eqns : equation list) =
   (* Is lhs, args a full definition of the function? *)
   let ok_args lhs args =
-    let argv =  List.filter_map args ~f:var_or_none in
-    let argset = VarSet.of_list argv in
-    if Set.length argset = List.length args &&
-       (Set.is_empty (Set.diff argset (Analysis.free_variables lhs)))
+    let argv =  List.map args ~f:ext_var_or_none in
+    let argset = VarSet.of_list (List.concat (List.filter_opt argv)) in
+    if List.for_all ~f:Option.is_some argv &&
+       (Set.is_empty (Set.diff (Analysis.free_variables lhs) argset))
     then
-      Some argv
+      Some (List.filter_opt argv)
     else
       None
   in
   let mk_lam lhs args =
     let pre_subst =
       List.map args
-        ~f:(fun arg ->
-            let t = Variable.vtype_or_new arg in
+        ~f:(fun arg_tuple ->
+            let t =
+              match arg_tuple with
+              | [v] -> Variable.vtype_or_new v
+              | l -> RType.TTup (List.map ~f:Variable.vtype_or_new l)
+            in
             let v = Variable.mk ~t:(Some t) (Alpha.fresh "x") in
-            v, (mk_var arg, mk_var v))
+            match arg_tuple with
+            | [arg] -> v, [mk_var arg, mk_var v]
+            | l -> v, List.mapi l ~f:(fun i arg -> mk_var arg, mk_sel (mk_var v) i)
+          )
     in
     let new_args, subst = List.unzip pre_subst in
-    new_args, Reduce.reduce_term (substitution subst lhs)
+    new_args, Reduce.reduce_term (substitution (List.concat subst) lhs)
   in
   let full_defs, other_eqns =
     let f (t, inv, lhs, rhs) =
@@ -457,7 +464,7 @@ let solve_full_definitions (unknowns : VarSet.t) (eqns : equation list) =
       full_defs
   in
   if List.length partial_soln > 0 then
-    Log.debug_msg Fmt.(str "Partial solution:@;@[<hov 2>%a@]" pp_soln partial_soln);
+    Log.debug_msg Fmt.(str "Syntactic definition:@;@[<hov 2>%a@]" pp_soln partial_soln);
   partial_soln,
   Set.diff unknowns resolved,
   new_eqns
@@ -518,7 +525,7 @@ let solve_stratified (unknowns : VarSet.t) (eqns : equation list) =
         solve_constant_eqns unknowns eqns
       in
       let partial_soln', new_unknowns, new_eqns =
-        solve_full_definitions new_unknowns new_eqns
+        solve_syntactic_definitions new_unknowns new_eqns
       in
       partial_soln @ partial_soln', new_unknowns, new_eqns
     else
