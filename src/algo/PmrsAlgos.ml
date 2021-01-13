@@ -25,16 +25,19 @@ let rec refinement_loop (p : psi_def) (t_set, u_set : TermSet.t * TermSet.t) =
   let s_resp, solution = Equations.solve ~p eqns in
   match s_resp, solution with
   | RSuccess _, Some sol ->
-    (match Verify.check_solution ~p (t_set, u_set) sol with
-     | Some (new_t_set, new_u_set) ->
-       Log.debug (fun frmt () ->
-           Fmt.(pf frmt "@[<hov 2>Counterexample terms:@;@[<hov 2>%a@]"
-                  (list ~sep:comma pp_term) (Set.elements (Set.diff new_t_set t_set))));
-       refinement_loop p (new_t_set, new_u_set)
-     | None ->
-       Log.print_ok ();
-       let target = Reduce.instantiate_with_solution p.target sol in
-       Ok target)
+    (try
+       let check_r = Verify.check_solution ~p (t_set, u_set) sol in
+       (match check_r with
+        | Some (new_t_set, new_u_set) ->
+          Log.debug (fun frmt () ->
+              Fmt.(pf frmt "@[<hov 2>Counterexample terms:@;@[<hov 2>%a@]"
+                     (list ~sep:comma pp_term) (Set.elements (Set.diff new_t_set t_set))));
+          refinement_loop p (new_t_set, new_u_set)
+        | None ->
+          Log.print_ok ();
+          let target = Reduce.instantiate_with_solution p.target sol in
+          Ok target)
+     with _ -> Error RFail)
 
   | RFail, _ -> Log.error_msg "SyGuS solver failed to find a solution."; Error RFail
 

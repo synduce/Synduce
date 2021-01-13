@@ -407,7 +407,10 @@ let solve_syntactic_definitions (unknowns : VarSet.t) (eqns : equation list) =
     if List.for_all ~f:Option.is_some argv &&
        (Set.is_empty (Set.diff (Analysis.free_variables lhs) argset))
     then
-      Some (List.filter_opt argv)
+      let args = List.filter_opt argv in
+      (if List.length (List.concat args) = Set.length argset then
+         Some args
+       else None)
     else
       None
   in
@@ -431,8 +434,8 @@ let solve_syntactic_definitions (unknowns : VarSet.t) (eqns : equation list) =
   in
   let full_defs, other_eqns =
     let f (t, inv, lhs, rhs) =
-      match rhs.tkind with
-      | TApp({tkind=TVar x; _}, args) when Set.mem unknowns x ->
+      match inv, rhs.tkind with
+      | None, TApp({tkind=TVar x; _}, args) when Set.mem unknowns x ->
         (match ok_args lhs args with
          | Some argv ->
            let lam_args, lam_body = mk_lam lhs argv in

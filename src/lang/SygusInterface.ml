@@ -67,7 +67,7 @@ let rec sygus_of_term (t : term) : sygus_term =
   | TVar x -> SyId (IdSimple x.vname)
   | TIte (c, a, b) -> SyApp( IdSimple "ite", List.map ~f:sygus_of_term [c;a;b])
   | TTup tl -> SyApp(IdSimple "mkTuple", List.map ~f:sygus_of_term tl)
-  | TSel (t,i) -> SyApp(IdIndexed("tupleSel",[INum i]), [sygus_of_term t])
+  | TSel (t,i) -> SyApp(IdIndexed("tupSel",[INum i]), [sygus_of_term t])
   | TApp ({tkind=TVar v;_}, args) -> SyApp(IdSimple v.vname, List.map ~f:sygus_of_term args)
   | TData (cstr, args) -> SyApp(IdSimple cstr, List.map ~f:sygus_of_term args)
   | TApp(_ , _) -> failwith "Sygus: application function can only be variable."

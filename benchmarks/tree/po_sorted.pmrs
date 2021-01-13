@@ -4,8 +4,13 @@ pmrs spec =
     main Leaf(x) -> x, true
     | main Node(a,l,r) ->
         let lh, lis = main l in
-        let rh, ris = main r in
-        a, (lh < a && a < rh) && lis && ris
+        let rh, ris = h (lh, lis) r in
+        a, a < rh && lis && ris
+    | h s Leaf(x) -> let y, b = s in x, b && x < y
+    | h s Node(a, l, r) ->
+        let lh, lis = h s l in
+        let rh, ris = h (lh, lis) r in
+        a, a < rh && lis && ris
 
 
 pmrs (join) target =

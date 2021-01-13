@@ -50,8 +50,10 @@ tree,maxtree2,naive,2,0.3145
 tree,maxtree2,requation,1,0.1343
 tree,maxtree,naive,2,0.3336
 tree,maxtree,requation,1,0.1716
-tree,mintree,naive,2,0.0371
-tree,mintree,requation,1,0.0062
+tree,minmax,naive,4,85.9822
+tree,minmax,requation,3,0.6305
+tree,min,naive,2,0.0371
+tree,min,requation,1,0.0062
 tree,mips,requation,2,0.366
 tree,mits,requation,2,0.4837
 tree,mpps,requation,5,137.9315
