@@ -69,7 +69,10 @@ let rec sygus_of_term (t : term) : sygus_term =
   | TTup tl -> SyApp(IdSimple "mkTuple", List.map ~f:sygus_of_term tl)
   | TSel (t,i) -> SyApp(IdIndexed("tupSel",[INum i]), [sygus_of_term t])
   | TApp ({tkind=TVar v;_}, args) -> SyApp(IdSimple v.vname, List.map ~f:sygus_of_term args)
-  | TData (cstr, args) -> SyApp(IdSimple cstr, List.map ~f:sygus_of_term args)
+  | TData (cstr, args) ->
+    (match args with
+       [] -> SyId (IdSimple cstr)
+     | _ ->  SyApp(IdSimple cstr, List.map ~f:sygus_of_term args))
   | TApp(_ , _) -> failwith "Sygus: application function can only be variable."
   | TFun (_, _) -> failwith "Sygus: functions in terms not supported."
 
@@ -164,6 +167,37 @@ let rec term_of_sygus (env : (string, variable, String.comparator_witness) Map.t
 (* ============================================================================================= *)
 (*                           COMMANDS                                                            *)
 (* ============================================================================================= *)
+
+let declare_sort_of_rtype (sname : string) (variants: (string * RType.t list) list)=
+  let dt_cons_decs =
+    let f (variantname, variantargs) =
+      variantname,
+      List.mapi variantargs
+        ~f:(fun i t -> variantname^"_"^(Int.to_string i), sort_of_rtype t)
+    in
+    List.map ~f variants
+  in
+  CDeclareDataType(sname, dt_cons_decs)
+
+
+let declare_sorts_of_vars (vars : VarSet.t) =
+  let sort_decls = Map.empty (module String) in
+  let rec f sort_decls t =
+    RType.(match t with
+        | TInt | TBool | TChar | TString -> sort_decls
+        | TTup tl -> List.fold ~f ~init:sort_decls tl
+        | TNamed tname ->
+          (match get_variants t with
+           | [] -> sort_decls
+           | l ->
+             Map.set sort_decls ~key:tname ~data:(declare_sort_of_rtype tname l))
+        | _ -> sort_decls)
+  in
+  let decl_map =
+    List.fold ~f ~init:sort_decls (List.map ~f:Variable.vtype_or_new (Set.elements vars))
+  in
+  snd (List.unzip (Map.to_alist decl_map))
+
 
 let declaration_of_var (v : variable) =  CDeclareVar(v.vname, sort_of_rtype (Variable.vtype_or_new v))
 

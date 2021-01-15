@@ -57,6 +57,7 @@ tree,min,requation,1,0.0062
 tree,mips,requation,2,0.366
 tree,mits,requation,2,0.4837
 tree,mpps,requation,5,137.9315
+tree,poly,requation,2,16.2117
 tree,sorted,naive,4,47.3055
 tree,sorted,requation,1,0.006
 tree,sumtree,naive,3,0.0437
@@ -68,5 +69,6 @@ zippers,maxPathWeight2,naive,5,2.8294
 zippers,maxPathWeight2,requation,1,0.0084
 zippers,maxPathWeight,naive,3,0.1198
 zippers,maxPathWeight,requation,2,0.1246
+zippers,mips,requation,2,0.3635
 zippers,sum,naive,3,0.071
 zippers,sum,requation,2,0.06

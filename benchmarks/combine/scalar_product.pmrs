@@ -1,0 +1,16 @@
+// The type of zipped vectors
+type 'a list = Nil | Cons of 'a * 'a * 'a list
+// A type for two zipped vectors
+type 'a zlist = ZNil | ZCons of 'a * 'a * 'a * 'a * 'a list
+
+type 'a two_lists = Two of 'a list * 'a list
+
+pmrs spec =
+    add_scalar Two(a,b) -> (f a) + (f b)
+    | f Nil -> 0
+    | f Cons(x1, x2, l) -> (x1 * x2) + (f l)
+
+pmrs (s0, f0) target =
+    prodsum ZNil -> s0
+    | prodsum ZCons(x1,x2,y1,y2, l) -> f0 x1 x2 y1 y2 (prodsum l)
+

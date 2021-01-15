@@ -12,9 +12,10 @@ pmrs spec { fun (x,y) -> y >= 0 && y >= x }  =
         mips (sum1 + a, max (sum1 + a) m1) r
 
 
-pmrs (s0, joinl) target =
+pmrs (s0, joinl, joinr) target =
     main Top -> s0
-    | main Zip(x, a, child, z) -> joinl a (spec child) (main z)
+    | main Zip(Left, a, child, z) -> joinl a (spec child) (main z)
+    | main Zip(Right, a, child, z) -> joinr a (spec child) (main z)
 
 pmrs repr =
     repr Top -> Empty

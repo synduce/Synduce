@@ -1,7 +1,11 @@
 import sys
 import datetime
 
-caption = "Benchmarks. A '-' indicates that synthesis timed out ($>$ 10min)."
+caption = "Benchmarks.\
+            For each class a few benchmarks are evaluated. \
+            The total synthesis time (in seconds) and the number of refinement steps are listed for both {\\tool} and the naive implementation.\
+            $T_{last}$ is the elapsed time before the last call to the syntax guided synthesis solver in the last refinement step.\
+             A '-' indicates that synthesis timed out ($>$ 10min)."
 
 
 def all_timeout(l):
@@ -22,14 +26,15 @@ def produce_tex_table(tex_output_file, data):
         ["combine",
          [
              ["mts", ["Combine", "mts", "no"]],
-             ["mts_and_mps", ["", "mts + mps", "no"]]
+             ["mts_and_mps", ["", "mts + mps", "yes"]]
          ]],
         ["zippers", [
             ["sum", ["", "sum", "no"]],
             ["height", ["Tree to", "height", "no"]],
             ["maxPathWeight", ["Zipper", "max weighted path", "no"]],
             ["maxPathWeight2", ["", "max w. path (hom)", "no"]],
-            ["leftmostodd", ["", "leftmost odd", "no"]]
+            ["leftmostodd", ["", "leftmost odd", "no"]],
+            ["mips", ["", "in-order mps", "yes"]]
         ]],
         ["ptree", [
             ["sum", ["", "sum", "no"]],
@@ -41,11 +46,12 @@ def produce_tex_table(tex_output_file, data):
         ["tree", [
             ["sumtree", ["", "sum", "no"]],
             ["maxtree", ["", "max", "no"]],
-            ["maxtree2", ["Change", "max 2", "no"]],
-            ["min", ["Tree", "min", "no"]],
-            ["minmax", ["Tree", "minmax", "no"]],
+            ["maxtree2", ["", "max 2", "no"]],
+            ["min", ["Change", "min", "no"]],
+            ["minmax", ["Tree", "min-max", "no"]],
             ["maxPathWeight", ["Traversal", "max weighted path", "no"]],
             ["sorted", ["", "sorted in-order", "no"]],
+            ["poly", ["", "pre-order poly", "no"]],
             ["mips", ["", "in-order mps", "yes"]],
             ["mits", ["", "in-order mts", "yes"]],
             ["mpps", ["", "post-order mps", "yes"]]
@@ -78,16 +84,20 @@ def produce_tex_table(tex_output_file, data):
         tex.write("\\begin{table}\n")
         tex.write("\t\caption{%s}\label{table:experiments}\n" % caption)
         tex.write("\t{\n")
-        tex.write("\t\t\\begin{tabular}[h]{|c|c|c|c|c|c|c|c|}\n")
+        tex.write("\t\t\\begin{tabular}[h]{|c|c|c|c|c|c||c|c|c|}\n")
         tex.write("\t\t\t\\hline\n")
         tex.write(
-            "\t\t\t &   & Inv. & \\tool & \# steps & Naive & \# steps & $T_{last}$\\\\ \n")
+            "\t\t\t \multirow{2}{*}{Class} & \multirow{2}{*}{Benchmark}  & \multirow{2}{*}{Inv.} & \multicolumn{3}{c||}{\\tool} & \multicolumn{3}{c|}{Naive}\\\\ \n")
+        tex.write("\t\t\t\\cline{4-9}\n")
+        tex.write(
+            "\t\t\t &   & & time & \# steps & $T_{last}$ & time & \# steps & $T_{last}$\\\\ \n")
         for benchmark_class, benchmarks in show_benchmarks:
             if len(benchmarks) > 0:
                 tex.write("\t\t\t\\hline\n")
             for benchmark_file, benchmark_info in benchmarks:
                 req_t = "?"
                 req_iters = "?"
+                req_last = "?"
                 nai_t = "?"
                 nai_iters = "?"
                 nai_last = "?"
@@ -104,6 +114,8 @@ def produce_tex_table(tex_output_file, data):
                     else:
                         req_t = "-"
                         req_iters = b_data["max"]
+                    if str(b_data["max"]) in b_data:
+                        req_last = "%3.2f" % b_data[str(b_data["max"])][0]
 
                 if (bkey, "naive") not in data.keys():
                     print("No data for %s, naive" % bkey)
@@ -119,9 +131,9 @@ def produce_tex_table(tex_output_file, data):
                     if str(b_data["max"]) in b_data:
                         nai_last = "%3.2f" % b_data[str(b_data["max"])][0]
 
-                tex.write("\t\t\t%s & %s & %s & %s & %s & %s & %s & %s\\\\ \n" % (
+                tex.write("\t\t\t%s & %s & %s & %s & %s & %s & %s & %s & %s\\\\ \n" % (
                     benchmark_info[0], benchmark_info[1], benchmark_info[2],
-                    req_t, req_iters, nai_t, nai_iters, nai_last))
+                    req_t, req_iters, req_last, nai_t, nai_iters, nai_last))
 
             # close table
         tex.write("\t\t\t\\hline\n")

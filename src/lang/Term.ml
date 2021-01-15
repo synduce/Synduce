@@ -597,17 +597,17 @@ let fpat_sub_all fp1s fp2s =
 
 let sexp_of_term (_ : term) = Sexp.Atom "TODO"
 
-let rec mk_composite_scalar (t : RType.t) : term =
+let rec mk_composite_base_type (t : RType.t) : term =
   match t with
   | RType.TInt -> mk_var (Variable.mk ~t:(Some t) (Alpha.fresh "i_"))
   | RType.TBool -> mk_var (Variable.mk ~t:(Some t) (Alpha.fresh "b_"))
   | RType.TString -> mk_var (Variable.mk ~t:(Some t) (Alpha.fresh "s_"))
   | RType.TChar -> mk_var (Variable.mk ~t:(Some t) (Alpha.fresh "c_"))
-  | RType.TTup tl -> mk_tup (List.map ~f:mk_composite_scalar tl)
-  | RType.TNamed _
+  | RType.TTup tl -> mk_tup (List.map ~f:mk_composite_base_type tl)
+  | RType.TNamed _ -> mk_var (Variable.mk ~t:(Some t) (Alpha.fresh "l_"))
   | RType.TFun (_, _)
   | RType.TParam (_, _)
-  | RType.TVar _ -> failwith "not a scalar type"
+  | RType.TVar _ -> failwith Fmt.(str "not a scalar type: %a" RType.pp t)
 
 
 

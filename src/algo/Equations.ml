@@ -336,6 +336,7 @@ let solve_eqns (unknowns : VarSet.t) (eqns : equation list) =
   (* Commands *)
   let set_logic = CSetLogic(Grammars.logic_of_operator all_operators) in
   let synth_objs = synthfuns_of_unknowns ~bools:has_ite ~ops:all_operators unknowns in
+  let sort_decls = declare_sorts_of_vars free_vars in
   let var_decls = List.map ~f:declaration_of_var (Set.elements free_vars) in
   let constraints = constraints_of_eqns eqns in
   let extra_defs =
@@ -343,7 +344,7 @@ let solve_eqns (unknowns : VarSet.t) (eqns : equation list) =
     (if Set.mem all_operators (Binary Min) then [min_definition] else [])
   in
   let commands =
-    set_logic :: (extra_defs @ synth_objs @ var_decls @ constraints @ [CCheckSynth])
+    set_logic :: (extra_defs @ sort_decls @ synth_objs @ var_decls @ constraints @ [CCheckSynth])
   in
   (* Call the solver. *)
   let handle_response (resp : solver_response) =
