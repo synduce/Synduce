@@ -626,3 +626,10 @@ B:tree/poly.pmrs,naive
 2,0.018,2,0
 3,0.037,3,0
 4,1.723,4,0
+B:list/last.pmrs,requation
+1,0.001,2,1
+1,0.0909
+B:list/last.pmrs,naive
+1,0.001,1,0
+2,0.019,2,0
+2,0.0373

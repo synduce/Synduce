@@ -59,6 +59,7 @@ def produce_tex_table(tex_output_file, data):
         ["list", [
             ["sumhom", ["", "sum", "no"]],
             ["lenhom", ["", "length", "no"]],
+            ["last", ["", "last", "no"]],
             ["prodhom", ["Parallelize", "product", "no"]],
             ["polyhom", ["List", "polynomial", "no"]],
             ["hamming", ["Functions", "hamming", "no"]],
@@ -69,7 +70,7 @@ def produce_tex_table(tex_output_file, data):
             ["line_of_sight", ["", "line of sight", "no"]],
             ["mtshom", ["", "mts", "yes"]],
             ["mpshom", ["", "mps", "yes"]],
-            ["mts_and_mps_hom", ["", "mts + mps", "yes"]],
+            ["mts_and_mps_hom", ["", "mts,mps combined", "yes"]],
             ["msshom", ["", "mss", "yes"]]
         ]]
 

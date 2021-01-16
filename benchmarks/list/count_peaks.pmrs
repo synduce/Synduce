@@ -4,19 +4,18 @@ type 'a list = Two of 'a * 'a | Cons of 'a * 'a list
 
 pmrs spec l =
     main l -> f l
-    | f Nil -> (0)
-    | f Cons(hd,tl) -> hd + (f tl)
+    | f Two(a,b) -> (a, b, a >= b, 0)
+    | f Cons(hd,tl) ->
+        let prev, last, slope, cnt = f tl in
+        hd, last, hd >= prev, cnt + (slope && hd < prev ? 1 : 0)
 
-pmrs (odot,f_0,s_0) target t =
-    target t           -> h t
-    | h CNil          -> s_0
-    | h Single(a)    -> f_0 a
+pmrs (odot,f_0) target t =
+    h CTwo(a, b)    -> f_0 a b
     | h Concat(x, y) -> odot (h x) (h y)
 
 pmrs repr l =
     repr l -> c l
-    | c CSingle(a) -> Single(a)
+    | c CTwo(a, b) -> Two(a, b)
     | c Concat(x, y) -> dec y x
-    | dec l CNil -> repr l
-    | dec l Single(a) -> Cons(a, repr l)
+    | dec l CTwo(a, b) -> Cons(a, Cons(b, repr l))
     | dec l Concat(x, y) -> dec (Concat(l, y)) x

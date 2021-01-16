@@ -34,7 +34,7 @@ let check_solution
     (t, u : TermSet.t * TermSet.t)
     (soln : (string * variable list * term) list) =
   (if use_naive then
-     Log.info (fun f () -> Fmt.(pf f "<NAIVE> Check solution."))
+     Log.info (fun f () -> Fmt.(pf f "Check solution."))
    else
      Log.info (fun f () -> Fmt.(pf f "Checking solution...")));
   let start_time = Unix.gettimeofday () in

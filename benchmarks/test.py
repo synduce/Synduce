@@ -23,6 +23,7 @@ input_files = [
     ["tree/sumtree.pmrs", ""],
     ["tree/maxtree.pmrs", ""],
     ["tree/min.pmrs", ""],
+    ["tree/last.pmrs", ""],
     ["tree/minmax.pmrs", ""],
     ["tree/maxtree2.pmrs", ""],
     ["tree/poly.pmrs", ""],

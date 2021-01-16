@@ -13,6 +13,7 @@ let options = [
   ('t',"detupling-off", (set Config.detupling_on false), None);
   ('i', "info-off", (set Config.info false), None);
   ('\000', "use-naive", (set Config.use_naive true), None);
+  ('\000', "use-bmc", (set Config.use_bmc true), None);
   ('\000', "parse-only", (set parse_only true), None);
   ('\000',"replacing-recursion-off", (set Config.replace_recursion false), None);
   ('\000', "show-vars", (set Config.show_vars true), None);

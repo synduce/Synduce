@@ -5,6 +5,8 @@ list,hamming,naive,3,0.5337
 list,hamming,requation,1,0.0464
 list,issorted,naive,4,3.229
 list,issorted,requation,2,3.297
+list,last,naive,2,0.0373
+list,last,requation,1,0.0909
 list,lenhom,naive,4,0.4464
 list,lenhom,requation,1,0.0252
 list,line_of_sight,requation,2,0.7225

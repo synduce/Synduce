@@ -1,11 +1,11 @@
 // The type of non-empty concat-lists
-type 'a clist = Single of 'a | Concat of 'a clist * 'a clist
+type clist = Single of int | Concat of clist * clist
 // The type of non-empty lists
-type 'a list = Elt of 'a | Cons of 'a * 'a list
+type list = Elt of int | Cons of int * list
 
 pmrs spec l =
-    lmin Elt(a) -> a
-    | lmin Cons(hd,tl) -> min hd (lmin tl)
+    last Elt(a) -> a
+    | last Cons(hd,tl) -> last tl
 
 pmrs (odot,f_0,s_0) target t =
     h Single(a)    -> f_0 a
