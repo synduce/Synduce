@@ -2,9 +2,10 @@ import sys
 import datetime
 
 caption = "Benchmarks.\
-            For each class a few benchmarks are evaluated. \
-            The total synthesis time (in seconds) and the number of refinement steps are listed for both {\\tool} and the naive implementation.\
-            $T_{last}$ is the elapsed time before the last call to the syntax guided synthesis solver in the last refinement step.\
+            For each class a few benchmarks are evaluated.\n\
+            The total synthesis time(in seconds) and the number of refinement steps are listed for both {\\tool} and the naive implementation.\n\
+            The shortest time is in bold font.\
+            $T_{last}$ is the elapsed time before the last call to the syntax guided synthesis solver in the last refinement step.\n\
              A '-' indicates that synthesis timed out ($>$ 10min)."
 
 
@@ -104,7 +105,7 @@ def produce_tex_table(tex_output_file, data):
                 nai_last = "?"
 
                 bkey = benchmark_class + "/" + benchmark_file + ".pmrs"
-
+                naive_bf = False
                 if (bkey, "requation") not in data.keys():
                     print("No data for %s, requation" % bkey)
                 else:
@@ -126,11 +127,18 @@ def produce_tex_table(tex_output_file, data):
                     if "res" in b_data:
                         nai_iters, nai_time = b_data["res"]
                         nai_t = "%3.2f" % float(nai_time)
+                        if float(nai_time) < float(req_t):
+                            naive_bf = True
                     else:
                         nai_t = "-"
                         nai_iters = b_data["max"]
                     if str(b_data["max"]) in b_data:
                         nai_last = "%3.2f" % b_data[str(b_data["max"])][0]
+
+                if naive_bf:
+                    nai_t = "{\\bfseries %s}" % nai_t
+                else:
+                    req_t = "{\\bfseries %s}" % req_t
 
                 tex.write("\t\t\t%s & %s & %s & %s & %s & %s & %s & %s & %s\\\\ \n" % (
                     benchmark_info[0], benchmark_info[1], benchmark_info[2],

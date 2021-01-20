@@ -3,3 +3,4 @@
 **/.merlin
 _build
 Example
+*.log
