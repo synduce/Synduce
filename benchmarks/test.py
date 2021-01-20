@@ -14,7 +14,7 @@ input_files = [
     ["zippers/sum.pmrs", ""],
     ["zippers/height.pmrs", ""],
     ["zippers/mips.pmrs", ""],
-    ["zippers/leftmostodd.pmrs", ""],
+    ["zippers/leftmostodd.pmrs", "-b 4"],
     ["zippers/maxPathWeight.pmrs", ""],
     ["zippers/maxPathWeight2.pmrs", ""],
     ["ptree/sum.pmrs", ""],

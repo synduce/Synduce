@@ -5,7 +5,7 @@ type sel = Left | Right
 type 'c zipper = Top | Zip of sel * 'c * 'c btree * 'c zipper
 
 
-pmrs spec {fun (b, x) -> !b || (x % 2 = 0)} =
+pmrs spec =
     leftOdd Empty -> false, 1
     | leftOdd Node(a, l, r) ->
             let b1, x1 = leftOdd l in

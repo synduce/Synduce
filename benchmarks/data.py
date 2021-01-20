@@ -1,6 +1,8 @@
 import sys
 import datetime
 
+input_file = "benchmarks/bench.txt"
+
 caption = "Benchmarks.\
             For each class a few benchmarks are evaluated.\n\
             The total synthesis time(in seconds) and the number of refinement steps are listed for both {\\tool} and the naive implementation.\n\
@@ -127,7 +129,7 @@ def produce_tex_table(tex_output_file, data):
                     if "res" in b_data:
                         nai_iters, nai_time = b_data["res"]
                         nai_t = "%3.2f" % float(nai_time)
-                        if float(nai_time) < float(req_t):
+                        if req_t == "-" or float(nai_time) < float(req_t):
                             naive_bf = True
                     else:
                         nai_t = "-"
@@ -168,7 +170,7 @@ def means(v):
 
 def raw_to_csv():
     benchmark_data = {}
-    with open("benchmarks/bench.txt") as raw:
+    with open(input_file) as raw:
         lines = raw.readlines()
         num_lines = len(lines)
         benchfile, method = "none", "none"
