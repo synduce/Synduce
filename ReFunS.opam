@@ -8,15 +8,17 @@ maintainer: ["victorn@cs.toronto.edu"]
 authors: ["Victor Nicolet"]
 license: "MIT"
 depends: [
-  "dune" {>= "2.6"}
+  "dune" {>= "2.8"}
   "base" {>= "v0.14.0"}
+  "core" {>= "v0.14.0"}
   "fmt" {>= "0.8.8"}
   "getopt" {>= "20120615"}
   "menhir" {>= "20200624"}
   "parsexp" {>= "v0.14.0"}
-  "ppx_let" {>= "v0.14.0"}
   "stdio" {>= "v0.14.0"}
   "sexplib" {>= "v0.14.0"}
+  "extlib" { >= "1.7.8" }
+  "lwt" { >= "5.4.0" }
 ]
 build: [
   ["dune" "subst"] {pinned}
