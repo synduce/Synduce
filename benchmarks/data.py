@@ -1,7 +1,7 @@
 import sys
 import datetime
 
-input_file = "benchmarks/bench.txt"
+input_file = "benchmarks/bench_laptop.txt"
 
 caption = "Benchmarks.\
             For each class a few benchmarks are evaluated.\n\
@@ -37,7 +37,7 @@ def produce_tex_table(tex_output_file, data):
             ["maxPathWeight", ["Zipper", "max weighted path", "no"]],
             ["maxPathWeight2", ["", "max w. path (hom)", "no"]],
             ["leftmostodd", ["", "leftmost odd", "no"]],
-            ["mips", ["", "in-order mps", "yes"]]
+            ["mips", ["", "{\\tt mips}", "yes"]]
         ]],
         ["ptree", [
             ["sum", ["", "sum", "no"]],
@@ -55,25 +55,26 @@ def produce_tex_table(tex_output_file, data):
             ["maxPathWeight", ["Traversal", "max weighted path", "no"]],
             ["sorted", ["", "sorted in-order", "no"]],
             ["poly", ["", "pre-order poly", "no"]],
-            ["mips", ["", "in-order mps", "yes"]],
+            ["mips", ["", "{\\tt mips}", "yes"]],
             ["mits", ["", "in-order mts", "yes"]],
             ["mpps", ["", "post-order mps", "yes"]]
         ]],
         ["list", [
             ["sumhom", ["", "sum", "no"]],
+            ["sumevens", ["", "sum of even elts.", "no"]],
             ["lenhom", ["", "length", "no"]],
             ["last", ["", "last", "no"]],
             ["prodhom", ["Parallelize", "product", "no"]],
             ["polyhom", ["List", "polynomial", "no"]],
             ["hamming", ["Functions", "hamming", "no"]],
-            ["maxhom", ["", "max", "no"]],
-            ["minhom", ["", "min", "no"]],
+            ["maxcount", ["", "count max elements", "no"]],
+            ["minhom", ["", "mininum", "no"]],
             ["issorted", ["", "is sorted", "no"]],
-            ["search", ["", "lin. search", "no"]],
+            ["search", ["", "linear search", "no"]],
             ["line_of_sight", ["", "line of sight", "no"]],
             ["mtshom", ["", "mts", "yes"]],
             ["mpshom", ["", "mps", "yes"]],
-            ["mts_and_mps_hom", ["", "mts,mps combined", "yes"]],
+            ["mts_and_mps_hom", ["", "mts and mps combined", "yes"]],
             ["msshom", ["", "mss", "yes"]]
         ]]
 
