@@ -44,10 +44,18 @@ type pmrs_rule = loc * term * term
 
 type pmrs_body = pmrs_rule list
 
+type function_body =
+  | PmrsBody of loc * pmrs_body
+  | ExprBody of loc * term
+
 type decl =
   | TypeDecl of loc * type_decl
   | FunDecl of loc * id * (id list) * term option * term
   | PMRSDecl of loc * (id list) * id * (id list) * term option * pmrs_body
+  | CamlPMRSDecl of loc * (id list) * term option * (id * (id list) * function_body) list
+  | SyntObjDecl of loc * decl * id * id
+
+
 
 type program = decl list
 
@@ -67,3 +75,60 @@ let rec pp_fterm (frmt : Formatter.t) (t : term) =
   | FTUn (op, t1) -> Fmt.(pf frmt "%a %a" Unop.pp op pp_fterm t1)
   | FTHOBin op -> Fmt.(pf frmt "(%a)" Binop.pp op)
   | FTIte (c, a, b) -> Fmt.(pf frmt "(%a?%a:%a)" pp_fterm c pp_fterm a pp_fterm b)
+
+(* Preprocessing progam *)
+let make_rules functions =
+  let f (name, args, func_body) =
+    match func_body with
+    | PmrsBody (ploc, rules) ->
+      let f (loc, lhs, rhs) =
+        let fargs = List.map ~f:(fun x -> mk_var loc x) args in
+        loc, mk_app ploc (mk_var ploc name) (fargs @ [lhs]), rhs
+      in
+      List.map ~f rules
+    | ExprBody (loc, term) ->
+      [loc, mk_app loc (mk_var loc name) [mk_var loc (List.last_exn args)], term]
+  in
+  List.concat (List.map ~f functions)
+
+
+let rebuild_pmrs_decl loc params inv functions =
+  match functions with
+  | (name, args, fbody) :: _ ->
+    Utils.Log.verbose_msg ("Preprocessing "^name);
+      let parametric_args =
+        match fbody with
+        | PmrsBody _ -> args
+        | ExprBody _ ->
+          match List.drop_last args with
+          | Some pargs -> pargs
+          | None ->
+            Utils.Log.error_msg Fmt.(str "%s should have at least one argument." name);
+            failwith "Not a proper recursion scheme."
+      in
+      PMRSDecl(loc, params, name, parametric_args, inv, make_rules functions)
+  | [] -> PMRSDecl(loc, params, "??", [], inv, [])
+
+
+let preprocess (prog : program) : program * (ident * ident * ident) option =
+    let obj_name = ref None in
+    let rec f d =
+      match d with
+      | CamlPMRSDecl(loc, params, invariant, functions) ->
+        rebuild_pmrs_decl loc params invariant functions
+      | SyntObjDecl(_, target_pmrs, spec_id, repr_id) ->
+        let rskel_name, d =
+          match f target_pmrs with
+          | PMRSDecl(_, _, name, _, _, _) as d ->
+            Utils.Log.verbose_msg Fmt.(str "Synthesis objective %s = %s %s" name spec_id repr_id);
+              Some name, d
+          | d -> None, d
+        in
+        (match rskel_name with
+        | Some n -> obj_name := Some (n, spec_id, repr_id)
+        | None -> ());
+        d
+      | _ -> d
+    in
+    let processed_decls = List.map ~f prog in
+    processed_decls, !obj_name

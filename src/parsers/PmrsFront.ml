@@ -24,7 +24,7 @@ let variable_not_found loc k =
 
 
 let parsefile filename =
-  (* Save the text for better error reporting. *)
+  (* Save the text for nicer error reporting. *)
   text := Stdio.In_channel.read_all filename;
   Log.reference_text := !text;
   let lexbuf = Lexing.from_channel ~with_positions:true (Stdio.In_channel.create filename) in
@@ -37,7 +37,10 @@ let parsefile filename =
     Log.(error (wrap1 "%a" Fmt.string (ErrorReports.report !text checkpoint)));
     []
   in
-  I.loop_handle succeed fail supplier checkpoint
+  (* Parse the program incrementally *)
+  let prog = I.loop_handle succeed fail supplier checkpoint in
+  (* Preprocessing Caml definitions into PMRS *)
+  preprocess prog
 
 
 (**

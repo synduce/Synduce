@@ -7,17 +7,26 @@ exception SyntaxError of string
 
 let keywords =
     [
+        "@inv", INVARIANT;
+        "@equiv", EQUIV;
+        "@defining", DEFINING;
         "abs", ABS;
+        "and", LETAND;
         "boolean", BOOLSORT;
+        "else", ELSE;
         "false", FALSE;
         "fun", FUN;
+        "function", FUNCTION;
         "in", IN;
+        "if", IF;
         "int", INTSORT;
         "let", LET;
         "pmrs", LETPMRS;
         "max", MAX;
         "min", MIN;
         "of", OF;
+        "rec", REC;
+        "then", THEN;
         "type", TYPE;
         "true", TRUE
     ]
@@ -38,6 +47,7 @@ let next_line lexbuf =
 let id = ['_' 'a'-'z'] ['_' 'A'-'Z' 'a'-'z' '0'-'9']*
 let capid = ['A'-'Z'] ['_' 'A'-'Z' 'a'-'z' '0'-'9']*
 let primed_id = ['''] ['_' 'A'-'Z' 'a'-'z' '0'-'9']*
+let at_id = ['@' '#'] ['_' 'A'-'Z' 'a'-'z' '0'-'9']*
 let nl = ['\n' '\r']
 let ws = ['\n' '\t' '\r' ' ']
 let digit = ['0'-'9']
@@ -50,6 +60,10 @@ rule token = parse
   | primed_id as pid  { PIDENT pid }
   | capid as capid    { CIDENT capid }
   | id as id          { try Hashtbl.find keyword_tbl id with Not_found -> IDENT id }
+  | at_id as keyw      { try Hashtbl.find keyword_tbl keyw with
+                            Not_found -> raise (LexError ("Unexpected keyword "^keyw)) }
+  | "//"              { comment lexbuf }
+  | "(*"              { multi_line_comment lexbuf }
   | "->"              { RIGHTARROW }
   | "!="              { NEQ }
   | "&&"              { AND }
@@ -64,6 +78,8 @@ rule token = parse
   | ")"               { RPAR }
   | "{"               { LBRACE }
   | "}"               { RBRACE }
+  | "["               { LBRACKET }
+  | "]"               { RBRACKET }
   | "+"               { PLUS }
   | "-"               { MINUS }
   | "*"               { TIMES }
@@ -76,7 +92,6 @@ rule token = parse
   | int as int        { INT (int_of_string int) }
   | nl                { next_line lexbuf; token lexbuf }
   | ws                { token lexbuf }
-  | "//"              { comment lexbuf }
   | eof               { EOF }
   | _                 { raise (LexError ("Unexpected char: "^(Lexing.lexeme lexbuf))) }
 
@@ -93,3 +108,9 @@ and comment = parse
     nl               { next_line lexbuf; token lexbuf }
   | eof              { EOF }
   | _                { comment lexbuf }
+
+and multi_line_comment = parse
+  | "*)" { token lexbuf }
+  | nl { next_line lexbuf; multi_line_comment lexbuf }
+  | eof { raise (SyntaxError ("Unexpected EOF - unterminated comment.")) }
+  | _ { multi_line_comment lexbuf }

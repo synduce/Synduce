@@ -2,6 +2,7 @@ type 'a clist = CNil | Single of 'a | Concat of 'a clist * 'a clist
 
 type 'a list = Nil | Cons of 'a * 'a list
 
+(* Pmrs is parametric on some input x *)
 pmrs spec x =
     main l -> f l
     | f Nil -> false

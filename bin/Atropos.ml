@@ -65,11 +65,12 @@ let main () =
    | DryadSynth -> Syguslib.Sygus.use_v1 := true);
   let start_time = Unix.gettimeofday () in
   Config.glob_start := start_time;
-  let prog = parse_pmrs !filename in
+  (* Parse input file. *)
+  let prog, psi_comps = parse_pmrs !filename in
   let _ = seek_types prog in
   let all_pmrs = translate prog in
   if !parse_only then Caml.exit 1;
-  (match Algo.PmrsAlgos.solve_problem all_pmrs with
+  (match Algo.PmrsAlgos.solve_problem psi_comps all_pmrs with
    | Ok target ->
      let elapsed = Unix.gettimeofday () -. start_time in
      Utils.Log.info Fmt.(fun frmt () -> pf frmt "Solution found in %4.4fs:@;%a@]" elapsed (box PMRS.pp) target);

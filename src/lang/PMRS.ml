@@ -135,9 +135,10 @@ let pp (frmt : Formatter.t) (pmrs : t) : unit =
             Fmt.(pf frmt "@[<v 2>  %a@]@;" pp_rewrite_rule (nt,args,pat,res))
         ) pmrs.prules
   in
-  Fmt.(pf frmt "%s⟨%a⟩: %a -> %a%a = @;@[<v 2>{@;%a@;}@]"
+  Fmt.(pf frmt "%s⟨%a⟩(%a): %a -> %a%a = @;@[<v 2>{@;%a@;}@]"
          pmrs.pvar.vname
          VarSet.pp_var_names pmrs.pparams
+         (list Variable.pp) pmrs.pargs
          RType.pp pmrs.pinput_typ
          RType.pp(first pmrs.poutput_typ)
          (option (braces pp_term)) (second pmrs.poutput_typ)

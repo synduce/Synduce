@@ -128,9 +128,17 @@ let psi_naive (p : psi_def) =
 
 let no_synth () = failwith "No synthesis objective found."
 
-let solve_problem (pmrs : (string, PMRS.t, Base.String.comparator_witness) Map.t) :
+let solve_problem
+  (psi_comps : (string * string * string) option)
+  (pmrs : (string, PMRS.t, Base.String.comparator_witness) Map.t) :
   (PMRS.t, solver_response) Result.t =
-  let orig_fname = "spec" and target_fname = "target" and repr_fname = "repr" in
+  let target_fname, spec_fname, repr_fname =
+    match psi_comps with
+    | Some names -> names
+    | None ->
+      Utils.Log.debug_msg ("Using default names.");
+      "target", "spec", "repr"
+  in
   (* Representation function. *)
   let repr, theta_to_tau =
     match Map.find pmrs repr_fname with
@@ -150,16 +158,17 @@ let solve_problem (pmrs : (string, PMRS.t, Base.String.comparator_witness) Map.t
   in
   (* Original function. *)
   let orig_f, tau =
-    match Map.find pmrs orig_fname with
+    match Map.find pmrs spec_fname with
     | Some pmrs -> pmrs, pmrs.pinput_typ
-    | None -> Log.error_msg "No origin function found."; no_synth ()
+    | None -> Log.error_msg Fmt.(str "No spec named %s found." spec_fname); no_synth ()
   in
   (* Target recursion scheme. *)
   let target_f, xi, theta =
     let target_f =
       match Map.find pmrs target_fname with
       | Some pmrs -> pmrs
-      | None -> Log.error_msg "No target recursion scheme found"; no_synth ()
+      | None -> Log.error_msg Fmt.(str "No recursion skeleton named %s found." target_fname);
+      no_synth ()
     in
     target_f, target_f.pparams, target_f.pinput_typ
   in
@@ -208,7 +217,7 @@ let solve_problem (pmrs : (string, PMRS.t, Base.String.comparator_witness) Map.t
   Log.info
     Fmt.(fun fmt () -> pf fmt " Ψ (%a) := ∀ x : %a. (%s o %s)(x) = %s(x)"
             (list ~sep:comma Term.Variable.pp) (Set.elements xi) RType.pp theta
-            orig_fname repr_fname target_fname);
+            spec_fname repr_fname target_fname);
   Log.info Fmt.(fun fmt () -> pf fmt "%a" PMRS.pp orig_f);
   Log.info Fmt.(fun fmt () -> pf fmt "%a" PMRS.pp target_f);
   Log.info Fmt.(fun fmt () ->

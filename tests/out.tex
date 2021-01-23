@@ -1,56 +1,66 @@
 % ====================================
-% This table has been automatically produced by the tool on 2021-01-12 20:00:01.617264.
+% This table has been automatically produced by the tool on 2021-01-23 13:51:13.349214.
 % ====================================
 \begin{table}
-	\caption{Benchmarks. A '-' indicates that synthesis timed out ($>$ 10min).}\label{table:experiments}
+	\caption{Benchmarks.            For each class a few benchmarks are evaluated.
+            The total synthesis time(in seconds) and the number of refinement steps are listed for both {\tool} and the naive implementation.
+            The shortest time is in bold font.            $T_{last}$ is the elapsed time before the last call to the syntax guided synthesis solver in the last refinement step.
+             A '-' indicates that synthesis timed out ($>$ 10min).}\label{table:experiments}
 	{
-		\begin{tabular}[h]{|c|c|c|c|c|c|c|c|}
+		\begin{tabular}[h]{|c|c|c|c|c|c||c|c|c|}
 			\hline
-			 &   & Inv. & \# steps & \tool  & Naive & \# steps & T_\{last\}\\ 
+			 \multirow{2}{*}{Class} & \multirow{2}{*}{Benchmark}  & \multirow{2}{*}{Inv.} & \multicolumn{3}{c||}{\tool} & \multicolumn{3}{c|}{Naive}\\ 
+			\cline{4-9}
+			 &   & & time & \# steps & $T_{last}$ & time & \# steps & $T_{last}$\\ 
 			\hline
-			Tail & sum & no & 2 & 0.04 & 0.03 & 3 & 0.02\\ 
-			Recursive & mts & no & 2 & 1.05 & 27.31 & 3 & 0.04\\ 
-			 & mps & no & 2 & 1.78 & 4.98 & 3 & 0.03\\ 
+			Tail & sum & no & 0.04 & 2 & 0.01 & {\bfseries 0.04} & 3 & 0.03\\ 
+			Recursive & mts & no & {\bfseries 1.22} & 2 & 0.03 & 32.58 & 3 & 0.05\\ 
+			 & mps & no & {\bfseries 2.19} & 2 & 0.03 & 6.23 & 3 & 0.04\\ 
 			\hline
-			Combine & mts & no & 2 & 1.83 & 206.98 & 3 & 0.03\\ 
-			 & mts + mps & no & 3 & 0.90 & - & 3 & 0.05\\ 
+			Combine & mts & no & {\bfseries 2.21} & 2 & 0.09 & 232.95 & 3 & 0.04\\ 
+			 & mts + mps & yes & {\bfseries 0.74} & 3 & 0.18 & - & 3 & 0.05\\ 
 			\hline
-			 & sum & no & 2 & 0.06 & 0.07 & 3 & 0.04\\ 
-			Tree to & height & no & 1 & 0.12 & 0.21 & 5 & 0.13\\ 
-			Zipper & max weighted path & no & 2 & 0.12 & 0.12 & 3 & 0.04\\ 
-			 & max w. path (hom) & no & 1 & 0.01 & 2.83 & 5 & 0.14\\ 
-			 & leftmost odd & no & 1 & 0.01 & - & 4 & 0.14\\ 
+			 & sum & no & 0.12 & 2 & 0.07 & {\bfseries 0.08} & 3 & 0.04\\ 
+			Tree to & height & no & {\bfseries 0.14} & 1 & 0.00 & 0.33 & 5 & 0.24\\ 
+			Zipper & max weighted path & no & 0.18 & 2 & 0.09 & {\bfseries 0.12} & 3 & 0.05\\ 
+			 & max w. path (hom) & no & {\bfseries 0.01} & 1 & 0.00 & 3.41 & 5 & 0.15\\ 
+			 & leftmost odd & no & {\bfseries 0.01} & 1 & 0.00 & - & 4 & 9.45\\ 
+			 & {\tt mips} & yes & {\bfseries 1.57} & 3 & 0.60 & - & 7 & 169.88\\ 
 			\hline
-			 & sum & no & 3 & 0.12 & 0.07 & 2 & 0.01\\ 
-			Flat & product & no & 3 & 0.19 & 0.06 & 2 & 0.01\\ 
-			Tree & max of heads & no & 2 & 0.11 & 0.24 & 3 & 0.04\\ 
-			 & max of lasts & no & 2 & 0.26 & 0.12 & 3 & 0.04\\ 
-			 & max sibling sum & no & 2 & 1.82 & 5.35 & 3 & 0.05\\ 
+			 & sum & no & 0.13 & 3 & 0.05 & {\bfseries 0.09} & 2 & 0.02\\ 
+			Flat & product & no & 0.21 & 3 & 0.06 & {\bfseries 0.07} & 2 & 0.02\\ 
+			Tree & max of heads & no & {\bfseries 0.12} & 2 & 0.03 & 0.30 & 3 & 0.04\\ 
+			 & max of lasts & no & 0.33 & 2 & 0.03 & {\bfseries 0.14} & 3 & 0.04\\ 
+			 & max sibling sum & no & {\bfseries 2.48} & 2 & 0.03 & 7.39 & 3 & 0.05\\ 
 			\hline
-			 & sum & no & 2 & 0.04 & 0.04 & 3 & 0.03\\ 
-			 & max & no & 1 & 0.17 & 0.33 & 2 & 0.01\\ 
-			Change & max 2 & no & 1 & 0.13 & 0.31 & 2 & 0.01\\ 
-			Tree & min & no & 1 & 0.01 & 0.04 & 2 & 0.01\\ 
-			Traversal & max weighted path & no & 3 & 0.08 & 0.08 & 3 & 0.03\\ 
-			 & sorted in-order & no & 1 & 0.01 & 47.31 & 4 & 2.14\\ 
-			 & in-order mps & yes & 2 & 0.37 & - & 4 & 3.31\\ 
-			 & in-order mts & yes & 2 & 0.48 & - & 4 & 2.06\\ 
-			 & post-order mps & yes & 5 & 137.93 & - & 6 & 42.41\\ 
+			 & sum & no & 0.05 & 2 & 0.02 & {\bfseries 0.05} & 3 & 0.03\\ 
+			 & max & no & {\bfseries 0.15} & 1 & 0.00 & 0.25 & 2 & 0.01\\ 
+			 & max 2 & no & {\bfseries 0.12} & 1 & 0.00 & 0.28 & 2 & 0.01\\ 
+			Change & min & no & {\bfseries 0.10} & 1 & 0.00 & 0.26 & 2 & 0.01\\ 
+			Tree & min-max & no & {\bfseries 0.64} & 3 & 0.17 & 108.38 & 4 & 4.02\\ 
+			Traversal & max weighted path & no & 0.14 & 3 & 0.09 & {\bfseries 0.08} & 3 & 0.04\\ 
+			 & sorted in-order & no & {\bfseries 0.01} & 1 & 0.00 & 54.32 & 4 & 2.63\\ 
+			 & pre-order poly & no & {\bfseries 18.86} & 2 & 0.07 & - & 4 & 2.22\\ 
+			 & {\tt mips} & yes & {\bfseries 0.41} & 2 & 0.07 & - & 4 & 4.06\\ 
+			 & in-order mts & yes & {\bfseries 0.61} & 2 & 0.11 & - & 4 & 2.60\\ 
+			 & post-order mps & yes & {\bfseries 153.69} & 4 & 99.29 & - & 6 & 48.02\\ 
 			\hline
-			 & sum & no & 1 & 0.03 & 0.38 & 3 & 0.18\\ 
-			 & length & no & 1 & 0.03 & 0.45 & 4 & 0.25\\ 
-			Parallelize & product & no & 1 & 0.03 & 0.39 & 3 & 0.18\\ 
-			List & polynomial & no & 1 & 0.07 & - & 253 & 49.19\\ 
-			Functions & hamming & no & 1 & 0.05 & 0.53 & 3 & 0.24\\ 
-			 & max & no & 1 & 0.08 & 0.10 & 2 & 0.02\\ 
-			 & min & no & 1 & 0.08 & 0.11 & 2 & 0.02\\ 
-			 & is sorted & no & 2 & 3.30 & 3.23 & 4 & 0.14\\ 
-			 & lin. search & no & 1 & 0.03 & 0.44 & 3 & 0.20\\ 
-			 & line of sight & no & 2 & 0.72 & - & 5 & 484.03\\ 
-			 & mts & yes & 1 & 0.08 & 5.55 & 4 & 0.67\\ 
-			 & mps & yes & 1 & 0.08 & 5.63 & 4 & 0.68\\ 
-			 & mts + mps & yes & 2 & 0.37 & 67.15 & 6 & 19.29\\ 
-			 & mss & yes & 3 & 6.46 & - & 7 & 582.95\\ 
+			 & sum & no & {\bfseries 0.03} & 1 & 0.00 & 0.40 & 3 & 0.18\\ 
+			 & sum of even elts. & no & {\bfseries 0.05} & 1 & 0.00 & 0.58 & 3 & 0.24\\ 
+			 & length & no & {\bfseries 0.02} & 1 & 0.00 & 0.46 & 4 & 0.25\\ 
+			 & last & no & {\bfseries 0.03} & 1 & 0.00 & 0.04 & 2 & 0.02\\ 
+			Parallelize & product & no & {\bfseries 0.03} & 1 & 0.00 & 0.40 & 3 & 0.18\\ 
+			List & polynomial & no & {\bfseries 0.07} & 1 & 0.00 & 1.24 & 5 & 0.64\\ 
+			Functions & hamming & no & {\bfseries 0.05} & 1 & 0.00 & 0.55 & 3 & 0.24\\ 
+			 & count max elements & no & {\bfseries 0.51} & 1 & 0.00 & 6.44 & 2 & 0.17\\ 
+			 & mininum & no & {\bfseries 0.06} & 1 & 0.00 & 0.09 & 2 & 0.02\\ 
+			 & is sorted & no & 3.81 & 2 & 0.13 & {\bfseries 3.74} & 4 & 0.15\\ 
+			 & linear search & no & {\bfseries 0.05} & 1 & 0.01 & 0.47 & 3 & 0.19\\ 
+			 & line of sight & no & {\bfseries 0.86} & 2 & 0.07 & - & 5 & 536.90\\ 
+			 & mts & yes & {\bfseries 0.08} & 1 & 0.00 & 4.44 & 4 & 0.56\\ 
+			 & mps & yes & {\bfseries 0.11} & 1 & 0.04 & 4.27 & 4 & 0.54\\ 
+			 & mts and mps combined & yes & {\bfseries 0.41} & 2 & 0.15 & 73.42 & 6 & 20.17\\ 
+			 & mss & yes & {\bfseries 6.08} & 3 & 2.12 & - & 6 & 271.19\\ 
 			\hline
 		\end{tabular}
 	}

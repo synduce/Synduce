@@ -32,14 +32,27 @@ let root_folder = Caml.Filename.current_dir_name
 
 let base s = Caml.Filename.concat root_folder s
 
-let cvc4_binary_path = FileUtil.which "cvc4"
+let cvc4_binary_path =
+  try
+    FileUtil.which "cvc4"
+  with _ -> failwith "CVC4 not found."
 
-let z3_binary_path = FileUtil.which "z3"
+let z3_binary_path =
+    try
+      FileUtil.which "z3"
+    with _ -> failwith "Z3 not found."
 
 
-(* TODO fix this. *)
-let dryadsynth_binary_path = "/home/victorn/tools/DryadSynth/exec.sh"
-let eusolver_binary_path = "/home/victorn/tools/DryadSynth/exec.sh"
+(* TODO fix this. Not functional. *)
+let dryadsynth_binary_path =
+    try
+      FileUtil.which "DryadSynth"
+    with _ -> ""
+
+let eusolver_binary_path =
+    try
+      FileUtil.which "eusolver"
+    with _ -> ""
 
 
 (* ============================================================================================= *)

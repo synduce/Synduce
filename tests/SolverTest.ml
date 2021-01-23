@@ -14,7 +14,7 @@ let test_from_input_file ?(print=true) file =
   let _ = program_of_sexp_list sexp in
   let tstart = Unix.time () in
   let response =
-    CVC4.exec_solver (input_filename, output_filename)
+    SygusSolver.exec_solver (input_filename, output_filename)
   in
   let elapsed = (Unix.time ()) -. tstart in
   Unix.remove output_filename;
