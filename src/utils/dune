@@ -1,4 +1,4 @@
 (library
     (name utils)
-    (public_name ReFunS.Lib.Utils)
-    (libraries base fmt sexplib str))
+    (public_name Atropos.Lib.Utils)
+    (libraries base fmt sexplib str fileutils))

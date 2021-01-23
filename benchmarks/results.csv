@@ -10,6 +10,8 @@ list,last,requation,1,0.0273
 list,lenhom,naive,4,0.4637
 list,lenhom,requation,1,0.0249
 list,line_of_sight,requation,2,0.8627
+list,maxcount,naive,2,6.444
+list,maxcount,requation,1,0.5072
 list,maxhom,naive,2,0.1003
 list,maxhom,requation,1,0.066
 list,minhom,naive,2,0.0877
@@ -29,8 +31,14 @@ list,search,naive,3,0.4746
 list,search,requation,1,0.0459
 list,sndminhom,naive,2,3.7303
 list,sndminhom,requation,1,2.37
+list,sumevens,naive,3,0.5786
+list,sumevens,requation,1,0.0468
+list,sumgt,naive,4,0.6474
+list,sumgt,requation,1,0.0455
 list,sumhom,naive,3,0.4031
 list,sumhom,requation,1,0.0275
+list,sumodds,naive,3,0.5789
+list,sumodds,requation,1,0.0438
 ptree,maxheads,naive,3,0.2993
 ptree,maxheads,requation,2,0.1186
 ptree,maxlast,naive,3,0.1418

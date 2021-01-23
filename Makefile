@@ -1,3 +1,3 @@
 all:
-	dune build bin/ReFunS.exe
-	ls -s _build/default/bin/ReFunS.exe ReFunS
+	dune build bin/Atropos.exe
+	ls -s _build/default/bin/Atropos.exe atropos

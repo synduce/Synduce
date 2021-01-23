@@ -1,5 +1,5 @@
 (lang dune 2.6)
-(name ReFunS)
+(name Atropos)
 (version 0.1)
 (license MIT)
 (authors "Victor Nicolet")
@@ -10,7 +10,7 @@
 
 
 (package
-    (name ReFunS)
+    (name Atropos)
     (synopsis "Recursive Function Synthesizer")
     (description "Executable and libraries for automatic synthesis of recursive functions.")
     (depends

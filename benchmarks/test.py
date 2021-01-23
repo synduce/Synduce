@@ -58,7 +58,7 @@ input_files = [
 ]
 
 root = os.getcwd()
-path = os.path.join(root, "_build/default/bin/ReFunS.exe")
+path = os.path.join(root, "_build/default/bin/Atropos.exe")
 
 sys.stdout.flush()
 

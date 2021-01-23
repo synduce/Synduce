@@ -1,4 +1,4 @@
-# ReFunS
+# Atropos
 
 Automatic recursive function synthesis.
 
