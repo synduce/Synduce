@@ -4,7 +4,7 @@ Automatic recursive function synthesis.
 This is very much work in progress, but is reasonably functional.
 
 # Requirements
-You will need [OCaml 4.11.1](https://ocaml.org/releases/4.11.1.html) and the [OCaml Package Manager (opam)](https://opam.ocaml.org) to get started.
+You will need a recent [OCaml](https://ocaml.org/releases/4.11.1.html) installation and the [OCaml Package Manager (opam)](https://opam.ocaml.org) to get started.
 
 The Ocaml dependencies of this project can be installed via opam (```opam install . --deps-only```).
 Once all the dependencies are installed, call ```make``` from the root of the project. The Makefile simply calls dune build and creates a shortcut to the binary executable.
@@ -17,7 +17,7 @@ This small script should work for an installation from scratch on Ubuntu, or any
 sudo apt install opam
 opam init
 eval $(opam env)
-opam switch create 4.11.1
+opam switch install ocaml-base-compiler
 eval $(opam env)
 opam install . --deps-only
 make
