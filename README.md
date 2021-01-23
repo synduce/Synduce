@@ -22,7 +22,7 @@ eval $(opam env)
 opam install . --deps-only
 make
 ```
-The above should work for OSX with `brew` instead of `(sudo) apt`, but this has not been tested.
+The installation of the dependencies sometimes fails. If it does, try installing `core` on its own, and then try again.
 
 ## Basic Usage
 `./atropos -h` should get you started.
