@@ -10,13 +10,18 @@ license: "MIT"
 depends: [
   "dune" {>= "2.6"}
   "base" {>= "v0.14.0"}
+  "core" { >= "v0.14.0" }
   "fmt" {>= "0.8.8"}
+  "extlib" {>= "1.7.7" }
   "getopt" {>= "20120615"}
   "menhir" {>= "20200624"}
+  "lwt" {>= "5.3.0"}
   "parsexp" {>= "v0.14.0"}
   "ppx_let" {>= "v0.14.0"}
+  "ppx_sexp_conv" {>= "v0.14.0"}
   "stdio" {>= "v0.14.0"}
   "sexplib" {>= "v0.14.0"}
+  "fileutils" {>= "0.6.3" }
 ]
 build: [
   ["dune" "subst"] {pinned}
