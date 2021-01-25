@@ -69,11 +69,13 @@ let main () =
   let prog, psi_comps = parse_pmrs !filename in
   let _ = seek_types prog in
   let all_pmrs = translate prog in
+  let is_ocaml_syntax = Caml.Filename.check_suffix !filename ".ml" in
   if !parse_only then Caml.exit 1;
   (match Algo.PmrsAlgos.solve_problem psi_comps all_pmrs with
    | Ok target ->
      let elapsed = Unix.gettimeofday () -. start_time in
-     Utils.Log.info Fmt.(fun frmt () -> pf frmt "Solution found in %4.4fs:@;%a@]" elapsed (box PMRS.pp) target);
+     Utils.Log.info Fmt.(fun frmt () -> pf frmt "Solution found in %4.4fs:@.%a@]"
+     elapsed (box (if is_ocaml_syntax then PMRS.pp_ocaml else PMRS.pp)) target);
      (* If no info required, output timing information. *)
      if not !Config.info then
        Fmt.(pf stdout "%i,%.4f@." !Algo.PmrsAlgos.refinement_steps elapsed)

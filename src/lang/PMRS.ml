@@ -83,7 +83,7 @@ let infer_pmrs_types (prog : t) =
     | Some res -> Map.set map ~key ~data:(nt, args, pat, rewrite_types (RType.mkv res) t_body), res
     | None -> Log.loc_fatal_errmsg cur_loc
                 (Fmt.str "(%a) has type %a, expected type %a."
-                   pp_term body RType.pp t_body.ttyp RType.pp t_head.ttyp)
+                  pp_term body RType.pp t_body.ttyp RType.pp t_head.ttyp)
   in
   let new_rules, new_subs =
     Map.fold prog.prules ~f:infer_aux ~init:(Map.empty (module Int), [])
@@ -119,10 +119,10 @@ let pp_pattern (frmt : Formatter.t) (t, args : pattern) : unit =
 
 let pp_rewrite_rule (frmt : Formatter.t) (nt, vargs, pat, t : rewrite_rule) : unit =
   Fmt.(pf frmt "@[<hov 2>@[<hov 2>%s %a %a  ⟹@] @;%a@]"
-         nt.vname
-         (list ~sep:comma Variable.pp) vargs
-         (option pp_pattern) pat
-         (box pp_term) t)
+        nt.vname
+        (list ~sep:comma Variable.pp) vargs
+        (option pp_pattern) pat
+        (box pp_term) t)
 
 
 let pp (frmt : Formatter.t) (pmrs : t) : unit =
@@ -136,15 +136,64 @@ let pp (frmt : Formatter.t) (pmrs : t) : unit =
         ) pmrs.prules
   in
   Fmt.(pf frmt "%s⟨%a⟩(%a): %a -> %a%a = @;@[<v 2>{@;%a@;}@]"
-         pmrs.pvar.vname
-         VarSet.pp_var_names pmrs.pparams
-         (list Variable.pp) pmrs.pargs
-         RType.pp pmrs.pinput_typ
-         RType.pp(first pmrs.poutput_typ)
-         (option (braces pp_term)) (second pmrs.poutput_typ)
-         pp_rules ())
+        pmrs.pvar.vname
+        VarSet.pp_var_names pmrs.pparams
+        (list Variable.pp) pmrs.pargs
+        RType.pp pmrs.pinput_typ
+        RType.pp(first pmrs.poutput_typ)
+        (option (braces pp_term)) (second pmrs.poutput_typ)
+        pp_rules ())
 
 
+let pp_ocaml (frmt : Formatter.t) (pmrs : t) : unit =
+    let print_caml_def (frmt : Formatter.t) (nt, args, cases) =
+      let pp_case f (opat, rhs) =
+        match opat with
+        | Some pat -> Fmt.(pf f "@[@[%a@] -> %a@]" pp_pattern pat pp_term rhs)
+        | None -> Fmt.(pf f "@[<missing pattern> ->@;%a@]" pp_term rhs)
+      in
+      match cases with
+      | [] -> ()
+      | [pat_opt, rhs] ->
+        (match pat_opt with
+        | Some pat -> Fmt.(pf frmt "@[<hov 2>%s @[%a _x@] =@;@[match _x with %a -> %a@]@]"
+              nt.vname (list ~sep:sp Variable.pp) args pp_pattern pat pp_term rhs)
+          | None ->
+          Fmt.(pf frmt "@[<hov 2>%s @[%a@] =@;%a@]"
+          nt.vname (list ~sep:sp Variable.pp) args pp_term rhs))
+      | _ :: _ ->
+        Fmt.(pf frmt "@[<hov 2>%s @[%a@]=@;@[<hov 2>function@;%a@]"
+            nt.vname (list ~sep:sp Variable.pp) args
+            (list ~sep:(fun f () -> pf f "@;| ") pp_case) cases)
+    in
+    let functions =
+        let f nt =
+          let nt_rules =
+            let f (nth, _, _, _) = Variable.(nth = nt) in
+            Map.filter ~f pmrs.prules
+          in
+          let args, match_cases =
+            let reconstr_cases (args, match_cases) (_, (_, args', pat, rhs)) =
+              let pre_subst = List.zip_exn args' args in
+              let substs = List.map ~f:(fun (x,y) -> mk_var x, mk_var y) pre_subst in
+              args, match_cases @ [pat, substitution substs rhs]
+            in
+            match Map.to_alist nt_rules with
+            | [] -> [], []
+            | (_, (_, args, pat, rhs)):: tl ->
+                let init = args, [pat, rhs] in
+                List.fold ~f:reconstr_cases ~init tl
+          in
+          nt, args, match_cases
+        in
+        List.map ~f (Set.elements pmrs.pnon_terminals)
+    in
+    match functions with
+    | [] -> ()
+    | hd :: tl ->
+        Fmt.(pf frmt "@[let rec %a@]@." print_caml_def hd);
+        List.iter tl
+          ~f:(fun caml_def -> Fmt.(pf frmt "@[and %a@]@." print_caml_def caml_def))
 
 
 
@@ -181,9 +230,9 @@ let func_to_pmrs (f : Variable.t) (args : fpattern list) (body : Term.term) =
 (*                                           UTILS FOR PMRS                                      *)
 (* ============================================================================================= *)
 (**
-   inverted_rule_lookup searches for rules whose rhs match (func args), and return
-   a map from rule id to the lhs of the rules matching (func args), with the appropriate
-   substitutions performed.
+  inverted_rule_lookup searches for rules whose rhs match (func args), and return
+  a map from rule id to the lhs of the rules matching (func args), with the appropriate
+  substitutions performed.
 *)
 let inverted_rule_lookup ?(boundvars = VarSet.empty) rules (func : term) (args : term list) =
   let list_matching l =
@@ -212,8 +261,8 @@ let inverted_rule_lookup ?(boundvars = VarSet.empty) rules (func : term) (args :
     | TApp(rhs_func, rhs_args) ->
       if Terms.(equal rhs_func func) then
         (match List.zip rhs_args args with
-         | Ok l -> Option.map ~f:lhs_term (list_matching l)
-         | _ -> None)
+        | Ok l -> Option.map ~f:lhs_term (list_matching l)
+        | _ -> None)
       else None
     | _ -> None
   in
