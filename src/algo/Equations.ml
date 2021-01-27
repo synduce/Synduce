@@ -527,14 +527,14 @@ let split_solve partial_soln (unknowns : VarSet.t) (eqns : equation list) =
 
 let solve_stratified (unknowns : VarSet.t) (eqns : equation list) =
   let psol, u, e =
-    if !Config.stratify_on then
-      let partial_soln, new_unknowns, new_eqns =
-        solve_constant_eqns unknowns eqns
+    if !Config.syndef_on then
+      let c_soln, no_c_unknowns, no_c_eqns =
+      solve_constant_eqns unknowns eqns
       in
       let partial_soln', new_unknowns, new_eqns =
-        solve_syntactic_definitions new_unknowns new_eqns
+        solve_syntactic_definitions no_c_unknowns no_c_eqns
       in
-      partial_soln @ partial_soln', new_unknowns, new_eqns
+      c_soln @ partial_soln', new_unknowns, new_eqns
     else
       [], unknowns, eqns
   in

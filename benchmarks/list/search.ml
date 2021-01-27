@@ -11,7 +11,7 @@ let rec search a =
     | Nil -> false
     | Cons(hd, tl) -> if hd = a then true else search a tl
 
-let rec clist_to_list  =
+let rec clist_to_list =
     function
     | CNil -> Nil
     | Single(a) -> Cons(a, Nil)
@@ -23,10 +23,12 @@ and dec l1 =
         | Concat(x, y) -> dec (Concat(l1, y)) x
 
 (* Target function: synthesize hsum s.t. hsum(x) = sum(clist_to_list(x)) *)
-let rec hsum a =
-    function
-    | CNil          -> s0
-    | Single(a)    -> f0 a
-    | Concat(x, y) -> odot (hsum x) (hsum y)
-    [@defining s0 f0 odot]
-    [@equiv sum clist_to_list ]
+let rec hsearch a t =
+    let main =
+        function
+        | CNil          -> s0
+        | Single(a)    -> f0 a
+        | Concat(x, y) -> odot (hsum x) (hsum y)
+        [@defining s0 f0 odot]
+        [@equiv sum clist_to_list ]
+    in main t

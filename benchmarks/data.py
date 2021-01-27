@@ -1,14 +1,15 @@
 import sys
 import datetime
 
-input_file = "benchmarks/bench_laptop.txt"
+input_file = "benchmarks/bench.txt"
 
 caption = "Benchmarks.\
             For each class a few benchmarks are evaluated.\n\
             The total synthesis time(in seconds) and the number of refinement steps are listed for both {\\tool} and the naive implementation.\n\
             The shortest time is in bold font.\
             $T_{last}$ is the elapsed time before the last call to the syntax guided synthesis solver in the last refinement step.\n\
-             A '-' indicates that synthesis timed out ($>$ 10min)."
+             A '-' indicates that synthesis timed out($>$ 10 min).\
+            Experiments are run on a laptop with 16G memory and an i7-8750H 6-core CPU at 2.20GHz running Ubuntu 19.10."
 
 
 def all_timeout(l):
@@ -22,27 +23,27 @@ def produce_tex_table(tex_output_file, data):
     show_benchmarks = [
         ["tailopt",
          [
-             ["sum", ["Tail", "sum", "no"]],
-             ["mts", ["Recursive", "mts", "no"]],
-             ["mps", ["", "mps", "no"]]
+             ["sum", ["Enforcing", "sum", "no"]],
+             ["mts", ["Tail", "mts", "no"]],
+             ["mps", ["Recursion", "mps", "no"]]
          ]],
         ["combine",
          [
-             ["mts", ["Combine", "mts", "no"]],
-             ["mts_and_mps", ["", "mts + mps", "yes"]]
+             ["mts", ["Combining", "mts + sum", "no"]],
+             ["mts_and_mps", ["Traversals", "sum + mts + mps", "yes"]]
          ]],
         ["zippers", [
             ["sum", ["", "sum", "no"]],
-            ["height", ["Tree to", "height", "no"]],
-            ["maxPathWeight", ["Zipper", "max weighted path", "no"]],
-            ["maxPathWeight2", ["", "max w. path (hom)", "no"]],
+            ["height", ["From ", "height", "no"]],
+            ["maxPathWeight", ["Tree to", "max weighted path", "no"]],
+            ["maxPathWeight2", ["Zipper", "max w. path (hom)", "no"]],
             ["leftmostodd", ["", "leftmost odd", "no"]],
             ["mips", ["", "{\\tt mips}", "yes"]]
         ]],
         ["ptree", [
             ["sum", ["", "sum", "no"]],
-            ["mul", ["Flat", "product", "no"]],
-            ["maxheads", ["Tree", "max of heads", "no"]],
+            ["mul", ["Tree", "product", "no"]],
+            ["maxheads", ["Flattening", "max of heads", "no"]],
             ["maxlast", ["", "max of lasts", "no"]],
             ["maxsum", ["", "max sibling sum", "no"]]
         ]],
@@ -50,9 +51,9 @@ def produce_tex_table(tex_output_file, data):
             ["sumtree", ["", "sum", "no"]],
             ["maxtree", ["", "max", "no"]],
             ["maxtree2", ["", "max 2", "no"]],
-            ["min", ["Change", "min", "no"]],
+            ["min", ["Changing", "min", "no"]],
             ["minmax", ["Tree", "min-max", "no"]],
-            ["maxPathWeight", ["Traversal", "max weighted path", "no"]],
+            ["maxPathWeight", ["Traversals", "max weighted path", "no"]],
             ["sorted", ["", "sorted in-order", "no"]],
             ["poly", ["", "pre-order poly", "no"]],
             ["mips", ["", "{\\tt mips}", "yes"]],
@@ -64,10 +65,10 @@ def produce_tex_table(tex_output_file, data):
             ["sumevens", ["", "sum of even elts.", "no"]],
             ["lenhom", ["", "length", "no"]],
             ["last", ["", "last", "no"]],
-            ["prodhom", ["Parallelize", "product", "no"]],
-            ["polyhom", ["List", "polynomial", "no"]],
-            ["hamming", ["Functions", "hamming", "no"]],
-            ["maxcount", ["", "count max elements", "no"]],
+            ["prodhom", ["Parallelizing", "product", "no"]],
+            ["polyhom", ["Functions", "polynomial", "no"]],
+            ["hamming", ["on", "hamming", "no"]],
+            ["maxcount", ["Lists", "count max elements", "no"]],
             ["minhom", ["", "mininum", "no"]],
             ["issorted", ["", "is sorted", "no"]],
             ["search", ["", "linear search", "no"]],
@@ -180,24 +181,39 @@ def raw_to_csv():
             s = lines[i]
             if s.startswith("B:"):
                 inst = s.strip().strip("B:").split(",")
-                benchfile, method = inst[0], inst[1].strip(" ")
-                benchmark_data[benchfile, method] = {}
-                benchmark_data[benchfile, method]["max"] = 0
+                benchfile, method = inst[0], inst[1].strip(" ").split("+")
+                method_base = method[0]
+                method_opt = "all"
+                if len(method) > 1:
+                    method_opt = method[1]
+                key = benchfile, method_base, method_opt
+                benchmark_data[key] = {}
+                benchmark_data[key]["max"] = 0
             else:
                 infos = lines[i].strip().split(",")
 
-                if len(infos) == 4:
-                    step, time, tnum, unum = infos[0], float(
-                        infos[1]), int(infos[2]), int(infos[3])
-                    benchmark_data[benchfile, method][step] = time, tnum, unum
-                    benchmark_data[benchfile, method]["max"] = max(
-                        benchmark_data[benchfile, method]["max"], int(step))
+                if len(infos) == 5:
+                    step, verif_time, time, tnum, unum = infos[0], float(
+                        infos[1]), float(infos[2]), int(infos[3]), int(infos[4])
+                    benchmark_data[key][step] = verif_time, time, tnum, unum
+                    benchmark_data[key]["max"] = max(
+                        benchmark_data[key]["max"], int(step))
 
-                if len(infos) == 2:
-                    benchmark_data[benchfile, method]["res"] = int(
-                        infos[0]), float(infos[1])
+                if len(infos) == 3:
+                    # Res = #of refinement steps, verif. time, total time.
+                    benchmark_data[key]["res"] = int(
+                        infos[0]), float(infos[1]), float(infos[2])
+    bd = {}
+    for k, v in benchmark_data.items():
+        file, method, flags = k
+        key = file, method
+        if key in bd.keys():
+            bd[key][flags] = v
+        else:
+            bd[key] = {}
+            bd[key][flags] = v
 
-    return benchmark_data
+    return bd
 
 
 def benchsort(x):
@@ -208,20 +224,24 @@ if __name__ == "__main__":
     thedict = raw_to_csv()
     results = []
     for k, v in thedict.items():
-        print(k, v)
-        k0 = k[0].split("/")
-        subfolder = k0[0].strip()
-        benchmark = k0[1].split(".")[0].strip()
-        if "res" in v.keys():
-            iters = v["res"][0]
-            time = v["res"][1]
-            results.append([subfolder, benchmark, k[1], iters, time])
+        print(k)
+        for k2, v in v.items():
+            print(k2, v)
+            k0 = k[0].split("/")
+            subfolder = k0[0].strip()
+            benchmark = k0[1].split(".")[0].strip()
+            if "res" in v.keys():
+                iters = v["res"][0]
+                verif_time = v["res"][1]
+                time = v["res"][2]
+                results.append(
+                    [subfolder, benchmark, k[1], iters, verif_time, time])
 
     results.sort(key=benchsort)
 
     with open("benchmarks/results.csv", 'w') as outf:
-        for a, b, c, d, e in results:
-            outf.write("%s,%s,%s,%s,%s\n" % (a, b, c, d, e))
+        for a, b, c, d, e, f in results:
+            outf.write("%s,%s,%s,%s,%s,%s\n" % (a, b, c, d, e, f))
 
     if len(sys.argv) > 1:
         tex_out = sys.argv[1]

@@ -18,9 +18,9 @@ let print_usage () =
     -i --info-off                  Turn off information messages. Print time and refinement steps.
   Turning optimizations off:
        --replacing-recursion-off   Do not use reference function in nested calls.
-    -s --split-solving-off         Do not split systems into subsystems.
-       --stratifying-off           Do not use syntactic definitions.
-    -t --detupling-off             Turn off detupling.
+    -s --no-splitting              Do not split systems into subsystems.
+       --no-syndef                 Do not use syntactic definitions.
+    -t --no-detupling              Turn off detupling.
        --use-naive                 Use the naive algorithm. Turns bmc on.
   Bounded checking:
        --use-bmc                   Use naive bounded model checking (bmc mode).
@@ -37,15 +37,15 @@ let options = [
   ('h', "help", (Some print_usage), None);
   ('v', "verbose", (set Config.verbose true), None);
   ('d', "debug", (set Config.debug true), None);
-  ('t',"detupling-off", (set Config.detupling_on false), None);
   ('i', "info-off", (set Config.info false), None);
+  ('\000', "show-vars", (set Config.show_vars true), None);
   ('\000', "use-naive", (set Config.use_naive true), None);
   ('\000', "use-bmc", (set Config.use_bmc true), None);
   ('\000', "parse-only", (set parse_only true), None);
   ('\000',"replacing-recursion-off", (set Config.replace_recursion false), None);
-  ('\000', "show-vars", (set Config.show_vars true), None);
-  ('\000',"stratifying-off", (set Config.stratify_on false), None);
-  ('s',"split-solving-off", (set Config.split_solve_on false), None);
+  ('t',"no-detupling", (set Config.detupling_on false), None);
+  ('\000',"no-syndef", (set Config.syndef_on false), None);
+  ('s',"no-splitting", (set Config.split_solve_on false), None);
   ('n',"verification", None, Some (Config.set_num_expansions_check));
   ('b',"bmc", None, Some (Config.set_check_depth));
   ('\000',"use-dryadsynth", (set Syguslib.Solvers.SygusSolver.default_solver DryadSynth), None)
@@ -66,10 +66,15 @@ let main () =
   let start_time = Unix.gettimeofday () in
   Config.glob_start := start_time;
   (* Parse input file. *)
-  let prog, psi_comps = parse_pmrs !filename in
+  let is_ocaml_syntax = Caml.Filename.check_suffix !filename ".ml" in
+  let prog, psi_comps =
+    if is_ocaml_syntax then
+      parse_ocaml !filename
+    else
+      parse_pmrs !filename
+  in
   let _ = seek_types prog in
   let all_pmrs = translate prog in
-  let is_ocaml_syntax = Caml.Filename.check_suffix !filename ".ml" in
   if !parse_only then Caml.exit 1;
   (match Algo.PmrsAlgos.solve_problem psi_comps all_pmrs with
    | Ok target ->
@@ -78,7 +83,7 @@ let main () =
      elapsed (box (if is_ocaml_syntax then PMRS.pp_ocaml else PMRS.pp)) target);
      (* If no info required, output timing information. *)
      if not !Config.info then
-       Fmt.(pf stdout "%i,%.4f@." !Algo.PmrsAlgos.refinement_steps elapsed)
+       Fmt.(pf stdout "%i,%.4f,%.4f@." !Algo.PmrsAlgos.refinement_steps !Config.verif_time elapsed)
 
    | Error _ -> Utils.Log.error_msg "No solution found.");
   if !Config.show_vars then Term.Variable.print_summary stdout ()

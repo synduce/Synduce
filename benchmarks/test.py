@@ -69,7 +69,48 @@ for filename_with_opt in input_files:
     os.system("timeout %i %s %s -i %s" %
               (timeout, path, os.path.realpath(os.path.join("benchmarks", filename)), opt))
     if len(sys.argv) < 2:
+        # Detupling off
+        # print("B:%s,requation+t" % filename)
+        # sys.stdout.flush()
+        # os.system("timeout %i %s %s -it %s" %
+        #           (timeout, path, os.path.realpath(os.path.join("benchmarks", filename)), opt))
+        # Detupling + splitting off
+        print("B:%s,requation+st" % filename)
+        sys.stdout.flush()
+        os.system("timeout %i %s %s -ist %s" %
+                  (timeout, path, os.path.realpath(os.path.join("benchmarks", filename)), opt))
+        # Syntactic definitions off
+        print("B:%s,requation+d" % filename)
+        sys.stdout.flush()
+        os.system("timeout %i %s %s -i --no-syndef %s" %
+                  (timeout, path, os.path.realpath(os.path.join("benchmarks", filename)), opt))
+        # All optimizations off
+        print("B:%s,requation+off" % filename)
+        sys.stdout.flush()
+        os.system("timeout %i %s %s -ist --no-syndef %s" %
+                  (timeout, path, os.path.realpath(os.path.join("benchmarks", filename)), opt))
+        # =========================================================================================
+        # ===> Naive algorithm evaluation.
         print("B:%s,naive" % filename)
         sys.stdout.flush()
         os.system("timeout %i %s %s -i %s %s" %
+                  (timeout, path, os.path.realpath(os.path.join("benchmarks", filename)), opt, naive_opt))
+        # # Detupling off
+        # print("B:%s,naive+t" % filename)
+        # sys.stdout.flush()
+        # os.system("timeout %i %s %s -it %s %s" %
+        #           (timeout, path, os.path.realpath(os.path.join("benchmarks", filename)), opt, naive_opt))
+        # Detupling + splitting off
+        print("B:%s,naive+st" % filename)
+        sys.stdout.flush()
+        os.system("timeout %i %s %s -ist %s %s" %
+                  (timeout, path, os.path.realpath(os.path.join("benchmarks", filename)), opt, naive_opt))
+        # Syntactic definitions off
+        print("B:%s,naive+d" % filename)
+        sys.stdout.flush()
+        os.system("timeout %i %s %s -i --no-syndef %s %s" %
+                  (timeout, path, os.path.realpath(os.path.join("benchmarks", filename)), opt, naive_opt))
+        print("B:%s,naive+off" % filename)
+        sys.stdout.flush()
+        os.system("timeout %i %s %s -ist --no-syndef %s %s" %
                   (timeout, path, os.path.realpath(os.path.join("benchmarks", filename)), opt, naive_opt))

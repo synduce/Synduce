@@ -7,8 +7,8 @@ open Fmt
 
 
 let test_from_input_file ?(print=true) file =
-  let input_filename = Config.base ("tests/inputs/"^file) in
-  let output_filename = Config.base "tests/outputs/"^file^"-res.txt" in
+  let input_filename = Config.base ("inputs/"^file) in
+  let output_filename = Config.base "outputs/"^file^"-res.txt" in
   let file_contents = Stdio.In_channel.create input_filename in
   let sexp = Sexplib.Sexp.input_sexps file_contents in
   let _ = program_of_sexp_list sexp in

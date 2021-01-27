@@ -1,4 +1,4 @@
 (executable
-    (name Atropos)
-    (public_name Atropos.Driver)
-    (libraries Lib fmt base parsexp sexplib getopt))
+ (name Atropos)
+ (public_name Atropos.Driver)
+ (libraries Lib fmt base parsexp compiler-libs sexplib getopt))

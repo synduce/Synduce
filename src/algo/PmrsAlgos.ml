@@ -16,8 +16,9 @@ let rec refinement_loop (p : psi_def) (t_set, u_set : TermSet.t * TermSet.t) =
   (* Output status information before entering process. *)
   let elapsed = Unix.gettimeofday () -. !Config.glob_start in
   Log.info (fun frmt () -> Fmt.pf frmt "Refinement step %i." !refinement_steps);
-  if not !Config.info then Fmt.(pf stdout "%i,%3.3f,%i,%i@."
-                                  !refinement_steps elapsed (Set.length t_set) (Set.length u_set));
+  if not !Config.info then Fmt.(pf stdout "%i,%3.3f,%3.3f,%i,%i@."
+                                  !refinement_steps !Config.verif_time
+                                   elapsed (Set.length t_set) (Set.length u_set));
   Log.debug_msg Fmt.(str "Start refinement loop with %i terms in T, %i terms in U."
                        (Set.length t_set) (Set.length u_set));
   (* Refinement of t_set, u_set. *)
@@ -81,8 +82,9 @@ let rec expansion_loop (p : psi_def) (t_set : TermSet.t) =
   Int.incr refinement_steps;
   let elapsed = Unix.gettimeofday () -. !Config.glob_start in
   Log.info (fun frmt () -> Fmt.pf frmt "Refinement step %i." !refinement_steps);
-  if not !Config.info then Fmt.(pf stdout "%i,%3.3f,%i,0@."
-                                  !refinement_steps elapsed (Set.length t_set));
+  if not !Config.info then Fmt.(pf stdout "%i,%3.3f,%3.3f,%i,0@."
+                                  !refinement_steps !Config.verif_time
+                                 elapsed (Set.length t_set));
   Log.debug_msg Fmt.(str "<NAIVE> Start expansion loop with %i terms in T." (Set.length t_set));
   (* Start of the algorithm. *)
   let eqns = Equations.make ~force_replace_off:true ~p t_set in

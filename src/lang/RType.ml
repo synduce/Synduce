@@ -2,7 +2,6 @@ open Base
 open Lexing
 open Utils
 
-
 let _tid = ref 0
 
 
@@ -159,7 +158,6 @@ let add_type ?(params: ident list = [])  ~(typename: string) (tterm : type_term)
       ~typename ~main_type variants;
     add_only ()
   | _ -> add_only ()
-
 
 
 (* ============================================================================================= *)

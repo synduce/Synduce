@@ -15,6 +15,8 @@ let info = ref true
 (* Start time. *)
 let glob_start = ref 0.0
 
+let verif_time = ref 0.0
+
 (* Toggle to show a summary of variables used and their types. *)
 let show_vars = ref false
 
@@ -65,11 +67,12 @@ let eusolver_binary_path =
 *)
 let detupling_on = ref true
 
-(** Stratified solving: first solve for constant definitions, and syntactic definitions,
-  and then solve for the rest of the equations.
-  Turn off using option --stratifying-off
+(**
+  Syntactic definitions: detect syntactic definitions in the equation systems and
+  use them.
+  Turn off with --no-syndef
  *)
-let stratify_on = ref true
+let syndef_on = ref true
 
 (** Separate systems of equations into subsystems, and solve independently each subsystem.
   Use option -s or --split-solving-off to turn off.

@@ -99,6 +99,7 @@ let check_solution
   let ctex_or_none = find_ctex 0 u in
   close_solver solver;
   let elapsed = Unix.gettimeofday () -. start_time in
+  Config.verif_time := !Config.verif_time +. elapsed;
   Log.info (fun f () -> Fmt.(pf f "... finished in %3.4fs" elapsed));
   ctex_or_none
 
@@ -156,5 +157,6 @@ let bounded_check
   spop solver;
   close_solver solver;
   let elapsed = Unix.gettimeofday () -. start_time in
+  Config.verif_time := !Config.verif_time +. elapsed;
   Log.info (fun f () -> Fmt.(pf f "... finished in %3.4fs" elapsed));
   ctex_or_none
