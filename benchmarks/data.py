@@ -1,7 +1,9 @@
 import sys
 import datetime
 
-input_file = "benchmarks/bench.txt"
+timeout_time = 600.0
+
+input_file = "benchmarks/bench_laptop.txt"
 
 caption = "Benchmarks.\
             For each class a few benchmarks are evaluated.\n\
@@ -21,32 +23,6 @@ def all_timeout(l):
 
 def produce_tex_table(tex_output_file, data):
     show_benchmarks = [
-        ["tailopt",
-         [
-             ["sum", ["Enforcing", "sum", "no"]],
-             ["mts", ["Tail", "mts", "no"]],
-             ["mps", ["Recursion", "mps", "no"]]
-         ]],
-        ["combine",
-         [
-             ["mts", ["Combining", "mts + sum", "no"]],
-             ["mts_and_mps", ["Traversals", "sum + mts + mps", "yes"]]
-         ]],
-        ["zippers", [
-            ["sum", ["", "sum", "no"]],
-            ["height", ["From ", "height", "no"]],
-            ["maxPathWeight", ["Tree to", "max weighted path", "no"]],
-            ["maxPathWeight2", ["Zipper", "max w. path (hom)", "no"]],
-            ["leftmostodd", ["", "leftmost odd", "no"]],
-            ["mips", ["", "{\\tt mips}", "yes"]]
-        ]],
-        ["ptree", [
-            ["sum", ["", "sum", "no"]],
-            ["mul", ["Tree", "product", "no"]],
-            ["maxheads", ["Flattening", "max of heads", "no"]],
-            ["maxlast", ["", "max of lasts", "no"]],
-            ["maxsum", ["", "max sibling sum", "no"]]
-        ]],
         ["tree", [
             ["sumtree", ["", "sum", "no"]],
             ["maxtree", ["", "max", "no"]],
@@ -60,6 +36,33 @@ def produce_tex_table(tex_output_file, data):
             ["mits", ["", "in-order mts", "yes"]],
             ["mpps", ["", "post-order mps", "yes"]]
         ]],
+        ["zippers", [
+                    ["sum", ["", "sum", "no"]],
+                    ["height", ["From ", "height", "no"]],
+                    ["maxPathWeight", ["Tree to", "max weighted path", "no"]],
+                    ["maxPathWeight2", ["Zipper", "max w. path (hom)", "no"]],
+                    ["leftmostodd", ["", "leftmost odd", "no"]],
+                    ["mips", ["", "{\\tt mips}", "yes"]]
+        ]],
+        ["tailopt",
+         [
+             ["sum", ["Enforcing", "sum", "no"]],
+             ["mts", ["Tail", "mts", "no"]],
+             ["mps", ["Recursion", "mps", "no"]]
+         ]],
+        ["combine",
+         [
+             ["mts", ["Combining", "mts + sum", "no"]],
+             ["mts_and_mps", ["Traversals", "sum + mts + mps", "yes"]]
+         ]],
+        ["ptree", [
+            ["sum", ["", "sum", "no"]],
+            ["mul", ["Tree", "product", "no"]],
+            ["maxheads", ["Flattening", "max of heads", "no"]],
+            ["maxlast", ["", "max of lasts", "no"]],
+            ["maxsum", ["", "max sibling sum", "no"]]
+        ]],
+
         ["list", [
             ["sumhom", ["", "sum", "no"]],
             ["sumevens", ["", "sum of even elts.", "no"]],
@@ -110,12 +113,27 @@ def produce_tex_table(tex_output_file, data):
 
                 bkey = benchmark_class + "/" + benchmark_file + ".pmrs"
                 naive_bf = False
+
+                # Pick best optimized version for requation
+                a_data = data[bkey, "requation"]
+                versions = ["all", "st", "d", "off"]
+                best_v = "all"
+                best_t = timeout_time
+                for version in versions:
+                    b_data = a_data[version]
+                    if "res" in b_data:
+                        _, _, this_time = b_data["res"]
+                        this_t = float(this_time)
+                        if this_t < best_t:
+                            best_t = this_t
+                            best_v = version
+
                 if (bkey, "requation") not in data.keys():
                     print("No data for %s, requation" % bkey)
                 else:
-                    b_data = data[bkey, "requation"]
+                    b_data = data[bkey, "requation"][best_v]
                     if "res" in b_data:
-                        req_iters, req_time = b_data["res"]
+                        req_iters, _, req_time = b_data["res"]
                         req_t = "%3.2f" % float(req_time)
                     else:
                         req_t = "-"
@@ -123,13 +141,27 @@ def produce_tex_table(tex_output_file, data):
                     if str(b_data["max"]) in b_data:
                         req_last = "%3.2f" % b_data[str(b_data["max"])][0]
 
+                # Pick best optimized version for naive
+                a_data = data[bkey, "naive"]
+                versions = ["all", "st", "d", "off"]
+                best_v = "all"
+                best_t = timeout_time
+                for version in versions:
+                    b_data = a_data[version]
+                    if "res" in b_data:
+                        _, _, this_time = b_data["res"]
+                        this_t = float(this_time)
+                        if this_t < best_t:
+                            best_t = this_t
+                            best_v = version
+
                 if (bkey, "naive") not in data.keys():
                     print("No data for %s, naive" % bkey)
 
                 else:
-                    b_data = data[bkey, "naive"]
+                    b_data = data[bkey, "naive"][best_v]
                     if "res" in b_data:
-                        nai_iters, nai_time = b_data["res"]
+                        nai_iters, _, nai_time = b_data["res"]
                         nai_t = "%3.2f" % float(nai_time)
                         if req_t == "-" or float(nai_time) < float(req_t):
                             naive_bf = True
