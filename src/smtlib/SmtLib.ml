@@ -1,5 +1,7 @@
 open Base
 open Sexplib
+open Sexp
+open Option.Let_syntax
 
 module OC = Stdio.Out_channel
 module IC = Stdio.In_channel
@@ -140,232 +142,426 @@ type script = command list
 
 
 
-let pp_option (f : Formatter.t) (oname, ovalue : solver_option) =
-  Fmt.(pf f ":%s %s" oname ovalue)
+let sexps_of_option (oname, ovalue : solver_option) : t list =
+  [Atom (":"^oname); Atom ovalue]
 
-let pp_info_flag (f : Formatter.t) (i : info_flag) =
+let option_of_sexp (sexp : t) : solver_option option =
+  match sexp with
+  | List[Atom s; Atom v] ->
+      if String.is_prefix s ~prefix:":" then
+          Some (String.drop_prefix s 1, v)
+      else None
+  | _ -> None
+
+let sexp_of_info_flag (i : info_flag) : t =
   match i with
-  | 0 -> Fmt.(pf f ":all-statistics")
-  | 1 -> Fmt.(pf f ":assertion-stack-levels")
-  | 2 -> Fmt.(pf f ":authors")
-  | 3 -> Fmt.(pf f ":error-behavior")
-  | 4 -> Fmt.(pf f ":name")
-  | 5 -> Fmt.(pf f ":reason-unknown")
-  | 6 -> Fmt.(pf f ":version")
-  | _ -> Fmt.(pf f "UNKNOWN_INFO_FLAG(%i)" i)
+  | 0 -> (Atom ":all-statistics")
+  | 1 -> (Atom ":assertion-stack-levels")
+  | 2 -> (Atom ":authors")
+  | 3 -> (Atom ":error-behavior")
+  | 4 -> (Atom ":name")
+  | 5 -> (Atom ":reason-unknown")
+  | 6 -> (Atom ":version")
+  | _ -> (Atom (Fmt.(str "UNKNOWN_INFO_FLAG(%i)" i)))
 
 
-let pp_numeral (f : Formatter.t) (n : numeral) =
-  Fmt.(pf f "%i" n)
+let info_flag_of_sexp (sexp : t) : info_flag =
+  match sexp with
+  | Atom ":all-statistics" -> 0
+  | Atom ":assertion-stack-levels" -> 1
+  | Atom ":authors" -> 2
+  | Atom ":error-behavior" -> 3
+  | Atom ":name" -> 4
+  | Atom ":reason-unknown" -> 5
+  | Atom ":version" -> 6
+  | _ -> 7
 
-let pp_smtSpecConstant (f : Formatter.t) (sc : smtSpecConstant) =
+
+let sexp_of_numeral (n : numeral) : Sexp.t =
+  Sexp.Atom (Fmt.(str "%i" n))
+
+let numeral_of_sexp (sexp: Sexp.t) : numeral option =
+  match sexp with
+  | Atom s ->
+      (try Some (Int.of_string s) with _ -> None)
+  | _ -> None
+
+let sexp_of_smtSpecConstant (sc : smtSpecConstant) : t =
   match sc with
-  | SCNumeral num -> pp_numeral f num
+  | SCNumeral num -> sexp_of_numeral num
 
   | SCDecimal (n1, d, n2) ->
-    Fmt.(pf f "%a.%a%a"
-           pp_numeral n1
+    Atom (
+      Fmt.(str "%s.%a%s" (Int.to_string n1)
            (list ~sep:(fun _ _ -> ()) (fun f' _ -> Fmt.(pf f' "0")))
            (List.init d ~f:(fun _ -> 0))
-           pp_numeral n2)
+           (Int.to_string n2)))
 
-  | SCHexaDecimal s -> Fmt.(pf f "#x%s" s)
+  | SCHexaDecimal s -> Atom (Fmt.(str "#x%s" s))
 
   | SCBinary bl ->
-    Fmt.(pf f "#b%a" (list ~sep:(fun _ _ -> ())
-                        (fun f b -> if b then pf f "1" else pf f "0")) bl)
+    Atom (Fmt.(str "#b%a" (list ~sep:(fun _ _ -> ())
+                        (fun f b -> if b then pf f "1" else pf f "0")) bl))
 
-  | SCString s -> Fmt.(pf f "%s" s)
+  | SCString s -> Atom (Fmt.(str "\"%s\"" s))
 
-let pp_smtSymbol (f : Formatter.t) (s : smtSymbol) =
+let smtSpecConstant_of_sexp (sexp: t) : smtSpecConstant option =
+  match sexp with
+  | Atom s ->
+    (if String.is_prefix ~prefix:"#b" s then
+      failwith "Binary unsupported for now!"
+    else if String.is_prefix ~prefix:"#b" s then
+      Some (SCHexaDecimal (String.drop_prefix s 2))
+    else if String.is_prefix ~prefix:"\"" s then
+      Some (SCString (String.drop_prefix (String.drop_prefix s 1) 1))
+    else
+      try
+        Some (SCNumeral (Int.of_string s))
+      with _ ->
+        failwith Fmt.(str " %s : decimal not supported." s))
+    | _ -> None
+
+
+let sexp_of_smtSymbol (s : smtSymbol) : t =
   match s with
-  | SSimple x -> Fmt.(pf f "%s" x)
-  | SQuoted x -> Fmt.(pf f "|%s|" x)
+  | SSimple x -> Atom x
+  | SQuoted x -> Atom ("|"^x^"|")
 
-let pp_smtIndex (f : Formatter.t) (idx : smtIndex) =
+let smtSymbol_of_sexp (s : t) : smtSymbol option =
+  match s with
+  | Atom x ->
+      if String.is_prefix ~prefix:"|" x && String.is_suffix ~suffix:"|" x then
+        Some (SQuoted (String.drop_prefix (String.drop_suffix x 1) 1))
+      else Some (SSimple x)
+  | _ -> None
+
+
+let sexp_of_smtIndex (idx : smtIndex) : t=
   match idx with
-  | INum n -> pp_numeral f n
-  | ISym s -> pp_smtSymbol f s
+  | INum n -> Atom (Int.to_string n)
+  | ISym s -> sexp_of_smtSymbol s
 
-let pp_smtIdentifier (f : Formatter.t) (id : smtIdentifier) =
+
+let smtIndex_of_sexp (s : t) : smtIndex option =
+  let num = let%map n = numeral_of_sexp s in INum n in
+  let sym = let%map symb = smtSymbol_of_sexp s in ISym symb in
+  Option.first_some num sym
+
+
+let sexp_of_smtIdentifier (id : smtIdentifier) : t =
   match id with
-  | Id s -> pp_smtSymbol f s
+  | Id s -> sexp_of_smtSymbol s
   | IdC (s, ixl) ->
-    Fmt.(pf f "(_ %a %a)" pp_smtSymbol s (list ~sep:sp pp_smtIndex) ixl)
+    let l = List (List.map ~f:sexp_of_smtIndex ixl) in
+    List [Atom "_"; sexp_of_smtSymbol s; l]
 
-let rec pp_sort (f : Formatter.t) (s : smtSort) =
+let smtIdentifier_of_sexp (sexp: t) : smtIdentifier option =
+  match sexp with
+  | Atom _ -> let%bind s = smtSymbol_of_sexp sexp in Some (Id s)
+
+  | List (Atom "_" :: symb :: indexes) ->
+    let%bind s = smtSymbol_of_sexp symb in
+    let%bind l = Option.all (List.map ~f:smtIndex_of_sexp indexes) in
+    Some (IdC(s,l))
+ | _ -> None
+
+
+let rec sexp_of_smtSort (s : smtSort) : t  =
   match s with
-  | SmtSort x -> Fmt.pf f "%a" pp_smtIdentifier x
+  | SmtSort x -> sexp_of_smtIdentifier x
   | Comp (x, l) ->
-    Fmt.(pf f "(%a %a)" pp_smtIdentifier x (list ~sep:sp pp_sort) l)
+    List  (sexp_of_smtIdentifier x ::(List.map ~f:sexp_of_smtSort l))
 
-let pp_smtAttribute (f : Formatter.t) (attr : smtAttribute) =
+let rec smtSort_of_sexp (s : t) : smtSort option =
+  match smtIdentifier_of_sexp s with
+  | Some x -> Some (SmtSort x)
+  | None ->
+    (match s with
+    | List (hd :: tl) ->
+      let%bind id = smtIdentifier_of_sexp hd in
+      let%bind args = Option.all (List.map ~f:smtSort_of_sexp tl) in
+      Some (Comp(id, args))
+    | _ -> None)
+
+
+let sexp_of_smtAttribute (attr : smtAttribute) : t =
   match attr with
-  | ASymb anam -> Fmt.pf f "%s" anam
-  | ASymbVal (aname, aval) -> Fmt.pf f "%s %s" aname aval
+  | ASymb anam -> Atom anam
+  | ASymbVal (aname, aval) -> List [Atom aname; Atom aval]
 
-let pp_sortedVar (f : Formatter.t) (s, srt : smtSortedVar) =
-  Fmt.pf f "(%a %a)" pp_smtSymbol s pp_sort srt
+let smtAttribute_of_sexp (sexp : t) : smtAttribute option =
+  match sexp with
+  | Atom s -> Some (ASymb s)
+  | List[Atom name; Atom value] -> Some (ASymbVal(name, value))
+    | _ -> None
 
-let pp_qual_ident (f : Formatter.t) (qi : smtQualIdentifier) =
+
+let sexp_of_sortedVar (s, srt : smtSortedVar) : t =
+  List [sexp_of_smtSymbol s; sexp_of_smtSort srt]
+
+
+let sortedVar_of_sexp (s : t)  : smtSortedVar option =
+  match s with
+  | List[symb; sort] ->
+      let%bind s1 = smtSymbol_of_sexp symb in
+      let%bind s2 = smtSort_of_sexp sort in
+      Some (s1, s2)
+  | _ -> None
+
+
+let sexp_of_smtQualIdentifier (qi : smtQualIdentifier) =
   match qi with
-  | QI s -> pp_smtIdentifier f s
-  | QIas (s, smtSort) -> Fmt.pf f "(as %a %a)" pp_smtIdentifier s pp_sort smtSort
+  | QI s -> sexp_of_smtIdentifier s
+  | QIas (s, smtSort) ->
+      List [Atom "as"; sexp_of_smtIdentifier s ; sexp_of_smtSort smtSort]
 
-let pp_smtPattern (f : Formatter.t) (p : smtPattern) =
+let smtQualIdentifier_of_sexp (s : t) : smtQualIdentifier option =
+  match s with
+  | List[Atom "as"; sid; ssort] ->
+      let%bind id = smtIdentifier_of_sexp sid in
+      let%map sort = smtSort_of_sexp ssort in
+      QIas(id, sort)
+  | _ ->
+      let%map id = smtIdentifier_of_sexp s in QI id
+
+
+let sexp_of_smtPattern (p : smtPattern) : t =
   match p with
-  | Pat s -> pp_smtSymbol f s
-  | PatComp (s, sl) -> Fmt.(pf f "(%a %a)" pp_smtSymbol s (list ~sep:sp pp_smtSymbol) sl)
+  | Pat s -> sexp_of_smtSymbol s
+  | PatComp (s, sl) -> List (sexp_of_smtSymbol s :: (List.map ~f:sexp_of_smtSymbol sl))
 
-let rec pp_smtTerm (f : Formatter.t) (t: smtTerm) =
+let smtPattern_of_sexp (s : t)  : smtPattern option =
+  match s with
+  | Atom _ -> let%map symb = smtSymbol_of_sexp s in Pat symb
+  | List (hd::tl) ->
+      let%bind s =  smtSymbol_of_sexp hd in
+      let%map l = Option.all (List.map ~f:smtSymbol_of_sexp tl) in
+      PatComp(s, l)
+  | _ -> None
+
+
+let rec sexp_of_smtTerm (t: smtTerm) : t =
   match t with
-  | SmtTSpecConst sc        -> Fmt.pf f "%a" pp_smtSpecConstant sc
+  | SmtTSpecConst sc        -> sexp_of_smtSpecConstant sc
 
-  | SmtTQualdId qi          -> Fmt.pf f "%a" pp_qual_ident qi
+  | SmtTQualdId qi          -> sexp_of_smtQualIdentifier qi
 
   | SmtTApp (func, args)       ->
-    Fmt.(pf f "(%a %a)" pp_qual_ident func (list ~sep:sp pp_smtTerm) args)
+    List (sexp_of_smtQualIdentifier func :: List.map ~f:sexp_of_smtTerm args)
 
   | SmtTLet (bindings, t')  ->
-    Fmt.(pf f "(let (%a) %a)" (list ~sep:sp pp_binding) bindings pp_smtTerm t')
+    List [Atom "let"; List (List.map ~f:sexp_of_binding bindings); sexp_of_smtTerm t']
 
   | SmtTForall (quants, t') ->
-    Fmt.(pf f "(forall (%a) %a)" (list ~sep:sp pp_sortedVar) quants pp_smtTerm t')
+    List [Atom "forall"; List (List.map ~f:sexp_of_sortedVar quants);  sexp_of_smtTerm t']
 
   | SmtTExists (quants, t') ->
-    Fmt.(pf f "(exists (%a) %a)" (list ~sep:sp pp_sortedVar) quants pp_smtTerm t')
+    List [Atom "exists"; List (List.map ~f:sexp_of_sortedVar quants);  sexp_of_smtTerm t']
 
   | SmtTMatch (t', cases)   ->
-    Fmt.(pf f "(match %a (%a))" pp_smtTerm t' (list ~sep:sp pp_match_case) cases)
+    List [Atom "match"; sexp_of_smtTerm t'; List (List.map ~f:sexp_of_match_case cases)]
 
   | SmtTAnnot (t', attrs)   ->
-    Fmt.(pf f "(! %a %a)" pp_smtTerm t' (list ~sep:sp pp_smtAttribute) attrs)
+    List (Atom "!" :: sexp_of_smtTerm t' :: List.map ~f:sexp_of_smtAttribute attrs)
 
-and pp_binding (f : Formatter.t) (v, e : var_binding) =
-  Fmt.pf f "(%a %a)" pp_smtSymbol v pp_smtTerm e
+and sexp_of_binding (v, e : var_binding) : t =
+    List [sexp_of_smtSymbol v; sexp_of_smtTerm e]
 
-and pp_match_case (f : Formatter.t) (p, t : match_case) =
-  Fmt.pf f "(%a %a)" pp_smtPattern p pp_smtTerm t
+and sexp_of_match_case (p, t : match_case) =
+    List [sexp_of_smtPattern p; sexp_of_smtTerm t]
 
 
+let rec smtTerm_of_sexp (s : t) : smtTerm option =
+  match s with
+  | List [Atom "let"; List bindings; body] ->
+    let%bind bindings = Option.all (List.map ~f:binding_of_sexp bindings) in
+    let%map body = smtTerm_of_sexp body in
+    SmtTLet(bindings, body)
 
-let pp_smtSelectorDec (f : Formatter.t) (s, srt : smtSelectorDec) =
-  Fmt.pf f "(%a %a)" pp_smtSymbol s pp_sort srt
+  | List [Atom "forall"; List quants; t] ->
+    let%bind qs = Option.all (List.map ~f:sortedVar_of_sexp quants) in
+    let%map body = smtTerm_of_sexp t in
+    SmtTForall (qs, body)
 
-let pp_smtConstructorDec (f : Formatter.t) (s, sdecs : smtConstructorDec) =
-  Fmt.(pf f "(%a %a)" pp_smtSymbol s (list ~sep:sp pp_smtSelectorDec) sdecs)
+  | List [Atom "exists"; List quants; t] ->
+    let%bind qs = Option.all (List.map ~f:sortedVar_of_sexp quants) in
+    let%map body = smtTerm_of_sexp t in
+    SmtTExists (qs, body)
 
-let pp_datatype_dec (f : Formatter.t) (dtdec : datatype_dec) =
+  | List [Atom "match"; trm; List cases] ->
+    let%bind t = smtTerm_of_sexp trm in
+    let%map cases' = Option.all (List.map ~f:match_case_of_sexp cases) in
+    SmtTMatch(t, cases')
+
+  | List (Atom "!" :: t :: attrs) ->
+    let%bind t' = smtTerm_of_sexp t in
+    let%map attrs' = Option.all (List.map ~f:smtAttribute_of_sexp attrs) in
+    SmtTAnnot(t', attrs')
+
+  | _ ->
+    match smtSpecConstant_of_sexp s with
+    | Some cs -> Some (SmtTSpecConst cs)
+    | None ->
+    match smtQualIdentifier_of_sexp s with
+      | Some qi -> Some (SmtTQualdId qi)
+      | None ->
+        match s with
+        | List (func :: args) ->
+          let%bind func' = smtQualIdentifier_of_sexp func in
+          let%map args' = Option.all (List.map ~f:smtTerm_of_sexp args) in
+          SmtTApp(func', args')
+        | _ -> None
+
+
+and match_case_of_sexp (s : t) : match_case option =
+    match s with
+    | List [pat; rhs] ->
+        let%bind pat' = smtPattern_of_sexp pat in
+        let%map t = smtTerm_of_sexp rhs in
+        pat', t
+    | _ -> None
+
+and binding_of_sexp (s : t) : var_binding option =
+    match s with
+    | List [x; v] ->
+        let%bind x' = smtSymbol_of_sexp x in
+        let%map v' = smtTerm_of_sexp v in
+        x', v'
+    | _ -> None
+
+
+let sexp_of_smtSelectorDec (s, srt : smtSelectorDec) : t =
+  List [sexp_of_smtSymbol s; sexp_of_smtSort srt]
+
+
+let sexp_of_smtConstructorDec (s, sdecs : smtConstructorDec) : t =
+  List (sexp_of_smtSymbol s :: List.map ~f:sexp_of_smtSelectorDec sdecs)
+
+
+let sexp_of_datatype_dec (dtdec : datatype_dec) : t =
   match dtdec with
   | DDConstr cd_list ->
-    Fmt.(pf f "(%a)" (list ~sep:sp pp_smtConstructorDec) cd_list)
+    List (List.map ~f:sexp_of_smtConstructorDec cd_list)
 
   | DDPar (symbs, cd_list) ->
-    Fmt.((pf f "(par (%a) (%a))")
-           (list ~sep:sp pp_smtSymbol) symbs
-           (list ~sep:sp pp_smtConstructorDec) cd_list)
+    List [Atom "par";
+      List (List.map ~f:sexp_of_smtSymbol symbs);
+      List (List.map ~f:sexp_of_smtConstructorDec cd_list)]
 
-let pp_func_dec (f : Formatter.t) (s, svs, srt : func_dec) =
-  Fmt.(pf f "(%a (%a) %a)" pp_smtSymbol s (list ~sep:sp pp_sortedVar) svs pp_sort srt)
 
-let pp_func_def (f : Formatter.t) (s, svs, srt, t : func_def) =
-  Fmt.(pf f "%a (%a) %a %a" pp_smtSymbol s (list ~sep:sp pp_sortedVar) svs pp_sort srt pp_smtTerm t)
+let sexp_of_func_dec (s, svs, srt : func_dec) : t =
+  List [sexp_of_smtSymbol s; List (List.map ~f:sexp_of_sortedVar svs); sexp_of_smtSort srt]
 
-let pp_prop_literal (f : Formatter.t) (pl : prop_literal) =
+
+let sexp_of_func_def (s, svs, srt, t : func_def) : t list =
+  [sexp_of_smtSymbol s; List (List.map ~f:sexp_of_sortedVar svs); sexp_of_smtSort srt;
+        sexp_of_smtTerm t]
+
+
+let sexp_of_prop_literal (pl : prop_literal) : t =
   match pl with
-  | PL x -> Fmt.pf f "%a" pp_smtSymbol x
-  | PLNot x -> Fmt.pf f "(not %a)" pp_smtSymbol x
+  | PL x -> sexp_of_smtSymbol x
+  | PLNot x -> List [Atom "not"; sexp_of_smtSymbol x]
 
-let pp_smdSortDec (f : Formatter.t) (s, n : smdSortDec) =
-  Fmt.pf f "(%a %a)" pp_smtSymbol s pp_numeral n
 
-let pp_command (f : Formatter.t) (c : command) =
+let sexp_of_smtSortDec (s, n : smdSortDec) : t =
+  List [sexp_of_smtSymbol s; sexp_of_numeral n]
+
+let sexp_of_command (c : command) =
   match c with
-  | Assert t -> Fmt.pf f "(assert %a)" pp_smtTerm t
+  | Assert t -> List [Atom "assert"; sexp_of_smtTerm t]
 
-  | CheckSat -> Fmt.pf f "(check-sat)"
+  | CheckSat -> List [Atom "check-sat"]
 
   | CheckSatAssuming pl_list ->
-    Fmt.(pf f "(check-sat-assuming (%a))" (list ~sep:sp pp_prop_literal) pl_list)
+    List [Atom "check-sat-assuming"; List (List.map ~f:sexp_of_prop_literal pl_list)]
+
 
   | DeclareConst (sym, smtSort) ->
-    Fmt.pf f "(declare-const %a %a)" pp_smtSymbol sym pp_sort smtSort
+    List [Atom "declare-const"; sexp_of_smtSymbol sym; sexp_of_smtSort smtSort]
 
   | DeclareDatatype (sym, ddec) ->
-    Fmt.(pf f "(declare-datatype %a %a)" pp_smtSymbol sym pp_datatype_dec ddec)
+    List [Atom "declare-datatype"; sexp_of_smtSymbol sym; sexp_of_datatype_dec ddec]
 
   | DeclareDatatypes (sdec_l, ddec_l) ->
-    Fmt.(pf f "(declare-datatypes (%a) (%a))"
-           (list ~sep:sp pp_smdSortDec) sdec_l
-           (list ~sep:sp pp_datatype_dec) ddec_l)
+    List [Atom "declare-datatypes";
+          List (List.map ~f:sexp_of_smtSortDec sdec_l);
+           List (List.map ~f:sexp_of_datatype_dec ddec_l)]
 
   | DeclareFun (name, args, res)  ->
-    Fmt.(pf f "(declare-fun %a (%a) %a)" pp_smtSymbol name (list ~sep:sp pp_sort) args pp_sort res)
+    List [Atom "declare-fun"; sexp_of_smtSymbol name;
+          List (List.map ~f:sexp_of_smtSort args);
+          sexp_of_smtSort res]
 
   | DeclareSmtSort (s, n) ->
-    Fmt.pf f "(declare-smtSort %a %a)" pp_smtSymbol s pp_numeral n
+    List [Atom "declare-smtSort"; sexp_of_smtSymbol s; sexp_of_numeral n]
 
-  | DefineFun fd -> Fmt.pf f "(define-fun %a)" pp_func_def fd
+  | DefineFun fd ->
+    List (Atom "define-fun" :: sexp_of_func_def fd)
 
-  | DefineFunRec fd -> Fmt.(pf f "(define-fun-rec %a)" pp_func_def fd)
+  | DefineFunRec fd -> List (Atom "define-fun-rec" :: sexp_of_func_def fd)
 
   | DefineFunsRec (fdl, tl) ->
-    Fmt.(pf f "(define-funs-rec (%a) (%a))"
-           (list ~sep:sp pp_func_dec) fdl (list ~sep:sp pp_smtTerm) tl)
+    List [Atom "define-funs-rec";
+          List (List.map ~f:sexp_of_func_dec fdl);
+          List (List.map ~f:sexp_of_smtTerm tl)]
 
   | DefineSmtSort (s, sl, smtSort) ->
-    Fmt.(pf f "(define-smtSort %a (%a) %a)" pp_smtSymbol s (list ~sep:sp pp_smtSymbol) sl pp_sort smtSort)
+    List [Atom "define-sort"; sexp_of_smtSymbol s;
+      List (List.map ~f:sexp_of_smtSymbol sl);
+      sexp_of_smtSort smtSort]
 
-  | Echo s -> Fmt.pf f "(echo %s)" s
+  | Echo s -> List [Atom "echo"; Atom s]
 
-  | Exit -> Fmt.pf f "(exit)"
+  | Exit -> List [Atom "exit"]
 
-  | GetAssertions -> Fmt.pf f "(get-assertions)"
+  | GetAssertions -> List [Atom "get-assertions"]
 
-  | GetAssignment -> Fmt.pf f "(get-assignment)"
+  | GetAssignment -> List [Atom "get-assignment"]
 
-  | GetInfo iflag -> Fmt.pf f "(get-info %a)" pp_info_flag iflag
+  | GetInfo iflag -> List [Atom "get-info"; sexp_of_info_flag iflag]
 
-  | GetModel -> Fmt.pf f "(get-model)"
+  | GetModel -> List [Atom "get-model"]
 
-  | GetOption kw -> Fmt.pf f "(get-option %s)" kw
+  | GetOption kw -> List [Atom "get-option"; Atom kw]
 
-  | GetProof -> Fmt.pf f "(get-proof)"
+  | GetProof -> List [Atom "get-proof"]
 
-  | GetUnsatAssumptions -> Fmt.pf f "(get-unsat-assumptions)"
+  | GetUnsatAssumptions -> List [Atom "get-unsat-assumptions"]
 
-  | GetUnsatCore -> Fmt.pf f "(get-unsat-core)"
+  | GetUnsatCore -> List [Atom "get-unsat-core"]
 
-  | GetValue tl -> Fmt.(pf f "(get-value %a)" (list ~sep:sp pp_smtTerm) tl)
+  | GetValue tl -> List (Atom "get-value" :: (List.map ~f:sexp_of_smtTerm) tl)
 
-  | Pop n -> Fmt.pf f "(pop %a)" pp_numeral n
+  | Pop n -> List [Atom "pop"; sexp_of_numeral n]
 
-  | Push n -> Fmt.pf f "(push %a)" pp_numeral n
+  | Push n -> List [Atom "push"; sexp_of_numeral n]
 
-  | Reset -> Fmt.pf f "(reset)"
+  | Reset -> List [Atom "reset"]
 
-  | ResetAssertions ->  Fmt.pf f "(reset-assertions)"
+  | ResetAssertions ->  List [Atom "reset-assertions"]
 
-  | SetInfo attr -> Fmt.pf f "(set-info %s)" attr
+  | SetInfo attr -> List [Atom "set-info"; Atom attr]
 
-  | SetLogic s ->  Fmt.pf f "(set-logic %a)" pp_smtSymbol s
+  | SetLogic s ->  List [Atom "set-logic"; sexp_of_smtSymbol s]
 
-  | SetOption o ->  Fmt.pf f "(set-option %a)" pp_option o
+  | SetOption o ->  List (Atom "set-option" :: sexps_of_option o)
 
   (* Solver-specific commands *)
 
   | Simplify (t, ol) ->
-    if List.is_empty ol then Fmt.pf f "(simplify %a)" pp_smtTerm t
-    else Fmt.(pf f "(simplify %a %a)" pp_smtTerm t (list ~sep:sp pp_option) ol)
+    if List.is_empty ol then
+         List [Atom "simplify"; sexp_of_smtTerm t]
+    else List (Atom "simplify" ::  sexp_of_smtTerm t :: List.concat (List.map ~f:sexps_of_option ol))
 
 
 let write_command (out : OC.t) (c : command) : unit =
-  let comm_s = Fmt.(to_to_string pp_command c) in
+  let comm_s = Sexp.to_string (sexp_of_command c) in
   OC.output_lines out [comm_s];
   OC.flush out
 
 let pp_script (f : Formatter.t) (s : script) =
-  List.iter ~f:(fun cm -> Fmt.pf f "%a@." pp_command cm) s
+  List.iter ~f:(fun cm -> Fmt.pf f "%a@." Sexp.pp (sexp_of_command cm)) s
 
 
 (* Term construction *)

@@ -124,7 +124,8 @@ let rec term_of_smt (env : (string, variable, String.comparator_witness) Map.t) 
      | IBinop op ->
        (match args' with
         | [t1; t2] -> mk_bin op t1 t2
-        | _ -> failwith "Sygus: a binary operator with more than two arguments.")
+        | [t1] when Operator.(equal (Binary op) (Binary Minus)) -> mk_un Unop.Neg t1
+        | _ -> failwith Fmt.(str "Smt: %a operator with more than two arguments." Binop.pp op))
      | IUnop op ->
        (match args' with
         | [t1] -> mk_un op t1
@@ -134,6 +135,40 @@ let rec term_of_smt (env : (string, variable, String.comparator_witness) Map.t) 
   | SmtTForall (_, _) -> failwith "Smt: forall-terms not supported."
   | SmtTLet (_, _) -> failwith "Smt: let-terms not supported."
   | _ -> failwith "Composite identifier not supported."
+
+
+let constmap_of_s_exprs
+  (starting_map : (string, term, String.comparator_witness) Map.t)
+  (s_exprs : Sexp.t list) =
+  let add_sexp map sexp =
+    Sexp.(match sexp with
+    | List [Atom "define-fun"; Atom s; args; _; value] ->
+      (match args with
+      | List [] ->
+        let t_val_o =
+          let%map smt_value = smtTerm_of_sexp value in
+          term_of_smt (Map.empty (module String)) smt_value
+        in
+        (match t_val_o with
+        | Some t_val -> Map.set map ~key:s ~data:t_val
+        | None -> map)
+      | _ -> map)
+    | _ -> map)
+  in
+  match s_exprs with
+  | [Sexp.List l] -> List.fold ~f:add_sexp ~init:starting_map l
+  | _ -> starting_map
+
+
+let model_to_constmap (s : solver_response) =
+  let empty_map = Map.empty (module String) in
+  match s with
+  | Unknown | Unsat | Sat -> empty_map
+  | SExps s_exprs -> constmap_of_s_exprs empty_map s_exprs
+  | Error _ -> failwith "Smt solver error"
+
+
+
 
 
 (* ============================================================================================= *)

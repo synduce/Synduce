@@ -212,8 +212,10 @@ let make ?(force_replace_off = false) ~(p : psi_def) (tset : TermSet.t) : equati
     List.concat (List.map ~f eqns)
   in
   Log.verbose
-    (fun f () -> Fmt.(pf f "Equations > make (%i) @." (Set.length tset);
-                      List.iter ~f:(fun eqn -> Fmt.pf f "@[%a@]@." pp_equation eqn) pure_eqns));
+    (fun f () ->
+      let print_less = List.take pure_eqns !Config.pp_eqn_count  in
+      Fmt.(pf f "Equations > make (%i) @." (Set.length tset);
+                      List.iter ~f:(fun eqn -> Fmt.pf f "@[%a@]@." pp_equation eqn) print_less));
 
   match List.find ~f:(fun eq -> not (check_equation ~p eq)) pure_eqns with
   | Some not_pure ->

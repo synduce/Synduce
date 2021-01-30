@@ -21,7 +21,8 @@ let print_usage () =
     -s --no-splitting              Do not split systems into subsystems.
        --no-syndef                 Do not use syntactic definitions.
     -t --no-detupling              Turn off detupling.
-       --use-naive                 Use the naive algorithm. Turns bmc on.
+    --use-acegis                   Use the Abstract CEGIS algorithm. Turns bmc on.
+    --use-ccegis                   Use the Concrete CEGIS algorithm. Turns bmc on.
   Bounded checking:
        --use-bmc                   Use naive bounded model checking (bmc mode).
     -b --bmc                       Maximum depth of terms for bounded model checking, in bmc mode.
@@ -39,7 +40,8 @@ let options = [
   ('d', "debug", (set Config.debug true), None);
   ('i', "info-off", (set Config.info false), None);
   ('\000', "show-vars", (set Config.show_vars true), None);
-  ('\000', "use-naive", (set Config.use_naive true), None);
+  ('\000', "use-acegis", (set Config.use_acegis true), None);
+  ('\000', "use-ccegis", (set Config.use_ccegis true), None);
   ('\000', "use-bmc", (set Config.use_bmc true), None);
   ('\000', "parse-only", (set parse_only true), None);
   ('\000',"replacing-recursion-off", (set Config.replace_recursion false), None);
@@ -79,8 +81,9 @@ let main () =
   (match Algo.PmrsAlgos.solve_problem psi_comps all_pmrs with
    | Ok target ->
      let elapsed = Unix.gettimeofday () -. start_time in
-     Utils.Log.info Fmt.(fun frmt () -> pf frmt "Solution found in %4.4fs:@.%a@]"
-     elapsed (box (if is_ocaml_syntax then PMRS.pp_ocaml else PMRS.pp)) target);
+     let verif_ratio = 100.0 *. (!Config.verif_time /. elapsed) in
+     Utils.Log.info Fmt.(fun frmt () -> pf frmt "Solution found in %4.4fs (%3.1f%% verifying):@.%a@]"
+     elapsed verif_ratio (box (if is_ocaml_syntax then PMRS.pp_ocaml else PMRS.pp)) target);
      (* If no info required, output timing information. *)
      if not !Config.info then
        Fmt.(pf stdout "%i,%.4f,%.4f@." !Algo.PmrsAlgos.refinement_steps !Config.verif_time elapsed)

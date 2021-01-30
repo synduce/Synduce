@@ -80,11 +80,19 @@ let check_solution
   in
   let rec find_ctex num_checks terms_to_expand =
     Log.verbose_msg Fmt.(str "Check %i." num_checks);
-    if num_checks > !Config.num_expansions_check then None
-    else match List.sort ~compare:term_size_compare (Set.elements terms_to_expand) with
+    if num_checks > !Config.num_expansions_check
+    then None
+    else
+      let next =
+        List.filter ~f:(fun t -> term_height t <= !Config.check_depth)
+        (Set.elements terms_to_expand)
+      in
+      match List.sort ~compare:term_height_compare next with
       | [] -> None
       | hd :: tl ->
-        let has_ctex, t_set, u_set, num_checks = expand_and_check num_checks hd in
+        let has_ctex, t_set, u_set, num_checks =
+          expand_and_check num_checks hd
+        in
         (if has_ctex then
            Some (Set.union t t_set, terms_to_expand)
          else
@@ -106,6 +114,7 @@ let check_solution
 
 (* Perform a bounded check of the solution *)
 let bounded_check
+    ?(concrete_ctex=false)
     ~(p : psi_def)
     (soln : (string * variable list * term) list) =
   Log.info (fun f () -> Fmt.(pf f "Checking solution (bounded check)..."));
@@ -119,44 +128,94 @@ let bounded_check
     let formula = mk_not eqn in
     spush solver;
     smt_assert solver formula;
-    let x =
-      match check_sat solver with
-      | Sat -> true | _ -> false
+    let x = check_sat solver in
+    let model =
+      if concrete_ctex then
+        (match x with
+      | Sat -> Some (get_model solver)
+      | _ -> None )
+      else None
     in
     spop solver;
-    x
+    x, model
   in
-  let termset =
-    Analysis.terms_of_max_depth !Config.check_depth !AState._theta
-  in
-  Log.debug_msg Fmt.(str "%i constraints." (List.length termset));
-  let sys_eqns =
-    Equations.make
-      ~force_replace_off:true
-      ~p:{ p with target=target_inst}
-      (TermSet.of_list termset)
-  in
-  let smt_eqns = List.map sys_eqns ~f:(fun t -> t, constr_eqn t) in
-  let new_free_vars =
-    let f fv (_, _, lhs, rhs) =
-      Set.union fv (Set.union (Analysis.free_variables lhs) (Analysis.free_variables rhs))
+  let check_tset termset =
+    let sys_eqns =
+      Equations.make
+        ~force_replace_off:true
+        ~p:{ p with target=target_inst}
+        (TermSet.of_list termset)
     in
-    Set.diff (List.fold ~f ~init:VarSet.empty sys_eqns) free_vars
+    let smt_eqns = List.map sys_eqns ~f:(fun t -> t, constr_eqn t) in
+    let new_free_vars =
+      let f fv (_, _, lhs, rhs) =
+        Set.union fv (Set.union (Analysis.free_variables lhs) (Analysis.free_variables rhs))
+      in
+      Set.diff (List.fold ~f ~init:VarSet.empty sys_eqns) free_vars
+    in
+    declare_all solver init_vardecls;
+    spush solver;
+    declare_all solver (decls_of_vars new_free_vars);
+    let rec search_ctex _eqns =
+      match _eqns with
+      | [] -> None
+      | (eqn, smt_eqn) :: tl ->
+        match check_eqn smt_eqn with
+        | Sat, Some model_response ->
+            let model = model_to_constmap model_response in
+            let concr = Analysis.concretize ~model in
+            let t, inv, lhs, rhs = eqn in
+            Some (concr t, Option.map ~f:concr inv, concr lhs, concr rhs)
+        | Sat, None -> Some eqn
+        | Error msg, _ ->
+          Log.error_msg Fmt.(str "Solver failed with message: %s." msg);
+            failwith "SMT Solver error."
+        | SExps _, _
+        | Unsat, _ ->  search_ctex tl
+        | Unknown, _ ->
+          Log.error_msg Fmt.(str "SMT solver returned unkown. The solution might be incorrect.");
+          search_ctex tl
+    in
+    let ctex_or_none = search_ctex smt_eqns in
+    spop solver;
+    (match ctex_or_none with
+    | Some (t, _, _, _) ->
+        let ctex_height = Term.term_height t in
+        let current_check_depth = !Config.check_depth in
+        let update =
+          (max current_check_depth (ctex_height - 1))
+        in
+        Config.check_depth := update;
+        Log.verbose_msg Fmt.(str "Check depth: %i." !Config.check_depth)
+    | None -> ());
+    ctex_or_none
   in
-  declare_all solver init_vardecls;
-  spush solver;
-  declare_all solver (decls_of_vars new_free_vars);
-  let rec has_ctex _eqns =
-    match _eqns with
-    | [] -> None
-    | (eqn, smt_eqn) :: tl ->
-      if check_eqn smt_eqn then Some eqn
-      else has_ctex tl
+  let tqueue =
+    Queue.singleton
+    (Term.mk_var (Variable.mk ~t:(Some !AState._theta) "x"))
   in
-  let ctex_or_none = has_ctex smt_eqns in
-  spop solver;
+  let rec check_loop () =
+    match Queue.dequeue tqueue with
+    | None -> None
+    | Some t ->
+      let bounded_terms, ut = Expand.simple ~max_height:!Config.check_depth t in
+      match check_tset (Set.elements bounded_terms) with
+      | Some ctex -> Some ctex
+      | None ->
+        let new_terms =
+            List.sort ~compare:term_height_compare
+              (List.filter ~f:(fun t -> term_height t <= !Config.check_depth)
+              (Set.elements ut))
+        in
+        Queue.enqueue_all tqueue new_terms;
+        check_loop ()
+  in
+  let ctex_or_none =
+    check_loop ()
+  in
   close_solver solver;
   let elapsed = Unix.gettimeofday () -. start_time in
   Config.verif_time := !Config.verif_time +. elapsed;
   Log.info (fun f () -> Fmt.(pf f "... finished in %3.4fs" elapsed));
   ctex_or_none
+

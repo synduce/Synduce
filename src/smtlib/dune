@@ -1,4 +1,6 @@
 (library
-    (name smtlib)
-    (public_name Atropos.Lib.SmtLib)
-    (libraries core utils fmt sexplib str lwt lwt.unix extlib stdio))
+ (name smtlib)
+ (public_name Atropos.Lib.SmtLib)
+ (libraries core utils fmt sexplib str lwt lwt.unix extlib stdio)
+ (preprocess
+  (pps ppx_let)))

@@ -194,7 +194,7 @@ let generate_grammar ?(bools = false) (opset : OpSet.t) (args : sorted_var list)
   let params =
     {
       g_opset = opset;
-      g_fixed_constants = true;
+      g_fixed_constants = false;
       g_mul_constant = false;
       g_linear = true;
       g_locals = locals_of_scalar_type;

@@ -134,27 +134,27 @@ let replace_rhs_of_mains (p : psi_def) (t0 : term) : term =
 (*                                   NAIVE TERM EXPANSION                                        *)
 (* ============================================================================================= *)
 
-let is_max_expanded (t : term) =
-  match Analysis.expand_once t with [] -> true | _ -> false
+let is_max_expanded (t : term) = Term.is_novariant t
 
-let simple (t0 : term) =
+let simple ?(max_height = !Config.expand_cut) (t0 : term) =
   Log.verbose_msg Fmt.(str "Simple expansion of %a." pp_term t0);
-  let rec aux (t, u) =
-    match t with
+  let rec aux d (t, u) =
+    if d >= max_height then t ,u
+    else
+    (match t with
     | _ :: _ -> t, u
     | [] ->
-      (match List.sort ~compare:(var_count_compare !AState._theta) u with
+      (match List.sort ~compare:term_height_compare u with
        | uhd :: utl ->
          let t_exp = Analysis.expand_once uhd in
-         Log.verbose_msg Fmt.(str "Expand once %a -> %i" pp_term uhd (List.length t_exp));
          let t', u' = List.partition_tf ~f:is_max_expanded t_exp in
-         aux (t', utl @ u')
-       | [] -> t, u)
+         aux (d + 1) (t', utl @ u')
+       | [] -> t, u))
   in
-  if is_norec t0 then
+  if is_novariant t0 then
     TermSet.singleton t0, TermSet.empty
   else
-    let t,u = aux ([], [t0]) in
+    let t,u = aux 0 ([], [t0]) in
     Log.verbose Fmt.(fun f () -> pf f "t = @[<hov 2>%a@]" (list ~sep:comma pp_term) t);
     Log.verbose Fmt.(fun f () -> pf f "u = @[<hov 2>%a@]" (list ~sep:comma pp_term) u);
     TermSet.of_list t, TermSet.of_list u
@@ -274,7 +274,7 @@ let expand_max_main (p : psi_def) (f : PMRS.t) (g : PMRS.t) (t0 : term)
   mr_terms, rest
 
 let expand_driver p f g t =
-  match expand_max_main p f g t with 
+  match expand_max_main p f g t with
   | [], rest ->
     (match rest with
      | hd :: tl ->

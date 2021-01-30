@@ -2,6 +2,7 @@ open Base
 
 (** Toggle verbose messages. *)
 let verbose = ref false
+let pp_eqn_count = ref 10
 
 (** Toggle debugging. *)
 let debug = ref false
@@ -86,10 +87,17 @@ let split_solve_on = ref true
 let replace_recursion = ref true
 
 (**
-  Not an optimization. Set to true to use the naive base algorithm.
-  Option --use-naive sets this flag to true.
+  Not an optimization. Set to true to use the base abstract cegis algorithm.
+  Option --use-acegis sets this flag to true.
   *)
-let use_naive = ref false
+let use_acegis = ref false
+
+(**
+  Not an optimization. Set to true to use the base concrete cegis algorithm.
+  Option --use-ccegis sets this flag to true.
+  *)
+let use_ccegis = ref false
+
 
 (* ============================================================================================= *)
 (*                        BOUNDED EXPANSIONS / VERIFICATION PARAMETERS                           *)
@@ -116,7 +124,7 @@ let set_num_expansions_check (s : string) =
 let use_bmc = ref false
 
 (** Depth of bounded model checking. *)
-let check_depth = ref 3
+let check_depth = ref 7
 
 (** Bounded model checking depth is set by the -b or --bmc option of the CLI. *)
 let set_check_depth (s : string) =

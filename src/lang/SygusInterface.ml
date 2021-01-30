@@ -52,18 +52,19 @@ and dec_parametric t args =
 
 
 
-let literal_of_const (c : Constant.t) : literal =
+let sygus_term_of_const (c : Constant.t) : sygus_term =
   match c with
-  | Constant.CInt i -> LitNum i
-  | Constant.CTrue -> LitBool true
-  | Constant.CFalse -> LitBool false
+  | Constant.CInt i ->
+      if i > 0 then SyLit (LitNum i) else SyApp (IdSimple "-", [SyLit (LitNum (-i))])
+  | Constant.CTrue -> SyLit (LitBool true)
+  | Constant.CFalse -> SyLit (LitBool false)
 
 let rec sygus_of_term (t : term) : sygus_term =
   let tk = t.tkind in
   match tk with
   | TBin (op, t1, t2) -> SyApp (IdSimple (Binop.to_string op), List.map ~f:sygus_of_term [t1;t2])
   | TUn (op, t1) -> SyApp (IdSimple (Unop.to_string op), [sygus_of_term t1])
-  | TConst c -> SyLit (literal_of_const c)
+  | TConst c -> sygus_term_of_const c
   | TVar x -> SyId (IdSimple x.vname)
   | TIte (c, a, b) -> SyApp( IdSimple "ite", List.map ~f:sygus_of_term [c;a;b])
   | TTup tl -> SyApp(IdSimple "mkTuple", List.map ~f:sygus_of_term tl)
@@ -139,7 +140,9 @@ let rec term_of_sygus (env : (string, variable, String.comparator_witness) Map.t
        (match args' with
         | [t1; t2] -> mk_bin op t1 t2
         | [t1] when Operator.(equal (Binary op) (Binary Minus)) -> mk_un Unop.Neg t1
-        | _ -> failwith "Sygus: a binary operator with more than two arguments.")
+        | _ ->
+          Log.error_msg Fmt.(str "%a with %i arguments?" Binop.pp op (List.length args'));
+          failwith Fmt.(str "Sygus: %a with more than two arguments." Binop.pp op))
      | IUnop op ->
        (match args' with
         | [t1] -> mk_un op t1
@@ -147,7 +150,7 @@ let rec term_of_sygus (env : (string, variable, String.comparator_witness) Map.t
      | IIte ->
        (match args' with
         | [t1; t2; t3] -> mk_ite t1 t2 t3
-        | _ -> failwith "Sygus: a binary operator with more than two arguments.")
+        | _ -> failwith "Sygus: if-then-else should have three arguments.")
      | ITupleAccessor i ->
        (match args' with
         | [arg] -> mk_sel arg i

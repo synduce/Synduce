@@ -839,6 +839,12 @@ let term_size (t : term) =
 let term_size_compare (t1 : term) (t2 : term) = compare (term_size t1) (term_size t2)
 
 
+let term_height =
+  let case _ _ = None in
+  reduce ~init:0 ~case ~join:(fun a b -> 1 + (max a b))
+
+  let term_height_compare (t1 : term) (t2 : term) = compare (term_height t1) (term_height t2)
+
 let is_norec =
   let case _ t =
     match t.tkind with
@@ -846,6 +852,15 @@ let is_norec =
     | _ -> None
   in
   reduce ~init:true ~join:(&&) ~case
+
+let is_novariant =
+    let case _ t =
+      match t.tkind with
+      | TVar x ->
+          Some (List.is_empty (RType.get_variants (Variable.vtype_or_new x)))
+      | _ -> None
+    in
+    reduce ~init:true ~join:(&&) ~case
 
 (* ============================================================================================= *)
 (*                                    PRETTY PRINTERS                                            *)
