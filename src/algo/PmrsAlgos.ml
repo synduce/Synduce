@@ -85,7 +85,7 @@ let rec acegis_loop (p : psi_def) (t_set : TermSet.t) =
   if not !Config.info then Fmt.(pf stdout "%i,%3.3f,%3.3f,%i,0@."
                                   !refinement_steps !Config.verif_time
                                  elapsed (Set.length t_set));
-  Log.debug_msg Fmt.(str "<ACEGIS> Start expansion loop with %i terms in T." (Set.length t_set));
+  Log.debug_msg Fmt.(str "<ACEGIS> Start refinement loop with %i terms in T." (Set.length t_set));
   (* Start of the algorithm. *)
   let eqns = Equations.make ~force_replace_off:false ~p t_set in
   let s_resp, solution = Equations.solve ~p eqns in
@@ -135,7 +135,7 @@ let rec ccegis_loop (p : psi_def) (t_set : TermSet.t) =
   if not !Config.info then Fmt.(pf stdout "%i,%3.3f,%3.3f,%i,0@."
                                   !refinement_steps !Config.verif_time
                                  elapsed (Set.length t_set));
-  Log.debug_msg Fmt.(str "<CCEGIS> Start expansion loop with %i terms in T." (Set.length t_set));
+  Log.debug_msg Fmt.(str "<CCEGIS> Start refinement loop with %i terms in T." (Set.length t_set));
   (* Start of the algorithm. *)
   let eqns = Equations.make ~force_replace_off:false ~p t_set in
   let s_resp, solution = Equations.solve ~p eqns in

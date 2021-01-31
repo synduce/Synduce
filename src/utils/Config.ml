@@ -109,7 +109,7 @@ let use_ccegis = ref false
 let expand_depth = ref 2
 
 (* Maximum of expansion depth performed during bounded checking. *)
-let num_expansions_check = ref 15
+let num_expansions_check = ref 124
 
 (* Cut expansion after `expand_cut` terms generated. *)
 let expand_cut = ref 124
@@ -124,7 +124,7 @@ let set_num_expansions_check (s : string) =
 let use_bmc = ref false
 
 (** Depth of bounded model checking. *)
-let check_depth = ref 7
+let check_depth = ref 6
 
 (** Bounded model checking depth is set by the -b or --bmc option of the CLI. *)
 let set_check_depth (s : string) =

@@ -2,6 +2,8 @@ open Core
 open Term
 open Utils
 
+
+let _MAX = 1000
 (* ============================================================================================= *)
 (*                                  TERM REDUCTION                                               *)
 (* ============================================================================================= *)
@@ -119,7 +121,9 @@ and pmrs_until_irreducible (prog : PMRS.t) (input : term) =
   let rec apply_until_irreducible t =
     Int.incr steps;
     let t', reduced =  one_step t in
-    if reduced then apply_until_irreducible t' else t'
+    if reduced && !steps < _MAX then
+       apply_until_irreducible t'
+    else t'
   in
   apply_until_irreducible input
 

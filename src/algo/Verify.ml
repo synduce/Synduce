@@ -6,6 +6,7 @@ open Utils
 open SmtInterface
 open Smtlib.Solvers
 
+
 let constr_eqn (_, pre, lhs, rhs) =
   let rec mk_eqn (lhs, rhs) =
     let lhs, rhs = Reduce.reduce_term lhs, Reduce.reduce_term rhs in
@@ -49,7 +50,8 @@ let check_solution
     smt_assert solver formula;
     let x =
       match check_sat solver with
-      | Sat -> true | _ -> has_sat
+      | Sat -> Continue_or_stop.Stop(true)
+      | _ -> Continue_or_stop.Continue(has_sat)
     in
     spop solver;
     x
@@ -61,7 +63,9 @@ let check_solution
       else
         Expand.to_maximally_reducible p t0
     in
-    if Set.length t_set > 0 then
+    let num_terms = Set.length t_set in
+    if num_terms > 0 then
+      begin
       let sys_eqns = Equations.make ~force_replace_off:true ~p:{ p with target=target_inst} t_set in
       let smt_eqns = List.map sys_eqns ~f:constr_eqn in
       let new_free_vars =
@@ -70,18 +74,33 @@ let check_solution
         in
         Set.diff (List.fold ~f ~init:VarSet.empty sys_eqns) free_vars
       in
+      (* Solver calls. *)
       spush solver;
       declare_all solver (decls_of_vars new_free_vars);
-      let has_ctex = List.fold ~init:false ~f:check_eqn smt_eqns in
+      let has_ctex =
+        List.fold_until
+        ~finish:(fun x -> x)
+        ~init:false
+        ~f:check_eqn smt_eqns
+      in
       spop solver;
-      if has_ctex then true, t_set, u_set, i + 1 else false, TermSet.empty, u_set, i + 1
+      (* Result of solver calls. *)
+      if has_ctex then true, t_set, u_set, i + 1 else false, TermSet.empty, u_set, i + num_terms
+      end
     else (* set is empty *)
-      false, TermSet.empty, u_set, i
+      begin
+        Log.debug_msg Fmt.(str "Checked all terms.");
+        false, TermSet.empty, u_set, i
+      end
   in
   let rec find_ctex num_checks terms_to_expand =
     Log.verbose_msg Fmt.(str "Check %i." num_checks);
     if num_checks > !Config.num_expansions_check
-    then None
+    then
+      begin
+        Log.debug_msg Fmt.(str "Hit unfolding limit.");
+        None
+      end
     else
       let next =
         List.filter ~f:(fun t -> term_height t <= !Config.check_depth)
@@ -139,12 +158,12 @@ let bounded_check
     spop solver;
     x, model
   in
-  let check_tset termset =
+  let check term =
     let sys_eqns =
       Equations.make
         ~force_replace_off:true
         ~p:{ p with target=target_inst}
-        (TermSet.of_list termset)
+        (TermSet.singleton term)
     in
     let smt_eqns = List.map sys_eqns ~f:(fun t -> t, constr_eqn t) in
     let new_free_vars =
@@ -154,7 +173,6 @@ let bounded_check
       Set.diff (List.fold ~f ~init:VarSet.empty sys_eqns) free_vars
     in
     declare_all solver init_vardecls;
-    spush solver;
     declare_all solver (decls_of_vars new_free_vars);
     let rec search_ctex _eqns =
       match _eqns with
@@ -177,7 +195,6 @@ let bounded_check
           search_ctex tl
     in
     let ctex_or_none = search_ctex smt_eqns in
-    spop solver;
     (match ctex_or_none with
     | Some (t, _, _, _) ->
         let ctex_height = Term.term_height t in
@@ -190,32 +207,71 @@ let bounded_check
     | None -> ());
     ctex_or_none
   in
-  let tqueue =
-    Queue.singleton
-    (Term.mk_var (Variable.mk ~t:(Some !AState._theta) "x"))
+  let min_ch = !AState._span in
+  (*
+    From depth > 3, check using sampled terms. Otherwise checking time explodes too fast
+    for recursive types.
+  *)
+  let vterm, vterms =
+    Analysis.virtual_term_of_max_depth (min_ch + 1) !AState._theta,
+    List.map (List.range (min_ch + 2) (!Config.check_depth))
+    ~f:(fun i -> Analysis.virtual_term_of_max_depth i !AState._theta)
   in
-  let rec check_loop () =
-    match Queue.dequeue tqueue with
-    | None -> None
-    | Some t ->
-      let bounded_terms, ut = Expand.simple ~max_height:!Config.check_depth t in
-      match check_tset (Set.elements bounded_terms) with
-      | Some ctex -> Some ctex
-      | None ->
-        let new_terms =
-            List.sort ~compare:term_height_compare
-              (List.filter ~f:(fun t -> term_height t <= !Config.check_depth)
-              (Set.elements ut))
-        in
-        Queue.enqueue_all tqueue new_terms;
-        check_loop ()
+  let rec check_loop_vterms cnt vterm vterms =
+    if cnt >= 10000 then
+      begin
+        Log.debug_msg
+        Fmt.(str "Hit unfolding limit, v = @[<hov 2>%a@]"
+          Analysis.pp_virtual_term vterm);
+        None
+      end
+    else
+      begin
+        Log.verbose_msg (Fmt.str "Vterm = @[<hov 2>%a@]" Analysis.pp_virtual_term vterm);
+        let future = Analysis.pick_some vterm in
+        match future with
+        | t_opt, None ->
+          let cont () =
+            match vterms with
+            | hd :: tl -> check_loop_vterms (cnt + 1) hd tl
+            | [] -> None
+          in
+          (match t_opt with
+          | Some t ->
+            (match check t with
+            | Some ctex -> Some ctex
+            | None -> cont ())
+          | None -> cont ())
+
+        | None, Some v -> check_loop_vterms (cnt + 1) v vterms
+        | Some t, Some v ->
+          match check t with
+          | Some ctex -> Some ctex
+          | None -> check_loop_vterms (cnt + 1) v vterms
+      end
   in
-  let ctex_or_none =
-    check_loop ()
+  (* For depth < 2, check using all terms *)
+  let tset =
+    List.sort ~compare:term_height_compare
+      (Analysis.terms_of_max_depth 4 !AState._theta)
   in
-  close_solver solver;
-  let elapsed = Unix.gettimeofday () -. start_time in
-  Config.verif_time := !Config.verif_time +. elapsed;
-  Log.info (fun f () -> Fmt.(pf f "... finished in %3.4fs" elapsed));
-  ctex_or_none
+  Log.debug_msg Fmt.(str "%i terms to check" (List.length tset));
+let ctex_or_none =
+    List.fold_until tset
+    ~init:None
+    ~finish:(fun eqn -> eqn)
+    ~f:(fun _ t ->
+      match check t with
+      | Some ctex -> Continue_or_stop.Stop(Some ctex)
+      | None -> Continue_or_stop.Continue(None))
+    in
+  match ctex_or_none with
+  | Some ctex -> Some ctex
+  | None ->
+    let ctex_or_none = check_loop_vterms 0 vterm vterms in
+    close_solver solver;
+    let elapsed = Unix.gettimeofday () -. start_time in
+    Config.verif_time := !Config.verif_time +. elapsed;
+    Log.info (fun f () -> Fmt.(pf f "... finished in %3.4fs" elapsed));
+    ctex_or_none
 

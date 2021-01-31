@@ -165,7 +165,9 @@ let compute_rhs_with_replacing p t =
     let rec apply_until_irreducible t =
       Int.incr steps;
       let t', reduced =  one_step t in
-      if reduced then apply_until_irreducible t' else t'
+      if reduced && !steps < Reduce._MAX then
+        apply_until_irreducible t'
+      else t'
     in
     apply_until_irreducible x
   in

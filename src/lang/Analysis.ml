@@ -239,6 +239,84 @@ let terms_of_max_depth (depth : int) (typ : RType.t) : term list =
   constr_t 0 typ
 
 
+type virtual_term =
+  | VConstr of string * virtual_term list
+  | VChoice of virtual_term list
+  | VVarLeaf of Variable.t
+
+let rec pp_virtual_term (f : Formatter.t) (v : virtual_term) : unit =
+  match v with
+  | VConstr (cname, args) -> Fmt.(pf f "%s(%a)" cname (list ~sep:comma pp_virtual_term) args)
+  | VChoice args -> Fmt.(pf f "(choose %a)" (list ~sep:sp (parens pp_virtual_term)) args)
+  | VVarLeaf v -> Variable.pp f v
+
+let virtual_variant_no_recurse (variants : (string * RType.t list) list) : virtual_term =
+    let inst_or_none t =
+      match RType.get_variants t with
+      | [] -> Some (VVarLeaf (Variable.mk ~t:(Some t) (Alpha.fresh "l")))
+      | _ -> None
+    in
+    let f (variant, targs) =
+      match targs with
+      | [] -> Some (VConstr(variant,[]))
+      | targs ->
+        let l = List.map ~f:inst_or_none targs in
+        if List.for_all ~f:Option.is_some l then
+          Some (VConstr (variant, (List.filter_opt l)))
+        else None
+    in
+    VChoice (List.filter_opt (List.map ~f variants))
+
+
+let virtual_term_of_max_depth (depth : int) (typ : RType.t) : virtual_term =
+  let rec for_each_variant d (constrname, tl) =
+    VConstr(constrname, List.map ~f:(constr (d + 1)) tl)
+  and constr d t =
+    match RType.get_variants t with
+    | [] -> VVarLeaf (Variable.mk ~t:(Some t) (Alpha.fresh "a"))
+    | variants ->
+      if d >= depth then
+        virtual_variant_no_recurse variants
+      else
+        VChoice (List.map ~f:(for_each_variant d) variants)
+  in
+  constr 0 typ
+
+
+(** Pick some term in a vitual term, removing the choices made from the virtual term. *)
+let pick_some (virt : virtual_term) : term option * virtual_term option =
+  let rec aux vt =
+    match vt with
+    | VVarLeaf x -> Some (mk_var x), None
+    | VChoice choices ->
+      let n = List.length choices in
+      if n = 0 then None, None
+      else
+        let i = Random.int n in
+        (match List.split_n choices i with
+        | l, hd :: tl ->
+          let t, new_hd = aux hd in
+          (match new_hd with
+          | Some hd' -> t, Some (VChoice (l @ (hd' :: tl)))
+          | None -> t, Some (VChoice (l @ tl)))
+        | _, _ -> failwith "Unexpected failure in pick_some.")
+
+    | VConstr(cname, args) ->
+      (match args with
+      | [] -> Some (mk_data cname []), None
+      | _ ->
+      let tl, vl = List.unzip (List.map ~f:aux args) in
+      let t =
+        Option.map (all_or_none tl) ~f:(fun args' -> mk_data cname args')
+      in
+      let v =
+        Option.map (all_or_none vl) ~f:(fun args' -> VConstr(cname, args'))
+      in
+      t, v)
+  in
+  aux virt
+
+
 (* ============================================================================================= *)
 (*                                  TERM CONCRETIZATION                                          *)
 (* ============================================================================================= *)

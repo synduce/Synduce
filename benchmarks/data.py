@@ -3,7 +3,7 @@ import datetime
 
 timeout_time = 600.0
 
-input_file = "benchmarks/bench_laptop.txt"
+input_file = "benchmarks/bench.txt"
 
 caption = "Benchmarks.\
             For each class a few benchmarks are evaluated.\n\
@@ -14,6 +14,73 @@ caption = "Benchmarks.\
             Experiments are run on a laptop with 16G memory and an i7-8750H 6-core CPU at 2.20GHz running Ubuntu 19.10."
 
 
+algorithms = ["requation", "naive", "ccegis"]
+versions = ["all"]  # , "st", "d", "off"]
+fields = ["synt", "verif", "#i", "last"]
+
+show_benchmarks = [
+    ["tree", [
+        ["sumtree", ["", "sum", "no"]],
+        ["maxtree", ["", "max", "no"]],
+        ["maxtree2", ["", "max 2", "no"]],
+        ["min", ["Changing", "min", "no"]],
+        ["minmax", ["Tree", "min-max", "no"]],
+        ["maxPathWeight", ["Traversals", "max weighted path", "no"]],
+        ["sorted", ["", "sorted in-order", "no"]],
+        ["poly", ["", "pre-order poly", "no"]],
+        ["mips", ["", "{\\tt mips}", "yes"]],
+        ["mits", ["", "in-order mts", "yes"]],
+        ["mpps", ["", "post-order mps", "yes"]]
+    ]],
+    ["zippers", [
+        ["sum", ["", "sum", "no"]],
+        ["height", ["From ", "height", "no"]],
+        ["maxPathWeight", ["Tree to", "max weighted path", "no"]],
+        ["maxPathWeight2", ["Zipper", "max w. path (hom)", "no"]],
+        ["leftmostodd", ["", "leftmost odd", "no"]],
+        ["mips", ["", "{\\tt mips}", "yes"]]
+    ]],
+    ["tailopt",
+     [
+         ["sum", ["Enforcing", "sum", "no"]],
+         ["mts", ["Tail", "mts", "no"]],
+         ["mps", ["Recursion", "mps", "no"]]
+     ]],
+    ["combine",
+     [
+         ["mts", ["Combining", "mts + sum", "no"]],
+         ["mts_and_mps", ["Traversals", "sum + mts + mps", "yes"]]
+     ]],
+    ["ptree", [
+        ["sum", ["", "sum", "no"]],
+        ["mul", ["Tree", "product", "no"]],
+        ["maxheads", ["Flattening", "max of heads", "no"]],
+        ["maxlast", ["", "max of lasts", "no"]],
+        ["maxsum", ["", "max sibling sum", "no"]]
+    ]],
+
+    ["list", [
+        ["sumhom", ["", "sum", "no"]],
+        ["sumevens", ["", "sum of even elts.", "no"]],
+        ["lenhom", ["", "length", "no"]],
+        ["last", ["", "last", "no"]],
+        ["prodhom", ["Parallelizing", "product", "no"]],
+        ["polyhom", ["Functions", "polynomial", "no"]],
+        ["hamming", ["on", "hamming", "no"]],
+        ["maxcount", ["Lists", "count max elements", "no"]],
+        ["minhom", ["", "mininum", "no"]],
+        ["issorted", ["", "is sorted", "no"]],
+        ["search", ["", "linear search", "no"]],
+        ["line_of_sight", ["", "line of sight", "no"]],
+        ["mtshom", ["", "mts", "yes"]],
+        ["mpshom", ["", "mps", "yes"]],
+        ["mts_and_mps_hom", ["", "mts and mps combined", "yes"]],
+        ["msshom", ["", "mss", "yes"]]
+    ]]
+
+]
+
+
 def all_timeout(l):
     is_t = True
     for elt in l:
@@ -22,67 +89,6 @@ def all_timeout(l):
 
 
 def produce_tex_table(tex_output_file, data):
-    show_benchmarks = [
-        ["tree", [
-            ["sumtree", ["", "sum", "no"]],
-            ["maxtree", ["", "max", "no"]],
-            ["maxtree2", ["", "max 2", "no"]],
-            ["min", ["Changing", "min", "no"]],
-            ["minmax", ["Tree", "min-max", "no"]],
-            ["maxPathWeight", ["Traversals", "max weighted path", "no"]],
-            ["sorted", ["", "sorted in-order", "no"]],
-            ["poly", ["", "pre-order poly", "no"]],
-            ["mips", ["", "{\\tt mips}", "yes"]],
-            ["mits", ["", "in-order mts", "yes"]],
-            ["mpps", ["", "post-order mps", "yes"]]
-        ]],
-        ["zippers", [
-                    ["sum", ["", "sum", "no"]],
-                    ["height", ["From ", "height", "no"]],
-                    ["maxPathWeight", ["Tree to", "max weighted path", "no"]],
-                    ["maxPathWeight2", ["Zipper", "max w. path (hom)", "no"]],
-                    ["leftmostodd", ["", "leftmost odd", "no"]],
-                    ["mips", ["", "{\\tt mips}", "yes"]]
-        ]],
-        ["tailopt",
-         [
-             ["sum", ["Enforcing", "sum", "no"]],
-             ["mts", ["Tail", "mts", "no"]],
-             ["mps", ["Recursion", "mps", "no"]]
-         ]],
-        ["combine",
-         [
-             ["mts", ["Combining", "mts + sum", "no"]],
-             ["mts_and_mps", ["Traversals", "sum + mts + mps", "yes"]]
-         ]],
-        ["ptree", [
-            ["sum", ["", "sum", "no"]],
-            ["mul", ["Tree", "product", "no"]],
-            ["maxheads", ["Flattening", "max of heads", "no"]],
-            ["maxlast", ["", "max of lasts", "no"]],
-            ["maxsum", ["", "max sibling sum", "no"]]
-        ]],
-
-        ["list", [
-            ["sumhom", ["", "sum", "no"]],
-            ["sumevens", ["", "sum of even elts.", "no"]],
-            ["lenhom", ["", "length", "no"]],
-            ["last", ["", "last", "no"]],
-            ["prodhom", ["Parallelizing", "product", "no"]],
-            ["polyhom", ["Functions", "polynomial", "no"]],
-            ["hamming", ["on", "hamming", "no"]],
-            ["maxcount", ["Lists", "count max elements", "no"]],
-            ["minhom", ["", "mininum", "no"]],
-            ["issorted", ["", "is sorted", "no"]],
-            ["search", ["", "linear search", "no"]],
-            ["line_of_sight", ["", "line of sight", "no"]],
-            ["mtshom", ["", "mts", "yes"]],
-            ["mpshom", ["", "mps", "yes"]],
-            ["mts_and_mps_hom", ["", "mts and mps combined", "yes"]],
-            ["msshom", ["", "mss", "yes"]]
-        ]]
-
-    ]
     with open(tex_output_file, 'w') as tex:
         tex.write("%s ====================================\n" % '%')
         tex.write(
@@ -139,7 +145,7 @@ def produce_tex_table(tex_output_file, data):
                         req_t = "-"
                         req_iters = b_data["max"]
                     if str(b_data["max"]) in b_data:
-                        req_last = "%3.2f" % b_data[str(b_data["max"])][0]
+                        req_last = "%3.2f" % b_data[str(b_data["max"])][1]
 
                 # Pick best optimized version for naive
                 a_data = data[bkey, "naive"]
@@ -169,7 +175,7 @@ def produce_tex_table(tex_output_file, data):
                         nai_t = "-"
                         nai_iters = b_data["max"]
                     if str(b_data["max"]) in b_data:
-                        nai_last = "%3.2f" % b_data[str(b_data["max"])][0]
+                        nai_last = "%3.2f" % b_data[str(b_data["max"])][1]
 
                 if naive_bf:
                     nai_t = "{\\bfseries %s}" % nai_t
@@ -200,6 +206,61 @@ def means(v):
             tot_iterations = tot_iterations + iterations
             tot_time = tot_time + time
     return (int(tot_iterations / n), float(tot_time / n))
+
+
+def times_of_bdata(b_data):
+    s_t = "-"
+    v_t = "-"
+    tot_iters = "?"
+    s_last = "?"
+
+    if "res" in b_data:
+        tot_iters, v_time, s_time = b_data["res"]
+        tot_iters = "%i" % int(tot_iters)
+        s_t = "%3.2f" % float(s_time)
+        v_t = "%3.2f" % float(v_time)
+    else:
+        s_t = "-"
+        tot_iters = "%i" % int(b_data["max"])
+
+    if str(b_data["max"]) in b_data:
+        s_last = "%3.2f" % b_data[str(b_data["max"])][1]
+        v_t = "%3.2f" % b_data[str(b_data["max"])][1]
+
+    return [s_t, v_t, tot_iters, s_last]
+
+
+def build_line(data, benchmark_class, benchmark_file):
+    bkey = benchmark_class + "/" + benchmark_file + ".pmrs"
+    csvline = [benchmark_class, benchmark_file]
+    for algo in algorithms:
+        if (bkey, algo) in data.keys():
+            bdata = data[bkey, algo]
+            for ver in versions:
+                times = ["?", "?", "?", "?"]
+                if ver in bdata.keys():
+                    times = times_of_bdata(bdata[ver])
+                csvline += times
+        else:
+            for ver in versions:
+                times = ["?", "?", "?", "?"]
+                csvline += times
+    return csvline
+
+
+def csv_table(data, csvfile):
+    with open(csvfile, 'w') as csvout:
+        csvout.write("Category,File")
+        for algor in algorithms:
+            for opt in versions:
+                csvout.write("," + algor + "+" + opt)
+                for field in fields[1:]:
+                    csvout.write("," + field)
+        csvout.write("\n")
+        for benchmark_class, benchmarks in show_benchmarks:
+            for benchmark_file, _ in benchmarks:
+                csvline = build_line(data, benchmark_class, benchmark_file)
+                csvout.write(",".join(csvline) + '\n')
 
 
 def raw_to_csv():
@@ -254,26 +315,8 @@ def benchsort(x):
 
 if __name__ == "__main__":
     thedict = raw_to_csv()
-    results = []
-    for k, v in thedict.items():
-        print(k)
-        for k2, v in v.items():
-            print(k2, v)
-            k0 = k[0].split("/")
-            subfolder = k0[0].strip()
-            benchmark = k0[1].split(".")[0].strip()
-            if "res" in v.keys():
-                iters = v["res"][0]
-                verif_time = v["res"][1]
-                time = v["res"][2]
-                results.append(
-                    [subfolder, benchmark, k[1], iters, verif_time, time])
 
-    results.sort(key=benchsort)
-
-    with open("benchmarks/results.csv", 'w') as outf:
-        for a, b, c, d, e, f in results:
-            outf.write("%s,%s,%s,%s,%s,%s\n" % (a, b, c, d, e, f))
+    csv_table(thedict, "benchmarks/results.csv")
 
     if len(sys.argv) > 1:
         tex_out = sys.argv[1]

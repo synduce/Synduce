@@ -48,10 +48,10 @@ input_files = [
     ["list/line_of_sight.pmrs", ""],
     ["list/mts_and_mps_hom.pmrs", ""],
     ["list/issorted.pmrs", "-t"],
-    ["tree/sorted.pmrs", "-t"],
+    # ["tree/sorted.pmrs", "-t"],
     ["tree/mips.pmrs", ""],
     ["tree/mits.pmrs", ""],
-    ["tree/mpps.pmrs", ""]
+    # ["tree/mpps.pmrs", ""]
 ]
 
 root = os.getcwd()
@@ -93,7 +93,7 @@ for filename_with_opt in input_files:
                       (timeout, path, os.path.realpath(os.path.join("benchmarks", filename)), opt))
         # =========================================================================================
         # ===> ACEGIS algorithm evaluation.
-        naive_opt = "--use-acegis"
+        naive_opt = "--acegis"
         print("B:%s,naive" % filename)
         sys.stdout.flush()
         os.system("timeout %i %s %s -i %s %s" %
@@ -120,7 +120,7 @@ for filename_with_opt in input_files:
                       (timeout, path, os.path.realpath(os.path.join("benchmarks", filename)), opt, naive_opt))
 
          # ===> CCEGIS algorithm evaluation.
-        naive_opt = "--use-ccegis"
+        naive_opt = "--ccegis"
         print("B:%s,ccegis" % filename)
         sys.stdout.flush()
         os.system("timeout %i %s %s -i %s %s" %
