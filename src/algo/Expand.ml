@@ -131,7 +131,7 @@ let replace_rhs_of_mains (p : psi_def) (t0 : term) : term =
 
 
 (* ============================================================================================= *)
-(*                                   NAIVE TERM EXPANSION                                        *)
+(*                                   acegis TERM EXPANSION                                        *)
 (* ============================================================================================= *)
 
 let is_max_expanded (t : term) = Term.is_novariant t
@@ -292,6 +292,20 @@ let expand_max2 (p : psi_def) (f : PMRS.t) (g : PMRS.t) (t0 : term)
   | _ -> expand_driver p f g t0
 
 
+let is_mr (p : psi_def) (f : PMRS.t) (t0 : term) nt : bool =
+  let f_t0 = Reduce.reduce_pmrs f t0 in
+  let f_t0 = replace_rhs_of_main p f f_t0 in
+  let nr = nonreduced_terms p nt f_t0 in
+  match nr with [] -> true | _ -> false
+
+let is_mr_all (p : psi_def) (t0 : term) =
+  let nonterminals =
+    VarSet.union_list
+      [p.target.pnon_terminals; p.repr.pnon_terminals; p.orig.pnon_terminals]
+  in
+  (is_mr p p.target t0 nonterminals) && (Either.is_first (check_max_exp p p.orig p.repr t0))
+
+
 (** `maximal p t0 ` expands the term `t0 ` such that `p.orig (p.repr t0)` and 'p.target t0`
     are maximally reduced terms.
 *)
@@ -304,12 +318,7 @@ let to_maximally_reducible (p : psi_def) (t0 : term) : TermSet.t * TermSet .t =
   let tset0, uset0 =
     let g = p.target in
     (* Expand only if there are non-reduced terms *)
-    let g_t0 = Reduce.reduce_pmrs g t0 in
-    let g_t0 = replace_rhs_of_main p g g_t0 in
-    let nr = nonreduced_terms p nonterminals g_t0 in
-    match nr with
-    | [] -> [t0, t0], []
-    | _ -> expand_max p g t0
+    if is_mr p g t0 nonterminals then  [t0, t0], [] else expand_max p g t0
   in
   Log.verbose_msg Fmt.(str "@[Expand > tset_target = %a@]" (list ~sep:comma pp_term)
                          (List.map ~f:first tset0));

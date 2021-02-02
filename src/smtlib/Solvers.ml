@@ -116,7 +116,10 @@ let make_solver (path : string) : online_solver =
     Sys_error s ->
     failwith ("couldn't talk to solver, double-check path. Sys_error "^s)
 
-let close_solver solver = ignore @@ exec_command solver mk_exit
+let close_solver solver =
+  ignore @@ exec_command solver mk_exit;
+  OC.close_no_err solver.inputc;
+  IC.close  solver.outputc
 
 
 (** Returns empty response if commands is empty, otherwise, executes the LAST command in the

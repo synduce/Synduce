@@ -30,11 +30,11 @@ let constr_eqn (_, pre, lhs, rhs) =
    Returns the set (t,u) for the next step in the ctex-guided refinement loop.
 *)
 let check_solution
-    ?(use_naive = false)
+    ?(use_acegis = false)
     ~(p : psi_def)
     (t, u : TermSet.t * TermSet.t)
     (soln : (string * variable list * term) list) =
-  (if use_naive then
+  (if use_acegis then
      Log.info (fun f () -> Fmt.(pf f "Check solution."))
    else
      Log.info (fun f () -> Fmt.(pf f "Checking solution...")));
@@ -57,12 +57,7 @@ let check_solution
     x
   in
   let expand_and_check i (t0 : term) =
-    let t_set, u_set =
-      if use_naive then
-        Expand.simple t0
-      else
-        Expand.to_maximally_reducible p t0
-    in
+    let t_set, u_set = Expand.to_maximally_reducible p t0 in
     let num_terms = Set.length t_set in
     if num_terms > 0 then
       begin
@@ -103,7 +98,7 @@ let check_solution
       end
     else
       let next =
-        List.filter ~f:(fun t -> term_height t <= !Config.check_depth)
+        List.filter ~f:(fun t -> term_height t <= !Config.check_depth + 1)
         (Set.elements terms_to_expand)
       in
       match List.sort ~compare:term_height_compare next with
@@ -207,56 +202,13 @@ let bounded_check
     | None -> ());
     ctex_or_none
   in
-  let min_ch = !AState._span in
-  (*
-    From depth > 3, check using sampled terms. Otherwise checking time explodes too fast
-    for recursive types.
-  *)
-  let vterm, vterms =
-    Analysis.virtual_term_of_max_depth (min_ch + 1) !AState._theta,
-    List.map (List.range (min_ch + 2) (!Config.check_depth))
-    ~f:(fun i -> Analysis.virtual_term_of_max_depth i !AState._theta)
-  in
-  let rec check_loop_vterms cnt vterm vterms =
-    if cnt >= 10000 then
-      begin
-        Log.debug_msg
-        Fmt.(str "Hit unfolding limit, v = @[<hov 2>%a@]"
-          Analysis.pp_virtual_term vterm);
-        None
-      end
-    else
-      begin
-        Log.verbose_msg (Fmt.str "Vterm = @[<hov 2>%a@]" Analysis.pp_virtual_term vterm);
-        let future = Analysis.pick_some vterm in
-        match future with
-        | t_opt, None ->
-          let cont () =
-            match vterms with
-            | hd :: tl -> check_loop_vterms (cnt + 1) hd tl
-            | [] -> None
-          in
-          (match t_opt with
-          | Some t ->
-            (match check t with
-            | Some ctex -> Some ctex
-            | None -> cont ())
-          | None -> cont ())
-
-        | None, Some v -> check_loop_vterms (cnt + 1) v vterms
-        | Some t, Some v ->
-          match check t with
-          | Some ctex -> Some ctex
-          | None -> check_loop_vterms (cnt + 1) v vterms
-      end
-  in
-  (* For depth < 2, check using all terms *)
   let tset =
-    List.sort ~compare:term_height_compare
-      (Analysis.terms_of_max_depth 4 !AState._theta)
+    List.sort ~compare:term_size_compare
+      (Analysis.terms_of_max_depth
+        (!Config.check_depth - 1) !AState._theta)
   in
   Log.debug_msg Fmt.(str "%i terms to check" (List.length tset));
-let ctex_or_none =
+  let ctex_or_none =
     List.fold_until tset
     ~init:None
     ~finish:(fun eqn -> eqn)
@@ -264,14 +216,10 @@ let ctex_or_none =
       match check t with
       | Some ctex -> Continue_or_stop.Stop(Some ctex)
       | None -> Continue_or_stop.Continue(None))
-    in
-  match ctex_or_none with
-  | Some ctex -> Some ctex
-  | None ->
-    let ctex_or_none = check_loop_vterms 0 vterm vterms in
-    close_solver solver;
-    let elapsed = Unix.gettimeofday () -. start_time in
-    Config.verif_time := !Config.verif_time +. elapsed;
-    Log.info (fun f () -> Fmt.(pf f "... finished in %3.4fs" elapsed));
-    ctex_or_none
+  in
+  close_solver solver;
+  let elapsed = Unix.gettimeofday () -. start_time in
+  Config.verif_time := !Config.verif_time +. elapsed;
+  Log.info (fun f () -> Fmt.(pf f "... finished in %3.4fs" elapsed));
+  ctex_or_none
 

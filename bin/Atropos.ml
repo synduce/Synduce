@@ -17,14 +17,14 @@ let print_usage () =
     -v --verbose                   Print verbose.
     -i --info-off                  Turn off information messages. Print time and refinement steps.
   Turning optimizations off:
-       --replacing-recursion-off   Do not use reference function in nested calls.
     -s --no-splitting              Do not split systems into subsystems.
        --no-syndef                 Do not use syntactic definitions.
     -t --no-detupling              Turn off detupling.
+    -c --simple-init               Initialize T naively.
        --acegis                    Use the Abstract CEGIS algorithm. Turns bmc on.
        --ccegis                    Use the Concrete CEGIS algorithm. Turns bmc on.
   Bounded checking:
-       --use-bmc                   Use naive bounded model checking (bmc mode).
+       --use-bmc                   Use acegis bounded model checking (bmc mode).
     -b --bmc                       Maximum depth of terms for bounded model checking, in bmc mode.
     -v --verification              Number of expand calls for bounded model checking, in opt mode.
   Debugging:
@@ -44,7 +44,7 @@ let options = [
   ('\000', "ccegis", (set Config.use_ccegis true), None);
   ('\000', "use-bmc", (set Config.use_bmc true), None);
   ('\000', "parse-only", (set parse_only true), None);
-  ('\000',"replacing-recursion-off", (set Config.replace_recursion false), None);
+  ('c', "simple-init", (set Config.simple_init true), None);
   ('t',"no-detupling", (set Config.detupling_on false), None);
   ('\000',"no-syndef", (set Config.syndef_on false), None);
   ('s',"no-splitting", (set Config.split_solve_on false), None);

@@ -236,7 +236,7 @@ let terms_of_max_depth (depth : int) (typ : RType.t) : term list =
       in
       choices
   in
-  constr_t 0 typ
+  constr_t 1 typ
 
 
 type virtual_term =
@@ -331,6 +331,7 @@ let rec rand_const_of_type (typ : RType.t) : term =
   | TBool -> mk_const (if Random.bool () then Constant.CTrue else Constant.CFalse)
   | TChar -> failwith "Char unsupported."
   | TString -> failwith "String unsupported."
+  | TVar _ -> mk_const (Constant.CInt ((Random.int (_INT_MAX - _INT_MIN)) + _INT_MIN))
   | _ ->
     match get_variants typ with
     | [] -> failwith Fmt.(str "Unsupported value type %a" pp typ)

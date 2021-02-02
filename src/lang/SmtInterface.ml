@@ -43,7 +43,7 @@ let rec sort_of_rtype (t : RType.t) : smtSort =
   | RType.TTup tl -> Comp (Id (SSimple "Tuple"), List.map ~f:sort_of_rtype tl)
   | RType.TFun (tin, tout) -> Comp (Id (SSimple "->"), [sort_of_rtype tin; sort_of_rtype tout])
   | RType.TParam (args, t) -> dec_parametric t args
-  | RType.TVar i -> SmtSort (Id (SSimple ("sort"^Int.to_string i)))
+  | RType.TVar _ -> SmtSort (Id (SSimple "Int")) (* Assuming polymorphism means int ok *)
 
 and dec_parametric t args =
   match t with

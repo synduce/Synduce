@@ -80,11 +80,13 @@ let syndef_on = ref true
 *)
 let split_solve_on = ref true
 
-(**
-  When reducing terms, nested calls to the recursion skeleton are replaced by
-  calls to the reference function composed with the representation function.
+
+(** Initialize T using a single variable of type theta, instead of searching for a set of
+    terms covering all unknowns.
+    Use option --simple-init or -c to turn on.
 *)
-let replace_recursion = ref true
+let simple_init = ref false
+
 
 (**
   Not an optimization. Set to true to use the base abstract cegis algorithm.
@@ -124,7 +126,7 @@ let set_num_expansions_check (s : string) =
 let use_bmc = ref false
 
 (** Depth of bounded model checking. *)
-let check_depth = ref 6
+let check_depth = ref 5
 
 (** Bounded model checking depth is set by the -b or --bmc option of the CLI. *)
 let set_check_depth (s : string) =

@@ -56,17 +56,24 @@ let rec refinement_loop (p : psi_def) (t_set, u_set : TermSet.t * TermSet.t) =
 
 
 let psi (p : psi_def) =
-  let mgts = MGT.most_general_terms p.target in
-  Log.debug
-    (fun frmt () -> Fmt.(pf frmt "@[<hov 2>MGT() = %a@]"
-                           (list ~sep:comma pp_term) (Set.elements mgts)));
   (* Initialize sets with the most general terms. *)
   let t_set, u_set =
-    Set.fold mgts ~init:(TermSet.empty, TermSet.empty)
+  if !Config.simple_init then
+    let x0 =
+      mk_var (Variable.mk ~t:(Some !AState._theta) (Alpha.fresh "x"))
+    in
+    let s = TermSet.of_list (Analysis.expand_once x0) in
+    Set.partition_tf ~f:(Expand.is_mr_all p) s
+  else
+    let init_set = MGT.most_general_terms p.target in
+    Set.fold init_set ~init:(TermSet.empty, TermSet.empty)
       ~f:(fun (t,u) mgt ->
-          let t1, t2 = Expand.to_maximally_reducible p mgt in
-          Set.union t t1, Set.union u t2)
+          let t', u' = Expand.to_maximally_reducible p mgt in
+          Set.union t t', Set.union u u')
   in
+  Log.debug
+  (fun frmt () -> Fmt.(pf frmt "@[<hov 2>INIT = %a@]"
+                         (list ~sep:comma pp_term) (Set.elements t_set)));
   if Set.is_empty t_set then
     (Log.error_msg "Empty set of terms for equation system.";
      failwith "Cannot solve problem.")
@@ -87,7 +94,7 @@ let rec acegis_loop (p : psi_def) (t_set : TermSet.t) =
                                  elapsed (Set.length t_set));
   Log.debug_msg Fmt.(str "<ACEGIS> Start refinement loop with %i terms in T." (Set.length t_set));
   (* Start of the algorithm. *)
-  let eqns = Equations.make ~force_replace_off:false ~p t_set in
+  let eqns = Equations.make ~force_replace_off:true ~p t_set in
   let s_resp, solution = Equations.solve ~p eqns in
   match s_resp, solution with
   | RSuccess _, Some sol ->
@@ -119,7 +126,7 @@ let rec acegis_loop (p : psi_def) (t_set : TermSet.t) =
 
 let psi_acegis (p : psi_def) =
   let t_set =
-    TermSet.of_list (Analysis.terms_of_max_depth 0 !AState._theta)
+    TermSet.of_list (Analysis.terms_of_max_depth 1 !AState._theta)
   in
   (refinement_steps := 0; acegis_loop p t_set)
 
@@ -137,7 +144,7 @@ let rec ccegis_loop (p : psi_def) (t_set : TermSet.t) =
                                  elapsed (Set.length t_set));
   Log.debug_msg Fmt.(str "<CCEGIS> Start refinement loop with %i terms in T." (Set.length t_set));
   (* Start of the algorithm. *)
-  let eqns = Equations.make ~force_replace_off:false ~p t_set in
+  let eqns = Equations.make ~force_replace_off:true ~p t_set in
   let s_resp, solution = Equations.solve ~p eqns in
   match s_resp, solution with
   | RSuccess _, Some sol ->
@@ -171,7 +178,7 @@ let psi_ccegis (p : psi_def) =
   let t_set =
     TermSet.of_list
     (List.map ~f:Analysis.concretize
-      (Analysis.terms_of_max_depth 0 !AState._theta))
+      (Analysis.terms_of_max_depth 1 !AState._theta))
   in
   (refinement_steps := 0; ccegis_loop p t_set)
 

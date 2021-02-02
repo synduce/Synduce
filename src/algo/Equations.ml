@@ -178,7 +178,7 @@ let compute_rhs_with_replacing p t =
 
 
 let compute_rhs ?(force_replace_off=false) p t =
-  if !Config.replace_recursion && (not force_replace_off) then
+  if not force_replace_off then
     compute_rhs_with_replacing p t
   else
     let res = Expand.replace_rhs_of_mains p

@@ -1,66 +1,63 @@
 % ====================================
-% This table has been automatically produced by the tool on 2021-01-28 13:39:28.440266.
+% This table has been automatically produced by the tool on 2021-01-31 20:13:24.953094.
 % ====================================
 \begin{table}
-	\caption{Benchmarks.            For each class a few benchmarks are evaluated.
-            The total synthesis time(in seconds) and the number of refinement steps are listed for both {\tool} and the naive implementation.
-            The shortest time is in bold font.            $T_{last}$ is the elapsed time before the last call to the syntax guided synthesis solver in the last refinement step.
-             A '-' indicates that synthesis timed out($>$ 10 min).            Experiments are run on a laptop with 16G memory and an i7-8750H 6-core CPU at 2.20GHz running Ubuntu 19.10.}\label{table:experiments}
+	\caption{Experimental Results : We evaluate {\tool} with all optimizations, without detupling, without syntactic definitions and with all optimizations off.             Benchmarks are grouped by categories introduced in Section \ref{sec:cstudies}. \# indicates the number of refinement rounds.             $T_{last}$ is the elapsed time before the last call to the SyGuS solver in the last refinement step before timeout (`.` indicates that there was no previous round).             All times are in seconds. A '-' indicates timeout($>$ 10 min).             Experiments are run on a laptop with 16G memory and an i7-8750H 6-core CPU at 2.20GHz running Ubuntu 19.10.}\label{table:experiment_optimizations}
 	{
-		\begin{tabular}[h]{|c|c|c|c|c|c||c|c|c|}
+		\begin{tabular}[h]{|c| c|c|c|| c|c|c || c|c|c|| c|c|c|}
 			\hline
-			 \multirow{2}{*}{Class} & \multirow{2}{*}{Benchmark}  & \multirow{2}{*}{Inv.} & \multicolumn{3}{c||}{\tool} & \multicolumn{3}{c|}{Naive}\\ 
-			\cline{4-9}
-			 &   & & time & \# steps & $T_{last}$ & time & \# steps & $T_{last}$\\ 
+			\multirow{2}{*}{Benchmark} & \multicolumn{3}{c||}{\tool} & \multicolumn{3}{c||}{{\tool} - detupling} & \multicolumn{3}{c||}{{\tool} - detupling } & \multicolumn{3}{c|}{{\tool} - opt. off }                                                                                              \\
+			\cline{2-13}
+			                           & time                        & \#                                        & $T_{last}$                                 & time                                     & \#   & $T_{last}$ & time   & \#   & $T_{last}$                                             \\
 			\hline
-			 & sum & no & 0.07 & 2 & 0.01 & {\bfseries 0.05} & 3 & 0.02\\ 
-			 & max & no & {\bfseries 0.15} & 1 & 0.00 & 0.28 & 2 & 0.01\\ 
-			 & max 2 & no & {\bfseries 0.17} & 1 & 0.00 & 0.28 & 2 & 0.01\\ 
-			Changing & min & no & {\bfseries 0.10} & 1 & 0.00 & 0.29 & 2 & 0.01\\ 
-			Tree & min-max & no & {\bfseries 0.63} & 3 & 0.03 & 105.38 & 4 & 0.04\\ 
-			Traversals & max weighted path & no & 0.14 & 3 & 0.02 & {\bfseries 0.08} & 3 & 0.02\\ 
-			 & sorted in-order & no & {\bfseries 0.01} & 1 & 0.00 & - & 3 & 0.04\\ 
-			 & pre-order poly & no & {\bfseries 17.91} & 2 & 0.01 & - & 4 & 0.03\\ 
-			 & {\tt mips} & yes & {\bfseries 0.46} & 2 & 0.01 & - & 4 & 0.03\\ 
-			 & in-order mts & yes & {\bfseries 0.60} & 2 & 0.01 & - & 4 & 0.03\\ 
-			 & post-order mps & yes & {\bfseries 154.65} & 4 & 0.06 & - & 6 & 1.46\\ 
+			sum                        & {\bf 0.03}                  & 2                                         & 0.01                                       & 0.03                                     & 47.7 & 0.01       & 0.03   & 47.7 & 2          & 0.03   & 47.7 & 2 & 0.01  & ? & ? & ? & ? \\
+			max                        & {\bf 0.33}                  & 1                                         & .                                          & 0.33                                     & 99.7 & .          & 0.33   & 99.7 & 1          & 0.33   & 99.7 & 1 & .     & ? & ? & ? & ? \\
+			max(2)                     & {\bf 0.24}                  & 1                                         & .                                          & 0.24                                     & 99.5 & .          & 0.24   & 99.5 & 1          & 0.24   & 99.5 & 1 & .     & ? & ? & ? & ? \\
+			min                        & {\bf 0.23}                  & 1                                         & .                                          & 0.23                                     & 99.4 & .          & 0.23   & 99.4 & 1          & 0.23   & 99.4 & 1 & .     & ? & ? & ? & ? \\
+			minmax                     & {\bf 0.85}                  & 3                                         & 0.15                                       & 0.85                                     & 64.8 & 0.15       & 0.85   & 64.8 & 3          & 0.85   & 64.8 & 3 & 0.15  & ? & ? & ? & ? \\
+			max w. path                & {\bf 0.09}                  & 3                                         & 0.03                                       & 0.09                                     & 61.9 & 0.03       & 0.09   & 61.9 & 3          & 0.09   & 61.9 & 3 & 0.03  & ? & ? & ? & ? \\
+			sorted                     & {\bf 0.01}                  & 1                                         & .                                          & 0.01                                     & 84.8 & .          & 0.01   & 84.8 & 1          & 0.01   & 84.8 & 1 & .     & ? & ? & ? & ? \\
+			poly                       & {\bf 16.06}                 & 2                                         & 0.06                                       & 16.06                                    & 0.1  & 0.06       & 16.06  & 0.1  & 2          & 16.06  & 0.1  & 2 & 0.06  & ? & ? & ? & ? \\
+			{\tt mips}                 & {\bf 0.30}                  & 2                                         & 0.04                                       & 0.30                                     & 12.4 & 0.04       & 0.30   & 12.4 & 2          & 0.30   & 12.4 & 2 & 0.04  & ? & ? & ? & ? \\
+			mits                       & {\bf 0.41}                  & 2                                         & 0.05                                       & 0.41                                     & 7.9  & 0.05       & 0.41   & 7.9  & 2          & 0.41   & 7.9  & 2 & 0.05  & ? & ? & ? & ? \\
+			mpps                       & {\bf 130.82}                & 4                                         & 81.60                                      & 130.82                                   & 0.9  & 81.60      & 130.82 & 0.9  & 4          & 130.82 & 0.9  & 4 & 81.60 & ? & ? & ? & ? \\
 			\hline
-			 & sum & no & 0.12 & 2 & 0.01 & {\bfseries 0.08} & 3 & 0.03\\ 
-			From  & height & no & {\bfseries 0.12} & 1 & 0.00 & 0.23 & 5 & 0.05\\ 
-			Tree to & max weighted path & no & 0.18 & 2 & 0.01 & {\bfseries 0.12} & 3 & 0.03\\ 
-			Zipper & max w. path (hom) & no & {\bfseries 0.01} & 1 & 0.00 & 3.53 & 5 & 0.05\\ 
-			 & leftmost odd & no & {\bfseries 0.06} & 1 & 0.00 & - & 4 & 9.39\\ 
-			 & {\tt mips} & yes & {\bfseries 1.59} & 3 & 0.02 & - & 7 & 0.14\\ 
+			sum                        & {\bf 0.09}                  & 2                                         & 0.02                                       & 0.09                                     & 78.2 & 0.02       & 0.09   & 78.2 & 2          & 0.09   & 78.2 & 2 & 0.02  & ? & ? & ? & ? \\
+			height                     & {\bf 0.93}                  & 1                                         & .                                          & 0.93                                     & 11.6 & .          & 0.93   & 11.6 & 1          & 0.93   & 11.6 & 1 & .     & ? & ? & ? & ? \\
+			max w. path                & {\bf 0.20}                  & 2                                         & 0.03                                       & 0.20                                     & 81.2 & 0.03       & 0.20   & 81.2 & 2          & 0.20   & 81.2 & 2 & 0.03  & ? & ? & ? & ? \\
+			max w. path                & {\bf 0.01}                  & 1                                         & .                                          & 0.01                                     & 75.8 & .          & 0.01   & 75.8 & 1          & 0.01   & 75.8 & 1 & .     & ? & ? & ? & ? \\
+			leftmost o.                & {\bf 0.01}                  & 1                                         & .                                          & 0.01                                     & 76.1 & .          & 0.01   & 76.1 & 1          & 0.01   & 76.1 & 1 & .     & ? & ? & ? & ? \\
+			{\tt mips}                 & {\bf 2.12}                  & 3                                         & 0.49                                       & 2.12                                     & 44.8 & 0.49       & 2.12   & 44.8 & 3          & 2.12   & 44.8 & 3 & 0.49  & ? & ? & ? & ? \\
 			\hline
-			Enforcing & sum & no & 0.11 & 2 & 0.04 & {\bfseries 0.04} & 3 & 0.01\\ 
-			Tail & mts & no & {\bfseries 1.26} & 2 & 0.01 & 34.44 & 3 & 0.01\\ 
-			Recursion & mps & no & {\bfseries 2.29} & 2 & 0.01 & 6.58 & 3 & 0.01\\ 
+			sum                        & {\bf 0.02}                  & 2                                         & 0.01                                       & 0.02                                     & 48.7 & 0.01       & 0.02   & 48.7 & 2          & 0.02   & 48.7 & 2 & 0.01  & ? & ? & ? & ? \\
+			mts                        & {\bf 5.93}                  & 2                                         & 0.02                                       & 5.93                                     & 0.4  & 0.02       & 5.93   & 0.4  & 2          & 5.93   & 0.4  & 2 & 0.02  & ? & ? & ? & ? \\
+			mps                        & {\bf 1.67}                  & 2                                         & 0.02                                       & 1.67                                     & 1.3  & 0.02       & 1.67   & 1.3  & 2          & 1.67   & 1.3  & 2 & 0.02  & ? & ? & ? & ? \\
 			\hline
-			Combining & mts + sum & no & {\bfseries 2.39} & 2 & 0.01 & 242.59 & 3 & 0.01\\ 
-			Traversals & sum + mts + mps & yes & {\bfseries 0.76} & 3 & 0.02 & - & 3 & 0.02\\ 
+			mts                        & {\bf 9.77}                  & 2                                         & 0.02                                       & 9.77                                     & 0.2  & 0.02       & 9.77   & 0.2  & 2          & 9.77   & 0.2  & 2 & 0.02  & ? & ? & ? & ? \\
+			max. sums                  & {\bf 0.26}                  & 3                                         & 0.12                                       & 0.26                                     & 18.4 & 0.12       & 0.26   & 18.4 & 3          & 0.26   & 18.4 & 3 & 0.12  & ? & ? & ? & ? \\
 			\hline
-			 & sum & no & 0.13 & 3 & 0.02 & {\bfseries 0.09} & 2 & 0.01\\ 
-			Tree & product & no & 0.22 & 3 & 0.02 & {\bfseries 0.07} & 2 & 0.01\\ 
-			Flattening & max of heads & no & {\bfseries 0.12} & 2 & 0.01 & 0.29 & 3 & 0.02\\ 
-			 & max of lasts & no & 0.29 & 2 & 0.01 & {\bfseries 0.13} & 3 & 0.01\\ 
-			 & max sibling sum & no & {\bfseries 2.39} & 2 & 0.01 & 7.13 & 3 & 0.02\\ 
+			sum                        & {\bf 0.07}                  & 3                                         & 0.03                                       & 0.07                                     & 25.1 & 0.03       & 0.07   & 25.1 & 3          & 0.07   & 25.1 & 3 & 0.03  & ? & ? & ? & ? \\
+			mul                        & {\bf 0.07}                  & 2                                         & 0.01                                       & 0.07                                     & 16.3 & 0.01       & 0.07   & 16.3 & 2          & 0.07   & 16.3 & 2 & 0.01  & ? & ? & ? & ? \\
+			max heads                  & {\bf 0.21}                  & 2                                         & 0.02                                       & 0.21                                     & 16.6 & 0.02       & 0.21   & 16.6 & 2          & 0.21   & 16.6 & 2 & 0.02  & ? & ? & ? & ? \\
+			max lasts                  & {\bf 0.21}                  & 2                                         & 0.02                                       & 0.21                                     & 13.3 & 0.02       & 0.21   & 13.3 & 2          & 0.21   & 13.3 & 2 & 0.02  & ? & ? & ? & ? \\
+			max sib. sum               & {\bf 5.22}                  & 2                                         & 0.03                                       & 5.22                                     & 0.3  & 0.03       & 5.22   & 0.3  & 2          & 5.22   & 0.3  & 2 & 0.03  & ? & ? & ? & ? \\
 			\hline
-			 & sum & no & {\bfseries 0.03} & 1 & 0.00 & 0.41 & 3 & 0.17\\ 
-			 & sum of even elts. & no & {\bfseries 0.04} & 1 & 0.00 & 0.57 & 3 & 0.22\\ 
-			 & length & no & {\bfseries 0.04} & 1 & 0.00 & 0.44 & 4 & 0.22\\ 
-			 & last & no & {\bfseries 0.03} & 1 & 0.00 & 0.04 & 2 & 0.01\\ 
-			Parallelizing & product & no & {\bfseries 0.03} & 1 & 0.00 & 0.38 & 3 & 0.15\\ 
-			Functions & polynomial & no & {\bfseries 0.07} & 1 & 0.00 & 1.18 & 5 & 0.54\\ 
-			on & hamming & no & {\bfseries 0.04} & 1 & 0.00 & 0.55 & 3 & 0.22\\ 
-			Lists & count max elements & no & 0.51 & 1 & 0.00 & {\bfseries 0.13} & 2 & 0.01\\ 
-			 & mininum & no & {\bfseries 0.06} & 1 & 0.00 & 0.09 & 2 & 0.01\\ 
-			 & is sorted & no & {\bfseries 23.43} & 2 & 0.01 & - & 11 & 0.27\\ 
-			 & linear search & no & {\bfseries 0.09} & 1 & 0.00 & 0.48 & 3 & 0.18\\ 
-			 & line of sight & no & {\bfseries 0.86} & 2 & 0.01 & - & 5 & 0.08\\ 
-			 & mts & yes & {\bfseries 0.13} & 1 & 0.00 & 4.45 & 4 & 0.47\\ 
-			 & mps & yes & {\bfseries 0.08} & 1 & 0.00 & 4.47 & 4 & 0.50\\ 
-			 & mts and mps combined & yes & {\bfseries 0.38} & 2 & 0.01 & 72.80 & 6 & 3.89\\ 
-			 & mss & yes & {\bfseries 5.91} & 3 & 0.33 & - & 6 & 12.59\\ 
+			sum                        & {\bf 0.07}                  & 1                                         & .                                          & 0.07                                     & 87.4 & .          & 0.07   & 87.4 & 1          & 0.07   & 87.4 & 1 & .     & ? & ? & ? & ? \\
+			sum evens                  & {\bf 0.10}                  & 1                                         & .                                          & 0.10                                     & 70.4 & .          & 0.10   & 70.4 & 1          & 0.10   & 70.4 & 1 & .     & ? & ? & ? & ? \\
+			len                        & {\bf 0.07}                  & 1                                         & .                                          & 0.07                                     & 87.9 & .          & 0.07   & 87.9 & 1          & 0.07   & 87.9 & 1 & .     & ? & ? & ? & ? \\
+			last                       & {\bf 0.01}                  & 1                                         & .                                          & 0.01                                     & 50.4 & .          & 0.01   & 50.4 & 1          & 0.01   & 50.4 & 1 & .     & ? & ? & ? & ? \\
+			product                    & {\bf 0.07}                  & 1                                         & .                                          & 0.07                                     & 86.7 & .          & 0.07   & 86.7 & 1          & 0.07   & 86.7 & 1 & .     & ? & ? & ? & ? \\
+			polynomial                 & {\bf 0.07}                  & 1                                         & .                                          & 0.07                                     & 43.9 & .          & 0.07   & 43.9 & 1          & 0.07   & 43.9 & 1 & .     & ? & ? & ? & ? \\
+			hamming                    & {\bf 0.10}                  & 1                                         & .                                          & 0.10                                     & 77.8 & .          & 0.10   & 77.8 & 1          & 0.10   & 77.8 & 1 & .     & ? & ? & ? & ? \\
+			max cnt.                   & {\bf 0.37}                  & 1                                         & .                                          & 0.37                                     & 4.3  & .          & 0.37   & 4.3  & 1          & 0.37   & 4.3  & 1 & .     & ? & ? & ? & ? \\
+			minhom                     & {\bf 0.02}                  & 1                                         & .                                          & 0.02                                     & 61.6 & .          & 0.02   & 61.6 & 1          & 0.02   & 61.6 & 1 & .     & ? & ? & ? & ? \\
+			sorted                     & {\bf 3.24}                  & 2                                         & 0.10                                       & 3.24                                     & 0.5  & 0.10       & 3.24   & 0.5  & 2          & 3.24   & 0.5  & 2 & 0.10  & ? & ? & ? & ? \\
+			search                     & {\bf 0.08}                  & 1                                         & .                                          & 0.08                                     & 81.9 & .          & 0.08   & 81.9 & 1          & 0.08   & 81.9 & 1 & .     & ? & ? & ? & ? \\
+			l. of sight                & {\bf 0.79}                  & 2                                         & 0.08                                       & 0.79                                     & 9.6  & 0.08       & 0.79   & 9.6  & 2          & 0.79   & 9.6  & 2 & 0.08  & ? & ? & ? & ? \\
+			mts                        & {\bf 0.10}                  & 1                                         & .                                          & 0.10                                     & 68.4 & .          & 0.10   & 68.4 & 1          & 0.10   & 68.4 & 1 & .     & ? & ? & ? & ? \\
+			mps                        & {\bf 0.09}                  & 1                                         & .                                          & 0.09                                     & 71.8 & .          & 0.09   & 71.8 & 1          & 0.09   & 71.8 & 1 & .     & ? & ? & ? & ? \\
+			mts + mps                  & {\bf 0.36}                  & 2                                         & 0.09                                       & 0.36                                     & 42.0 & 0.09       & 0.36   & 42.0 & 2          & 0.36   & 42.0 & 2 & 0.09  & ? & ? & ? & ? \\
+			mss                        & {\bf 4.84}                  & 3                                         & 1.55                                       & 4.84                                     & 12.4 & 1.55       & 4.84   & 12.4 & 3          & 4.84   & 12.4 & 3 & 1.55  & ? & ? & ? & ? \\
 			\hline
 		\end{tabular}
 	}
