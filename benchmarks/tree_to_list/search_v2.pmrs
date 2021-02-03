@@ -1,0 +1,20 @@
+(* Trees *)
+type 'a tree = Empty | Node of 'a * 'a tree * 'a tree
+(* Lists *)
+type 'a list = Nil | Cons of 'a * 'a list
+
+(* Representation function from tree to list *)
+pmrs repr =
+    repr Empty -> Nil
+    | repr Node(a, l, r) ->  dec Cons(a, repr r) l
+    | dec li Empty ->  li
+    | dec li Node(a, ll, lr) -> dec Cons(a, dec li lr) ll
+
+pmrs (odot, s0) target x =
+    search_tree Empty -> s0 x
+    | search_tree Node(a, l, r) -> odot x a (search_tree l) (search_tree r)
+
+
+pmrs spec x =
+    main Nil -> false
+    | main Cons(hd, tl) -> (hd = x ? true : (main tl))

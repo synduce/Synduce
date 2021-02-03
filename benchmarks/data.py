@@ -13,9 +13,11 @@ caption2 = "Extended Experimental Results.  Three algorithm are compared: the se
             All times are in seconds. A '-' indicates timeout($>$ 10 min).\
              Experiments are run on a laptop with 16G memory and an i7-8750H 6-core CPU at 2.20GHz running Ubuntu 19.10."
 
-caption_optimizations = "Optimization Evaluation Results: We evaluate {\\tool} with all optimizations, without detupling, without syntactic definitions and with all optimizations off. \
-            Benchmarks are grouped by categories introduced in Section \\ref{sec:cstudies}. \# indicates the number of refinement rounds. \
-            $T_{last}$ is the elapsed time before the last call to the SyGuS solver in the last refinement step before timeout (`.` indicates that there was no previous round). \
+caption_optimizations = "Optimization Evaluation Results: We evaluate {\\tool} and abstract CEGIS with some optimizations turned off. \
+            {\\tt - ini} indicates that optimized initialized is off, {\\tt - sys} indicates tuple components and independent subsystems is turned off, and {\\tt stx} that syntactic definitions are turned off.\
+            {\\tt on} (and {\\tt off}) indicate that all optimizations are turned on (resp. off).\
+            Benchmarks are grouped by categories introduced in Section \\ref{sec:cstudies}. \
+            \# indicates the number of refinement rounds for the given algorithm, and \#i indicate the number of refinement rounds without the optimized initialization.\
             All times are in seconds. A '-' indicates timeout($>$ 10 min).\
              Experiments are run on a laptop with 16G memory and an i7-8750H 6-core CPU at 2.20GHz running Ubuntu 19.10."
 
@@ -116,6 +118,10 @@ def format_verif(f):
         return "\\textit{%3.1f}" % f
 
 
+def incr_avg(old_val, new_count, new_val):
+    return (old_val + (new_val - old_val) / new_count)
+
+
 def produce_tex_table(tex_output_file, data):
     with open(tex_output_file, 'w') as tex:
         tex.write("%s ====================================\n" % '%')
@@ -162,7 +168,7 @@ def produce_tex_table(tex_output_file, data):
                 else:
                     b_data = data[bkey, "requation"][best_v]
                     if "res" in b_data:
-                        req_iters, _, req_time = b_data["res"]
+                        req_iters, _, req_time, _ = b_data["res"]
                         req_t = "%3.2f" % float(req_time)
                     else:
                         req_t = "-"
@@ -179,7 +185,7 @@ def produce_tex_table(tex_output_file, data):
                     if version in a_data.keys():
                         b_data = a_data[version]
                         if "res" in b_data:
-                            _, _, this_time = b_data["res"]
+                            _, _, this_time, _ = b_data["res"]
                             this_t = float(this_time)
                             if this_t < best_t:
                                 best_t = this_t
@@ -191,7 +197,7 @@ def produce_tex_table(tex_output_file, data):
                 else:
                     b_data = data[bkey, "acegis"][best_v]
                     if "res" in b_data:
-                        nai_iters, _, nai_time = b_data["res"]
+                        nai_iters, _, nai_time, _ = b_data["res"]
                         nai_t = "%3.2f" % float(nai_time)
                         if req_t == "-" or float(nai_time) < float(req_t):
                             acegis_bf = True
@@ -302,23 +308,18 @@ def produce_versions_tex_table(tex_output_file, data):
         "\t\caption{%s}\label{table:experiment_optimizations}\n" % caption_optimizations)
     tex.write("\t{\n")
     tex.write(
-        "\t\t\\begin{tabular}[h]{|c| c|c || c|c || c|c || c|c || c|c | }\n")
+        "\t\t \\hspace{-3em}\
+        \\begin{tabular}[h]{|c| c| c|c|c|c|c|c || c| c|c|c|c| }\n")
     tex.write("\t\t\t\\hline\n")
     tex.write(
         "\t\t\t \multirow{2}{*}{Benchmark} & \
-                \multicolumn{2}{c||}{\\tool} & \
-                \multicolumn{2}{c||}{Init. off} & \
-                \multicolumn{2}{c||}{Detupling off} & \
-                \multicolumn{2}{c||}{Syntactic def. off} & \
-                \multicolumn{2}{c|}{All opt. off}\\\\ \n")
-    tex.write("\t\t\t\\cline{2-11}\n")
+                \multicolumn{7}{c||}{\\tool} & \
+                \multicolumn{5}{c|}{Abstract CEGIS} \\\\ \n")
+    tex.write("\t\t\t\\cline{2-13}\n")
     tex.write(
         "\t\t\t  &\
-        time & \# &\
-        time & \# &\
-        time & \# &\
-        time & \# &\
-        time & \#\\\\ \n")
+         \# & {\\tt on} & \#i & {\\tt -ini} & {\\tt -sys} & {\\tt -stx} & {\\tt off} &\
+         \# & {\\tt on} & {\\tt -sys} & {\\tt -stx} & {\\tt off} \\\\ \n")
 
     ver = "all"
     for benchmark_class, benchmarks in show_benchmarks:
@@ -326,6 +327,7 @@ def produce_versions_tex_table(tex_output_file, data):
             tex.write("\t\t\t\\hline\n")
         for benchmark_file, benchmark_info in benchmarks:
             bkey = benchmark_class + "/" + benchmark_file + ".pmrs"
+            # Collect Data for requation
             algo = "requation"
             csvline = []
             if (bkey, algo) in data.keys():
@@ -339,38 +341,41 @@ def produce_versions_tex_table(tex_output_file, data):
                 for version in versions:
                     times = ["?", "?", "?", "?"]
                     csvline += times
-            # Make fastest bold
-            t_all = floti(csvline[0])
-            t_ini = floti(csvline[4])
-            t_st = floti(csvline[8])
-            t_d = floti(csvline[12])
-            t_off = floti(csvline[16])
-            if t_all <= t_st and t_all <= t_d and t_all <= t_off and t_all <= t_ini:
-                csvline[0] = bold(csvline[0])
-            if t_ini < t_all and t_ini < t_d and t_ini < t_off and t_ini < t_st:
-                csvline[4] = bold(csvline[4])
-            if t_st < t_all and t_st < t_d and t_st < t_off and t_st < t_ini:
-                csvline[8] = bold(csvline[8])
-            if t_d < t_all and t_d < t_st and t_d < t_off and t_d < t_ini:
-                csvline[12] = bold(csvline[12])
-            if t_off < t_all and t_off < t_st and t_off < t_d and t_off < t_ini:
-                csvline[16] = bold(csvline[16])
 
-            # Remove the verification time percentage.
-            del csvline[1]
-            del csvline[4]
-            del csvline[7]
-            del csvline[10]
-            del csvline[13]
-            # Remove T_last
-            del csvline[2]
-            del csvline[4]
-            del csvline[6]
-            del csvline[8]
-            del csvline[10]
+            req_csvline = [csvline[2], csvline[0], csvline[6], csvline[4],
+                           csvline[8], csvline[12], csvline[16]]
+            amin = floti(req_csvline[1])
+            indexmin = 1
+            for i in range(1, len(req_csvline)):
+                if floti(req_csvline[i]) < amin and i != 2:
+                    indexmin = i
+            req_csvline[indexmin] = bold(req_csvline[indexmin])
+            # Collect data for ACEGIS
+            algo = "acegis"
+            csvline = []
+            if (bkey, algo) in data.keys():
+                bdata = data[bkey, algo]
+                for version in versions:
+                    times = ["?", "?", "?", "?"]
+                    if version in bdata.keys():
+                        times = times_of_bdata(bdata[version])
+                    csvline += times
+            else:
+                for version in versions:
+                    times = ["?", "?", "?", "?"]
+                    csvline += times
 
-            tex.write("%s & %s \\\\ \n" % (
-                benchmark_info[1], "& ".join(csvline)))
+            cegis_csvline = [csvline[2], csvline[0],
+                             csvline[8], csvline[12], csvline[16]]
+            amin = floti(cegis_csvline[1])
+            indexmin = 1
+            for i in range(1, len(cegis_csvline)):
+                if floti(cegis_csvline[i]) < amin:
+                    indexmin = i
+            cegis_csvline[indexmin] = bold(cegis_csvline[indexmin])
+
+            tex.write("%s & %s & %s \\\\ \n" % (
+                benchmark_info[1], "& ".join(req_csvline), "& ".join(cegis_csvline)))
 
     tex.write("\t\t\t\\hline\n")
     tex.write("\t\t\end{tabular}\n")
@@ -400,7 +405,7 @@ def times_of_bdata(b_data):
     s_last = "?"
 
     if "res" in b_data:
-        tot_iters, v_time, s_time = b_data["res"]
+        tot_iters, v_time, s_time, _ = b_data["res"]
         tot_iters = "%i" % int(tot_iters)
         s_t = "%3.2f" % float(s_time)
         v_t = "%3.1f" % (100.0 * (float(v_time) / float(s_time)))
@@ -470,11 +475,13 @@ def raw_to_csv():
                 benchfile, method = inst[0], inst[1].strip(" ").split("+")
                 method_base = method[0]
                 method_opt = "all"
-                if len(method) > 1:
+                if len(method) > 1 and method[1] != "":
                     method_opt = method[1]
                 key = benchfile, method_base, method_opt
-                benchmark_data[key] = {}
-                benchmark_data[key]["max"] = 0
+                if key not in benchmark_data:
+                    benchmark_data[key] = {}
+                if "max" not in benchmark_data[key]:
+                    benchmark_data[key]["max"] = 0
             else:
                 infos = lines[i].strip().split(",")
 
@@ -487,8 +494,20 @@ def raw_to_csv():
 
                 if len(infos) == 3:
                     # Res = #of refinement steps, verif. time, total time.
-                    benchmark_data[key]["res"] = int(
-                        infos[0]), float(infos[1]), float(infos[2])
+                    if "res" in benchmark_data[key]:
+                        old_res = benchmark_data[key]["res"]
+                        old_count = old_res[3]
+                        new_steps = max(old_res[0], int(infos[0]))
+                        new_verif = incr_avg(
+                            old_res[1], old_count, float((infos[1])))
+                        new_time = incr_avg(
+                            old_res[2], old_count, float(infos[2]))
+                        new_count = old_count + 1
+                        benchmark_data[key]["res"] = new_steps, new_verif, new_time, new_count
+                    else:
+                        benchmark_data[key]["res"] = int(
+                            infos[0]), float(infos[1]), float(infos[2]), 1
+
     bd = {}
     for k, v in benchmark_data.items():
         file, method, flags = k
