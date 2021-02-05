@@ -2,6 +2,7 @@ open Base
 
 (** Toggle verbose messages. *)
 let verbose = ref false
+
 let pp_eqn_count = ref 10
 
 (** Toggle debugging. *)
@@ -24,7 +25,6 @@ let show_vars = ref false
 (** Maximum steps of rewrites to apply during PMRS reduction. *)
 let reduction_limit = ref 100
 
-
 (* ============================================================================================= *)
 (*                                STORAGE AND BINARY PATHS                                       *)
 (* ============================================================================================= *)
@@ -35,28 +35,14 @@ let root_folder = Caml.Filename.current_dir_name
 
 let base s = Caml.Filename.concat root_folder s
 
-let cvc4_binary_path =
-  try
-    FileUtil.which "cvc4"
-  with _ -> failwith "CVC4 not found."
+let cvc4_binary_path = try FileUtil.which "cvc4" with _ -> failwith "CVC4 not found."
 
-let z3_binary_path =
-    try
-      FileUtil.which "z3"
-    with _ -> failwith "Z3 not found."
-
+let z3_binary_path = try FileUtil.which "z3" with _ -> failwith "Z3 not found."
 
 (* TODO fix this. Not functional. *)
-let dryadsynth_binary_path =
-    try
-      FileUtil.which "DryadSynth"
-    with _ -> ""
+let dryadsynth_binary_path = try FileUtil.which "DryadSynth" with _ -> ""
 
-let eusolver_binary_path =
-    try
-      FileUtil.which "eusolver"
-    with _ -> ""
-
+let eusolver_binary_path = try FileUtil.which "eusolver" with _ -> ""
 
 (* ============================================================================================= *)
 (*                  SYSTEM OF EQUATIONS OPTIMIZATION FLAGS                                       *)
@@ -80,13 +66,11 @@ let syndef_on = ref true
 *)
 let split_solve_on = ref true
 
-
 (** Initialize T using a single variable of type theta, instead of searching for a set of
     terms covering all unknowns.
     Use option --simple-init or -c to turn on.
 *)
 let simple_init = ref false
-
 
 (**
   Not an optimization. Set to true to use the base abstract cegis algorithm.
@@ -100,6 +84,10 @@ let use_acegis = ref false
   *)
 let use_ccegis = ref false
 
+(**
+  Simplify equations before feeding them to equations solver.
+*)
+let simplify_eqns = ref false
 
 (* ============================================================================================= *)
 (*                        BOUNDED EXPANSIONS / VERIFICATION PARAMETERS                           *)
@@ -121,7 +109,6 @@ let set_num_expansions_check (s : string) =
   let i = Int.of_string s in
   if i > 0 && i < 1024 then num_expansions_check := i
 
-
 (** Use bounded model checking. From CLI, use --use-bmc to set to true. *)
 let use_bmc = ref false
 
@@ -132,5 +119,3 @@ let check_depth = ref 5
 let set_check_depth (s : string) =
   let i = Int.of_string s in
   if i > 0 && i < 1024 then check_depth := i
-
-

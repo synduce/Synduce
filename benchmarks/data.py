@@ -6,14 +6,15 @@ timeout_time = 600.0
 input_file = "benchmarks/bench.txt"
 
 caption = "Experimental Results.  Benchmarks are grouped by categories introduced in Section \\ref{sec:cstudies}. \# steps indicates the number of refinement rounds. $T_{last}$ is the elapsed time before the last call to the SyGuS solver in the last refinement step before timeout. All times are in seconds. The best time is highlighted in bold font.  A '-' indicates timeout ($>$ 10 min). The ``Inv'' column indicates if codomain constraints were required. Experiments are run on a laptop with 16G memory and an i7-8750H 6-core CPU at 2.20GHz running Ubuntu 19.10."
-caption2 = "Extended Experimental Results.  Three algorithm are compared: the selective bounding CEGIS in {\\tool}, abstract CEGIS and concrete CEGIS. \
+
+caption2 = "Extended Experimental Results.  Three algorithm are compared: the selective bounding CEGIS in {\\tool}, symbolic CEGIS and concrete CEGIS. \
             Benchmarks are grouped by categories introduced in Section \\ref{sec:cstudies}. \# indicates the number of refinement rounds. \
             ver.\% indicates the percentage of total time spent verifying solutions.\
             $T_{last}$ is the elapsed time before the last call to the SyGuS solver in the last refinement step before timeout (`.` indicates that there was no previous round). \
             All times are in seconds. A '-' indicates timeout($>$ 10 min).\
              Experiments are run on a laptop with 16G memory and an i7-8750H 6-core CPU at 2.20GHz running Ubuntu 19.10."
 
-caption_optimizations = "Optimization Evaluation Results: We evaluate {\\tool} and abstract CEGIS with some optimizations turned off. \
+caption_optimizations = "Optimization Evaluation Results: We evaluate {\\tool} and symbolic CEGIS with some optimizations turned off. \
             {\\tt - ini} indicates that optimized initialized is off, {\\tt - sys} indicates tuple components and independent subsystems is turned off, and {\\tt stx} that syntactic definitions are turned off.\
             {\\tt on} (and {\\tt off}) indicate that all optimizations are turned on (resp. off).\
             Benchmarks are grouped by categories introduced in Section \\ref{sec:cstudies}. \
@@ -76,17 +77,26 @@ show_benchmarks = [
         ["prodhom", ["Parallelizing", "product", "no", "product"]],
         ["polyhom", ["Functions", "polynomial", "no", "polynomial"]],
         ["hamming", ["on", "hamming", "no", "hamming"]],
-        ["maxcount", ["Lists", "count max elements", "no", "max cnt."]],
-        ["minhom", ["", "mininum", "no", "minhom"]],
+        ["minhom", ["Lists", "min", "no", "minhom"]],
         ["issorted", ["", "is sorted", "no", "sorted"]],
         ["search", ["", "linear search", "no", "search"]],
         ["line_of_sight", ["", "line of sight", "no", "l. of sight"]],
         ["mtshom", ["", "mts", "yes", "mts"]],
         ["mpshom", ["", "mps", "yes", "mps"]],
         ["mts_and_mps_hom", ["", "mts and mps combined", "yes", "mts + mps"]],
-        ["msshom", ["", "mss", "yes", "mss"]]
+        ["msshom", ["", "mss", "yes", "mss"]],
+        ["maxcount", ["", "count max elements", "no", "max cnt."]],
     ]]
+]
 
+extra_benchmarks = [
+    ["tree_to_list", [
+        ["search",    ["List", "search", "no", "search"]],
+        ["search_v2", ["to", "search (v2)", "no", "search"]],
+        ["search_v3", ["Tree", "search (v3)", "no", "search"]],
+        # ["mls", ["", "max left sum", "yes", "mls"]],
+        # ["mps",       ["", "mps", "no", "mps"]]
+    ]]
 ]
 
 
@@ -104,6 +114,34 @@ def floti(f):
     except:
         ret = timeout_time
     return ret
+
+
+def speedup(a, b):
+    if b == "-":
+        return - 1
+    else:
+        a = floti(a)
+        b = floti(b)
+        if b > 0:
+            return b / a
+        else:
+            return -1
+
+
+def median(sample):
+    n = len(sample)
+    index = n // 2
+    # Sample with an odd number of observations
+    if n % 2:
+        return sorted(sample)[index]
+    # Sample with an even number of observations
+    return sum(sorted(sample)[index - 1:index + 1]) / 2
+
+
+def mean(sample):
+    n = len(sample)
+    s = sum(sample)
+    return s / n
 
 
 def bold(s):
@@ -140,10 +178,11 @@ def produce_tex_table(tex_output_file, data):
                  \multirow{2}{*}{Benchmark} & \
                   \multirow{2}{*}{Inv.} & \
                    \multicolumn{3}{c||}{\\tool} & \
-                    \multicolumn{3}{c|}{Naive}\\\\ \n")
+                    \multicolumn{3}{c|}{Baseline Method}\\\\ \n")
         tex.write("\t\t\t\\cline{4-9}\n")
         tex.write(
             "\t\t\t &   & & time & \# steps & $T_{last}$ & time & \# steps & $T_{last}$\\\\ \n")
+        speedups = []
         for benchmark_class, benchmarks in show_benchmarks:
             if len(benchmarks) > 0:
                 tex.write("\t\t\t\\hline\n")
@@ -207,6 +246,9 @@ def produce_tex_table(tex_output_file, data):
                     if str(b_data["max"]) in b_data:
                         nai_last = "%3.2f" % b_data[str(b_data["max"])][1]
 
+                speedups += [[(benchmark_class, benchmark_info[1]),
+                              speedup(req_t, nai_t)]]
+
                 if acegis_bf:
                     nai_t = "{\\bfseries %s}" % nai_t
                 else:
@@ -222,6 +264,28 @@ def produce_tex_table(tex_output_file, data):
         tex.write("\t}\n")
         tex.write("\end{table}\n")
         tex.close()
+        print("Num benchmarks: %i" % len(speedups))
+        print("==================================")
+        count_timeouts = 0
+        count_100x = 0
+        count_10x = 0
+        speedup_only = []
+        for b, s in speedups:
+            print("Speedup %10s,%20s: %4.1f" % (b[0], b[1], s))
+            if s < 0:
+                count_timeouts += 1
+            else:
+                speedup_only += [s]
+            if s > 50.1:
+                count_100x += 1
+            if s > 5.1:
+                count_10x += 1
+        print("==================================")
+        print("Num timeouts: %i" % count_timeouts)
+        print("Num > 100x: %i" % count_100x)
+        print("Num > 10x: %i" % count_10x)
+        print("Average: %3.4f" % mean(speedup_only))
+        print("Median: %3.4f" % median(speedup_only))
 
 
 def produce_full_tex_table(tex_output_file, data):
@@ -240,7 +304,7 @@ def produce_full_tex_table(tex_output_file, data):
     tex.write(
         "\t\t\t \multirow{2}{*}{Benchmark} & \
                 \multicolumn{3}{c||}{\\tool} & \
-                \multicolumn{3}{c||}{Abstract CEGIS} & \
+                \multicolumn{3}{c||}{Symbolic CEGIS} & \
                 \multicolumn{3}{c|}{Concrete CEGIS}\\\\ \n")
     tex.write("\t\t\t\\cline{2-10}\n")
     tex.write(
@@ -250,7 +314,7 @@ def produce_full_tex_table(tex_output_file, data):
         time & ver. \%  & \#\\\\ \n")
 
     ver = "all"
-    for benchmark_class, benchmarks in show_benchmarks:
+    for benchmark_class, benchmarks in show_benchmarks + extra_benchmarks:
         if len(benchmarks) > 0:
             tex.write("\t\t\t\\hline\n")
         for benchmark_file, benchmark_info in benchmarks:
@@ -314,7 +378,7 @@ def produce_versions_tex_table(tex_output_file, data):
     tex.write(
         "\t\t\t \multirow{2}{*}{Benchmark} & \
                 \multicolumn{7}{c||}{\\tool} & \
-                \multicolumn{5}{c|}{Abstract CEGIS} \\\\ \n")
+                \multicolumn{5}{c|}{Symbolic CEGIS} \\\\ \n")
     tex.write("\t\t\t\\cline{2-13}\n")
     tex.write(
         "\t\t\t  &\
@@ -322,7 +386,7 @@ def produce_versions_tex_table(tex_output_file, data):
          \# & {\\tt on} & {\\tt -sys} & {\\tt -stx} & {\\tt off} \\\\ \n")
 
     ver = "all"
-    for benchmark_class, benchmarks in show_benchmarks:
+    for benchmark_class, benchmarks in show_benchmarks + extra_benchmarks:
         if len(benchmarks) > 0:
             tex.write("\t\t\t\\hline\n")
         for benchmark_file, benchmark_info in benchmarks:

@@ -1,0 +1,27 @@
+(* Trees *)
+type 'a tree = Empty | Node of 'a * 'a tree * 'a tree
+(* Lists *)
+type 'a list = Nil | Cons of 'a * 'a list
+
+(* Representation function from tree to list *)
+(* pmrs repr =
+    repr Empty -> Nil
+    | repr Node(a, l, r) ->  dec Cons(a, repr l) r
+    | dec li Empty ->  li
+    | dec li Node(a, ll, lr) -> dec Cons(a, dec li ll) lr *)
+pmrs repr =
+    repr Empty -> Nil
+    | repr Node(a, l, r) ->  Cons(a , dec (repr l) r)
+    | dec li Empty ->  li
+    | dec li Node(a, ll, lr) -> Cons(a, dec (dec li ll) lr)
+
+
+(* Target recursion scheme: homomorphism on trees. *)
+pmrs (odot, s0) target =
+    search_tree Empty -> s0
+    | search_tree Node(a, l, r) -> odot a (search_tree l) (search_tree r)
+
+(* A simple spec: search on lists. *)
+pmrs spec {fun (x,y) -> y > x && y > 0} =
+    mps Nil -> (0,0)
+    | mps Cons(hd, tl) -> let x, y = mps tl in x + hd, max (x + hd) y
