@@ -196,7 +196,10 @@ let make ?(force_replace_off = false) ~(p : psi_def) (tset : TermSet.t) : equati
     let f (t, lhs, rhs) =
       let applic x = substitution all_subs (Reduce.reduce_term (substitution all_subs x)) in
       let lhs' = Reduce.reduce_term (applic lhs) and rhs' = Reduce.reduce_term (applic rhs) in
-      let projs = projection_eqns lhs' rhs' in
+      let lhs'', rhs'' =
+        if !Config.simplify_eqns then (Eval.simplify lhs', Eval.simplify rhs') else (lhs', rhs')
+      in
+      let projs = projection_eqns lhs'' rhs'' in
       List.map ~f:(fun (lhs, rhs) -> (t, invar invariants lhs rhs, lhs, rhs)) projs
     in
     List.concat (List.map ~f eqns)
@@ -258,6 +261,7 @@ let revert_projs (orig_xi : VarSet.t)
 (* ============================================================================================= *)
 (*                               SOLVING SYSTEMS OF EQUATIONS                                    *)
 (* ============================================================================================= *)
+
 let pp_soln (f : Formatter.t) soln =
   Fmt.(
     list ~sep:comma (fun fmrt (s, args, bod) ->
@@ -268,7 +272,76 @@ let pp_soln (f : Formatter.t) soln =
               bod))
     f soln
 
-let synthfuns_of_unknowns ?(bools = false) ?(ops = OpSet.empty) (unknowns : VarSet.t) =
+let combine ?(verb = false) prev_sol new_response =
+  match (prev_sol, new_response) with
+  | Some soln, (resp, Some soln') ->
+      if verb then Log.debug_msg Fmt.(str "Partial solution:@;@[<hov 2>%a@]" pp_soln soln');
+      (resp, Some (soln @ soln'))
+  | _, (resp, None) -> (resp, None)
+  | None, (resp, _) -> (resp, None)
+
+let solve_syntactic_definitions (unknowns : VarSet.t) (eqns : equation list) =
+  (* Is lhs, args a full definition of the function? *)
+  let ok_args lhs args =
+    let argv = List.map args ~f:ext_var_or_none in
+    let argset = VarSet.of_list (List.concat (List.filter_opt argv)) in
+    if
+      List.for_all ~f:Option.is_some argv
+      && Set.is_empty (Set.diff (Analysis.free_variables lhs) argset)
+    then
+      let args = List.filter_opt argv in
+      if List.length (List.concat args) = Set.length argset then Some args else None
+    else None
+  in
+  let mk_lam lhs args =
+    let pre_subst =
+      List.map args ~f:(fun arg_tuple ->
+          let t =
+            match arg_tuple with
+            | [ v ] -> Variable.vtype_or_new v
+            | l -> RType.TTup (List.map ~f:Variable.vtype_or_new l)
+          in
+          let v = Variable.mk ~t:(Some t) (Alpha.fresh "x") in
+          match arg_tuple with
+          | [ arg ] -> (v, [ (mk_var arg, mk_var v) ])
+          | l -> (v, List.mapi l ~f:(fun i arg -> (mk_var arg, mk_sel (mk_var v) i))))
+    in
+    let new_args, subst = List.unzip pre_subst in
+    (new_args, Reduce.reduce_term (substitution (List.concat subst) lhs))
+  in
+  let full_defs, other_eqns =
+    let f (t, inv, lhs, rhs) =
+      match (inv, rhs.tkind) with
+      | _, TApp ({ tkind = TVar x; _ }, args) when Set.mem unknowns x -> (
+          match ok_args lhs args with
+          | Some argv ->
+              let lam_args, lam_body = mk_lam lhs argv in
+              Either.First (x, (lam_args, lam_body))
+          | None -> Either.Second (t, inv, lhs, rhs) )
+      | _ -> Either.Second (t, inv, lhs, rhs)
+    in
+    List.partition_map ~f eqns
+  in
+  let resolved = VarSet.of_list (List.map ~f:Utils.first full_defs) in
+  let new_eqns =
+    let substs =
+      List.map full_defs ~f:(fun (x, (lhs_args, lhs_body)) ->
+          let t, _ = infer_type (mk_fun (List.map ~f:(fun x -> PatVar x) lhs_args) lhs_body) in
+          (mk_var x, t))
+    in
+    List.map other_eqns ~f:(fun (t, inv, lhs, rhs) ->
+        let new_lhs = Reduce.reduce_term (substitution substs lhs) in
+        let new_rhs = Reduce.reduce_term (substitution substs rhs) in
+        (t, inv, new_lhs, new_rhs))
+  in
+  let partial_soln =
+    List.map ~f:(fun (x, (lhs_args, lhs_body)) -> (x.vname, lhs_args, lhs_body)) full_defs
+  in
+  if List.length partial_soln > 0 then
+    Log.debug_msg Fmt.(str "Syntactic definition:@;@[<hov 2>%a@]" pp_soln partial_soln);
+  (partial_soln, Set.diff unknowns resolved, new_eqns)
+
+let synthfuns_of_unknowns ?(bools = false) ?(eqns = []) ?(ops = OpSet.empty) (unknowns : VarSet.t) =
   let xi_formals (xi : variable) : sorted_var list * sygus_sort =
     match Variable.vtype_or_new xi with
     | RType.TFun (TTup targs, tres) -> (sorted_vars_of_types targs, sort_of_rtype tres)
@@ -277,7 +350,8 @@ let synthfuns_of_unknowns ?(bools = false) ?(ops = OpSet.empty) (unknowns : VarS
   in
   let f xi =
     let args, ret_sort = xi_formals xi in
-    let grammar = Grammars.generate_grammar ~bools ops args ret_sort in
+    let guess = if !Config.optimize_grammars then Grammars.make_guess eqns xi else None in
+    let grammar = Grammars.generate_grammar ~guess ~bools ops args ret_sort in
     CSynthFun (xi.vname, args, ret_sort, grammar)
   in
   List.map ~f (Set.elements unknowns)
@@ -316,7 +390,7 @@ let solve_eqns (unknowns : VarSet.t) (eqns : equation list) =
   in
   (* Commands *)
   let set_logic = CSetLogic (Grammars.logic_of_operator all_operators) in
-  let synth_objs = synthfuns_of_unknowns ~bools:has_ite ~ops:all_operators unknowns in
+  let synth_objs = synthfuns_of_unknowns ~bools:has_ite ~eqns ~ops:all_operators unknowns in
   let sort_decls = declare_sorts_of_vars free_vars in
   let var_decls = List.map ~f:declaration_of_var (Set.elements free_vars) in
   let constraints = constraints_of_eqns eqns in
@@ -350,6 +424,14 @@ let solve_eqns (unknowns : VarSet.t) (eqns : equation list) =
   | Some resp -> handle_response resp
   | None -> (RFail, None)
 
+let solve_eqns_proxy (unknowns : VarSet.t) (eqns : equation list) =
+  if !Config.syndef_on then
+    let partial_soln, new_unknowns, new_eqns = solve_syntactic_definitions unknowns eqns in
+    if Set.length new_unknowns > 0 then
+      combine (Some partial_soln) (solve_eqns new_unknowns new_eqns)
+    else (RSuccess [], Some partial_soln)
+  else solve_eqns unknowns eqns
+
 (* Solve the trivial equations first, avoiding the overhead from the
    sygus solver.
 *)
@@ -373,67 +455,6 @@ let solve_constant_eqns (unknowns : VarSet.t) (eqns : equation list) =
   let partial_soln = List.map ~f:(fun (x, lhs) -> (x.vname, [], lhs)) constant_soln in
   if List.length partial_soln > 0 then
     Log.debug_msg Fmt.(str "Constant:@;@[<hov 2>%a@]" pp_soln partial_soln);
-  (partial_soln, Set.diff unknowns resolved, new_eqns)
-
-let solve_syntactic_definitions (unknowns : VarSet.t) (eqns : equation list) =
-  (* Is lhs, args a full definition of the function? *)
-  let ok_args lhs args =
-    let argv = List.map args ~f:ext_var_or_none in
-    let argset = VarSet.of_list (List.concat (List.filter_opt argv)) in
-    if
-      List.for_all ~f:Option.is_some argv
-      && Set.is_empty (Set.diff (Analysis.free_variables lhs) argset)
-    then
-      let args = List.filter_opt argv in
-      if List.length (List.concat args) = Set.length argset then Some args else None
-    else None
-  in
-  let mk_lam lhs args =
-    let pre_subst =
-      List.map args ~f:(fun arg_tuple ->
-          let t =
-            match arg_tuple with
-            | [ v ] -> Variable.vtype_or_new v
-            | l -> RType.TTup (List.map ~f:Variable.vtype_or_new l)
-          in
-          let v = Variable.mk ~t:(Some t) (Alpha.fresh "x") in
-          match arg_tuple with
-          | [ arg ] -> (v, [ (mk_var arg, mk_var v) ])
-          | l -> (v, List.mapi l ~f:(fun i arg -> (mk_var arg, mk_sel (mk_var v) i))))
-    in
-    let new_args, subst = List.unzip pre_subst in
-    (new_args, Reduce.reduce_term (substitution (List.concat subst) lhs))
-  in
-  let full_defs, other_eqns =
-    let f (t, inv, lhs, rhs) =
-      match (inv, rhs.tkind) with
-      | None, TApp ({ tkind = TVar x; _ }, args) when Set.mem unknowns x -> (
-          match ok_args lhs args with
-          | Some argv ->
-              let lam_args, lam_body = mk_lam lhs argv in
-              Either.First (x, (lam_args, lam_body))
-          | None -> Either.Second (t, inv, lhs, rhs) )
-      | _ -> Either.Second (t, inv, lhs, rhs)
-    in
-    List.partition_map ~f eqns
-  in
-  let resolved = VarSet.of_list (List.map ~f:Utils.first full_defs) in
-  let new_eqns =
-    let substs =
-      List.map full_defs ~f:(fun (x, (lhs_args, lhs_body)) ->
-          let t, _ = infer_type (mk_fun (List.map ~f:(fun x -> PatVar x) lhs_args) lhs_body) in
-          (mk_var x, t))
-    in
-    List.map other_eqns ~f:(fun (t, inv, lhs, rhs) ->
-        let new_lhs = Reduce.reduce_term (substitution substs lhs) in
-        let new_rhs = Reduce.reduce_term (substitution substs rhs) in
-        (t, inv, new_lhs, new_rhs))
-  in
-  let partial_soln =
-    List.map ~f:(fun (x, (lhs_args, lhs_body)) -> (x.vname, lhs_args, lhs_body)) full_defs
-  in
-  if List.length partial_soln > 0 then
-    Log.debug_msg Fmt.(str "Syntactic definition:@;@[<hov 2>%a@]" pp_soln partial_soln);
   (partial_soln, Set.diff unknowns resolved, new_eqns)
 
 let split_solve partial_soln (unknowns : VarSet.t) (eqns : equation list) =
@@ -460,16 +481,9 @@ let split_solve partial_soln (unknowns : VarSet.t) (eqns : equation list) =
     let sl, u, e = List.fold (Set.elements unknowns) ~f ~init:([], VarSet.empty, eqns) in
     sl @ [ (u, e) ]
   in
-  let combine prev_sol new_response =
-    match (prev_sol, new_response) with
-    | Some soln, (resp, Some soln') ->
-        Log.debug_msg Fmt.(str "Partial solution:@;@[<hov 2>%a@]" pp_soln soln');
-        (resp, Some (soln @ soln'))
-    | _, (resp, None) -> (resp, None)
-    | None, (resp, _) -> (resp, None)
-  in
   let solve_eqn_aux prev_resp prev_sol u e =
-    if Set.length u > 0 then combine prev_sol (solve_eqns u e) else (prev_resp, prev_sol)
+    if Set.length u > 0 then combine ~verb:true prev_sol (solve_eqns_proxy u e)
+    else (prev_resp, prev_sol)
   in
   List.fold split_eqn_systems ~init:(RSuccess [], Some partial_soln)
     ~f:(fun (prev_resp, prev_sol) (u, e) -> solve_eqn_aux prev_resp prev_sol u e)

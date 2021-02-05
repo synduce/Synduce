@@ -23,7 +23,8 @@ let print_usage () =
     \    -c --simple-init               Initialize T naively.\n\
     \       --acegis                    Use the Abstract CEGIS algorithm. Turns bmc on.\n\
     \       --ccegis                    Use the Concrete CEGIS algorithm. Turns bmc on.\n\
-    \       --simplify                  Simplify equations with partial evaluation.\n\
+    \       --no-simplify               Don't simplify equations with partial evaluation.\n\
+    \       --no-gropt                  Don't optimize grammars.\n\
     \  Bounded checking:\n\
     \       --use-bmc                   Use acegis bounded model checking (bmc mode).\n\
     \    -b --bmc                       Maximum depth of terms for bounded model checking, in bmc \
@@ -51,7 +52,8 @@ let options =
     ('c', "simple-init", set Config.simple_init true, None);
     ('t', "no-detupling", set Config.detupling_on false, None);
     ('\000', "no-syndef", set Config.syndef_on false, None);
-    ('\000', "simplify", set Config.simplify_eqns true, None);
+    ('\000', "no-simplify", set Config.simplify_eqns false, None);
+    ('\000', "no-gropt", set Config.optimize_grammars false, None);
     ('s', "no-splitting", set Config.split_solve_on false, None);
     ('n', "verification", None, Some Config.set_num_expansions_check);
     ('b', "bmc", None, Some Config.set_check_depth);

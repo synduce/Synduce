@@ -87,7 +87,12 @@ let use_ccegis = ref false
 (**
   Simplify equations before feeding them to equations solver.
 *)
-let simplify_eqns = ref false
+let simplify_eqns = ref true
+
+(**
+  Use the equations as a indicator to optimize grammars, without compromising soundness.
+*)
+let optimize_grammars = ref true
 
 (* ============================================================================================= *)
 (*                        BOUNDED EXPANSIONS / VERIFICATION PARAMETERS                           *)

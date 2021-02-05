@@ -70,8 +70,8 @@ sys.stdout.flush()
 
 algos = [
     ["requation", ""],
-    ["acegis", "--acegis"],
-    ["ccegis", "--ccegis"]
+    # ["acegis", "--acegis"],
+    # ["ccegis", "--ccegis"]
 ]
 
 optims = [
