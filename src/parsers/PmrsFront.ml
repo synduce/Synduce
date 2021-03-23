@@ -54,13 +54,13 @@ let seek_types (prog : program) =
           | Ok _ -> ()
           | Error es ->
               Log.(error (fun f () -> log_with_excerpt f !text term.pos Sexp.pp_hum es));
-              Log.fatal () )
+              Log.fatal ())
       | TypeDecl (_, TDSimple (typename, term)) -> (
           match Lang.RType.add_type ~typename term with
           | Ok _ -> ()
           | Error es ->
               Log.(error (fun f () -> log_with_excerpt f !text term.pos Sexp.pp_hum es));
-              Log.fatal () )
+              Log.fatal ())
       | _ -> ())
     prog
 
@@ -84,8 +84,8 @@ let fterm_to_term _ allv globs locs rterm =
     | None -> (
         match Term.VarSet.find_by_name allv k with
         | None -> (
-            match Hashtbl.find globs k with None -> variable_not_found loc k | Some x -> x )
-        | Some x -> x )
+            match Hashtbl.find globs k with None -> variable_not_found loc k | Some x -> x)
+        | Some x -> x)
     | Some x -> x
   in
   let _env = Term.VarSet.to_env locs in
@@ -135,10 +135,10 @@ let pmrs_of_rules loc (globs : (string, Term.variable) Hashtbl.t) (params : Term
               | Some _ -> accum
               | None ->
                   Set.add accum
-                    (Term.Variable.mk ~attrs:Term.Attributes.(singleton (NonTerminal 0)) nt) )
+                    (Term.Variable.mk ~attrs:Term.Attributes.(singleton (NonTerminal 0)) nt))
           | _ ->
               loc_fatal_errmsg rloc
-                (Fmt.str "Rule head first term should be a variable, not %a." pp_fterm func) )
+                (Fmt.str "Rule head first term should be a variable, not %a." pp_fterm func))
       | _ ->
           loc_fatal_errmsg rloc
             (Fmt.str "Rule head should be an applicative term, not %a." pp_fterm rhead)
@@ -175,9 +175,9 @@ let pmrs_of_rules loc (globs : (string, Term.variable) Hashtbl.t) (params : Term
         in
         match rhead.kind with
         | FTApp ({ kind = FTVar nt; _ }, rule_args) ->
-            ( ( match Term.VarSet.find_by_name nont nt with
+            ( (match Term.VarSet.find_by_name nont nt with
               | Some x -> x
-              | None -> failwith "impossible" ),
+              | None -> failwith "impossible"),
               f rule_args )
         | _ -> loc_fatal_errmsg rloc "Rule head is empty."
       in
@@ -209,25 +209,28 @@ let pmrs_of_rules loc (globs : (string, Term.variable) Hashtbl.t) (params : Term
     let f x = fterm_to_term x.pos allv globs Term.VarSet.empty x in
     Option.map invariant ~f
   in
-  PMRS.infer_pmrs_types
-    Term.
+  let pmrs0 =
+    PMRS.
       {
         pvar;
         pargs = args;
-        pparams = VarSet.of_list params;
+        pparams = Term.VarSet.of_list params;
         pnon_terminals = nont;
         prules = rules;
         porder = -1;
         pmain_symb = main_symb;
         pinput_typ = RType.TInt;
         (* Will be replaced during type inference. *)
-        poutput_typ = (RType.TInt, invariant) (* Will be replace during type inference. *);
+        poutput_typ = (RType.TInt, invariant) (* Will be replaced during type inference. *);
       }
+  in
+  PMRS.infer_pmrs_types pmrs0
 
 let translate_function loc globs (f : Term.Variable.t) (args : Term.Variable.t list)
     (invariant : term option) (body : term) =
   let arg_set = Term.VarSet.of_list (f :: args) in
   let body = fterm_to_term loc Term.VarSet.empty globs arg_set body in
+  Log.debug_msg Fmt.(str "Term before typing:@;%a" Term.pp_term body);
   let typed_body, _ = Term.infer_type body in
   let f_type =
     match args with
@@ -253,7 +256,7 @@ let translate (prog : program) =
       | FunDecl (loc, fname, _, _, _) | PMRSDecl (loc, _, fname, _, _, _) -> (
           match Hashtbl.add globals ~key:fname ~data:(Term.Variable.mk fname) with
           | `Ok -> ()
-          | `Duplicate -> loc_fatal_errmsg loc (Fmt.str "%s already declared." fname) )
+          | `Duplicate -> loc_fatal_errmsg loc (Fmt.str "%s already declared." fname))
       | _ -> ());
   (* Second pass  *)
   List.fold
@@ -266,9 +269,9 @@ let translate (prog : program) =
           let pvar = Hashtbl.find_exn globals pname in
           let vargs = List.map ~f:Term.Variable.mk args in
           let pmrs = pmrs_of_rules loc globals vparams vargs pvar invariant body in
-          ( match Hashtbl.add PMRS._globals ~key:pvar.vid ~data:pmrs with
+          (match Hashtbl.add PMRS._globals ~key:pvar.vid ~data:pmrs with
           | `Ok -> Log.verbose_msg ("Parsed " ^ pname)
-          | `Duplicate -> Log.error_msg (pname ^ " already declared, ignoring.") );
+          | `Duplicate -> Log.error_msg (pname ^ " already declared, ignoring."));
           Set.iter pmrs.pnon_terminals ~f:(fun x ->
               match Hashtbl.add PMRS._nonterminals ~key:x.vid ~data:pmrs with
               | `Ok -> Log.verbose_msg ("Referenced " ^ x.vname)
@@ -278,8 +281,8 @@ let translate (prog : program) =
           let vargs = List.map ~f:Term.Variable.mk args in
           let fvar = Hashtbl.find_exn globals fname in
           let func_info = translate_function loc globals fvar vargs invariant body in
-          ( match Hashtbl.add Term._globals ~key:fvar.vid ~data:func_info with
+          (match Hashtbl.add Term._globals ~key:fvar.vid ~data:func_info with
           | `Ok -> Log.verbose_msg ("Parsed " ^ fvar.vname)
-          | `Duplicate -> Log.error_msg (fvar.vname ^ " already declared.") );
+          | `Duplicate -> Log.error_msg (fvar.vname ^ " already declared."));
           pmrses
       | _ -> pmrses)

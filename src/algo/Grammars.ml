@@ -75,27 +75,27 @@ let int_parametric ?(guess = None) (params : grammar_parameters) =
               match s with SId (IdSimple "Int") -> Some (GTerm t) | _ -> None)
         @ [ GTerm (SyApp (IdSimple "-", [ ix ])) ]
         @ [ GTerm (SyApp (IdSimple "+", [ ix; ix ])) ]
-        @ ( if params.g_linear && params.g_mul_constant then
-            [ GTerm (SyApp (IdSimple "*", [ ic; ix ])); GTerm (SyApp (IdSimple "div", [ ix; ic ])) ]
-          else [] )
-        @ ( if Set.mem params.g_opset (Binary Min) then
-            [ GTerm (SyApp (IdSimple "min", [ ix; ix ])) ]
-          else [] )
-        @ ( if Set.mem params.g_opset (Binary Max) then
-            [ GTerm (SyApp (IdSimple "max", [ ix; ix ])) ]
-          else [] )
-        @ ( if
-            Set.mem params.g_opset (Binary Times)
-            || Set.mem params.g_opset (Binary Div)
-            || not params.g_linear
+        @ (if params.g_linear && params.g_mul_constant then
+           [ GTerm (SyApp (IdSimple "*", [ ic; ix ])); GTerm (SyApp (IdSimple "div", [ ix; ic ])) ]
+          else [])
+        @ (if Set.mem params.g_opset (Binary Min) then
+           [ GTerm (SyApp (IdSimple "min", [ ix; ix ])) ]
+          else [])
+        @ (if Set.mem params.g_opset (Binary Max) then
+           [ GTerm (SyApp (IdSimple "max", [ ix; ix ])) ]
+          else [])
+        @ (if
+           Set.mem params.g_opset (Binary Times)
+           || Set.mem params.g_opset (Binary Div)
+           || not params.g_linear
           then
-            [ GTerm (SyApp (IdSimple "*", [ ix; ix ])); GTerm (SyApp (IdSimple "div", [ ix; ix ])) ]
-          else [] )
-        @ ( if Set.mem params.g_opset (Unary Abs) then [ GTerm (SyApp (IdSimple "abs", [ ix ])) ]
-          else [] )
-        @ ( if Set.mem params.g_opset (Binary Div) then
-            [ GTerm (SyApp (IdSimple "div", [ ix; ic ])) ]
-          else [] )
+           [ GTerm (SyApp (IdSimple "*", [ ix; ix ])); GTerm (SyApp (IdSimple "div", [ ix; ix ])) ]
+          else [])
+        @ (if Set.mem params.g_opset (Unary Abs) then [ GTerm (SyApp (IdSimple "abs", [ ix ])) ]
+          else [])
+        @ (if Set.mem params.g_opset (Binary Div) then
+           [ GTerm (SyApp (IdSimple "div", [ ix; ic ])) ]
+          else [])
         @ if params.g_bools then [ GTerm (SyApp (IdSimple "ite", [ ipred; ix; ix ])) ] else [] );
     ]
     @ [
@@ -139,7 +139,7 @@ let int_parametric ?(guess = None) (params : grammar_parameters) =
                 Utils.Log.debug_msg
                   Fmt.(str "Grammar optimization: top binary symbol is %s" (Binop.to_string b));
                 [ (("IStart", int_sort), [ GTerm (SyApp (IdSimple (Binop.to_string b), args)) ]) ]
-            | None -> [] )
+            | None -> [])
         | GIte -> [ (("IStart", int_sort), [ GTerm (SyApp (IdSimple "ite", [ ipred; ix; ix ])) ]) ]
         | _ -> []
       in
@@ -177,23 +177,23 @@ let bool_parametric ?(guess = None) (params : grammar_parameters) =
               match s with SId (IdSimple "Int") -> Some (GTerm t) | _ -> None)
         @ [ GTerm (SyApp (IdSimple "-", [ ix ])) ]
         @ [ GTerm (SyApp (IdSimple "+", [ ix; ix ])) ]
-        @ ( if Set.mem params.g_opset (Binary Min) then
-            [ GTerm (SyApp (IdSimple "min", [ ix; ix ])) ]
-          else [] )
-        @ ( if Set.mem params.g_opset (Binary Max) then
-            [ GTerm (SyApp (IdSimple "max", [ ix; ix ])) ]
-          else [] )
-        @ ( if Set.mem params.g_opset (Binary Times) then
-            [ GTerm (SyApp (IdSimple "*", [ ic; ix ])) ]
-          else [] )
-        @ ( if Set.mem params.g_opset (Binary Div) then
-            [ GTerm (SyApp (IdSimple "div", [ ix; ic ])) ]
-          else [] )
-        @ ( if Set.mem params.g_opset (Unary Abs) then [ GTerm (SyApp (IdSimple "abs", [ ix ])) ]
-          else [] )
-        @ ( if Set.mem params.g_opset (Binary Div) then
-            [ GTerm (SyApp (IdSimple "div", [ ix; ic ])) ]
-          else [] )
+        @ (if Set.mem params.g_opset (Binary Min) then
+           [ GTerm (SyApp (IdSimple "min", [ ix; ix ])) ]
+          else [])
+        @ (if Set.mem params.g_opset (Binary Max) then
+           [ GTerm (SyApp (IdSimple "max", [ ix; ix ])) ]
+          else [])
+        @ (if Set.mem params.g_opset (Binary Times) then
+           [ GTerm (SyApp (IdSimple "*", [ ic; ix ])) ]
+          else [])
+        @ (if Set.mem params.g_opset (Binary Div) then
+           [ GTerm (SyApp (IdSimple "div", [ ix; ic ])) ]
+          else [])
+        @ (if Set.mem params.g_opset (Unary Abs) then [ GTerm (SyApp (IdSimple "abs", [ ix ])) ]
+          else [])
+        @ (if Set.mem params.g_opset (Binary Div) then
+           [ GTerm (SyApp (IdSimple "div", [ ix; ic ])) ]
+          else [])
         @ [ GTerm (SyApp (IdSimple "ite", [ ipred; ix; ix ])) ] );
     ]
     @ [
@@ -221,7 +221,7 @@ let bool_parametric ?(guess = None) (params : grammar_parameters) =
             match args with
             | Some args ->
                 [ (("IStart", bool_sort), [ GTerm (SyApp (IdSimple (Binop.to_string b), args)) ]) ]
-            | None -> [] )
+            | None -> [])
         | GIte ->
             [ (("IStart", bool_sort), [ GTerm (SyApp (IdSimple "ite", [ ipred; ipred; ipred ])) ]) ]
         | _ -> []

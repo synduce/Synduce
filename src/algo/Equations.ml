@@ -94,13 +94,13 @@ let proj_unknowns (unknowns : VarSet.t) =
 (* ============================================================================================= *)
 
 let check_equation ~(p : psi_def) ((_, pre, lhs, rhs) : equation) : bool =
-  ( match (Expand.nonreduced_terms_all p lhs, Expand.nonreduced_terms_all p rhs) with
+  (match (Expand.nonreduced_terms_all p lhs, Expand.nonreduced_terms_all p rhs) with
   | [], [] -> true
-  | _ -> false )
+  | _ -> false)
   &&
   match pre with
   | None -> true
-  | Some t -> ( match Expand.nonreduced_terms_all p t with [] -> true | _ -> false )
+  | Some t -> ( match Expand.nonreduced_terms_all p t with [] -> true | _ -> false)
 
 (**
    Compute the left hand side of an equation of p from term t.
@@ -146,7 +146,7 @@ let compute_rhs_with_replacing p t =
             | hd :: _ ->
                 let hd' = remap_rec_calls p hd in
                 rstep := true;
-                Some hd' )
+                Some hd')
         (* Replace recursive calls to g by calls to f circ g,
            if recursive call appear under unknown. *)
         | _ -> None
@@ -317,7 +317,7 @@ let solve_syntactic_definitions (unknowns : VarSet.t) (eqns : equation list) =
           | Some argv ->
               let lam_args, lam_body = mk_lam lhs argv in
               Either.First (x, (lam_args, lam_body))
-          | None -> Either.Second (t, inv, lhs, rhs) )
+          | None -> Either.Second (t, inv, lhs, rhs))
       | _ -> Either.Second (t, inv, lhs, rhs)
     in
     List.partition_map ~f eqns
@@ -519,7 +519,7 @@ let solve ~(p : psi_def) (eqns : equation list) =
       | resp, None -> (resp, None)
     else solve_stratified unknowns eqns
   in
-  ( match soln_final with
+  (match soln_final with
   | _, Some soln -> Utils.Log.debug_msg Fmt.(str "@[<hov 2>Solution found: @;%a" pp_soln soln)
-  | _ -> () );
+  | _ -> ());
   soln_final
