@@ -239,8 +239,8 @@ module Binop = struct
     match s with
     | "<" -> Some Lt
     | ">" -> Some Gt
-    | ">=" -> Some Le
-    | "<=" -> Some Ge
+    | "<=" -> Some Le
+    | ">=" -> Some Ge
     | "=" -> Some Eq
     | "max" -> Some Max
     | "min" -> Some Min

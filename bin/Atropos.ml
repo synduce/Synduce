@@ -35,7 +35,7 @@ let print_usage () =
     \       --parse-only                Just parse the input.\n\
     \       --show-vars                 Print variables and their types at the end.\n\
      -> Try:\n\
-     ./atropos benchmarks/list/mpshom.pmrs@.";
+     ./atropos benchmarks/list/mps.ml@.";
   Caml.exit 0
 
 let options =

@@ -2,7 +2,12 @@ type 'a clist = CNil | Single of 'a | Concat of 'a clist * 'a clist
 
 type 'a list = Nil | Cons of 'a * 'a list
 
-let rec sum = function Nil -> 0 | Cons (hd, tl) -> hd + sum tl
+let rec mps = function
+  | Nil -> (0, 0)
+  | Cons (hd, tl) ->
+      let _mps, _sum = mps tl in
+      (max (_mps + hd) 0, _sum + hd)
+  [@@ensures fun (x, y) -> x >= 0]
 
 let rec clist_to_list = function
   | CNil -> Nil
@@ -14,11 +19,10 @@ and dec l1 = function
   | Single a -> Cons (a, clist_to_list l1)
   | Concat (x, y) -> dec (Concat (y, l1)) x
 
-(* Target function: synthesize hsum s.t. hsum(x) = sum(clist_to_list(x)) *)
-let rec hsum = function
+let rec hom = function
   | CNil -> [%synt s0]
   | Single a -> [%synt f0] a
-  | Concat (x, y) -> [%synt join] (hsum x) (hsum y)
+  | Concat (x, y) -> [%synt join] (hom x) (hom y)
 
 ;;
-assert (hsum = clist_to_list @@ sum)
+assert (hom = clist_to_list @@ mps)

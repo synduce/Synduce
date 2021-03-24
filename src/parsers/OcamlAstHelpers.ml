@@ -64,6 +64,10 @@ let rec fterm_of_expr (expr : expression) : term =
           match args with
           | Some { pexp_desc = Pexp_tuple tl; _ } ->
               mk_data cur_loc id (List.map ~f:fterm_of_expr tl)
+          | Some { pexp_desc = Pexp_ident argid; pexp_loc = argloc; _ } -> (
+              match simple_ident_of_longident argid.txt with
+              | Some argid -> mk_data cur_loc id [ mk_var (wloc argloc) argid ]
+              | None -> failwith "Bad constructor arguments")
           | Some _ -> failwith "Bad constructor arguments"
           | None -> mk_data cur_loc id [])
       | None -> failwith "Longident for constructor not supported.")
