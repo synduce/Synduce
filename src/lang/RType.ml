@@ -67,28 +67,22 @@ let rec pp (frmt : Formatter.t) (typ : t) =
   | TChar -> Fmt.(pf frmt "char")
   | TNamed s -> Fmt.(pf frmt "%s" s)
   | TTup tl -> Fmt.(pf frmt "%a" (parens (list ~sep:Utils.ast pp)) tl)
-  | TFun (tin, tout) -> Fmt.(pf frmt "%a -> %a" pp tin pp tout)
+  | TFun (tin, tout) -> Fmt.(pf frmt "(%a -> %a)" pp tin pp tout)
   | TParam (alpha, t') -> Fmt.(pf frmt "%a[%a]" pp t' (list ~sep:comma pp) alpha)
   | TVar i -> Fmt.(pf frmt "α%i" i)
 
-let instantiate_variant (vargs : type_term list) (instantiator : (ident * int) list) =
-  let rec variant_arg tt =
-    match tt.tkind with
-    | TyInt -> TInt
-    | TyBool -> TBool
-    | TyChar -> TChar
-    | TyString -> TString
-    | TyFun (tin, tout) -> TFun (variant_arg tin, variant_arg tout)
-    | TyTyp e -> TNamed e
-    | TyParam x -> (
-        match List.Assoc.find instantiator ~equal:String.equal x with
-        | Some i -> TVar i
-        | None -> Log.loc_fatal_errmsg tt.pos "Unknown type parameter.")
-    | TySum _ -> Log.loc_fatal_errmsg tt.pos "Variant is a sum type."
-    | TyVariant (_, tl) -> TTup (List.map ~f:variant_arg tl)
-    | TyConstr (params, te) -> TParam (List.map ~f:variant_arg params, variant_arg te)
-  in
-  List.map vargs ~f:variant_arg
+let fun_typ_unpack (t : t) : t list * t =
+  let rec aux pre = function TFun (a, b) -> aux (pre @ [ a ]) b | _ as _t -> (pre, _t) in
+  let targs, tout = aux [] t in
+  (targs, tout)
+
+let rec fun_typ_pack (targs : t list) (tout : t) =
+  match (List.last targs, List.drop_last targs) with
+  | Some elt, Some pre -> fun_typ_pack pre (TFun (elt, tout))
+  | _ -> tout
+
+(* ============================================================================================= *)
+(* Type names and storage *)
 
 (**
    This hashtable maps type names to the type term of their declaration.
@@ -109,25 +103,6 @@ let _tname_to_variants : (string, string list) Hashtbl.t = Hashtbl.create (modul
 
 let _variants : (string, t * t list) Hashtbl.t = Hashtbl.create (module String)
 
-let type_of_variant (variant : string) : (t * t list) option = Hashtbl.find _variants variant
-
-(* Add the builtin types *)
-let add_variant ~(variant : string) ~(typename : string) (vdec : t * t list) =
-  Hashtbl.add_exn _variants ~key:variant ~data:vdec;
-  Hashtbl.add_multi _tname_to_variants ~key:typename ~data:variant;
-  Hashtbl.add_exn _variant_to_tname ~key:variant ~data:typename
-
-let add_all_variants ~(params : (ident * int) list) ~(main_type : t) ~(typename : ident)
-    (tl : type_term list) : unit =
-  let add_one_variant m_variant =
-    match m_variant.tkind with
-    | TyVariant (vname, vdef) ->
-        let vargs = instantiate_variant vdef params in
-        add_variant ~variant:vname ~typename (main_type, vargs)
-    | _ -> failwith "Unexpected variant form."
-  in
-  List.iter ~f:add_one_variant tl
-
 let get_type (typename : string) = Hashtbl.find _types typename
 
 let dump_types (frmt : Formatter.t) () =
@@ -139,32 +114,6 @@ let dump_types (frmt : Formatter.t) () =
   in
   Fmt.(pf frmt "@[Variants:@]@.");
   Hashtbl.iteri _variants ~f:f_v
-
-(**
-   `add_type ?params ~typename tterm` adds a type with name typename and parameters
-   params (default empty list) and type term tterm to the global store.
-*)
-let add_type ?(params : ident list = []) ~(typename : string) (tterm : type_term) =
-  let ty_params_inst =
-    List.map
-      ~f:(fun s -> match get_fresh_tvar () with TVar i -> (s, i) | _ -> failwith "unexpected")
-      params
-  in
-  let main_type =
-    match params with
-    | [] -> TNamed typename
-    | _ -> TParam (List.map ~f:(fun (_, b) -> TVar b) ty_params_inst, TNamed typename)
-  in
-  let add_only () =
-    match Hashtbl.add _types ~key:typename ~data:main_type with
-    | `Ok -> Ok ()
-    | `Duplicate -> Error Log.(satom (Fmt.str "Type %s already declared" typename) @! tterm.pos)
-  in
-  match tterm.tkind with
-  | TySum variants ->
-      add_all_variants ~params:ty_params_inst ~typename ~main_type variants;
-      add_only ()
-  | _ -> add_only ()
 
 (* ============================================================================================= *)
 
@@ -263,6 +212,46 @@ let merge_subs loc (s : substitution) (t : substitution) : substitution =
   | None -> Log.loc_fatal_errmsg loc "Error merging constraints."
 
 (* ============================================================================================= *)
+(*                      VARIANT TYPES                                                            *)
+(* ============================================================================================= *)
+
+let type_of_variant (variant : string) : (t * t list) option = Hashtbl.find _variants variant
+
+let instantiate_variant (vargs : type_term list) (instantiator : (ident * int) list) =
+  let rec variant_arg tt =
+    match tt.tkind with
+    | TyInt -> TInt
+    | TyBool -> TBool
+    | TyChar -> TChar
+    | TyString -> TString
+    | TyFun (tin, tout) -> TFun (variant_arg tin, variant_arg tout)
+    | TyTyp e -> TNamed e
+    | TyParam x -> (
+        match List.Assoc.find instantiator ~equal:String.equal x with
+        | Some i -> TVar i
+        | None -> Log.loc_fatal_errmsg tt.pos "Unknown type parameter.")
+    | TySum _ -> Log.loc_fatal_errmsg tt.pos "Variant is a sum type."
+    | TyVariant (_, tl) -> TTup (List.map ~f:variant_arg tl)
+    | TyConstr (params, te) -> TParam (List.map ~f:variant_arg params, variant_arg te)
+  in
+  List.map vargs ~f:variant_arg
+
+(* Add the builtin types *)
+let add_variant ~(variant : string) ~(typename : string) (vdec : t * t list) =
+  Hashtbl.add_exn _variants ~key:variant ~data:vdec;
+  Hashtbl.add_multi _tname_to_variants ~key:typename ~data:variant;
+  Hashtbl.add_exn _variant_to_tname ~key:variant ~data:typename
+
+let add_all_variants ~(params : (ident * int) list) ~(main_type : t) ~(typename : ident)
+    (tl : type_term list) : unit =
+  let add_one_variant m_variant =
+    match m_variant.tkind with
+    | TyVariant (vname, vdef) ->
+        let vargs = instantiate_variant vdef params in
+        add_variant ~variant:vname ~typename (main_type, vargs)
+    | _ -> failwith "Unexpected variant form."
+  in
+  List.iter ~f:add_one_variant tl
 
 (**
    get_variants t returns a list of variants of a given types.
@@ -299,6 +288,32 @@ let get_variants (typ : t) : (string * t list) list =
 let is_recursive_variant ((_, types) : string * t list) =
   let f t = match get_variants t with [] -> false | _ -> true in
   List.exists types ~f
+
+(**
+   `add_type ?params ~typename tterm` adds a type with name typename and parameters
+   params (default empty list) and type term tterm to the global store.
+*)
+let add_type ?(params : ident list = []) ~(typename : string) (tterm : type_term) =
+  let ty_params_inst =
+    List.map
+      ~f:(fun s -> match get_fresh_tvar () with TVar i -> (s, i) | _ -> failwith "unexpected")
+      params
+  in
+  let main_type =
+    match params with
+    | [] -> TNamed typename
+    | _ -> TParam (List.map ~f:(fun (_, b) -> TVar b) ty_params_inst, TNamed typename)
+  in
+  let add_only () =
+    match Hashtbl.add _types ~key:typename ~data:main_type with
+    | `Ok -> Ok ()
+    | `Duplicate -> Error Log.(satom (Fmt.str "Type %s already declared" typename) @! tterm.pos)
+  in
+  match tterm.tkind with
+  | TySum variants ->
+      add_all_variants ~params:ty_params_inst ~typename ~main_type variants;
+      add_only ()
+  | _ -> add_only ()
 
 (* ============================================================================================= *)
 (*                                  REDUCTION / TRANSFORMATION                                   *)

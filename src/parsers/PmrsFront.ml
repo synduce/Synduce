@@ -219,9 +219,9 @@ let pmrs_of_rules loc (globs : (string, Term.variable) Hashtbl.t) (params : Term
         prules = rules;
         porder = -1;
         pmain_symb = main_symb;
-        pinput_typ = RType.TInt;
+        pinput_typ = RType.TNamed "_?";
         (* Will be replaced during type inference. *)
-        poutput_typ = (RType.TInt, invariant) (* Will be replaced during type inference. *);
+        poutput_typ = (RType.TNamed "_?", invariant) (* Will be replaced during type inference. *);
       }
   in
   PMRS.infer_pmrs_types pmrs0

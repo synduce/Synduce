@@ -464,8 +464,8 @@ let mk_data ?(pos = dummy_loc) (c : string) (xs : term list) =
   { tpos = pos; tkind = TData (c, xs); ttyp = typ }
 
 let mk_fun ?(pos = dummy_loc) (args : fpattern list) (body : term) =
-  let targs = RType.(TTup (List.map ~f:(fun t -> fpat_ty t) args)) in
-  { tpos = pos; tkind = TFun (args, body); ttyp = RType.TFun (targs, body.ttyp) }
+  let targs = List.map ~f:(fun t -> fpat_ty t) args in
+  { tpos = pos; tkind = TFun (args, body); ttyp = RType.fun_typ_pack targs body.ttyp }
 
 let mk_ite ?(pos = dummy_loc) ?(typ = None) (c : term) (th : term) (el : term) =
   let typ = match typ with Some t -> t | None -> RType.get_fresh_tvar () in
@@ -880,38 +880,44 @@ let infer_type (t : term) : term * RType.substitution =
                 failwith "Type inference: tuple acessor, accesed tuple of wrong type.")
         | _ ->
             Log.error_msg
-              Fmt.(str "Tuple acessor argument %a of type %a." pp_term t_c RType.pp t_c.ttyp);
+              Fmt.(str "Tuple accessor argument %a of type %a." pp_term t_c RType.pp t_c.ttyp);
             failwith "Type inference: tuple accessor on type acessor.")
     | TFun (args, body) ->
         let t_body, c_body = aux body in
         (mk_fun ~pos:t0.tpos args t_body, c_body)
     | TApp (func, fargs) -> (
         let t_func, c_func = aux func and t_args, c_args = List.unzip (List.map ~f:aux fargs) in
+        let argst = List.map ~f:(fun t -> t.ttyp) t_args in
         let _c = RType.(mkv c_func @ mkv (List.concat c_args)) in
         match t_func.ttyp with
-        | RType.TFun (a, b) -> (
-            match
-              RType.(unify (_c @ [ (RType.TTup (List.map ~f:(fun t -> t.ttyp) t_args), a) ]))
-            with
-            | Some subs -> (mk_app ~pos:t0.tpos ~typ:(Some b) t_func t_args, subs)
-            | None ->
+        | RType.TFun (_, _) -> (
+            let func_targs, func_tout = RType.fun_typ_unpack t_func.ttyp in
+            match List.zip func_targs argst with
+            | Ok typ_pairs -> (
+                match RType.(unify (_c @ typ_pairs)) with
+                | Some subs -> (mk_app ~pos:t0.tpos ~typ:(Some func_tout) t_func t_args, subs)
+                | None ->
+                    Log.loc_fatal_errmsg eloc
+                      (Fmt.str "Type inference failure: could not unify types in application %a(%a)"
+                         pp_term func
+                         (box (list ~sep:sp pp_term))
+                         fargs))
+            | Unequal_lengths ->
                 Log.loc_fatal_errmsg eloc
-                  (Fmt.str "Type inference failure: could not unify types in %a(%a)" pp_term func
-                     (list ~sep:comma pp_term) fargs))
+                  (Fmt.str "Type inference failure: %a expects %i argument, given %i: %a." pp_term
+                     func (List.length func_targs) (List.length fargs)
+                     (box (list ~sep:sp pp_term))
+                     fargs))
         | RType.TVar f_tvar -> (
-            let a = RType.get_fresh_tvar () and b = RType.get_fresh_tvar () in
-            match
-              RType.(
-                unify
-                  (_c
-                  @ [
-                      (RType.TFun (a, b), RType.TVar f_tvar);
-                      (RType.TTup (List.map ~f:(fun t -> t.ttyp) t_args), a);
-                    ]))
-            with
-            | Some subs -> (mk_app ~pos:t0.tpos ~typ:(Some b) t_func t_args, subs)
+            (* |- f_tvar : (_ -> _ -> _ .. -> _) -> 'b *)
+            let t_out = RType.get_fresh_tvar () in
+            let tf = RType.fun_typ_pack argst t_out in
+            match RType.(unify (_c @ [ (tf, RType.TVar f_tvar) ])) with
+            | Some subs -> (mk_app ~pos:t0.tpos ~typ:(Some t_out) t_func t_args, subs)
             | None -> failwith "Type inference failure.")
-        | _ -> Log.loc_fatal_errmsg eloc "Type inference failure: could not type as function.")
+        | _ as tf ->
+            Log.loc_fatal_errmsg eloc
+              (Fmt.str "Type inference failure: could not type %a as function." RType.pp tf))
     | TData (cstr, args) -> (
         match RType.type_of_variant cstr with
         | Some (tout, targs) -> (
@@ -928,7 +934,8 @@ let infer_type (t : term) : term * RType.substitution =
                   (Fmt.str "Type inference failure: could not match %s arguments: %a and %a." cstr
                      (list ~sep:comma pp_term) t_args (list ~sep:comma RType.pp) targs))
         | None ->
-            Log.loc_fatal_errmsg eloc "Type inference failure: could not find constructor type.")
+            Log.loc_fatal_errmsg eloc
+              Fmt.(str "Type inference failure: could not find type of %s." cstr))
   in
   let t', subs = aux t in
   match RType.unify (RType.mkv subs) with

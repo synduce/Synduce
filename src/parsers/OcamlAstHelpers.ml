@@ -60,6 +60,8 @@ let rec fterm_of_expr (expr : expression) : term =
   | Pexp_tuple el -> mk_tup cur_loc (List.map ~f:fterm_of_expr el)
   | Pexp_construct (constr, args) -> (
       match simple_ident_of_longident constr.txt with
+      | Some "true" -> mk_const cur_loc T.Constant.CTrue
+      | Some "false" -> mk_const cur_loc T.Constant.CFalse
       | Some id -> (
           match args with
           | Some { pexp_desc = Pexp_tuple tl; _ } ->

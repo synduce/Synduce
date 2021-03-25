@@ -76,7 +76,12 @@ let main () =
   let is_ocaml_syntax = Caml.Filename.check_suffix !filename ".ml" in
   let prog, psi_comps = if is_ocaml_syntax then parse_ocaml !filename else parse_pmrs !filename in
   let _ = seek_types prog in
-  let all_pmrs = translate prog in
+  let all_pmrs =
+    try translate prog
+    with e ->
+      if !Config.show_vars then Term.Variable.print_summary stdout ();
+      raise e
+  in
   if !parse_only then Caml.exit 1;
   (match Algo.PmrsAlgos.solve_problem psi_comps all_pmrs with
   | Ok target ->

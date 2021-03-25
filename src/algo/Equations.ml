@@ -343,10 +343,9 @@ let solve_syntactic_definitions (unknowns : VarSet.t) (eqns : equation list) =
 
 let synthfuns_of_unknowns ?(bools = false) ?(eqns = []) ?(ops = OpSet.empty) (unknowns : VarSet.t) =
   let xi_formals (xi : variable) : sorted_var list * sygus_sort =
-    match Variable.vtype_or_new xi with
-    | RType.TFun (TTup targs, tres) -> (sorted_vars_of_types targs, sort_of_rtype tres)
-    | RType.TFun (targ, tres) -> (sorted_vars_of_types [ targ ], sort_of_rtype tres)
-    | t -> ([], sort_of_rtype t)
+    let tv = Variable.vtype_or_new xi in
+    let targs, tout = RType.fun_typ_unpack tv in
+    (sorted_vars_of_types targs, sort_of_rtype tout)
   in
   let f xi =
     let args, ret_sort = xi_formals xi in
