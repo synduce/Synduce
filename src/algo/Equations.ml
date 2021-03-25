@@ -33,8 +33,8 @@ let pp_equation (f : Formatter.t) ((orig, inv, lhs, rhs) : equation) =
 (*                        PROJECTION : OPTIMIZATION FOR TUPLES                                   *)
 (* ============================================================================================= *)
 
-let mk_projs (tin : RType.t) (tl : RType.t list) (xi : Variable.t) =
-  let f i t = Variable.mk ~t:(Some RType.(TFun (tin, t))) (xi.vname ^ Int.to_string i) in
+let mk_projs (targs : RType.t list) (tl : RType.t list) (xi : Variable.t) =
+  let f i t = Variable.mk ~t:(Some (RType.fun_typ_pack targs t)) (xi.vname ^ Int.to_string i) in
   List.mapi ~f tl
 
 let projection_eqns (lhs : term) (rhs : term) =
@@ -67,9 +67,13 @@ let proj_unknowns (unknowns : VarSet.t) =
   let unknowns_projs, new_unknowns =
     let f (l, vs) xi =
       match Variable.vtype_or_new xi with
-      | RType.TFun (tin, TTup tl) ->
-          let new_vs = mk_projs tin tl xi in
-          (l @ [ (xi, Some new_vs) ], Set.union vs (VarSet.of_list new_vs))
+      | RType.TFun _ -> (
+          let targs, tout = RType.fun_typ_unpack (Variable.vtype_or_new xi) in
+          match tout with
+          | TTup tl ->
+              let new_vs = mk_projs targs tl xi in
+              (l @ [ (xi, Some new_vs) ], Set.union vs (VarSet.of_list new_vs))
+          | _ -> (l @ [ (xi, None) ], Set.add vs xi))
       | _ -> (l @ [ (xi, None) ], Set.add vs xi)
     in
     List.fold ~f ~init:([], VarSet.empty) (Set.elements unknowns)
