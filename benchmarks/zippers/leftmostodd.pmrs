@@ -6,10 +6,10 @@ type 'c zipper = Top | Zip of sel * 'c * 'c btree * 'c zipper
 
 
 pmrs spec =
-    leftOdd Empty -> false, 0
+    leftOdd Empty -> false, 1
     | leftOdd Node(a, l, r) ->
             let b1, x1 = leftOdd l in
-            (b1 ? (b1, x1) : (a % 2 = 0 ? (true, a) : (leftOdd r)))
+            (b1 ? (b1, x1) : (a % 2 = 1 ? (true, a) : (leftOdd r)))
 
 pmrs (s0, joinl, joinr) target =
     main Top -> s0

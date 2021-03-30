@@ -219,7 +219,7 @@ let pmrs_of_rules loc (globs : (string, Term.variable) Hashtbl.t) (params : Term
         prules = rules;
         porder = -1;
         pmain_symb = main_symb;
-        pinput_typ = RType.TNamed "_?";
+        pinput_typ = [ RType.TNamed "_?" ];
         (* Will be replaced during type inference. *)
         poutput_typ = (RType.TNamed "_?", invariant) (* Will be replaced during type inference. *);
       }

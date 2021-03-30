@@ -21,10 +21,10 @@ let get_objects () = Hashtbl.to_alist _synt_objects
 (* ============================================================================================= *)
 
 let sloc (locator : 'a Location.loc) : Lexing.position * Lexing.position =
-  (locator.loc.loc_start, locator.loc.loc_start)
+  (locator.loc.loc_start, locator.loc.loc_end)
 
 let wloc (locator : Warnings.loc) : Lexing.position * Lexing.position =
-  (locator.loc_start, locator.loc_start)
+  (locator.loc_start, locator.loc_end)
 
 let simple_ident_of_longident (l : Longident.t) : string option =
   match l with Longident.Lident i -> Some i | _ -> None

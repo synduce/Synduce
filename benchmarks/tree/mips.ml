@@ -2,7 +2,7 @@ type 'a tree = Nil | Node of 'a * 'a tree * 'a tree
 
 let rec repr x = x
 
-let rec mips t = f (0, 0) t [@@ensures fun (x, y) -> y >= 0 && y >= x]
+let rec mips t = f (0, 0) t [@@ensures fun (x, y) -> y >= 0]
 
 and f s = function
   | Nil -> s

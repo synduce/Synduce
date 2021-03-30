@@ -150,7 +150,10 @@ let instantiate_with_solution (p : PMRS.t) (soln : (string * variable list * ter
   reduce_rules target_inst
 
 let is_identity (p : PMRS.t) =
-  let input_symb = Variable.mk ~t:(Some p.pinput_typ) "e" in
-  match reduce_pmrs p (mk_var input_symb) with
-  | { tkind = TVar x; _ } -> Variable.(x = input_symb)
+  match p.pinput_typ with
+  | [ it ] -> (
+      let input_symb = Variable.mk ~t:(Some it) "e" in
+      match reduce_pmrs p (mk_var input_symb) with
+      | { tkind = TVar x; _ } -> Variable.(x = input_symb)
+      | _ -> false)
   | _ -> false

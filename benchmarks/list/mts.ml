@@ -8,6 +8,7 @@ let rec mts = function
       let _mts, _sum = mts tl in
       let new_sum = _sum + hd in
       (max _mts new_sum, new_sum)
+  (* the mts is always positive *)
   [@@ensures fun (x, y) -> x >= 0]
 
 let rec clist_to_list = function

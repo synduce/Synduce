@@ -15,7 +15,7 @@ type top_function = variable * variable list * term
 
 type t = {
   pvar : Variable.t;
-  pinput_typ : RType.t;
+  pinput_typ : RType.t list;
   poutput_typ : RType.t * term option;
   pargs : variable list;
   pparams : VarSet.t;
@@ -88,11 +88,7 @@ let infer_pmrs_types (prog : t) =
   match RType.unify (RType.mkv new_subs) with
   | Some usubs ->
       Variable.update_var_types (RType.mkv usubs);
-      let typ_in, typ_out =
-        match Variable.vtype_or_new prog.pmain_symb with
-        | RType.TFun (t_in, t_out) -> (t_in, t_out)
-        | _ -> failwith "PMRS with multiple inputs not supported."
-      in
+      let typ_in, typ_out = RType.fun_typ_unpack (Variable.vtype_or_new prog.pmain_symb) in
       Variable.update_var_types
         [ (Variable.vtype_or_new prog.pvar, Variable.vtype_or_new prog.pmain_symb) ];
       let invariant = Option.map ~f:(fun x -> first (infer_type x)) (second prog.poutput_typ) in
@@ -123,7 +119,7 @@ let pp (frmt : Formatter.t) (pmrs : t) : unit =
   in
   Fmt.(
     pf frmt "%s⟨%a⟩(%a): %a -> %a%a = @;@[<v 2>{@;%a@;}@]" pmrs.pvar.vname VarSet.pp_var_names
-      pmrs.pparams (list Variable.pp) pmrs.pargs RType.pp pmrs.pinput_typ RType.pp
+      pmrs.pparams (list Variable.pp) pmrs.pargs (list ~sep:comma RType.pp) pmrs.pinput_typ RType.pp
       (first pmrs.poutput_typ)
       (option (braces pp_term))
       (second pmrs.poutput_typ) pp_rules ())
@@ -200,7 +196,7 @@ let func_to_pmrs (f : Variable.t) (args : fpattern list) (body : Term.term) =
   in
   {
     pvar = f;
-    pinput_typ = tin;
+    pinput_typ = [ tin ];
     poutput_typ = (tout, None);
     pargs = Set.elements (fpat_vars (PatTup args));
     pparams = VarSet.empty;

@@ -19,7 +19,7 @@ let read_sig filename =
   Location.init buf filename;
   let ast = Parse.implementation buf in
   Stdio.In_channel.close handle;
-  Fmt.(pf stdout "%a@." Pprintast.structure ast);
+  Log.debug (fun f () -> Fmt.(pf f "Input program:@;%a" Pprintast.structure ast));
   ast
 
 let rec type_term_of_core_type (t : core_type) : type_term =

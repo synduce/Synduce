@@ -14,13 +14,10 @@ and dec l1 = function
   | Single a -> Cons (a, clist_to_list l1)
   | Concat (x, y) -> dec (Concat (y, l1)) x
 
-let rec hsearch a t =
-  let main = function
-    | CNil -> [%synt s0]
-    | Single a -> [%synt f0] a
-    | Concat (x, y) -> [%synt odot] (hsum x) (hsum y)
-  in
-  main t
+let rec hsearch a = function
+  | CNil -> [%synt s0]
+  | Single a -> [%synt f0] a
+  | Concat (x, y) -> [%synt odot] (hsearch a x) (hsearch a y)
 
 ;;
 assert (hsearch = clist_to_list @@ search)
