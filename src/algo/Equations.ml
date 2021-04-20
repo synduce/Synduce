@@ -130,7 +130,7 @@ let remap_rec_calls p t =
     | TApp ({ tkind = TVar x; _ }, args) ->
         if a && Variable.equal x g.pmain_symb then
           match args with [ arg ] -> First (compute_lhs p arg) | _ -> Second a
-        else if Set.mem g.pparams x then Second true
+        else if Set.mem g.psyntobjs x then Second true
         else Second a
     | _ -> Second a
   in
@@ -508,10 +508,10 @@ let solve_stratified (unknowns : VarSet.t) (eqns : equation list) =
     | resp, None -> (resp, None)
 
 let solve ~(p : psi_def) (eqns : equation list) =
-  let unknowns = p.target.pparams in
+  let unknowns = p.target.psyntobjs in
   let soln_final =
     if !Config.detupling_on then
-      let new_unknowns, projections = proj_unknowns p.target.pparams in
+      let new_unknowns, projections = proj_unknowns p.target.psyntobjs in
       let new_eqns = proj_and_detuple_eqns projections eqns in
       match solve_stratified new_unknowns new_eqns with
       | resp, Some soln0 ->

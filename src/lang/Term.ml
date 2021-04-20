@@ -928,7 +928,8 @@ let infer_type (t : term) : term * RType.substitution =
                 | Some subs -> ({ t0 with ttyp = tout; tkind = TData (cstr, t_args) }, subs)
                 | None ->
                     Log.loc_fatal_errmsg eloc
-                      (Fmt.str "Type inference failure: could not unify %s arguments." cstr))
+                      (Fmt.str "Type inference failure: could not unify %s arguments %a." cstr
+                         (list ~sep:comma pp_term) t_args))
             | Unequal_lengths ->
                 Log.loc_fatal_errmsg eloc
                   (Fmt.str "Type inference failure: could not match %s arguments: %a and %a." cstr

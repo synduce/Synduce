@@ -214,7 +214,12 @@ let solve_problem (psi_comps : (string * string * string) option)
   (* Original function. *)
   let orig_f, tau =
     match Map.find pmrs spec_fname with
-    | Some pmrs -> (pmrs, pmrs.pinput_typ)
+    | Some pmrs -> (
+        match List.last pmrs.pinput_typ with
+        | Some tau -> (pmrs, tau)
+        | None ->
+            Log.error_msg Fmt.(str "Reference function should have at least one input argument.");
+            no_synth ())
     | None ->
         Log.error_msg Fmt.(str "No spec named %s found." spec_fname);
         no_synth ()
@@ -228,11 +233,15 @@ let solve_problem (psi_comps : (string * string * string) option)
           Log.error_msg Fmt.(str "No recursion skeleton named %s found." target_fname);
           no_synth ()
     in
-    (target_f, target_f.pparams, target_f.pinput_typ)
+    match List.last target_f.pinput_typ with
+    | Some theta -> (target_f, target_f.psyntobjs, theta)
+    | None ->
+        Log.error_msg Fmt.(str "Recursion skeleton should have at least one input.");
+        no_synth ()
   in
   (* Match origin and target recursion scheme types. *)
-  (match theta_to_tau with
-  | RType.TFun (TTup [ theta' ], tau') | RType.TFun (theta', tau') -> (
+  (match RType.fun_typ_unpack theta_to_tau with
+  | [ theta' ], tau' -> (
       let sb1 = RType.unify_one theta theta' in
       let sb2 = RType.unify_one tau tau' in
       match (sb1, sb2) with
@@ -274,7 +283,7 @@ let solve_problem (psi_comps : (string * string * string) option)
   in
   let target_f = PMRS.infer_pmrs_types target_f in
   let orig_f = PMRS.infer_pmrs_types orig_f in
-  let theta = target_f.pinput_typ in
+  let args_t = target_f.pinput_typ in
   let t_out = orig_f.poutput_typ in
   (* Print summary information about the problem, before solving.*)
   Log.info
@@ -282,7 +291,7 @@ let solve_problem (psi_comps : (string * string * string) option)
       fun fmt () ->
         pf fmt " Ψ (%a) := ∀ x : %a. (%s o %s)(x) = %s(x)"
           (list ~sep:comma Term.Variable.pp)
-          (Set.elements xi) RType.pp theta spec_fname repr_fname target_fname);
+          (Set.elements xi) (list ~sep:sp RType.pp) args_t spec_fname repr_fname target_fname);
   Log.info Fmt.(fun fmt () -> pf fmt "%a" PMRS.pp orig_f);
   Log.info Fmt.(fun fmt () -> pf fmt "%a" PMRS.pp target_f);
   Log.info

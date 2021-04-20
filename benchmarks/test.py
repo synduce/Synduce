@@ -71,16 +71,16 @@ sys.stdout.flush()
 
 algos = [
     ["requation", ""],
-    ["acegis", "--acegis"],
+    # ["acegis", "--acegis"],
     # ["ccegis", "--ccegis"]
 ]
 
 optims = [
-    #["all", ""],
+    ["all", ""],
     # ["ini", "-c"],
     # ["st", "-st"],
     # ["d", "--no-syndef"],
-    ["off", "-st --no-syndef"]
+    # ["off", "-st --no-syndef"]
 ]
 
 for filename_with_opt in input_files:

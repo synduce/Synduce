@@ -112,7 +112,7 @@ let fterm_to_term _ allv globs locs rterm =
   in
   f _env rterm
 
-let pmrs_of_rules loc (globs : (string, Term.variable) Hashtbl.t) (params : Term.variable list)
+let pmrs_of_rules loc (globs : (string, Term.variable) Hashtbl.t) (synt_objs : Term.variable list)
     (args : Term.variable list) (pvar : Term.variable) (invariant : term option) (body : pmrs_body)
     : PMRS.t =
   (* Check that params and args do not have variables with the same name.
@@ -122,8 +122,8 @@ let pmrs_of_rules loc (globs : (string, Term.variable) Hashtbl.t) (params : Term
     ~f:(fun vp ->
       if List.mem args vp ~equal:Term.Variable.same_name then
         loc_fatal_errmsg loc "Duplicate parameter and argument name:")
-    params;
-  let pset = Term.VarSet.of_list params and aset = Term.VarSet.of_list args in
+    synt_objs;
+  let pset = Term.VarSet.of_list synt_objs and aset = Term.VarSet.of_list args in
   (* First pass to collect the non-terminal variables. *)
   let nont =
     let f accum (rloc, rhead, _) =
@@ -214,7 +214,7 @@ let pmrs_of_rules loc (globs : (string, Term.variable) Hashtbl.t) (params : Term
       {
         pvar;
         pargs = args;
-        pparams = Term.VarSet.of_list params;
+        psyntobjs = Term.VarSet.of_list synt_objs;
         pnon_terminals = nont;
         prules = rules;
         porder = -1;

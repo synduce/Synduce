@@ -68,7 +68,9 @@ let rec pp (frmt : Formatter.t) (typ : t) =
   | TNamed s -> Fmt.(pf frmt "%s" s)
   | TTup tl -> Fmt.(pf frmt "%a" (parens (list ~sep:Utils.ast pp)) tl)
   | TFun (tin, tout) -> Fmt.(pf frmt "(%a -> %a)" pp tin pp tout)
-  | TParam (alpha, t') -> Fmt.(pf frmt "%a[%a]" pp t' (list ~sep:comma pp) alpha)
+  | TParam (alpha, t') ->
+      if List.length alpha > 1 then Fmt.(pf frmt "(%a) %a" (list ~sep:comma pp) alpha pp t')
+      else Fmt.(pf frmt "%a %a" (list ~sep:comma pp) alpha pp t')
   | TVar i -> Fmt.(pf frmt "α%i" i)
 
 let fun_typ_unpack (t : t) : t list * t =
@@ -188,6 +190,8 @@ let rec unify_one (s : t) (t : t) : substitution option =
         Log.verbose (fun frmt () -> Fmt.(pf frmt "Type unification: circularity %a - %a") pp s pp t);
         None)
       else Some [ (x, t') ]
+  | TParam ([], t1), _ -> unify_one t1 t
+  | _, TParam ([], t2) -> unify_one s t2
   | _ ->
       if Poly.equal s t then Some []
       else (
@@ -266,7 +270,7 @@ let get_variants (typ : t) : (string * t list) list =
         match type_of_variant variant_name with
         | Some (typ', tl') -> (
             match typ' with
-            | TParam (params', _) -> (
+            | TParam (params', _) when List.length params' > 0 -> (
                 match unify (List.zip_exn params params') with
                 | Some subs -> List.map ~f:(sub_all (mkv subs)) tl'
                 | None -> failwith "TODO")

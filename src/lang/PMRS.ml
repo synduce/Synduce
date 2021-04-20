@@ -14,11 +14,14 @@ type rewrite_rule = variable * variable list * pattern option * term
 type top_function = variable * variable list * term
 
 type t = {
+  (* The main function symbol *)
   pvar : Variable.t;
+  (* The input type. *)
   pinput_typ : RType.t list;
+  (* Output type and optional invariant on output of function. *)
   poutput_typ : RType.t * term option;
   pargs : variable list;
-  pparams : VarSet.t;
+  psyntobjs : VarSet.t;
   prules : rewrite_rule IntMap.t;
   pnon_terminals : VarSet.t;
   pmain_symb : variable;
@@ -119,8 +122,8 @@ let pp (frmt : Formatter.t) (pmrs : t) : unit =
   in
   Fmt.(
     pf frmt "%s⟨%a⟩(%a): %a -> %a%a = @;@[<v 2>{@;%a@;}@]" pmrs.pvar.vname VarSet.pp_var_names
-      pmrs.pparams (list Variable.pp) pmrs.pargs (list ~sep:comma RType.pp) pmrs.pinput_typ RType.pp
-      (first pmrs.poutput_typ)
+      pmrs.psyntobjs (list Variable.pp) pmrs.pargs (list ~sep:comma RType.pp) pmrs.pinput_typ
+      RType.pp (first pmrs.poutput_typ)
       (option (braces pp_term))
       (second pmrs.poutput_typ) pp_rules ())
 
@@ -199,7 +202,7 @@ let func_to_pmrs (f : Variable.t) (args : fpattern list) (body : Term.term) =
     pinput_typ = [ tin ];
     poutput_typ = (tout, None);
     pargs = Set.elements (fpat_vars (PatTup args));
-    pparams = VarSet.empty;
+    psyntobjs = VarSet.empty;
     (* PMRS from a function cannot have unkowns. *)
     porder = 0;
     pmain_symb;
