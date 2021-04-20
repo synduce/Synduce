@@ -2,7 +2,9 @@
 import os
 import sys
 
-timeout_value = 1800  # 30min timeout
+# Timeout is 10min for all experiments.
+timeout_value = 600  # 10min timeout
+# Maximum 4gb memory - this should not be limiting!
 memout_value = 8000 * (2 ** 10)  # 4GB memory limit
 timeout = ("../timeout/timeout -t %i -m %i --no-info-on-success" %
            (timeout_value, memout_value))
@@ -76,7 +78,7 @@ algos = [
     # ["ccegis", "--ccegis --no-gropt"]
 ]
 
-optims = [
+woptims = [
     ["all", ""],
     # ["ini", "-c --no-gropt"],
     # ["st", "-st --no-gropt"],
@@ -84,13 +86,46 @@ optims = [
     # ["off", "-st --no-syndef --no-gropt"]
 ]
 
-for filename_with_opt in input_files:
-    filename = filename_with_opt[0]
-    extra_opt = filename_with_opt[1]
-    for algo in algos:
-        for optim in optims:
-            print("B:%s,%s+%s" % (filename, algo[0], optim[0]))
-            sys.stdout.flush()
-            os.system("%s %s %s -i %s %s %s" %
-                      (timeout, exec_path, algo[1], optim[1], extra_opt,
-                       os.path.realpath(os.path.join("benchmarks", filename))))
+if __name__ == "__main__":
+    if len(sys.argv) > 1:
+        table_no = int(sys.argv[1])
+        if table_no == 1:
+            # Table 1 : compare Atropo and Baseline
+            algos = [
+                    ["requation", "--no-gropt"],
+                    ["acegis", "--acegis --no-gropt"]
+            ]
+            optims = [["all", ""]]
+        elif table_no == 2:
+            # Table 2 : compare Atropos, Baseline and Concrete CEGIS
+            algos = [
+                    ["requation", "--no-gropt"],
+                    ["acegis", "--acegis --no-gropt"],
+                    ["ccegis", "--ccegis --no-gropt"]
+            ]
+            optims = [["all", ""]]
+        elif table_no == 3:
+            # Table 2 : compare Atropos, Baseline with optimizations on/off
+            algos = [
+                ["requation", "--no-gropt"],
+                ["acegis", "--acegis --no-gropt"],
+            ]
+
+            woptims = [
+                ["all", ""],
+                ["ini", "-c --no-gropt"],
+                ["st", "-st --no-gropt"],
+                ["d", "--no-syndef --no-gropt"],
+                ["off", "-st --no-syndef --no-gropt"]
+            ]
+
+    for filename_with_opt in input_files:
+        filename = filename_with_opt[0]
+        extra_opt = filename_with_opt[1]
+        for algo in algos:
+            for optim in optims:
+                print("B:%s,%s+%s" % (filename, algo[0], optim[0]))
+                sys.stdout.flush()
+                os.system("%s %s %s -i %s %s %s" %
+                          (timeout, exec_path, algo[1], optim[1], extra_opt,
+                           os.path.realpath(os.path.join("benchmarks", filename))))

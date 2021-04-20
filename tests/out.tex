@@ -1,5 +1,5 @@
 % ====================================
-% This table has been automatically produced by the tool on 2021-03-30 08:53:40.046075.
+% This table has been automatically produced by the tool on 2021-04-20 18:01:35.931005.
 % ====================================
 \begin{table}
 	\caption{Experimental Results.  Benchmarks are grouped by categories introduced in Section \ref{sec:cstudies}. \# steps indicates the number of refinement rounds. $T_{last}$ is the elapsed time before the last call to the SyGuS solver in the last refinement step before timeout. All times are in seconds. The best time is highlighted in bold font.  A '-' indicates timeout ($>$ 10 min). The ``Inv'' column indicates if codomain constraints were required. Experiments are run on a laptop with 16G memory and an i7-8750H 6-core CPU at 2.20GHz running Ubuntu 19.10.}\label{table:experiments}
@@ -10,3 +10,55 @@
 			\cline{4-9}
 			 &   & & time & \# steps & $T_{last}$ & time & \# steps & $T_{last}$\\ 
 			\hline
+			 & sum & no & 0.07 & 2 & 0.04 & {\bfseries 0.05} & 3 & 0.03\\ 
+			 & max & no & {\bfseries 0.15} & 1 & 0.00 & 0.28 & 2 & 0.02\\ 
+			 & max 2 & no & {\bfseries 0.17} & 1 & 0.05 & 0.27 & 2 & 0.01\\ 
+			Changing & min & no & {\bfseries 0.10} & 1 & 0.00 & 0.29 & 2 & 0.02\\ 
+			Tree & min-max & no & {\bfseries 0.63} & 3 & 0.17 & 105.38 & 4 & 4.31\\ 
+			Traversals & max weighted path & no & 0.14 & 3 & 0.09 & {\bfseries 0.08} & 3 & 0.04\\ 
+			 & sorted in-order & no & {\bfseries 0.01} & 1 & 0.00 & 55.08 & 4 & 2.53\\ 
+			 & pre-order poly. & no & {\bfseries 17.91} & 2 & 0.07 & - & 4 & 2.21\\ 
+			 & {\tt mips} & yes & {\bfseries 0.46} & 2 & 0.11 & - & 4 & 4.64\\ 
+			 & in-order mts & yes & {\bfseries 0.60} & 2 & 0.11 & - & 4 & 2.45\\ 
+			 & post-order mps & yes & {\bfseries 154.65} & 4 & 100.03 & - & 6 & 49.53\\ 
+			\hline
+			 & sum & no & 0.12 & 2 & 0.07 & {\bfseries 0.08} & 3 & 0.04\\ 
+			From  & height & no & {\bfseries 0.12} & 1 & 0.00 & 0.23 & 5 & 0.14\\ 
+			Tree to & max weighted path & no & 0.18 & 2 & 0.09 & {\bfseries 0.12} & 3 & 0.05\\ 
+			Zipper & max w. path (hom) & no & {\bfseries 0.01} & 1 & 0.00 & 2.57 & 4 & 0.94\\ 
+			 & leftmost odd & no & {\bfseries 0.06} & 1 & 0.05 & - & 4 & 9.49\\ 
+			 & {\tt mips} & yes & {\bfseries 1.59} & 3 & 0.60 & - & 7 & 177.31\\ 
+			\hline
+			Enforcing & sum & no & 0.11 & 2 & 0.09 & {\bfseries 0.04} & 3 & 0.03\\ 
+			Tail & mts & no & {\bfseries 1.26} & 2 & 0.03 & 34.35 & 3 & 0.05\\ 
+			Recursion & mps & no & 2.29 & 2 & 0.03 & {\bfseries 0.42} & 3 & 0.03\\ 
+			\hline
+			Combining & mts + sum & no & {\bfseries 2.39} & 2 & 0.07 & 6.98 & 3 & 0.03\\ 
+			Traversals & sum + mts + mps & yes & {\bfseries 0.76} & 3 & 0.20 & - & 3 & 0.05\\ 
+			\hline
+			 & sum & no & 0.13 & 3 & 0.05 & {\bfseries 0.09} & 2 & 0.01\\ 
+			Tree & product & no & 0.22 & 3 & 0.06 & {\bfseries 0.06} & 2 & 0.01\\ 
+			Flattening & max of heads & no & {\bfseries 0.12} & 2 & 0.03 & 0.29 & 3 & 0.04\\ 
+			 & max of lasts & no & 0.29 & 2 & 0.03 & {\bfseries 0.13} & 3 & 0.04\\ 
+			 & max sibling sum & no & {\bfseries 2.39} & 2 & 0.03 & 6.93 & 3 & 0.23\\ 
+			\hline
+			 & sum & no & {\bfseries 0.03} & 1 & 0.00 & 0.41 & 3 & 0.18\\ 
+			 & sum of even elts. & no & {\bfseries 0.04} & 1 & 0.00 & 0.57 & 3 & 0.24\\ 
+			 & length & no & {\bfseries 0.04} & 1 & 0.01 & 0.39 & 3 & 0.18\\ 
+			 & last & no & {\bfseries 0.03} & 1 & 0.00 & 0.04 & 2 & 0.02\\ 
+			Parallelizing & product & no & {\bfseries 0.03} & 1 & 0.00 & 0.37 & 2 & 0.10\\ 
+			Functions & polynomial & no & {\bfseries 0.07} & 1 & 0.00 & 1.18 & 5 & 0.60\\ 
+			on & hamming & no & {\bfseries 0.04} & 1 & 0.00 & 0.55 & 3 & 0.24\\ 
+			Lists & min & no & {\bfseries 0.06} & 1 & 0.00 & 0.09 & 2 & 0.02\\ 
+			 & is sorted & no & 23.43 & 2 & 0.54 & {\bfseries 4.08} & 4 & 0.18\\ 
+			 & linear search & no & {\bfseries 0.09} & 1 & 0.05 & 0.48 & 3 & 0.19\\ 
+			 & line of sight & no & {\bfseries 0.86} & 2 & 0.07 & 10.31 & 4 & 0.46\\ 
+			 & mts & yes & {\bfseries 0.13} & 1 & 0.06 & 4.45 & 4 & 0.53\\ 
+			 & mps & yes & {\bfseries 0.08} & 1 & 0.00 & 4.47 & 4 & 0.55\\ 
+			 & mts and mps combined & yes & {\bfseries 0.38} & 2 & 0.12 & 72.80 & 6 & 19.59\\ 
+			 & mss & yes & {\bfseries 5.91} & 3 & 2.14 & - & 6 & 279.17\\ 
+			 & count max elements & no & 0.51 & 1 & 0.00 & {\bfseries 0.13} & 2 & 0.03\\ 
+			\hline
+		\end{tabular}
+	}
+\end{table}

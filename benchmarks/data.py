@@ -3,7 +3,6 @@ import datetime
 
 timeout_time = 600.0
 
-input_file = "benchmarks/bench.txt"
 
 caption = "Experimental Results.  Benchmarks are grouped by categories introduced in Section \\ref{sec:cstudies}. \# steps indicates the number of refinement rounds. $T_{last}$ is the elapsed time before the last call to the SyGuS solver in the last refinement step before timeout. All times are in seconds. The best time is highlighted in bold font.  A '-' indicates timeout ($>$ 10 min). The ``Inv'' column indicates if codomain constraints were required. Experiments are run on a laptop with 16G memory and an i7-8750H 6-core CPU at 2.20GHz running Ubuntu 19.10."
 
@@ -149,6 +148,8 @@ def bold(s):
 
 
 def format_verif(f):
+    if f == "?":
+        return "?"
     f = float(f)
     if f < 0.009:
         return "$\\sim$\\textit{0.}"
@@ -525,7 +526,7 @@ def csv_table(data, csvfile):
                 csvout.write(",".join(csvline) + '\n')
 
 
-def raw_to_csv():
+def raw_to_csv(input_file):
     benchmark_data = {}
     with open(input_file) as raw:
         lines = raw.readlines()
@@ -548,14 +549,14 @@ def raw_to_csv():
                     benchmark_data[key]["max"] = 0
             else:
                 infos = lines[i].strip().split(",")
-
+                # A line with 5 numbers if for an intermediate synthesis step.
                 if len(infos) == 5:
                     step, verif_time, time, tnum, unum = infos[0], float(
                         infos[1]), float(infos[2]), int(infos[3]), int(infos[4])
                     benchmark_data[key][step] = verif_time, time, tnum, unum
                     benchmark_data[key]["max"] = max(
                         benchmark_data[key]["max"], int(step))
-
+                # A line with 3 numbers means synthesis finished.
                 if len(infos) == 3:
                     # Res = #of refinement steps, verif. time, total time.
                     if "res" in benchmark_data[key]:
@@ -590,16 +591,40 @@ def benchsort(x):
 
 
 if __name__ == "__main__":
-    thedict = raw_to_csv()
+    # input_file = "benchmarks/bench.txt"
+    # output_file = "benchmarks/results.csv"
 
-    csv_table(thedict, "benchmarks/results.csv")
+    if len(sys.argv) < 4:
+        print(
+            "Usage: python3 report.py INPUT_FILE OUTPUT_CSV TABLE# [TEX_OUTPUT]\n\n\
+                    INPUT_FILE   the input file produce by running test.py\n\
+                    OUTPUT_FILE  the csv to store temporary results\n\
+                    TABLE#       1-3 to produce Table 1, 2 or 3.\n\
+                    TEX_OUTPUT   If 0 < TABLE# <= 3, provide .tex output file.\n\
+            ")
+        exit()
 
-    if len(sys.argv) == 2:
-        tex_out = sys.argv[1]
+    input_file = sys.argv[1]
+    output_file = sys.argv[2]
+    table_no = int(sys.argv[3])
+
+    if table_no > 0 and table_no < 4:
+        if len(sys.argv) < 5:
+            print(
+                "Please provide output .tex file after table number.")
+
+    thedict = raw_to_csv(input_file)
+
+    csv_table(thedict, output_file)
+
+    if table_no == 1:
+        tex_out = sys.argv[4]
         produce_tex_table(tex_out, thedict)
-    if len(sys.argv) == 3:
-        tex_out = sys.argv[1]
-        if int(sys.argv[2]) > 0:
-            produce_full_tex_table(tex_out, thedict)
-        else:
-            produce_versions_tex_table(tex_out, thedict)
+
+    if table_no == 2:
+        tex_out = sys.argv[4]
+        produce_versions_tex_table(tex_out, thedict)
+
+    if table_no == 3:
+        tex_out = sys.argv[4]
+        produce_full_tex_table(tex_out, thedict)
