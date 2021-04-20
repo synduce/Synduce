@@ -6,11 +6,13 @@ type list = Elt of int | Cons of int * list
 
 let rec spec = function Elt a -> a | Cons (hd, tl) -> hd
 
-let rec target = function
-  | Single a -> [%synt f_0] a
-  | Concat (x, y) -> [%synt odot] (target x) (target y)
+let rec target t = h t
 
-let rec repr = function Single a -> Elt a | Concat (l1, l2) -> dec l2 l1
+and h = function Single a -> [%synt f_0] a | Concat (x, y) -> [%synt odot] (h x) (h y)
+
+let rec repr l = c l
+
+and c = function Single a -> Elt a | Concat (l1, l2) -> dec l2 l1
 
 and dec l2 = function
   | Single a -> Cons (a, repr l2)

@@ -68,9 +68,11 @@ let rec pp (frmt : Formatter.t) (typ : t) =
   | TNamed s -> Fmt.(pf frmt "%s" s)
   | TTup tl -> Fmt.(pf frmt "%a" (parens (list ~sep:Utils.ast pp)) tl)
   | TFun (tin, tout) -> Fmt.(pf frmt "(%a -> %a)" pp tin pp tout)
-  | TParam (alpha, t') ->
-      if List.length alpha > 1 then Fmt.(pf frmt "(%a) %a" (list ~sep:comma pp) alpha pp t')
-      else Fmt.(pf frmt "%a %a" (list ~sep:comma pp) alpha pp t')
+  | TParam (alpha, t') -> (
+      match alpha with
+      | [] -> Fmt.(pf frmt "ɑ? %a" pp t')
+      | [ a ] -> Fmt.(pf frmt "%a %a" pp a pp t')
+      | _ -> Fmt.(pf frmt "(%a) %a" (list ~sep:comma pp) alpha pp t'))
   | TVar i -> Fmt.(pf frmt "α%i" i)
 
 let fun_typ_unpack (t : t) : t list * t =
@@ -224,10 +226,10 @@ let type_of_variant (variant : string) : (t * t list) option = Hashtbl.find _var
 let instantiate_variant (vargs : type_term list) (instantiator : (ident * int) list) =
   let rec variant_arg tt =
     match tt.tkind with
-    | TyInt -> TInt
-    | TyBool -> TBool
-    | TyChar -> TChar
-    | TyString -> TString
+    | TyInt | TyTyp "int" -> TInt
+    | TyBool | TyTyp "bool" -> TBool
+    | TyChar | TyTyp "char" -> TChar
+    | TyString | TyTyp "string" -> TString
     | TyFun (tin, tout) -> TFun (variant_arg tin, variant_arg tout)
     | TyTyp e -> TNamed e
     | TyParam x -> (

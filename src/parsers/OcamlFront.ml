@@ -29,15 +29,18 @@ let rec type_term_of_core_type (t : core_type) : type_term =
   in
   match t.ptyp_desc with
   | Ptyp_var s -> mk_t_param (wloc t.ptyp_loc) s
-  | Ptyp_poly (params, t) ->
-      mk_t_constr (wloc t.ptyp_loc) (of_params params) (type_term_of_core_type t)
-  | Ptyp_tuple _ -> failwith "tuple unsupported"
+  | Ptyp_poly (params, t) -> (
+      match params with
+      | [] -> type_term_of_core_type t
+      | _ -> mk_t_constr (wloc t.ptyp_loc) (of_params params) (type_term_of_core_type t))
+  | Ptyp_tuple _ -> failwith "tuple not supported"
   | Ptyp_constr (c, targs) -> (
       match c.txt with
-      | Lident cid ->
-          mk_t_constr (wloc t.ptyp_loc)
-            (List.map ~f:type_term_of_core_type targs)
-            (mk_t_typ (wloc c.loc) cid)
+      | Lident cid -> (
+          let t1 = mk_t_typ (wloc c.loc) cid in
+          match targs with
+          | [] -> t1
+          | _ -> mk_t_constr (wloc t.ptyp_loc) (List.map ~f:type_term_of_core_type targs) t1)
       | _ -> failwith Fmt.(str "constr %s unsupported" "unk"))
   | _ ->
       Log.error_msg Fmt.(str "%a" Pprintast.core_type t);
