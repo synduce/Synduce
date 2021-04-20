@@ -91,8 +91,9 @@ let simplify_eqns = ref true
 
 (**
   Use the equations as a indicator to optimize grammars, without compromising soundness.
+  OFF for CAV
 *)
-let optimize_grammars = ref true
+let optimize_grammars = ref false
 
 (* ============================================================================================= *)
 (*                        BOUNDED EXPANSIONS / VERIFICATION PARAMETERS                           *)

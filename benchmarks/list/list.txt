@@ -2,11 +2,11 @@ PMRS Version            ML Version
 
 bal.pmrs                ---
 count_peaks.pmrs        ---
-first.pmrs              first.ml ? issue with types
+first.pmrs              first.ml
 hamming.pmrs            hamming.ml
 insert.pmrs             ---
 issorted.pmrs           is_sorted.ml
-last.pmrs               last.ml ?
+last.pmrs               last.ml
 lenhom.pmrs             len.ml
 line_of_sight.pmrs      line_of_sight.ml
 maxcount.pmrs           maxcount.ml

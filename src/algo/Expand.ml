@@ -90,7 +90,10 @@ let nonreduced_terms_all (p : psi_def) (t : term) =
   in
   nonreduced_terms p all_nont t
 
-let replace_rhs_of_main (p : psi_def) (f : PMRS.t) (t0 : term) : term =
+(* Replace subterms that correspond to the right-hand side of the main rule to avoid
+  capturing f(v) when v is a variable. *)
+let replace_rhs_of_main ?(for_mr = false) (p : psi_def) (f : PMRS.t) (t0 : term) : term =
+  Log.verbose_msg Fmt.(str "t0 = %a" pp_term t0);
   let nr = nonreduced_terms p f.pnon_terminals t0 in
   let rule_set = Map.filter f.prules ~f:(fun (nt, _, _, _) -> Variable.(nt = f.pmain_symb)) in
   let bound_params = Set.union f.psyntobjs (VarSet.of_list f.pargs) in
@@ -99,7 +102,22 @@ let replace_rhs_of_main (p : psi_def) (f : PMRS.t) (t0 : term) : term =
       match
         Map.max_elt (PMRS.inverted_rule_lookup ~boundvars:bound_params rule_set (mk_var nt) args)
       with
-      | Some (_, lhs) -> Some (mk_app (mk_var nt) args, lhs)
+      | Some (_, lhs) ->
+          if for_mr then
+            match lhs.tkind with
+            | TApp (_, lhs_args) -> (
+                match List.last lhs_args with
+                | Some { tkind = TVar _; _ } ->
+                    Log.verbose_msg
+                      Fmt.(
+                        str "Replacement of %a by %a." pp_term (mk_app (mk_var nt) args) pp_term lhs);
+                    Some (mk_app (mk_var nt) args, lhs)
+                | _ -> None)
+            | _ -> None
+          else (
+            Log.verbose_msg
+              Fmt.(str "Replacement of %a by %a." pp_term (mk_app (mk_var nt) args) pp_term lhs);
+            Some (mk_app (mk_var nt) args, lhs))
       | None -> None
     in
     List.filter_map ~f:(fun x -> x) (List.map ~f nr)
@@ -191,7 +209,7 @@ let expand_max (p : psi_def) (f : PMRS.t) (t0 : term) : (term * term) list * ter
 let composed_reduction_sequence (p : psi_def) (f : PMRS.t) (g : PMRS.t) (t0 : term) =
   let _t0 = Reduce.reduce_pmrs g t0 in
   let _t1 = Reduce.reduce_pmrs f _t0 in
-  let _t2 = replace_rhs_of_main p g _t1 in
+  let _t2 = replace_rhs_of_main ~for_mr:true p g _t1 in
   replace_rhs_of_main p f _t2
 
 let check_max_exp p f g t =
@@ -250,15 +268,25 @@ let expand_driver p f g t =
       | [] -> ([], []))
   | mr_terms, rest -> (mr_terms, rest)
 
+(**
+  Expand so that terms are MR-terms for f @ g.
+*)
 let expand_max2 (p : psi_def) (f : PMRS.t) (g : PMRS.t) (t0 : term) : (term * term) list * term list
     =
   match check_max_exp p f g t0 with First x -> ([ x ], []) | _ -> expand_driver p f g t0
 
 let is_mr (p : psi_def) (f : PMRS.t) (t0 : term) nt : bool =
+  Log.verbose_msg Fmt.(str "Is %a maximally reducible by %s?" pp_term t0 f.PMRS.pvar.vname);
   let f_t0 = Reduce.reduce_pmrs f t0 in
   let f_t0 = replace_rhs_of_main p f f_t0 in
   let nr = nonreduced_terms p nt f_t0 in
-  match nr with [] -> true | _ -> false
+  match nr with
+  | [] ->
+      Log.verbose_msg "Yes.";
+      true
+  | _ ->
+      Log.verbose_msg "No.";
+      false
 
 let is_mr_all (p : psi_def) (t0 : term) =
   let nonterminals =
@@ -266,8 +294,8 @@ let is_mr_all (p : psi_def) (t0 : term) =
   in
   is_mr p p.target t0 nonterminals && Either.is_first (check_max_exp p p.orig p.repr t0)
 
-(** `maximal p t0 ` expands the term `t0 ` such that `p.orig (p.repr t0)` and 'p.target t0`
-    are maximally reduced terms.
+(** `maximal p t0 ` expands the term `t0 ` into T, U such that all terms in T are MR-terms
+  for (p.orig (p.repr)) and p.target and T,U is a boundary.
 *)
 let to_maximally_reducible (p : psi_def) (t0 : term) : TermSet.t * TermSet.t =
   Log.verbose_msg Fmt.(str "@[Expand > t0 = %a@]" pp_term t0);
