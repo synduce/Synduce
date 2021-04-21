@@ -9,6 +9,26 @@ memout_value = 8000 * (2 ** 10)  # 4GB memory limit
 timeout = ("../timeout/timeout -t %i -m %i --no-info-on-success" %
            (timeout_value, memout_value))
 
+kick_the_tires_set = [
+    ["list/sumhom.pmrs", ""],
+    ["ptree/sum.pmrs", ""],
+    ["tree/sumtree.pmrs", ""],
+    ["tailopt/sum.pmrs", ""],
+    ["zippers/sum.pmrs", ""],
+    ["zippers/height.pmrs", ""],
+    ["zippers/maxPathWeight.pmrs", ""],
+    ["ptree/mul.pmrs", ""],
+    ["tree/maxtree.pmrs", ""],
+    ["tree/min.pmrs", ""],
+    ["tree/maxtree2.pmrs", ""],
+    ["list/sumodds.pmrs", ""],
+    ["list/prodhom.pmrs", ""],
+    ["list/polyhom.pmrs", ""],
+    ["list/hamming.pmrs", ""],
+    ["list/sumevens.pmrs", ""],
+    ["list/lenhom.pmrs", ""],
+    ["list/last.pmrs", ""]
+]
 
 reduced_benchmark_set = [
     ["list/sumhom.pmrs", ""],
@@ -30,13 +50,12 @@ reduced_benchmark_set = [
     ["tree/minmax.pmrs", ""],
     ["tree/maxtree2.pmrs", ""],
     ["tree/poly.pmrs", ""],
-    ["list/sumodds.pmrs", ""],
+    ["list/sumevens.pmrs", ""],
     ["list/prodhom.pmrs", ""],
     ["list/polyhom.pmrs", ""],
     ["list/hamming.pmrs", ""],
     ["list/maxcount.pmrs", ""],
     ["list/minhom.pmrs", ""],
-    ["list/mincount.pmrs", ""],
     ["list/last.pmrs", ""],
     ["list/sndminhom.pmrs", ""],
     ["list/mtshom.pmrs", ""],
@@ -109,26 +128,12 @@ exec_path = os.path.join(root, "_build/default/bin/Atropos.exe")
 
 sys.stdout.flush()
 
-algos = [
-    # Grammar optimizations not part of CAV21 and unstable
-    ["requation", "--no-gropt"],
-    # ["acegis", "--acegis --no-gropt"],
-    # ["ccegis", "--ccegis --no-gropt"]
-]
-
-woptims = [
-    ["all", ""],
-    # ["ini", "-c --no-gropt"],
-    # ["st", "-st --no-gropt"],
-    # ["d", "--no-syndef --no-gropt"],
-    # ["off", "-st --no-syndef --no-gropt"]
-]
 
 if __name__ == "__main__":
     if len(sys.argv) > 1:
         table_no = int(sys.argv[1])
         if table_no == 1:
-            # Table 1 : compare Atropo and Baseline
+            # Table 1 : compare Atropos and Baseline
             algos = [
                     ["requation", "--no-gropt"],
                     ["acegis", "--acegis --no-gropt"]
@@ -162,9 +167,12 @@ if __name__ == "__main__":
         exit()
 
     if len(sys.argv) > 2:
-        input_files = reduced_benchmark_set
+        if int(sys.argv[2]) == 0:
+            input_files = kick_the_tires_set
+        else:
+            input_files = reduced_benchmark_set
     else:
-        intput_files = benchmark_set
+        input_files = benchmark_set
 
     for filename_with_opt in input_files:
         filename = filename_with_opt[0]

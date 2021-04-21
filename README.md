@@ -1,9 +1,43 @@
+# Kick-the-tires phase
+
+The reviewers can make sure that the artifact runs properly by running a few scripts and testing the tool on
+a simple benchmark.
+
+## Running the script
+The script `kick_the_tires.sh` runs a subset of the benchmarks presented in the paper, and produces a text
+version of Table 1.
+- Producing the experimental data should take no more than a minute.
+- The script should then report a summary of the experiments: you should see that 17 benchmarks have been run successfully (Atropos and the baseline have not timed out).
+- A text version of Table 1 is printed. Missing data for the other benchmarks is indicated by a question mark "?". You should see the 17 benchmarks for which this first phase collects data, among the 43 benchmarks. The synthesis times reported should be less than a second.
+
+## Testing the tool
+
+You can try running the tool on one of the benchmarks, for example the `sum` example in the list parallelization category:
+```
+./atropos benchmarks/list/sumhom.pmrs
+```
+The tool first prints out a summary of the problem it needs to solve: the reference function `spec`, the target recursion skeleton `target` and the representation function `repr`. It then starts solving the problem by synthesizing functions for the unknown components of the recursion skeleton, in this case `odot`, `f_0` and `s_0`.
+The message printed should be the solution, and in how much time it was found.
+The reviewer should expect a message of the form:
+```
+ INFO : Solution found in 0.0777s (96.1% verifying):
+target⟨odot, f_0, s_0⟩(): int clist -> int =
+{
+  ‣ target t   ⟹  h t
+    h  CNil  ⟹  0
+    h  Single(a)  ⟹  a
+    h  Concat(x, y)  ⟹  (h x) + (h y)
+
+  }
+```
+The unknowns in the recursion skeleton have been substituted for their implementation.
+
+# Further evaluation
+
+
 # Atropos
 
-Automatic recursive function synthesis.
-This is very much work in progress, but is reasonably functional.
-CAV21 branch.
-# Requirements
+## Requirements
 You will need a recent [OCaml](https://ocaml.org/releases/4.11.1.html) installation and the [OCaml Package Manager (opam)](https://opam.ocaml.org) to get started.
 
 The Ocaml dependencies of this project can be installed via opam (```opam install . --deps-only```).
@@ -11,7 +45,7 @@ Once all the dependencies are installed, call ```make``` from the root of the pr
 
 You will need [**Z3**](https://github.com/Z3Prover/z3) and [**CVC4**](https://cvc4.github.io) installed on your system. *Atropos* detects where your binaries are using `which z3` and `which cvc4`.
 
-## Installation script on Ubuntu:
+### Installation script on Ubuntu:
 This small script should work for an installation from scratch on Ubuntu, or any system with the apt package manager.
 ```
 sudo apt install opam
@@ -24,10 +58,10 @@ make
 ```
 The installation of the dependencies sometimes fails. If it does, try installing `core` on its own, and then try again.
 
-## Basic Usage
+### Basic Usage
 `./atropos -h` should get you started.
 
-# Examples
+## Examples
 The `benchmarks` folder contains input examples. An input problem is defined by three components: a reference function `spec`, a representation function `repr` and a recursion skeleton `target`.
 The datatypes on which each of these components operate have to be defined first.
 

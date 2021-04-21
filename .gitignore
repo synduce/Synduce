@@ -7,3 +7,4 @@ Example
 *.tex
 *.txt
 *.csv
+review_data/*

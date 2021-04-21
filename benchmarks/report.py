@@ -111,6 +111,8 @@ def floti(f):
 
 
 def speedup(a, b):
+    if b == "?" or a == "?":
+        return "?"
     if b == "-":
         if a != "-":
             return "∞"
@@ -194,15 +196,11 @@ def produce_txt_table(tex_output_file, data):
                 bkey = benchmark_class + "/" + benchmark_file + ".pmrs"
                 acegis_bf = False
 
-                # Pick best optimized version for requation
-                a_data = data[bkey, "requation"]
-                versions = ["all", "st", "d", "off"]
-                best_v = "all"
-
                 if (bkey, "requation") not in data.keys():
-                    print("No data for %s, requation" % bkey)
+                    #print("No data for %s, requation" % bkey)
+                    pass
                 else:
-                    b_data = data[bkey, "requation"][best_v]
+                    b_data = data[bkey, "requation"]["all"]
                     if "res" in b_data:
                         req_iters, _, req_time, _ = b_data["res"]
                         req_t = "%3.2f" % float(req_time)
@@ -212,26 +210,13 @@ def produce_txt_table(tex_output_file, data):
                     if str(b_data["max"]) in b_data:
                         req_last = "%3.2f" % b_data[str(b_data["max"])][1]
 
-                # Pick best optimized version for acegis
-                a_data = data[bkey, "acegis"]
-                versions = ["all", "st", "d", "off"]
-                best_v = "all"
                 best_t = timeout_time
-                for version in versions:
-                    if version in a_data.keys():
-                        b_data = a_data[version]
-                        if "res" in b_data:
-                            _, _, this_time, _ = b_data["res"]
-                            this_t = float(this_time)
-                            if this_t < best_t:
-                                best_t = this_t
-                                best_v = version
 
                 if (bkey, "acegis") not in data.keys():
-                    print("No data for %s, acegis" % bkey)
-
+                    #print("No data for %s, acegis" % bkey)
+                    pass
                 else:
-                    b_data = data[bkey, "acegis"][best_v]
+                    b_data = data[bkey, "acegis"]["all"]
                     if "res" in b_data:
                         nai_iters, _, nai_time, _ = b_data["res"]
                         nai_t = "%3.2f" % float(nai_time)
@@ -253,8 +238,7 @@ def produce_txt_table(tex_output_file, data):
         outp.write(caption1)
         outp.write("\n")
         outp.close()
-        print("Num benchmarks: %i" % len(speedups))
-        print("=============================================")
+        print("============== SUMMARY ================")
         print("Summary of relative improvement of Atropos over baseline.")
         print("improvement = baseline synt. time / Atropos synt. time")
         print("∞ means baseline timed out, but atropos did not")
@@ -266,8 +250,11 @@ def produce_txt_table(tex_output_file, data):
         count_100x = 0
         count_10x = 0
         speedup_only = []
+        count_data_points = 0
         for b, s in speedups:
-            print("%10s,%20s : %s" % (b[0], b[1], s))
+            if s != "?":
+                print("%10s,%20s : %s" % (b[0], b[1], s))
+                count_data_points += 1
             try:
                 s = float(s)
                 if s < 0:
@@ -281,13 +268,15 @@ def produce_txt_table(tex_output_file, data):
             except:
                 count_timeouts += 1
 
-        print("==============================================")
+        print("---------------------------------------------")
+        print("Data for %i benchmarks." % count_data_points)
         print("Num timeouts (baseline or Atropos): %i" % count_timeouts)
         print("Not counting when baseline times out, count improvements of")
         print("> 100x : %i" % count_100x)
         print("> 10x  : %i" % count_10x)
         print("Average speedup: %3.4f" % mean(speedup_only))
         print("Median  speedup: %3.4f" % median(speedup_only))
+        print("=============================================")
 
 
 # TABLE 2 =====================================================================
