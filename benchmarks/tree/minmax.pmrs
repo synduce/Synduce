@@ -3,11 +3,11 @@ type 'a tree = Node of 'a * 'a tree * 'a tree | Leaf of 'a
 pmrs spec =
     main t -> f t
     | f Leaf(x) -> (x, x)
-    | f Node(a,l,r) -> let amin, amax = h (a, a) l in h (amin, amax) r
-    | h s Leaf(x) -> let amin, amax = s in min amin x, max amax x
-    | h s Node(a,l,r) ->
+    | f Node(a,l,r) -> let amin, amax = g (a, a) l in g (amin, amax) r
+    | g s Leaf(x) -> let amin, amax = s in min amin x, max amax x
+    | g s Node(a,l,r) ->
             let amin, amax = s in
-            h (h (min amin a, max amax a) l) r
+            g (g (min amin a, max amax a) l) r
 
 pmrs (join, f0) target =
     main t1 -> h t1

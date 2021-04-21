@@ -4,7 +4,7 @@ pmrs spec l =
     f_mts Nil -> 0, 0
     | f_mts Cons(hd,tl) -> (fun (sum, mts) -> sum + hd, max mts (sum + hd)) (f_mts tl)
 
-pmrs (oplus, s0) target t =
+pmrs (oplus) target t =
     main l -> f (0,0) l
     | f s Nil -> s
     | f s Cons(hd, tl) -> f (oplus s hd) tl

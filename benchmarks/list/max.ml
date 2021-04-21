@@ -2,7 +2,7 @@ type 'a clist = Single of 'a | Concat of 'a clist * 'a clist
 
 type 'a list = Elt of 'a | Cons of 'a * 'a list
 
-let rec spec = function Elt a -> a | Cons (hd, tl) -> min hd (spec tl)
+let rec spec = function Elt a -> a | Cons (hd, tl) -> max hd (spec tl)
 
 let rec repr = function Single a -> Elt a | Concat (x, y) -> dec y x
 

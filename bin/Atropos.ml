@@ -35,7 +35,7 @@ let print_usage () =
     \       --parse-only                Just parse the input.\n\
     \       --show-vars                 Print variables and their types at the end.\n\
      -> Try:\n\
-     ./atropos benchmarks/list/mpshom.pmrs@.";
+     ./atropos benchmarks/list/mps.ml@.";
   Caml.exit 0
 
 let options =
@@ -66,19 +66,24 @@ let main () =
   let filename = match !filename with Some f -> ref f | None -> print_usage () in
   set_style_renderer stdout `Ansi_tty;
   Caml.Format.set_margin 100;
-  ( match !Syguslib.Solvers.SygusSolver.default_solver with
+  (match !Syguslib.Solvers.SygusSolver.default_solver with
   | CVC4 -> ()
   | EUSolver -> failwith "EUSolver unsupported."
-  | DryadSynth -> Syguslib.Sygus.use_v1 := true );
+  | DryadSynth -> Syguslib.Sygus.use_v1 := true);
   let start_time = Unix.gettimeofday () in
   Config.glob_start := start_time;
   (* Parse input file. *)
   let is_ocaml_syntax = Caml.Filename.check_suffix !filename ".ml" in
   let prog, psi_comps = if is_ocaml_syntax then parse_ocaml !filename else parse_pmrs !filename in
   let _ = seek_types prog in
-  let all_pmrs = translate prog in
+  let all_pmrs =
+    try translate prog
+    with e ->
+      if !Config.show_vars then Term.Variable.print_summary stdout ();
+      raise e
+  in
   if !parse_only then Caml.exit 1;
-  ( match Algo.PmrsAlgos.solve_problem psi_comps all_pmrs with
+  (match Algo.PmrsAlgos.solve_problem psi_comps all_pmrs with
   | Ok target ->
       let elapsed = Unix.gettimeofday () -. start_time in
       let verif_ratio = 100.0 *. (!Config.verif_time /. elapsed) in
@@ -91,7 +96,7 @@ let main () =
       (* If no info required, output timing information. *)
       if not !Config.info then
         Fmt.(pf stdout "%i,%.4f,%.4f@." !Algo.PmrsAlgos.refinement_steps !Config.verif_time elapsed)
-  | Error _ -> Utils.Log.error_msg "No solution found." );
+  | Error _ -> Utils.Log.error_msg "No solution found.");
   if !Config.show_vars then Term.Variable.print_summary stdout ()
 
 ;;

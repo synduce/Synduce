@@ -24,7 +24,7 @@ let resolve_func (func : term) =
           | None -> (
               match Hashtbl.find PMRS._nonterminals x.vid with
               | Some pm -> FRNonT pm
-              | None -> FRUnknown ) ) )
+              | None -> FRUnknown)))
   | TFun (vargs, body) -> FRFun (vargs, body)
   | _ -> FRUnknown
 
@@ -49,8 +49,8 @@ let rule_lookup prules (f : variable) (fargs : term list) : term list =
                   let bindto_list = Map.to_alist bindto_map in
                   let pat_v, pat_bto = List.unzip bindto_list in
                   app_sub (rule_args @ pat_v) (first_args @ pat_bto) rhs
-              | None -> None )
-          | _ -> None )
+              | None -> None)
+          | _ -> None)
       (* Pattern is empty. Simple substitution. *)
       | None -> app_sub rule_args fargs rhs
     else None
@@ -67,13 +67,13 @@ let rec reduce_term (t : term) : term =
         | FRFun (fpatterns, body) -> (
             match Analysis.subst_args fpatterns args' with
             | Some subst -> Some (substitution subst body)
-            | None -> None )
+            | None -> None)
         | FRPmrs pm -> (
             match args' with
             | [ tp ] -> Some (f (reduce_pmrs pm tp))
-            | _ -> None (* PMRS are defined only with one argument for now. *) )
+            | _ -> None (* PMRS are defined only with one argument for now. *))
         | FRNonT p -> Some (pmrs_until_irreducible p t)
-        | FRUnknown -> None )
+        | FRUnknown -> None)
     | TFun ([], body) -> Some (f body)
     | TIte (c, tt, tf) -> (
         match c.tkind with
@@ -86,10 +86,10 @@ let rec reduce_term (t : term) : term =
             | TTup tlt, TTup tlf -> (
                 match List.zip tlt tlf with
                 | Ok zip -> Some (mk_tup (List.map zip ~f:(fun (tt', tf') -> mk_ite c tt' tf')))
-                | Unequal_lengths -> None )
-            | _, _ -> None ) )
+                | Unequal_lengths -> None)
+            | _, _ -> None))
     | TSel (t, i) -> (
-        match f t with { tkind = TTup tl; _ } -> Some (List.nth_exn tl i) | _ -> None )
+        match f t with { tkind = TTup tl; _ } -> Some (List.nth_exn tl i) | _ -> None)
     | _ -> None
   in
   transform ~case t
@@ -104,7 +104,7 @@ and pmrs_until_irreducible (prog : PMRS.t) (input : term) =
           | [] -> _t
           | hd :: _ ->
               rstep := true;
-              hd )
+              hd)
       | _ -> _t
     in
     let t0' = rewrite_with rewrite_rule t0 in
@@ -134,14 +134,14 @@ let reduce_rules (p : PMRS.t) =
   { p with prules = reduced_rules }
 
 let instantiate_with_solution (p : PMRS.t) (soln : (string * variable list * term) list) =
-  let xi_set = p.pparams in
+  let xi_set = p.psyntobjs in
   let xi_substs =
     let f (name, args, body) =
       match VarSet.find_by_name xi_set name with
       | Some xi -> (
           match args with
           | [] -> [ (Term.mk_var xi, body) ]
-          | _ -> [ (Term.mk_var xi, mk_fun (List.map ~f:(fun x -> PatVar x) args) body) ] )
+          | _ -> [ (Term.mk_var xi, mk_fun (List.map ~f:(fun x -> PatVar x) args) body) ])
       | None -> []
     in
     List.concat (List.map ~f soln)
@@ -150,7 +150,10 @@ let instantiate_with_solution (p : PMRS.t) (soln : (string * variable list * ter
   reduce_rules target_inst
 
 let is_identity (p : PMRS.t) =
-  let input_symb = Variable.mk ~t:(Some p.pinput_typ) "e" in
-  match reduce_pmrs p (mk_var input_symb) with
-  | { tkind = TVar x; _ } -> Variable.(x = input_symb)
+  match p.pinput_typ with
+  | [ it ] -> (
+      let input_symb = Variable.mk ~t:(Some it) "e" in
+      match reduce_pmrs p (mk_var input_symb) with
+      | { tkind = TVar x; _ } -> Variable.(x = input_symb)
+      | _ -> false)
   | _ -> false

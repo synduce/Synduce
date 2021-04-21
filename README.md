@@ -59,15 +59,15 @@ and dec l1 =
 ```
 Two of the three components of the synthesis problem are defined. Now, let us write the recursion skeleton that needs to be synthesized. The function `hsum: int clist -> int` with unknowns `s0`, `f0` and `odot` defines a list homomorphism:
 ```ocaml
-let rec hsum =
-    function
-    | CNil          -> s0
-    | Single(a)    -> f0 a
-    | Concat(x, y) -> odot (hsum x) (hsum y)
-    [@defining s0 f0 odot]
-    [@equiv sum clist_to_list ]
+let rec hsum = function
+  | CNil -> [%synt s0]
+  | Single a -> [%synt f0] a
+  | Concat (x, y) -> [%synt join] (hsum x) (hsum y)
+;;
+assert (hsum = clist_to_list @@ sum)
 ```
-The extension `[@defining s0 f0 odot]` indicate that the functions `s0`, `f0` and `odot` need to be synthesized. The extension `[@equiv sum clist_to_list@]` indicates that they should be synthesized such that the resulting implementation of `hsum` is equivalent to `sum` composed with `clist_to_list`.
+The functions to be synthesized are `[%synt s0]`, `[%synt f0]` and `[%synt join]`. The syntax extensions can be replaced by either simple functions or constants.
+The final assertions indicates that the tool should synthesize the expressions for `s0`, `f0` and `join` such that the function `hsum` is functionally equivalent to using `clist_to_list` and then `sum` (i.e. for any input `x` we have `hsum x = sum (clist_to_list x)`).
 
 Note that the representation function and the target recursion skeleton can be reused across a large set of examples. All the benchmarks in `benchmarks/list` use the same `repr` and `target`, modulo some changes in the base case when lists have a minimum size.
 Running `./atropos benchmarks/list/sum.ml` returns the solution in less than a second:
@@ -84,7 +84,7 @@ let rec hsum =
 
 ## Caml Syntax
 
-The interface using the Caml syntax is still in development. See the `.ml` files in the benchmarks folder.
+The interface using the Caml syntax is still in development. See the `.ml` files in the benchmarks folder. Specification are supported through syntax extensions: optional objects such as invariants are specified through attributes, and mandatory objects (functions to be synthesized) are written using `[%synt name-of-the-function]`.
 The PMRS syntax supports more input benchmarks.
 
 ## PMRS Syntax

@@ -33,8 +33,8 @@ let pp_equation (f : Formatter.t) ((orig, inv, lhs, rhs) : equation) =
 (*                        PROJECTION : OPTIMIZATION FOR TUPLES                                   *)
 (* ============================================================================================= *)
 
-let mk_projs (tin : RType.t) (tl : RType.t list) (xi : Variable.t) =
-  let f i t = Variable.mk ~t:(Some RType.(TFun (tin, t))) (xi.vname ^ Int.to_string i) in
+let mk_projs (targs : RType.t list) (tl : RType.t list) (xi : Variable.t) =
+  let f i t = Variable.mk ~t:(Some (RType.fun_typ_pack targs t)) (xi.vname ^ Int.to_string i) in
   List.mapi ~f tl
 
 let projection_eqns (lhs : term) (rhs : term) =
@@ -67,9 +67,13 @@ let proj_unknowns (unknowns : VarSet.t) =
   let unknowns_projs, new_unknowns =
     let f (l, vs) xi =
       match Variable.vtype_or_new xi with
-      | RType.TFun (tin, TTup tl) ->
-          let new_vs = mk_projs tin tl xi in
-          (l @ [ (xi, Some new_vs) ], Set.union vs (VarSet.of_list new_vs))
+      | RType.TFun _ -> (
+          let targs, tout = RType.fun_typ_unpack (Variable.vtype_or_new xi) in
+          match tout with
+          | TTup tl ->
+              let new_vs = mk_projs targs tl xi in
+              (l @ [ (xi, Some new_vs) ], Set.union vs (VarSet.of_list new_vs))
+          | _ -> (l @ [ (xi, None) ], Set.add vs xi))
       | _ -> (l @ [ (xi, None) ], Set.add vs xi)
     in
     List.fold ~f ~init:([], VarSet.empty) (Set.elements unknowns)
@@ -94,13 +98,13 @@ let proj_unknowns (unknowns : VarSet.t) =
 (* ============================================================================================= *)
 
 let check_equation ~(p : psi_def) ((_, pre, lhs, rhs) : equation) : bool =
-  ( match (Expand.nonreduced_terms_all p lhs, Expand.nonreduced_terms_all p rhs) with
+  (match (Expand.nonreduced_terms_all p lhs, Expand.nonreduced_terms_all p rhs) with
   | [], [] -> true
-  | _ -> false )
+  | _ -> false)
   &&
   match pre with
   | None -> true
-  | Some t -> ( match Expand.nonreduced_terms_all p t with [] -> true | _ -> false )
+  | Some t -> ( match Expand.nonreduced_terms_all p t with [] -> true | _ -> false)
 
 (**
    Compute the left hand side of an equation of p from term t.
@@ -126,7 +130,7 @@ let remap_rec_calls p t =
     | TApp ({ tkind = TVar x; _ }, args) ->
         if a && Variable.equal x g.pmain_symb then
           match args with [ arg ] -> First (compute_lhs p arg) | _ -> Second a
-        else if Set.mem g.pparams x then Second true
+        else if Set.mem g.psyntobjs x then Second true
         else Second a
     | _ -> Second a
   in
@@ -146,7 +150,7 @@ let compute_rhs_with_replacing p t =
             | hd :: _ ->
                 let hd' = remap_rec_calls p hd in
                 rstep := true;
-                Some hd' )
+                Some hd')
         (* Replace recursive calls to g by calls to f circ g,
            if recursive call appear under unknown. *)
         | _ -> None
@@ -317,7 +321,7 @@ let solve_syntactic_definitions (unknowns : VarSet.t) (eqns : equation list) =
           | Some argv ->
               let lam_args, lam_body = mk_lam lhs argv in
               Either.First (x, (lam_args, lam_body))
-          | None -> Either.Second (t, inv, lhs, rhs) )
+          | None -> Either.Second (t, inv, lhs, rhs))
       | _ -> Either.Second (t, inv, lhs, rhs)
     in
     List.partition_map ~f eqns
@@ -343,10 +347,9 @@ let solve_syntactic_definitions (unknowns : VarSet.t) (eqns : equation list) =
 
 let synthfuns_of_unknowns ?(bools = false) ?(eqns = []) ?(ops = OpSet.empty) (unknowns : VarSet.t) =
   let xi_formals (xi : variable) : sorted_var list * sygus_sort =
-    match Variable.vtype_or_new xi with
-    | RType.TFun (TTup targs, tres) -> (sorted_vars_of_types targs, sort_of_rtype tres)
-    | RType.TFun (targ, tres) -> (sorted_vars_of_types [ targ ], sort_of_rtype tres)
-    | t -> ([], sort_of_rtype t)
+    let tv = Variable.vtype_or_new xi in
+    let targs, tout = RType.fun_typ_unpack tv in
+    (sorted_vars_of_types targs, sort_of_rtype tout)
   in
   let f xi =
     let args, ret_sort = xi_formals xi in
@@ -505,10 +508,10 @@ let solve_stratified (unknowns : VarSet.t) (eqns : equation list) =
     | resp, None -> (resp, None)
 
 let solve ~(p : psi_def) (eqns : equation list) =
-  let unknowns = p.target.pparams in
+  let unknowns = p.target.psyntobjs in
   let soln_final =
     if !Config.detupling_on then
-      let new_unknowns, projections = proj_unknowns p.target.pparams in
+      let new_unknowns, projections = proj_unknowns p.target.psyntobjs in
       let new_eqns = proj_and_detuple_eqns projections eqns in
       match solve_stratified new_unknowns new_eqns with
       | resp, Some soln0 ->
@@ -519,7 +522,7 @@ let solve ~(p : psi_def) (eqns : equation list) =
       | resp, None -> (resp, None)
     else solve_stratified unknowns eqns
   in
-  ( match soln_final with
+  (match soln_final with
   | _, Some soln -> Utils.Log.debug_msg Fmt.(str "@[<hov 2>Solution found: @;%a" pp_soln soln)
-  | _ -> () );
+  | _ -> ());
   soln_final
