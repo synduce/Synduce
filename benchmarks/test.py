@@ -10,7 +10,45 @@ timeout = ("../timeout/timeout -t %i -m %i --no-info-on-success" %
            (timeout_value, memout_value))
 
 
-input_files = [
+reduced_benchmark_set = [
+    ["list/sumhom.pmrs", ""],
+    ["ptree/sum.pmrs", ""],
+    ["tree/sumtree.pmrs", ""],
+    ["tailopt/sum.pmrs", ""],
+    ["tailopt/mts.pmrs", ""],
+    ["tailopt/mps.pmrs", ""],
+    ["combine/mts.pmrs", ""],
+    ["combine/mts_and_mps.pmrs", ""],
+    ["zippers/sum.pmrs", ""],
+    ["zippers/height.pmrs", ""],
+    ["zippers/mips.pmrs", ""],
+    ["zippers/leftmostodd.pmrs", "-b 6"],
+    ["zippers/maxPathWeight.pmrs", ""],
+    ["ptree/mul.pmrs", ""],
+    ["tree/maxtree.pmrs", ""],
+    ["tree/min.pmrs", ""],
+    ["tree/minmax.pmrs", ""],
+    ["tree/maxtree2.pmrs", ""],
+    ["tree/poly.pmrs", ""],
+    ["list/sumodds.pmrs", ""],
+    ["list/prodhom.pmrs", ""],
+    ["list/polyhom.pmrs", ""],
+    ["list/hamming.pmrs", ""],
+    ["list/maxcount.pmrs", ""],
+    ["list/minhom.pmrs", ""],
+    ["list/mincount.pmrs", ""],
+    ["list/last.pmrs", ""],
+    ["list/sndminhom.pmrs", ""],
+    ["list/mtshom.pmrs", ""],
+    ["list/mpshom.pmrs", ""],
+    ["list/msshom.pmrs", ""],
+    ["list/search.pmrs", ""],
+    ["list/line_of_sight.pmrs", ""],
+    ["tree/sorted.pmrs", "-t"],
+    ["tree/mips.pmrs", ""],
+]
+
+benchmark_set = [
     ["list/sumhom.pmrs", ""],
     ["ptree/sum.pmrs", ""],
     ["tree/sumtree.pmrs", ""],
@@ -118,6 +156,15 @@ if __name__ == "__main__":
                 ["d", "--no-syndef --no-gropt"],
                 ["off", "-st --no-syndef --no-gropt"]
             ]
+    else:
+        print(
+            "Usage:python3 test.py TABLE_NO [USE_REDUCED_SET]\n\tRun the experiments to generate data for table TABLE_NO (1, 2, or 3).\n\tIf an additional argument is provided, only a reduced set of benchmarks is run.")
+        exit()
+
+    if len(sys.argv) > 2:
+        input_files = reduced_benchmark_set
+    else:
+        intput_files = benchmark_set
 
     for filename_with_opt in input_files:
         filename = filename_with_opt[0]
