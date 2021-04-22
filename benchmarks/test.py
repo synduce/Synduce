@@ -35,9 +35,7 @@ reduced_benchmark_set = [
     ["ptree/sum.pmrs", ""],
     ["tree/sumtree.pmrs", ""],
     ["tailopt/sum.pmrs", ""],
-    ["tailopt/mts.pmrs", ""],
     ["tailopt/mps.pmrs", ""],
-    ["combine/mts.pmrs", ""],
     ["combine/mts_and_mps.pmrs", ""],
     ["zippers/sum.pmrs", ""],
     ["zippers/height.pmrs", ""],
@@ -59,7 +57,6 @@ reduced_benchmark_set = [
     ["list/last.pmrs", ""],
     ["list/sndminhom.pmrs", ""],
     ["list/mtshom.pmrs", ""],
-    ["list/mpshom.pmrs", ""],
     ["list/msshom.pmrs", ""],
     ["list/search.pmrs", ""],
     ["list/line_of_sight.pmrs", ""],
@@ -147,6 +144,7 @@ if __name__ == "__main__":
                     ["ccegis", "--ccegis --no-gropt"]
             ]
             optims = [["all", ""]]
+
         elif table_no == 3:
             # Table 2 : compare Atropos, Baseline with optimizations on/off
             algos = [

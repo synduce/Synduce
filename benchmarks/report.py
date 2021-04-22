@@ -82,6 +82,7 @@ extra_benchmarks = [
 ]
 
 sp = " "
+dash = "-"
 kw_class = "... Class"
 kw_benchmark = "... Benchmark"
 kw_time = "time"
@@ -92,6 +93,18 @@ kw_toolname = "Atropos"
 kw_baseline = "Baseline"
 kw_acegis = "Symbolic CEGIS"
 kw_ccegis = "Concrete CEGIS"
+kw_path = "Path"
+
+
+def explain():
+    print("Benchmarks are stored in the benchmarks/ folder.")
+    print(f"{kw_class: <20s} | {kw_benchmark : <25s} | {kw_path : <30s}")
+    for cat_folder, cat_benchmarks in show_benchmarks:
+        print(f"{dash:-<80s}-")
+        for bench_file, attributes in cat_benchmarks:
+            bench_path = "benchmarks/" + cat_folder + "/" + bench_file + ".pmrs"
+            print(
+                f" {attributes[0]: <19s} | {attributes[1]: <25s} | {bench_path : <30s}")
 
 
 def all_timeout(l):
@@ -568,12 +581,14 @@ if __name__ == "__main__":
 
     if len(sys.argv) < 4:
         print(
-            "Usage: python3 report.py INPUT_FILE OUTPUT_CSV TABLE# [TEX_OUTPUT]\n\n\
-                    INPUT_FILE   the input file produce by running test.py\n\
-                    OUTPUT_FILE  the csv to store temporary results\n\
-                    TABLE#       1-3 to produce Table 1, 2 or 3.\n\
-                    TEX_OUTPUT   If 0 < TABLE# <= 3, provide .tex output file.\n\
-            ")
+            "Usage: python3 report.py LOG_FILE OUTPUT_CSV TABLE# [TXT_OUTPUT]\n\
+Use this script to generate the tables from the experiment log in LOG_FILE.\n\
+            LOG_FILE     the input file produce by running test.py\n\
+            OUTPUT_CSV   a csv to store temporary results\n\
+            TABLE#       1-3 to produce Table 1, 2 or 3.\n\
+            TXT_OUTPUT   If 0 < TABLE# <= 3, provide .txt output file for the table.\n\
+This is where the benchmark input files are stored:")
+        explain()
         exit()
 
     input_file = sys.argv[1]
@@ -588,6 +603,10 @@ if __name__ == "__main__":
     thedict = raw_to_csv(input_file)
 
     csv_table(thedict, output_file)
+
+    if table_no == 0:
+        explain()
+        exit()
 
     if table_no == 1:
         tex_out = sys.argv[4]
