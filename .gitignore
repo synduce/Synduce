@@ -5,3 +5,5 @@ _build
 Example
 *.log
 *.tex
+tests/*.txt
+benchmarks/*.csv
