@@ -3,9 +3,11 @@ import os
 import sys
 
 # Timeout is 10min for all experiments.
-timeout_value = 600  # 10min timeout
+timeout_value = 360  # 6min timeout for the review
 # Maximum 4gb memory - this should not be limiting!
 memout_value = 8000 * (2 ** 10)  # 4GB memory limit
+
+
 timeout = ("../timeout/timeout -t %i -m %i --no-info-on-success" %
            (timeout_value, memout_value))
 
@@ -36,26 +38,21 @@ reduced_benchmark_set = [
     ["tree/sumtree.pmrs", ""],
     ["tailopt/sum.pmrs", ""],
     ["tailopt/mps.pmrs", ""],
-    ["combine/mts_and_mps.pmrs", ""],
     ["zippers/sum.pmrs", ""],
     ["zippers/height.pmrs", ""],
     ["zippers/mips.pmrs", ""],
     ["zippers/leftmostodd.pmrs", "-b 6"],
-    ["zippers/maxPathWeight.pmrs", ""],
     ["ptree/mul.pmrs", ""],
     ["tree/maxtree.pmrs", ""],
     ["tree/min.pmrs", ""],
     ["tree/minmax.pmrs", ""],
-    ["tree/maxtree2.pmrs", ""],
     ["tree/poly.pmrs", ""],
     ["list/sumevens.pmrs", ""],
     ["list/prodhom.pmrs", ""],
     ["list/polyhom.pmrs", ""],
-    ["list/hamming.pmrs", ""],
     ["list/maxcount.pmrs", ""],
     ["list/minhom.pmrs", ""],
     ["list/last.pmrs", ""],
-    ["list/sndminhom.pmrs", ""],
     ["list/mtshom.pmrs", ""],
     ["list/msshom.pmrs", ""],
     ["list/search.pmrs", ""],
@@ -65,7 +62,6 @@ reduced_benchmark_set = [
 ]
 
 benchmark_set = [
-    ["list/sumhom.pmrs", ""],
     ["ptree/sum.pmrs", ""],
     ["tree/sumtree.pmrs", ""],
     ["tailopt/sum.pmrs", ""],
@@ -90,19 +86,14 @@ benchmark_set = [
     ["tree/poly.pmrs", ""],
     ["tree/maxPathWeight.pmrs", ""],
     ["list/sumhom.pmrs", ""],
-    ["list/sumodds.pmrs", ""],
-    ["list/sumgt.pmrs", ""],
     ["list/sumevens.pmrs", ""],
     ["list/lenhom.pmrs", ""],
     ["list/prodhom.pmrs", ""],
     ["list/polyhom.pmrs", ""],
     ["list/hamming.pmrs", ""],
-    ["list/maxhom.pmrs", ""],
     ["list/maxcount.pmrs", ""],
     ["list/minhom.pmrs", ""],
-    ["list/mincount.pmrs", ""],
     ["list/last.pmrs", ""],
-    ["list/sndminhom.pmrs", ""],
     ["list/mtshom.pmrs", ""],
     ["list/mpshom.pmrs", ""],
     ["list/msshom.pmrs", ""],
@@ -118,6 +109,11 @@ benchmark_set = [
     ["list_to_tree/search_v2.pmrs", ""],
     ["list_to_tree/search_v3.pmrs", ""],
     ["list_to_tree/mls.pmrs", ""]
+    # ["list/maxhom.pmrs", ""],
+    # ["list/sumodds.pmrs", ""],
+    # ["list/sumgt.pmrs", ""],
+    # ["list/sndminhom.pmrs", ""],
+    #  ["list/mincount.pmrs", ""],
 ]
 
 root = os.getcwd()

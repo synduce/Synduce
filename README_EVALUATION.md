@@ -1,27 +1,35 @@
 # Kick-the-tires phase
 
-The reviewers can make sure that the artifact runs properly by running a few scripts and testing the tool on
-a simple benchmark.
+The reviewers can make sure that the artifact runs properly by running a few scripts and testing the
+tool on a simple benchmark. The source code and the tool is located in the `atropos` folder, and all
+scripts should be run from that folder. All the scripts generate data in the `review_data` folder,
+which you can delete at any point to clean up the experimental data you generated.
 
-## Running the script
-The script `kick_the_tires.sh` runs a subset of the benchmarks presented in the paper, and produces a text
-version of Table 1.
-- Producing the experimental data should take no more than a minute.
-- The script should then report a summary of the experiments: you should see that 17 benchmarks have been run successfully (Atropos and the baseline have not timed out).
-- A text version of Table 1 is printed. Missing data for the other benchmarks is indicated by a question mark "?". You should see the 17 benchmarks for which this first phase collects data, among the 43 benchmarks. The synthesis times reported should be less than a second.
+## Preliminary results
+
+The script `kick_the_tires.sh` runs a subset of the benchmarks presented in the paper, and produces
+a text version of Table 1. Running `./kick_the_tires.sh` should take no more than a minute.
+- The script first generates experimental data for 17 of the 43 benchmarks of the paper.
+- Then it reports a summary of the experiments: you observe see that the 17 benchmarks have been run
+  successfully (Atropos and the baseline have not timed out).
+- A text version of Table 1 is printed. The missing data for the other benchmarks is indicated by a
+  question mark "?" where relevant. You should see the 17 benchmarks for which this first phase
+  collects data, among the 43 benchmarks. The synthesis times reported should be less than a second.
 
 ## Testing the tool
 
-You can try running the tool on one of the benchmarks, for example the `sum` example in the list parallelization category:
+You can try running the tool on one of the benchmarks, for example the `sum` example in the list
+parallelization category:
 ```
 ./atropos benchmarks/list/sumhom.pmrs
 ```
 The tool first prints out a summary of the problem it needs to solve: the reference function `spec`,
 the target recursion skeleton `target` and the representation function `repr`. It then starts
 solving the problem by synthesizing functions for the unknown components of the recursion skeleton,
-in this case `odot`, `f_0` and `s_0`.
-The last message printed should be the solution, and in how much time it was found.
-The reviewer should expect a message of the form:
+in this case `odot`, `f_0` and `s_0`. A more detailed description of how to use the tool is given
+later and in the `README.md` file of the tool.
+The tool runs correctly if the last message printed shows the solution, and in how much time it was
+found. The reviewer should expect a message of the form:
 ```
  INFO : Solution found in 0.0777s (96.1% verifying):
 target⟨odot, f_0, s_0⟩(): int clist -> int =
@@ -33,45 +41,73 @@ target⟨odot, f_0, s_0⟩(): int clist -> int =
 
   }
 ```
-The unknowns in the recursion skeleton have been substituted for their implementation.
 
 # Evaluating Atropos
 
-The main claim of the paper is that Atropos successfully synthesized solutions for a wide range of benchmarks, with a significant improvement over a baseline method that is itself implemented in the tool. This claim is backed by the results presented in Table 1. The Appendix also contains additional experimental results in Table 2 and 3. The reviewer may want to reproduce the results presented by running the tools on the benchmarks. Naturally, we expect the results of reproducing the experiments in a virtual machine and on a different computer to be different from the ones presented in the paper. However, Atropos should still perform better than the baseline in general. We also expect that the tool should not time out on the set of benchmarks used in the paper.
+The main claim of the paper is that Atropos successfully synthesizes solutions for a wide range of
+benchmarks, with a significant improvement over a baseline method that is itself implemented in the
+tool. This claim is backed by the results presented in Table 1. The Appendix also contains
+additional experimental results in Tables 2 and 3. The reviewer may want to reproduce the results
+presented by running the tools on the benchmarks. Naturally, we expect the results of reproducing
+the experiments in a virtual machine and on a different computer to be different from the ones
+presented in the paper. However, Atropos should still perform better than the baseline in general.
+We also expect that the tool should not time out on the set of benchmarks used in the paper.
+
+We have set the timeout to 6 mins for the review (as opposed to 10min in the paper) to allow the
+reviewer to run more benchmarks. This parameter can be changed in the `benchmaarks/test.py` file.
 
 ## Experimental Results
 
-The following instructions explain how to run the experiments to reproduce the results presented in Tables 1, 2 and 3 of the paper.
+The following instructions explain how to run the experiments to reproduce the results presented in
+Tables 1, 2 and 3 of the paper.
 
 ### Reproducing the results of Table 1
 
-To reproduce the results of Table 1, we provide a script that will run the necessary experiments and produce a textual version of Table 1 (the same as the table produced in the kick-the-tires phase).
+To reproduce the results of Table 1, we provide a script that will run the necessary experiments and
+produce a textual version of Table 1 (the same as the table produced in the kick-the-tires phase).
 
-Executing `./table1.sh` runs the tool and the baseline algorithm on each benchmark once. The log is stored in `review_data/log.txt` and running the script more than once will append more data to the log. If the script is run several times without deleting the log file, the table contains information that is average over all the runs.
+Executing `./table1.sh` runs the tool and the baseline algorithm on each benchmark once. The log is
+stored in `review_data/log.txt` and running the script more than once will append more data to the
+log. If the script is run several times without deleting the log file, the table contains
+information that is averaged over all the runs. Running the script should take an hour.
 
 The text version of Table 1 is stored in `review_data/table1.txt`.
 
 ### Reproducing the results of Table 2 and 3
 
-Given the limited time given to the reviewers to reproduce the results in our paper, we selected a subset of benchmarks on which the experiments can be run to reproduce the results of Tables 2 and 3 at least partially.
-To do so, run `./table2_partial.sh` and `./table3_partial.sh`. The experimental data is appended to `review_data/log.txt` and the script then generates the tables in `review_data/table2.txt` and `review_data/table3.txt`.
-Running either of those scripts will take several hours.
+Given the limited time given to the reviewers to reproduce the results in our paper, we selected a
+subset of benchmarks on which the experiments can be run to reproduce partially the results of
+Tables 2 and 3. Note that these tables are part of the Appendix.
 
-If the reviewers want to spend more time generating their own experimental data, they can use the `./table2_full.sh` and `./table3_full.sh` scripts. Running the full scripts will take more than a day.
+The reviewer can run `./table2_partial.sh` (and `./table3_partial.sh`). The experimental data is
+appended to `review_data/log.txt` and the script then generates the tables in
+`review_data/table2.txt` (resp. `review_data/table3.txt`). Running either of those scripts will take
+an hour.
+
+If the reviewers want to spend more time generating their own experimental data, they can use the
+`./table2_full.sh` and `./table3_full.sh` scripts. Running the full scripts will take more than a
+day.
 
 ### Results from our experimental data
 
-We included a sample of our experimental data in `benchmarks_log_cav21.txt`. The reviewers can generate the tables using this data by calling the `benchmarks/report.py` script as follows:
+We included a sample of our experimental data in `benchmarks_log_cav21.txt`. The reviewers can
+generate the tables using this data by calling the `benchmarks/report.py` script as follows:
 ```
 ./benchmarks/report.py benchmarks/benchmarks_log_cav21.txt review_data/tmp.csv TABLE_NO review_data/table.txt
 ```
-The script will generate Table `TABLE_NO` (= 1, 2 or 3) in the `review_data/table.txt` file, storing temporary results in `review_data/tmp.csv`. The reviewers should observe the same results as the ones reported in the paper, with possibly a few differences as we collected more data for some benchmarks.
-One difference is that the *mts* benchmarks of the *Enforcing tail recursion* category has been corrected, and Atropos synthesizes a solution even without the optimization (the numbers in Table 3 will differ). This has been signaled during the rebuttal period.
+The script will generate Table `TABLE_NO` (= 1, 2 or 3) in the `review_data/table.txt` file, storing
+temporary results in `review_data/tmp.csv`. The reviewers should observe the same results as the
+ones reported in the paper, with possibly a few differences as we collected more data for some
+benchmarks. One difference is that the *mts* benchmark of the *Enforcing tail recursion* category
+has been corrected, and Atropos synthesizes a solution even without the optimizations on (the
+numbers in Table 3 will differ). This has been signaled during the rebuttal period.
 
 
 ## Using the tool on the benchmarks
 
-The tool provides a help message if called with the `h` option:
+The folder containing the tool contains a README file explaining how to use the tool. The tool also
+provides a help message if called with the `h` option:
+
 ```
 ./atropos -h
 Usage : atropos [options] input_file
@@ -99,27 +135,33 @@ Options:
 -> Try:
 ./atropos benchmarks/list/mps.ml
 ```
-The reviewers may be interested in running the tool with the `--acegis` option to run the baseline algorithm, the symbolic CEGIS. The `--ccegis` flag runs the concrete CEGIS algorithm that is discussed in Table 2.
+The reviewers may be interested in running the tool with the `--acegis` option to run the baseline
+algorithm, the symbolic CEGIS. The `--ccegis` flag runs the concrete CEGIS algorithm that is
+discussed in Table 2.
 
-The flags that need to be used to turn the optimizations discussed for Table 3 are also explained in the help message.
+The flags that need to be used to turn the optimizations discussed for Table 3 are also explained in
+the help message.
 
-Note that in the version submitted for review, grammar optimizations are off by default and the `--no-gropt` flag has no effect.
-
-Finally, the reviewer can read the README.md file provided with the tool to write their own benchmark in the with the .pmrs extension (a special syntax to write pattern matching recursion schemes) or in the form of Ocaml programs (with the .ml extension).
+Note that in the version submitted for review, grammar optimizations are off by default and the
+`--no-gropt` flag has no effect. The `--no-simplify` option is also irrelevant.
 
 ### Location of individual benchmarks
 
-The benchmarks are stored in the `benchmarks` folder, each subfolder containing a category of benchmarks.
-Running `./benchmarks/report.py` will print a table that indicates where the file for each benchmark given in Table 1 is stored (after a usage message for the script, which is used to generate the tables).
-
+The benchmarks are stored in the `benchmarks` folder, each subfolder containing a category of
+benchmarks. Running `./benchmarks/report.py` will print a table that indicates where the file for
+each benchmark given in Table 1 is stored (after a usage message for the script, which is used to
+generate the tables).
 
 ### Running the tool on a benchmark
 
-For example, we can run the tool on the `mips` example used in Section 1 (the input file is `benchmarks/tree/mips.pmrs`).
-To do so, run `./atropos benchmarks/tree/mips.ml`. Synthesis should take less than a second.
-In the following, we detail the output produced by the tool.
+For example, the reviewer can run the tool on the `mips` example used in Section 1 (the input file
+is `benchmarks/tree/mips.pmrs`). To do so, run `./atropos benchmarks/tree/mips.ml`. Synthesis should
+take less than a second. In the following, we detail the output produced by the tool.
 
-The first message is a confirmation of the synthesis problem the tool is trying to solve: it must find the implementation of `join1` and `s0` such that for any tree of integers `x`, the reference function `spec` composed with the representation function `repr` is equivalent to the recursion skeleton `target`:
+The first message is a confirmation of the synthesis problem the tool is trying to solve: it must
+find the implementation of `join1` and `s0` such that for any tree of integers `x`, the reference
+function `spec` composed with the representation function `repr` is equivalent to the recursion
+skeleton `target`:
 ```
  INFO :  Ψ (join1, s0) := ∀ x : int tree. (spec o repr)(x) = target(x)
 ```
@@ -141,9 +183,12 @@ The tool then prints the definition of the different components given in the inp
       }
  INFO : repr(x) = x
  ```
- In this case, the representation function is identity. The two other functions are pattern matching recursion schemes. For more information on the input format(s), see the `README.md` file provided with the tool.
+ In this case, the representation function is identity. The two other functions are pattern matching
+ recursion schemes. For more information on the input format(s), see the `README.md` file provided
+ with the tool.
 
- The tool then starts the refinement loop. In this case, it succeeds in 2 steps and finds a solution.
+ The tool then starts the refinement loop. In this case, it succeeds in 2 steps and finds a
+ solution.
  ```
  INFO : Refinement step 1.
  INFO : Checking solution...
@@ -161,5 +206,7 @@ target⟨join1, s0⟩(): int tree -> (int * int) =
 
   }
 ```
-The solution is the input recursion skeleton `target` where the unknowns `join1` and `s0` have been replaced by their definition. We use the notation `s[0]` to access the first element of the tuple `s` in the output format.
+The solution is the input recursion skeleton `target` where the unknowns `join1` and `s0` have been
+replaced by their definition. We use the notation `s[0]` to access the first element of the tuple
+`s` in the output format.
 

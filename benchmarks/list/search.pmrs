@@ -2,7 +2,11 @@ type 'a clist = CNil | Single of 'a | Concat of 'a clist * 'a clist
 
 type 'a list = Nil | Cons of 'a * 'a list
 
-(* Pmrs is parametric on some input x *)
+(*
+    This pmrs has a non-recursible input argument x, which in this
+    case reprsents the integer the function is searching for.
+    The type of the spec function is int -> int list -> bool
+*)
 pmrs spec x =
     main l -> f l
     | f Nil -> false

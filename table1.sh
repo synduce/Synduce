@@ -1,6 +1,6 @@
 #!/bin/sh
 LOG_FILE="review_data/log.txt"
-CSV_FILE="review_data/table1.csv"
+CSV_FILE="review_data/tmp.csv"
 TABLE1="review_data/table1.txt"
 
 mkdir -p "review_data"
