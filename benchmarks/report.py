@@ -166,11 +166,14 @@ def bold(s):
 def format_verif(f):
     if f == "?":
         return "?"
-    f = float(f)
-    if f < 0.009:
-        return "0."
-    else:
-        return "%3.1f" % f
+    try:
+        f = float(f)
+        if f < 0.009:
+            return "0."
+        else:
+            return "%3.1f" % f
+    except:
+        return "-"
 
 
 def incr_avg(old_val, new_count, new_val):

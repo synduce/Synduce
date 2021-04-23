@@ -5,7 +5,8 @@ type 'a list = Elt of 'a | Cons of 'a * 'a list
 
 pmrs spec l =
     lmin Elt(a) -> (a, 1)
-    | lmin Cons(hd,tl) -> let amin, acnt = lmin tl in (min amin hd, (hd < amin ? 1 : acnt))
+    | lmin Cons(hd,tl) -> let amin, acnt = lmin tl in
+        (min amin hd, (hd < amin ? 1 : acnt + (hd = amin ? 1 : 0)))
 
 pmrs (odot,f_0,s_0) target t =
     h Single(a)    -> f_0 a

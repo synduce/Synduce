@@ -5,11 +5,11 @@ type 'a list = Nil | Cons of 'a * 'a list
 let rec mts = function
   | Nil -> (0, 0)
   | Cons (hd, tl) ->
-      let _mts, _sum = mts tl in
-      let new_sum = _sum + hd in
-      (max _mts new_sum, new_sum)
+      let amts, asum = mts tl in
+      let new_sum = asum + hd in
+      (max amts new_sum, new_sum)
   (* the mts is always positive *)
-  [@@ensures fun (x, y) -> x >= 0]
+  [@@ensures fun (x, y) -> x >= 0 && x >= y]
 
 let rec clist_to_list = function
   | CNil -> Nil
