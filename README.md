@@ -8,6 +8,14 @@ Once all the dependencies are installed, call ```make``` from the root of the pr
 
 You will need [**Z3**](https://github.com/Z3Prover/z3) and [**CVC4**](https://cvc4.github.io) installed on your system. *Atropos* detects where your binaries are using `which z3` and `which cvc4`.
 
+> The script `setup.sh` installs all the dependencies and packages from a fresh Ubuntu installation.
+
+# Folder structure
+
+- `./bin/` contains all the sources for the executable,
+- `./src/` contains all the sources for the libraries. The `lang` folder is where you will find most of the language definitions and `algo` the algorithmic components.
+- `./benchmarks/` contains benchmarks and sample inputs. `parse_examples/parsing.pmrs` is an example of the input syntax for the PMRS with recursive type definitions. The syntax is similar to Caml, except for the recursion scheme declarations. Call `./benchmarks/report.py` to see a list of benchmarks. The `./benchmarks/unrealizable` folder contains examples on which the tool either fails or runs forever because no solution exists.
+
 
 ### Basic Usage
 `./atropos -h` should get you started.
@@ -19,7 +27,7 @@ and the recursion skeleton. If the input type of the reference function is `tau`
 of the recursion skeleton is `theta`, the representation function must be a function from `theta` to
 `tau`.
 
-The tool accepts inputs defined two syntaxes: a syntax specific for pattern-matching recursion scheme (PRMS) and (files with `.pmrs` extension) or an OCaml file (`.ml` extension). The PMRS syntax is more feature complete, but we are actively working on the ML syntax.
+The tool accepts inputs defined in two different formats: using a syntax specific for pattern-matching recursion scheme (PRMS) (files with `.pmrs` extension) or an OCaml file (`.ml` extension). The PMRS syntax is more feature complete, but we are actively working on the ML syntax.
 
 ## PMRS syntax
 
@@ -93,11 +101,4 @@ let rec hsum = function
         | Single(a) -> a
         | Concat(x, y) -> (hsum x) + (hsum y)
 ```
-
-
-# Folder structure
-
-- `./bin/` contains all the sources for the executable,
-- `./src/` contains all the sources for the libraries. The `lang` folder is where you will find most of the language definitions and `algo` the algorithmic components.
-- `./benchmarks/` contains benchmarks and sample inputs. `parse_examples/parsing.pmrs` is an example of the input syntax for the PMRS with recursive type definitions. The syntax is similar to Caml, except for the recursion scheme declarations.
 

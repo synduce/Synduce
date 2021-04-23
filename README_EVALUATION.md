@@ -53,7 +53,7 @@ the experiments in a virtual machine and on a different computer to be different
 presented in the paper. However, Atropos should still perform better than the baseline in general.
 We also expect that the tool should not time out on the set of benchmarks used in the paper.
 
-We have set the timeout to 6 mins for the review (as opposed to 10min in the paper) to allow the
+We have set the timeout to 4 mins for the review (as opposed to 10min in the paper) to allow the
 reviewer to run more benchmarks. This parameter can be changed in the `benchmaarks/test.py` file.
 
 ## Experimental Results
@@ -69,7 +69,8 @@ produce a textual version of Table 1 (the same as the table produced in the kick
 Executing `./table1.sh` runs the tool and the baseline algorithm on each benchmark once. The log is
 stored in `review_data/log.txt` and running the script more than once will append more data to the
 log. If the script is run several times without deleting the log file, the table contains
-information that is averaged over all the runs. Running the script should take an hour.
+information that is averaged over all the runs. Running the script should take a little more than
+an hour.
 
 The text version of Table 1 is stored in `review_data/table1.txt`.
 
@@ -105,9 +106,10 @@ numbers in Table 3 will differ). This has been signaled during the rebuttal peri
 
 ## Using the tool on the benchmarks
 
-The folder containing the tool contains a README file explaining how to use the tool. The tool also
-provides a help message if called with the `h` option:
+The folder containing the tool contains a `README.md` file explaining how to use the tool. In this
+file, we give an overview and some information specific to this review.
 
+The tool prints a help message if called with the `h` option, e.g.:
 ```
 ./atropos -h
 Usage : atropos [options] input_file
@@ -136,11 +138,12 @@ Options:
 ./atropos benchmarks/list/mps.ml
 ```
 The reviewers may be interested in running the tool with the `--acegis` option to run the baseline
-algorithm, the symbolic CEGIS. The `--ccegis` flag runs the concrete CEGIS algorithm that is
+algorithm (symbolic CEGIS). The `--ccegis` flag runs the concrete CEGIS algorithm that is
 discussed in Table 2.
 
 The flags that need to be used to turn the optimizations discussed for Table 3 are also explained in
-the help message.
+the help message(`-s` and `-t` are used together to turn off detupling and splitting systems of
+equations into subsystems).
 
 Note that in the version submitted for review, grammar optimizations are off by default and the
 `--no-gropt` flag has no effect. The `--no-simplify` option is also irrelevant.
