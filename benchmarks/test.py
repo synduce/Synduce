@@ -2,7 +2,7 @@
 import os
 import sys
 
-# Timeout is 10min for all experiments.
+# Timeout for all experiments.
 timeout_value = 240  # 4min timeout for the review
 # Maximum 4gb memory - this should not be limiting!
 memout_value = 8000 * (2 ** 10)  # 4GB memory limit
@@ -49,7 +49,6 @@ reduced_benchmark_set_table2 = [
     ["list/polyhom.pmrs", ""],
     ["list/minhom.pmrs", ""],
     ["list/last.pmrs", ""],
-    ["list/mtshom.pmrs", ""],
     ["list/msshom.pmrs", ""],
     ["tree/sorted.pmrs", "-t"],
     ["tree/mips.pmrs", ""],
@@ -66,14 +65,10 @@ reduced_benchmark_set_table3 = [
     ["ptree/mul.pmrs", ""],
     ["tree/maxtree.pmrs", ""],
     ["tree/min.pmrs", ""],
-    ["list/sumevens.pmrs", ""],
     ["list/polyhom.pmrs", ""],
     ["list/minhom.pmrs", ""],
-    ["list/last.pmrs", ""],
     ["list/mtshom.pmrs", ""],
-    #["list/msshom.pmrs", ""],
-    ["tree/sorted.pmrs", "-t"],
-    #["tree/mips.pmrs", ""],
+    ["tree/mips.pmrs", ""],
 ]
 
 benchmark_set = [

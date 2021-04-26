@@ -13,13 +13,11 @@ Once all the dependencies are installed, call ```make``` from the root of the pr
 
 
 
-
 # Folder structure
 
 - `./bin/` contains all the sources for the executable,
 - `./src/` contains all the sources for the libraries. The `lang` folder is where you will find most of the language definitions and `algo` the algorithmic components.
 - `./benchmarks/` contains benchmarks and sample inputs. `parse_examples/parsing.pmrs` is an example of the input syntax for the PMRS with recursive type definitions. The syntax is similar to Caml, except for the recursion scheme declarations. Call `./benchmarks/report.py` to see a list of benchmarks. The `./benchmarks/unrealizable` folder contains examples on which the tool either fails or runs forever because no solution exists.
-
 
 ### Basic Usage
 `./atropos -h` should get you started.

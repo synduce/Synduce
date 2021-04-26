@@ -1,5 +1,8 @@
 (* In the PMRS syntax, comments have the same syntax as OCaml comments. *)
 // Line comments can also be written like this.
+(* You can compare this file to the mps.ml file, which specifies
+    the same problem.
+ *)
 
 (*
     Type declarations have the same syntax as in Ocaml.

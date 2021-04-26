@@ -1,9 +1,13 @@
 # Kick-the-tires phase
 
 The reviewers can make sure that the artifact runs properly by running a few scripts and testing the
-tool on a simple benchmark. The source code and the tool is located in the `atropos` folder, and all
-scripts should be run from that folder. All the scripts generate data in the `review_data` folder,
-which you can delete at any point to clean up the experimental data you generated.
+tool on a simple benchmark.
+This README is focused on explaining which script can be run to reproduce the result in the paper.
+For more information on how to build the tool from source, and how to use the tool, more information
+can be found in `atropos/README.md`.
+The source code and the tool is located in the `atropos` folder, and all scripts should be run from
+that folder. All the scripts generate data in the `atropos/review_data` folder, which you can delete
+at any point to clean up the experimental data you generated.
 
 ## Preliminary results
 
@@ -53,7 +57,7 @@ the experiments in a virtual machine and on a different computer to be different
 presented in the paper. However, Atropos should still perform better than the baseline in general.
 We also expect that the tool should not time out on the set of benchmarks used in the paper.
 
-We have set the timeout to 4 mins for the review (as opposed to 10min in the paper) to allow the
+We have set the timeout to 4min for the review (instead of 10min in the paper) to allow the
 reviewer to run more benchmarks. This parameter can be changed in the `benchmaarks/test.py` file.
 
 ## Experimental Results
@@ -69,8 +73,8 @@ produce a textual version of Table 1 (the same as the table produced in the kick
 Executing `./table1.sh` runs the tool and the baseline algorithm on each benchmark once. The log is
 stored in `review_data/log.txt` and running the script more than once will append more data to the
 log. If the script is run several times without deleting the log file, the table contains
-information that is averaged over all the runs. Running the script should take a little more than
-an hour.
+information that is averaged over all the runs. Running the script should take 1 and 2 hours
+(approx. 75min on the laptop used for evaluation in the paper).
 
 The text version of Table 1 is stored in `review_data/table1.txt`.
 
@@ -83,7 +87,7 @@ Tables 2 and 3. Note that these tables are part of the Appendix.
 The reviewer can run `./table2_partial.sh` (and `./table3_partial.sh`). The experimental data is
 appended to `review_data/log.txt` and the script then generates the tables in
 `review_data/table2.txt` (resp. `review_data/table3.txt`). Running either of those scripts will take
-an hour.
+about an hour.
 
 If the reviewers want to spend more time generating their own experimental data, they can use the
 `./table2_full.sh` and `./table3_full.sh` scripts. Running the full scripts will take more than a
