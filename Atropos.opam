@@ -6,24 +6,22 @@ description:
   "Executable and libraries for automatic synthesis of recursive functions."
 maintainer: ["victorn@cs.toronto.edu"]
 authors: ["Victor Nicolet"]
-homepage: ["https://github.com/victornicolet/atropos"]
-bug-reports: [ "https://github.com/victornicolet/atropos/issues" ]
 license: "MIT"
+homepage: "https://github.com/victornicolet/atropos"
 depends: [
-  "dune" {>= "2.8"}
+  "dune" {>= "2.6"}
   "base" {>= "v0.14.0"}
-  "core" {>= "v0.14.1" }
   "fmt" {>= "0.8.8"}
   "getopt" {>= "20120615"}
   "menhir" {>= "20200624"}
   "parsexp" {>= "v0.14.0"}
   "ppx_let" {>= "v0.14.0"}
-  "ppx_sexp_conv" { "v0.14.0"}
   "stdio" {>= "v0.14.0"}
+  "ppx_sexp_conv" {>= "v0.14.0"}
+  "fileutils" {>= "0.6.3"}
+  "extlib" {>= "1.7.7"}
+  "lwt" {>= "5.4.0"}
   "sexplib" {>= "v0.14.0"}
-  "fileutils" {>= "0.6.3" }
-  "extlib" {>= "1.7.7" }
-  "lwt" {>= "5.4.0" }
 ]
 build: [
   ["dune" "subst"] {pinned}
