@@ -1,5 +1,4 @@
 (library
  (name algo)
  (public_name Atropos.Lib.Algo)
- (libraries base fmt unix sexplib ppx_let utils lang)
- (preprocess (pps ppx_let ppx_sexp_conv)))
+ (libraries base fmt utils lang))

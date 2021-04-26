@@ -1,5 +1,4 @@
 open Base
-open Sexplib
 open Sexp
 open Option.Let_syntax
 module OC = Stdio.Out_channel
@@ -141,7 +140,7 @@ let info_flag_of_sexp (sexp : t) : info_flag =
 let sexp_of_numeral (n : numeral) : Sexp.t = Sexp.Atom Fmt.(str "%i" n)
 
 let numeral_of_sexp (sexp : Sexp.t) : numeral option =
-  match sexp with Atom s -> ( try Some (Int.of_string s) with _ -> None ) | _ -> None
+  match sexp with Atom s -> ( try Some (Int.of_string s) with _ -> None) | _ -> None
 
 let sexp_of_smtSpecConstant (sc : smtSpecConstant) : t =
   match sc with
@@ -169,7 +168,7 @@ let smtSpecConstant_of_sexp (sexp : t) : smtSpecConstant option =
         Some (SCString (String.drop_prefix (String.drop_prefix s 1) 1))
       else
         try Some (SCNumeral (Int.of_string s))
-        with _ -> failwith Fmt.(str " %s : decimal not supported." s) )
+        with _ -> failwith Fmt.(str " %s : decimal not supported." s))
   | _ -> None
 
 let sexp_of_smtSymbol (s : smtSymbol) : t =
@@ -229,7 +228,7 @@ let rec smtSort_of_sexp (s : t) : smtSort option =
           let%bind id = smtIdentifier_of_sexp hd in
           let%bind args = Option.all (List.map ~f:smtSort_of_sexp tl) in
           Some (Comp (id, args))
-      | _ -> None )
+      | _ -> None)
 
 let sexp_of_smtAttribute (attr : smtAttribute) : t =
   match attr with
@@ -288,7 +287,8 @@ let rec sexp_of_smtTerm (t : smtTerm) : t =
   match t with
   | SmtTSpecConst sc -> sexp_of_smtSpecConstant sc
   | SmtTQualdId qi -> sexp_of_smtQualIdentifier qi
-  | SmtTApp (func, args) -> List (sexp_of_smtQualIdentifier func :: List.map ~f:sexp_of_smtTerm args)
+  | SmtTApp (func, args) ->
+      List (sexp_of_smtQualIdentifier func :: List.map ~f:sexp_of_smtTerm args)
   | SmtTLet (bindings, t') ->
       List [ Atom "let"; List (List.map ~f:sexp_of_binding bindings); sexp_of_smtTerm t' ]
   | SmtTForall (quants, t') ->
@@ -338,7 +338,7 @@ let rec smtTerm_of_sexp (s : t) : smtTerm option =
                   let%bind func' = smtQualIdentifier_of_sexp func in
                   let%map args' = Option.all (List.map ~f:smtTerm_of_sexp args) in
                   SmtTApp (func', args')
-              | _ -> None ) ) )
+              | _ -> None)))
 
 and match_case_of_sexp (s : t) : match_case option =
   match s with

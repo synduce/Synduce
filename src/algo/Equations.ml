@@ -477,7 +477,7 @@ let split_solve partial_soln (unknowns : VarSet.t) (eqns : equation list) =
       in
       match eqn_u with
       | [] ->
-          Log.debug_msg Fmt.(str "Solve for %s independently." xi.vname);
+          Log.debug_msg Fmt.(str "Synthesize %s independently." xi.vname);
           (l @ [ (VarSet.singleton xi, eqn_only_u) ], u, rest)
       | _ -> (l, Set.add u xi, e)
     in
