@@ -87,21 +87,21 @@ Tables 2 and 3. Note that these tables are part of the Appendix.
 The reviewer can run `./table2_partial.sh` (and `./table3_partial.sh`). The experimental data is
 appended to `review_data/log.txt` and the script then generates the tables in
 `review_data/table2.txt` (resp. `review_data/table3.txt`). Running either of those scripts will take
-about an hour.
+between 1 and 2 hours.
 
-If the reviewers want to spend more time generating their own experimental data, they can use the
+If the reviewer wants to spend more time generating their own experimental data, they can use the
 `./table2_full.sh` and `./table3_full.sh` scripts. Running the full scripts will take more than a
 day.
 
 ### Results from our experimental data
 
-We included a sample of our experimental data in `benchmarks_log_cav21.txt`. The reviewers can
+We included a sample of our experimental data in `benchmarks_log_cav21.txt`. The reviewer can
 generate the tables using this data by calling the `benchmarks/report.py` script as follows:
 ```
 ./benchmarks/report.py benchmarks/benchmarks_log_cav21.txt review_data/tmp.csv TABLE_NO review_data/table.txt
 ```
 The script will generate Table `TABLE_NO` (= 1, 2 or 3) in the `review_data/table.txt` file, storing
-temporary results in `review_data/tmp.csv`. The reviewers should observe the same results as the
+temporary results in `review_data/tmp.csv`. The reviewer should observe the same results as the
 ones reported in the paper, with possibly a few differences as we collected more data for some
 benchmarks. One difference is that the *mts* benchmark of the *Enforcing tail recursion* category
 has been corrected, and Atropos synthesizes a solution even without the optimizations on (the
