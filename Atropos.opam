@@ -17,6 +17,9 @@ depends: [
   "ppx_let" {>= "v0.14.0"}
   "stdio" {>= "v0.14.0"}
   "sexplib" {>= "v0.14.0"}
+  "fileutils" {>= "0.6.3" }
+  "extlib" {>= "1.7.7" }
+  "lwt" {>= "5.4.0" }
 ]
 build: [
   ["dune" "subst"] {pinned}

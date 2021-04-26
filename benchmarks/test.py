@@ -32,7 +32,7 @@ kick_the_tires_set = [
     ["list/last.pmrs", ""]
 ]
 
-reduced_benchmark_set = [
+reduced_benchmark_set_table2 = [
     ["list/sumhom.pmrs", ""],
     ["ptree/sum.pmrs", ""],
     ["tree/sumtree.pmrs", ""],
@@ -40,23 +40,40 @@ reduced_benchmark_set = [
     ["tailopt/mps.pmrs", ""],
     ["zippers/sum.pmrs", ""],
     ["zippers/height.pmrs", ""],
-    ["zippers/mips.pmrs", ""],
     ["zippers/leftmostodd.pmrs", "-b 6"],
     ["ptree/mul.pmrs", ""],
     ["tree/maxtree.pmrs", ""],
     ["tree/min.pmrs", ""],
     ["tree/poly.pmrs", ""],
     ["list/sumevens.pmrs", ""],
-    ["list/prodhom.pmrs", ""],
     ["list/polyhom.pmrs", ""],
-    ["list/maxcount.pmrs", ""],
     ["list/minhom.pmrs", ""],
     ["list/last.pmrs", ""],
     ["list/mtshom.pmrs", ""],
     ["list/msshom.pmrs", ""],
-    ["list/search.pmrs", ""],
     ["tree/sorted.pmrs", "-t"],
     ["tree/mips.pmrs", ""],
+]
+
+reduced_benchmark_set_table3 = [
+    ["list/sumhom.pmrs", ""],
+    ["ptree/sum.pmrs", ""],
+    ["tree/sumtree.pmrs", ""],
+    ["tailopt/sum.pmrs", ""],
+    ["tailopt/mps.pmrs", ""],
+    ["zippers/sum.pmrs", ""],
+    ["zippers/height.pmrs", ""],
+    ["ptree/mul.pmrs", ""],
+    ["tree/maxtree.pmrs", ""],
+    ["tree/min.pmrs", ""],
+    ["list/sumevens.pmrs", ""],
+    ["list/polyhom.pmrs", ""],
+    ["list/minhom.pmrs", ""],
+    ["list/last.pmrs", ""],
+    ["list/mtshom.pmrs", ""],
+    #["list/msshom.pmrs", ""],
+    ["tree/sorted.pmrs", "-t"],
+    #["tree/mips.pmrs", ""],
 ]
 
 benchmark_set = [
@@ -163,7 +180,13 @@ if __name__ == "__main__":
         if int(sys.argv[2]) == 0:
             input_files = kick_the_tires_set
         else:
-            input_files = reduced_benchmark_set
+            if table_no == 2:
+                input_files = reduced_benchmark_set_table2
+            elif table_no == 3:
+                input_files = reduced_benchmark_set_table3
+            else:
+                input_files = kick_the_tires_set
+
     else:
         input_files = benchmark_set
 
