@@ -282,7 +282,8 @@ def produce_txt_table(tex_output_file, data):
                 if s > 5.1:
                     count_10x += 1
             except:
-                count_timeouts += 1
+                if s != "?":
+                    count_timeouts += 1
 
         print("---------------------------------------------")
         print("Data for %i benchmarks." % count_data_points)
