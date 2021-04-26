@@ -1,4 +1,4 @@
 (library
-    (name syguslib)
-    (public_name Atropos.Lib.SygusLib)
-    (libraries core utils fmt sexplib str lwt lwt.unix extlib stdio))
+ (name syguslib)
+ (public_name Atropos.Lib.SygusLib)
+ (libraries core utils fmt sexplib str lwt lwt.unix extlib stdio))

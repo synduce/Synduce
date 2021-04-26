@@ -23,7 +23,7 @@ let log c =
       open_log ();
       match !log_out with
       | Some oc -> write_command oc c
-      | None -> Log.(error (wrap "Failed to open log file.")) )
+      | None -> Log.(error (wrap "Failed to open log file.")))
 
 (* Solver response and other types. *)
 type solver_response = SmtLib.solver_response
@@ -49,7 +49,7 @@ let solver_read (solver : online_solver) : solver_response =
 
 let exec_command (solver : online_solver) (c : command) =
   if !log_queries then log c;
-  ( match c with
+  (match c with
   | DefineSmtSort (s, _, _)
   | DeclareDatatype (s, _)
   | DeclareConst (s, _)
@@ -57,7 +57,7 @@ let exec_command (solver : online_solver) (c : command) =
   | DefineFun (s, _, _, _)
   | DeclareFun (s, _, _) ->
       Hash_set.add solver.declared (str_of_symb s)
-  | _ -> () );
+  | _ -> ());
   solver_write solver c;
   solver_read solver
 
