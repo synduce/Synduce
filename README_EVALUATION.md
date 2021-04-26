@@ -119,9 +119,8 @@ The tool prints a help message if called with the `h` option, e.g.:
 Usage : atropos [options] input_file
 Options:
     -h --help                      Print this message.
-    -d --debug                     Print debugging information.
     -v --verbose                   Print verbose.
-    -i --info-off                  Turn off information messages. Print time and refinement steps.
+    -i --info-off                  Print timing information only.
   Otimizations off/on:
     -s --no-splitting              Do not split systems into subsystems.
        --no-syndef                 Do not use syntactic definitions.
@@ -174,11 +173,11 @@ skeleton `target`:
 ```
 The tool then prints the definition of the different components given in the input file:
 ```
- INFO : spec⟨⟩(): int tree -> (int * int){fun (x, y) -> (y ≥ 0) ∧ (y ≥ x)} =
+ INFO : spec⟨⟩(): int tree -> (int * int){fun (x, y) -> (y ≥ 0) && (y ≥ x)} =
     {
       ‣ main t   ⟹  f (0, 0) t
         f s Nil  ⟹  s
-        f s Node(a, l, r)  ⟹  (fun (sum1, m1) ->  f (sum1 + a, (sum1 + a) ￪ m1) r) (f s l)
+        f s Node(a, l, r)  ⟹  (fun (sum1, m1) ->  f (sum1 + a, max (sum1 + a) m1) r) (f s l)
 
       }
  INFO : target⟨join1, s0⟩(): int tree -> (int * int) =
@@ -189,6 +188,7 @@ The tool then prints the definition of the different components given in the inp
 
       }
  INFO : repr(x) = x
+
  ```
  In this case, the representation function is identity. The two other functions are pattern matching
  recursion schemes. For more information on the input format(s), see the `README.md` file provided
@@ -209,11 +209,11 @@ target⟨join1, s0⟩(): int tree -> (int * int) =
   ‣ main_mips t1   ⟹  mips t1
     mips  Nil  ⟹  (0, 0)
     mips  Node(a, l, r)  ⟹
-      (a + ((mips l)[0] + (mips r)[0]), (mips l)[1] ￪ (a + ((mips l)[0] + (mips r)[1])))
+      (a + ((mips l).0 + (mips r).0), max (mips l).1 (a + ((mips l).0 + (mips r).1)))
 
   }
+
 ```
 The solution is the input recursion skeleton `target` where the unknowns `join1` and `s0` have been
-replaced by their definition. We use the notation `s[0]` to access the first element of the tuple
-`s` in the output format.
-
+replaced by their definition. We use the notation `s.0` to access the first element of the tuple
+`s` in the *output* format.

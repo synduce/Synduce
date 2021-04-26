@@ -208,15 +208,15 @@ module Binop = struct
     | Ge -> "≥"
     | Le -> "≤"
     | Eq -> "="
-    | Max -> "￪"
-    | Min -> "￬"
+    | Max -> "max"
+    | Min -> "min"
     | Plus -> "+"
     | Minus -> "-"
     | Times -> "×"
     | Div -> "/"
     | Mod -> "%"
-    | And -> "∧"
-    | Or -> "∨"
+    | And -> "&&"
+    | Or -> "||"
 
   let to_string (op : t) =
     match op with
@@ -784,9 +784,14 @@ let pp_term (frmt : Formatter.t) (x : term) =
     match t.tkind with
     | TConst c -> pf frmt "%a" Constant.pp c
     | TVar v -> pf frmt "%a" Variable.pp v
-    | TBin (op, t1, t2) ->
-        if paren then pf frmt "@[<hov 2>(%a@;%a@;%a)@]" (aux true) t1 Binop.pp op (aux true) t2
-        else pf frmt "@[<hov 2>%a@;%a@;%a@]" (aux true) t1 Binop.pp op (aux true) t2
+    | TBin (op, t1, t2) -> (
+        match op with
+        | Binop.Max | Binop.Min ->
+            if paren then pf frmt "@[<hov 2>(%a@;%a@;%a)@]" Binop.pp op (aux true) t1 (aux true) t2
+            else pf frmt "@[<hov 2>%a@;%a@;%a@]" Binop.pp op (aux true) t1 (aux true) t2
+        | _ ->
+            if paren then pf frmt "@[<hov 2>(%a@;%a@;%a)@]" (aux true) t1 Binop.pp op (aux true) t2
+            else pf frmt "@[<hov 2>%a@;%a@;%a@]" (aux true) t1 Binop.pp op (aux true) t2)
     | TUn (op, t1) ->
         if paren then pf frmt "@[<hov 2>(%a@;%a)@]" Unop.pp op (aux true) t1
         else pf frmt "@[<hov 2>%a@;%a@]" Unop.pp op (aux true) t1
@@ -795,7 +800,7 @@ let pp_term (frmt : Formatter.t) (x : term) =
           pf frmt "@[<hov 2>(%a@;?@;%a@;:@;%a)@]" (aux false) c (aux false) t1 (aux false) t2
         else pf frmt "@[<hov 2>%a@;?@;%a@;:@;%a@]" (aux false) c (aux false) t1 (aux false) t2
     | TTup tl -> pf frmt "@[<hov 2>(%a)@]" (list ~sep:comma (aux false)) tl
-    | TSel (t, i) -> pf frmt "@[<hov 2>%a[%i]@]" (aux true) t i
+    | TSel (t, i) -> pf frmt "@[<hov 2>%a.%i@]" (aux true) t i
     | TFun (args, body) ->
         if paren then
           pf frmt "@[<hov 2>(fun %a -> @;%a)@]" (list ~sep:sp pp_fpattern) args (aux false) body

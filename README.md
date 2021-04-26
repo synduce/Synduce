@@ -34,8 +34,7 @@ The tool accepts inputs defined in two different formats: using a syntax specifi
 ## PMRS syntax
 
 `atropos` uses a special syntax to specify recursion schemes (Pattern Matching Recursion Schemes).
-The files ending in `.pmrs` are examples of this syntax. The benchmark
-`benchmarks/list/mpshom.pmrs` includes detailed comments on the input format.
+The files ending in `.pmrs` are examples of this syntax. The benchmark `benchmarks/list/mpshom.pmrs` includes detailed comments on the input format.
 
 The general syntax of a pattern matching recursion scheme is as follows:
 ```
@@ -50,12 +49,11 @@ pmrs (unknowns*) pmrs_name pmrs_args {invariant} =
 - `{invariant}` is an optional invariant of the function (for the reference function). `invariant` is a function of the form `fun (x1, x2, ...) -> expr(x1, x2, ...)` where `x1, x2, ..` is the output of the function, and `expr(x1, x2, ..)` a boolean expression. `invariant` indicates that `invariant(pmrs_name(x))` is true for any input `x` of the pmrs.
 - `f x_1 ... x_n -> t` is a non-pattern matching rule with arguments `x_1 ... x_n` and contractum `t`.
 - `g x_1 ... x_n p -> t` is a pattern matching rule with arguments `x_1 ... x_n` and pattern `p` and contractum `t`.
--
-The first rule defines the main function of the PMRS, and the type of the non-terminal symbol of
-the rule should be the type of a function from input type of the PMRS to output type.
+- The first rule defines the main function of the PMRS. The type of the non-terminal symbol of
+the first rule should be the type of a function from input type of the PMRS to output type.
 
 ## ML syntax
-The interface using the Caml syntax is still in development. See the `.ml` files in the benchmarks folder. Specifications are supported through syntax extensions: optional objects such as invariants are specified through attributes, and mandatory objects (functions to be synthesized) are written using `[%synt name-of-the-function]`. The Caml syntax is limited to benchmarks where the functions have only one input argument for now.
+The interface using the Caml syntax is still in development. See the `.ml` files in the benchmarks folder. Specifications are supported through syntax extensions: optional objects such as invariants are specified through attributes, and mandatory components (functions to be synthesized) are written using `[%synt name-of-the-function]`. The Caml syntax is limited to benchmarks where the main recursive function has only one input argument for now.
 
 For example, in the file `benchmarks/list/sum.ml` we have the following type definitions:
 ```ocaml
@@ -103,4 +101,4 @@ let rec hsum = function
         | Single(a) -> a
         | Concat(x, y) -> (hsum x) + (hsum y)
 ```
-
+NOTE: The notation `s.0` to access the first element of the tuple `s` in the *output* format.
