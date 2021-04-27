@@ -8,7 +8,7 @@ timeout_value = 240  # 4min timeout for the review
 memout_value = 8000 * (2 ** 10)  # 4GB memory limit
 
 
-timeout = ("../timeout/timeout -t %i -m %i --no-info-on-success" %
+timeout = ("./extras/timeout/timeout -t %i -m %i --no-info-on-success" %
            (timeout_value, memout_value))
 
 kick_the_tires_set = [

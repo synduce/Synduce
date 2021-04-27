@@ -2,12 +2,14 @@
 
 The reviewers can make sure that the artifact runs properly by running a few scripts and testing the
 tool on a simple benchmark.
-This README is focused on explaining which script can be run to reproduce the result in the paper.
+This readme is focused on explaining which scripts can be run to reproduce the results in the paper.
 For more information on how to build the tool from source, and how to use the tool, more information
-can be found in `atropos/README.md`.
-The source code and the tool is located in the `atropos` folder, and all scripts should be run from
-that folder. All the scripts generate data in the `atropos/review_data` folder, which you can delete
-at any point to clean up the experimental data you generated.
+can be found in `README.md`.
+All the scripts for evaluation should be run from the root folder. All the scripts generate data in
+the `review_data` folder, which you can delete at any point to clean up the experimental
+data you generated.
+The benchmarking scripts require `python3` to be installed (see `benchmarks/test.py` and
+`benchmarks/report.py`).
 
 ## Preliminary results
 
