@@ -102,3 +102,8 @@ let rec hsum = function
         | Concat(x, y) -> (hsum x) + (hsum y)
 ```
 NOTE: The notation `s.0` to access the first element of the tuple `s` in the *output* format.
+
+
+# Evaluation
+The folder `extras/cav21` contains scripts and a readme to reproduce the results presented in the CAV21 paper.
+Please move the scripts to the root folder before executing them.
