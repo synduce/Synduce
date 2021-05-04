@@ -7,6 +7,47 @@ open Syguslib.Sygus
 
 let refinement_steps = ref 0
 
+type soln = { soln_rec_scheme : PMRS.t; soln_implems : (symbol * variable list * term) list }
+
+let pp_implems (frmt : Formatter.t) (implems : (symbol * variable list * term) list) =
+  let pp_single_or_tup frmt l =
+    match l with
+    | [] -> ()
+    | [ (_, v) ] -> pp_term frmt v
+    | _ :: _ ->
+        Fmt.(pf frmt "(%a)" (list ~sep:(fun _f () -> pf _f ", ") pp_term) (List.map ~f:second l))
+  in
+
+  let pp_implem frmt (s, args, t) =
+    let f v =
+      match Variable.vtype_or_new v with
+      | TTup tl ->
+          let f i typ =
+            let v' = Variable.mk ~t:(Some typ) (v.vname ^ Int.to_string i) in
+            (mk_sel (mk_var v) i, mk_var v')
+          in
+          List.mapi ~f tl
+      | _ -> [ (mk_var v, mk_var v) ]
+    in
+    let subs = List.map ~f args in
+    let t' = substitution (List.concat subs) t in
+    Fmt.(
+      pf frmt "@[<hov 2>%a %a @[%a@] %a@;%a@]"
+        (styled (`Fg `Red) string)
+        "let"
+        (styled (`Fg `Cyan) string)
+        s (list ~sep:sp pp_single_or_tup) subs
+        (styled (`Fg `Red) string)
+        "=" pp_term t')
+  in
+  Fmt.((list ~sep:(fun _f () -> pf _f "@.@.") pp_implem) frmt implems)
+
+let pp_soln ?(use_ocaml_syntax = false) (frmt : Formatter.t) (solution : soln) =
+  Fmt.(
+    pf frmt "@.%a@.@.@[%a@]@." pp_implems solution.soln_implems
+      (if use_ocaml_syntax then PMRS.pp_ocaml else PMRS.pp)
+      solution.soln_rec_scheme)
+
 (* ============================================================================================= *)
 (*                             MAIN REFINEMENT LOOP                                              *)
 (* ============================================================================================= *)
@@ -40,8 +81,7 @@ let rec refinement_loop (p : psi_def) ((t_set, u_set) : TermSet.t * TermSet.t) =
             refinement_loop p (new_t_set, new_u_set)
         | None ->
             Log.print_ok ();
-            let target = Reduce.instantiate_with_solution p.target sol in
-            Ok target
+            Ok { soln_rec_scheme = p.target; soln_implems = sol }
       with _ -> Error RFail)
   | RFail, _ ->
       Log.error_msg "SyGuS solver failed to find a solution.";
@@ -106,8 +146,7 @@ let rec acegis_loop (p : psi_def) (t_set : TermSet.t) =
           acegis_loop p (Set.add t_set t)
       | None ->
           Log.print_ok ();
-          let target = Reduce.instantiate_with_solution p.target sol in
-          Ok target)
+          Ok { soln_rec_scheme = p.target; soln_implems = sol })
   | RFail, _ ->
       Log.error_msg "<ACEGIS> SyGuS solver failed to find a solution.";
       Error RFail
@@ -154,8 +193,7 @@ let rec ccegis_loop (p : psi_def) (t_set : TermSet.t) =
           ccegis_loop p (Set.add t_set t)
       | None ->
           Log.print_ok ();
-          let target = Reduce.instantiate_with_solution p.target sol in
-          Ok target)
+          Ok { soln_rec_scheme = p.target; soln_implems = sol })
   | RFail, _ ->
       Log.error_msg "<CCEGIS> SyGuS solver failed to find a solution.";
       Error RFail
@@ -186,7 +224,7 @@ let no_synth () = failwith "No synthesis objective found."
 
 let solve_problem (psi_comps : (string * string * string) option)
     (pmrs : (string, PMRS.t, Base.String.comparator_witness) Map.t) :
-    (PMRS.t, solver_response) Result.t =
+    (soln, solver_response) Result.t =
   let target_fname, spec_fname, repr_fname =
     match psi_comps with
     | Some names -> names

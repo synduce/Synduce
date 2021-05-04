@@ -89,7 +89,7 @@ let main () =
         Fmt.(
           fun frmt () ->
             pf frmt "Solution found in %4.4fs (%3.1f%% verifying):@.%a@]" elapsed verif_ratio
-              (box (if is_ocaml_syntax then PMRS.pp_ocaml else PMRS.pp))
+              (box (Algo.PmrsAlgos.pp_soln ~use_ocaml_syntax:is_ocaml_syntax))
               target);
       (* If no info required, output timing information. *)
       if not !Config.info then

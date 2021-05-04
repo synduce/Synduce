@@ -529,7 +529,7 @@ let rec mk_composite_base_type (t : RType.t) : term =
   | RType.TTup tl -> mk_tup (List.map ~f:mk_composite_base_type tl)
   | RType.TNamed _ -> mk_var (Variable.mk ~t:(Some t) (Alpha.fresh "l_"))
   | RType.TFun (_, _) | RType.TParam (_, _) | RType.TVar _ ->
-      failwith Fmt.(str "not a scalar type: %a" RType.pp t)
+      failwith Fmt.(str "mk_composite_base_type: %a is not a base type." RType.pp t)
 
 (* ============================================================================================= *)
 (*                             EQUALITY                                                          *)

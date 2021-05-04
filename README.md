@@ -96,12 +96,15 @@ The final assertions indicates that the tool should synthesize the expressions f
 Note that the representation function and the target recursion skeleton can be reused across a large set of examples. All the benchmarks in `benchmarks/list` use the same `repr` and `target`, modulo some changes in the base case when lists have a minimum size.
 Running `./atropos benchmarks/list/sum.ml` returns the solution in less than a second:
 ```ocaml
+let s0  = 0
+let f0 x = x
+let join x40 x42 = x40 + x42
 let rec hsum = function
-         CNil -> 0
-        | Single(a) -> a
-        | Concat(x, y) -> (hsum x) + (hsum y)
+    | CNil -> s0
+    | Single(a) -> f0 a
+    | Concat(x, y) -> join (hsum x) (hsum y)
 ```
-NOTE: The notation `s.0` to access the first element of the tuple `s` in the *output* format.
+
 
 
 # Evaluation
