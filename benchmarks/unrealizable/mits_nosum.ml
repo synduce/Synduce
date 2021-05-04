@@ -1,6 +1,6 @@
 type 'a tree = Nil | Node of 'a * 'a tree * 'a tree
 
-let rec spec t = f 0 t
+let rec spec t = f 0 t [@@ensures fun x -> x >= 0]
 
 and f s = function
   | Nil -> s
@@ -8,7 +8,6 @@ and f s = function
       let _mts = f s l in
       let _mts' = max (_mts + a) 0 in
       f _mts' r
-  [@@ensures fun x -> x >= 0]
 
 let rec mits = function Nil -> [%synt s0] | Node (a, l, r) -> [%synt join1] a (mits l) (mits r)
 
