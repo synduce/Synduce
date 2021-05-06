@@ -23,7 +23,7 @@ let pp_implems (frmt : Formatter.t) (implems : (symbol * variable list * term) l
       match Variable.vtype_or_new v with
       | TTup tl ->
           let f i typ =
-            let v' = Variable.mk ~t:(Some typ) (v.vname ^ Int.to_string i) in
+            let v' = Variable.mk ~t:(Some typ) (Alpha.fresh ~s:"j" ()) in
             (mk_sel (mk_var v) i, mk_var v')
           in
           List.mapi ~f tl
@@ -102,7 +102,7 @@ let psi (p : psi_def) =
   (* Initialize sets with the most general terms. *)
   let t_set, u_set =
     if !Config.simple_init then
-      let x0 = mk_var (Variable.mk ~t:(Some !AState._theta) (Alpha.fresh "x")) in
+      let x0 = mk_var (Variable.mk ~t:(Some !AState._theta) (Alpha.fresh ())) in
       let s = TermSet.of_list (Analysis.expand_once x0) in
       Set.partition_tf ~f:(Expand.is_mr_all p) s
     else

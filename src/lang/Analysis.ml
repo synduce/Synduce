@@ -29,19 +29,19 @@ let subst_args fpatterns args =
     match (fpat, t.tkind) with
     | PatVar x, _ -> [ (mk_var x, t) ]
     | PatTup pl, TTup tl -> (
-        match List.zip pl tl with Ok ptl -> List.concat (List.map ~f ptl) | _ -> failwith "no sub" )
+        match List.zip pl tl with Ok ptl -> List.concat (List.map ~f ptl) | _ -> failwith "no sub")
     | _ -> failwith "no sub"
   in
 
   match List.zip fpatterns args with
-  | Ok l -> ( try Some (List.concat (List.map ~f l)) with _ -> None )
+  | Ok l -> ( try Some (List.concat (List.map ~f l)) with _ -> None)
   | _ -> None
 
 let replace_calls_to (funcs : VarSet.t) =
   let case _ t =
     match t.tkind with
     | TApp ({ tkind = TVar x; _ }, _) when Set.mem funcs x ->
-        Some (mk_var (Variable.mk ~t:(Some t.ttyp) (Alpha.fresh x.vname)))
+        Some (mk_var (Variable.mk ~t:(Some t.ttyp) (Alpha.fresh ~s:x.vname ())))
     | _ -> None
   in
   transform ~case
@@ -58,7 +58,7 @@ let apply_projections (projs : (int, variable list, Int.comparator_witness) Map.
             let args' = List.map ~f args in
             let projected = pack xlist args' in
             Some (mk_tup projected)
-        | None -> None )
+        | None -> None)
     | _ -> None
   in
   transform ~case t
@@ -87,7 +87,7 @@ let matches ?(boundvars = VarSet.empty) (t : term) ~(pattern : term) =
           let pat_ty = Variable.vtype_or_new vpat in
           match RType.unify_one pat_ty t.ttyp with
           | Some _ -> Ok [ (vpat, t) ]
-          | _ -> Error [ (pat, t) ] )
+          | _ -> Error [ (pat, t) ])
     | TData (cstr, mems), TData (cstr', mems') ->
         if String.equal cstr cstr' && List.length mems = List.length mems' then
           match List.map2 ~f:aux mems mems' with
@@ -95,7 +95,7 @@ let matches ?(boundvars = VarSet.empty) (t : term) ~(pattern : term) =
           | List.Or_unequal_lengths.Ok ls -> (
               match Result.combine_errors ls with
               | Ok subs -> Ok (List.concat subs)
-              | Error errs -> Error (List.concat errs) )
+              | Error errs -> Error (List.concat errs))
         else Error [ (pat, t) ]
     | TApp (pat_f, pat_args), TApp (t_f, t_args) -> (
         match List.map2 ~f:aux pat_args t_args with
@@ -104,7 +104,7 @@ let matches ?(boundvars = VarSet.empty) (t : term) ~(pattern : term) =
             let f_match = aux pat_f t_f in
             match Result.combine_errors (f_match :: arg_match) with
             | Ok subs -> Ok (List.concat subs)
-            | Error errs -> Error (List.concat errs) ) )
+            | Error errs -> Error (List.concat errs)))
     | _ -> if Terms.equal pat t then Ok [] else Error []
   in
   match aux pattern t with
@@ -118,18 +118,18 @@ let matches ?(boundvars = VarSet.empty) (t : term) ~(pattern : term) =
             ~f:(fun bindings ->
               match bindings with
               | [] -> None
-              | _ -> ( match unify bindings with Some e -> Some e | _ -> failwith "X" ))
+              | _ -> ( match unify bindings with Some e -> Some e | _ -> failwith "X"))
             (List.fold ~init:im ~f substs)
         in
         Some substs
-      with _ -> None )
+      with _ -> None)
 
 let matches_subpattern ?(boundvars = VarSet.empty) (t : term) ~(pattern : term) =
   let match_locations = ref [] in
   let rrule (pat : term) =
     match matches ~boundvars t ~pattern:pat with
     | Some substmap ->
-        let match_loc_place = Variable.mk ~t:(Some pat.ttyp) (Alpha.fresh "*") in
+        let match_loc_place = Variable.mk ~t:(Some pat.ttyp) (Alpha.fresh ~s:"*_" ()) in
         match_locations := (match_loc_place, substmap) :: !match_locations;
         Some { pat with tkind = TVar match_loc_place }
     | None -> None
@@ -167,7 +167,8 @@ let expand_once (t : term) : term list =
   let aux (v, v_expan) =
     let f (cstr_name, cstr_arg_types) =
       let cstr_args =
-        List.map cstr_arg_types ~f:(fun ty -> mk_var (Variable.mk ~t:(Some ty) (Alpha.fresh "new")))
+        List.map cstr_arg_types ~f:(fun ty ->
+            mk_var (Variable.mk ~t:(Some ty) (Alpha.fresh ~s:"n" ())))
       in
       let t, _ = infer_type (substitution [ (mk_var v, mk_data cstr_name cstr_args) ] t) in
       t
@@ -183,7 +184,7 @@ let expand_once (t : term) : term list =
 let variant_no_recurse (variants : (string * RType.t list) list) : term list =
   let inst_or_none t =
     match RType.get_variants t with
-    | [] -> Some (mk_var (Variable.mk ~t:(Some t) (Alpha.fresh "l")))
+    | [] -> Some (mk_var (Variable.mk ~t:(Some t) (Alpha.fresh ~s:"l" ())))
     | _ -> None
   in
   let f (variant, targs) =
@@ -199,7 +200,7 @@ let variant_no_recurse (variants : (string * RType.t list) list) : term list =
 let terms_of_max_depth (depth : int) (typ : RType.t) : term list =
   let rec constr_t d _typ : term list =
     match RType.get_variants _typ with
-    | [] -> [ mk_var (Variable.mk ~t:(Some _typ) (Alpha.fresh "a")) ]
+    | [] -> [ mk_var (Variable.mk ~t:(Some _typ) (Alpha.fresh ~s:"a" ())) ]
     | l ->
         if d >= depth then variant_no_recurse l else List.concat (List.map ~f:(constr_variant d) l)
   and constr_variant d (cname, cargs) : term list =
@@ -229,7 +230,7 @@ let rec pp_virtual_term (f : Formatter.t) (v : virtual_term) : unit =
 let virtual_variant_no_recurse (variants : (string * RType.t list) list) : virtual_term =
   let inst_or_none t =
     match RType.get_variants t with
-    | [] -> Some (VVarLeaf (Variable.mk ~t:(Some t) (Alpha.fresh "l")))
+    | [] -> Some (VVarLeaf (Variable.mk ~t:(Some t) (Alpha.fresh ~s:"l" ())))
     | _ -> None
   in
   let f (variant, targs) =
@@ -246,7 +247,7 @@ let virtual_term_of_max_depth (depth : int) (typ : RType.t) : virtual_term =
   let rec for_each_variant d (constrname, tl) = VConstr (constrname, List.map ~f:(constr (d + 1)) tl)
   and constr d t =
     match RType.get_variants t with
-    | [] -> VVarLeaf (Variable.mk ~t:(Some t) (Alpha.fresh "a"))
+    | [] -> VVarLeaf (Variable.mk ~t:(Some t) (Alpha.fresh ()))
     | variants ->
         if d >= depth then virtual_variant_no_recurse variants
         else VChoice (List.map ~f:(for_each_variant d) variants)
@@ -267,9 +268,9 @@ let pick_some (virt : virtual_term) : term option * virtual_term option =
           | l, hd :: tl -> (
               let t, new_hd = aux hd in
               match new_hd with
-              | Some hd' -> (t, Some (VChoice (l @ (hd' :: tl))))
-              | None -> (t, Some (VChoice (l @ tl))) )
-          | _, _ -> failwith "Unexpected failure in pick_some." )
+              | Some hd' -> (t, Some (VChoice (l @ hd' :: tl)))
+              | None -> (t, Some (VChoice (l @ tl))))
+          | _, _ -> failwith "Unexpected failure in pick_some.")
     | VConstr (cname, args) -> (
         match args with
         | [] -> (Some (mk_data cname []), None)
@@ -277,7 +278,7 @@ let pick_some (virt : virtual_term) : term option * virtual_term option =
             let tl, vl = List.unzip (List.map ~f:aux args) in
             let t = Option.map (all_or_none tl) ~f:(fun args' -> mk_data cname args') in
             let v = Option.map (all_or_none vl) ~f:(fun args' -> VConstr (cname, args')) in
-            (t, v) )
+            (t, v))
   in
   aux virt
 
@@ -305,7 +306,7 @@ let rec rand_const_of_type (typ : RType.t) : term =
             match variant_no_recurse l with
             | [] ->
                 failwith Fmt.(str "Unsupported value type %a (no non-recursive constructor)" pp typ)
-            | hd :: _ -> concretize hd ) ))
+            | hd :: _ -> concretize hd)))
 
 and concretize ?(model = Map.empty (module String)) (t : term) : term =
   let case _ tin =
@@ -314,7 +315,7 @@ and concretize ?(model = Map.empty (module String)) (t : term) : term =
     | TVar x -> (
         match Map.find model x.vname with
         | Some t -> Some t
-        | None -> Some (rand_const_of_type (Variable.vtype_or_new x)) )
+        | None -> Some (rand_const_of_type (Variable.vtype_or_new x)))
     | _ -> None
   in
   transform ~case t

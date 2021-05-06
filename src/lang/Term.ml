@@ -522,12 +522,12 @@ let sexp_of_term (_ : term) = Sexp.Atom "TODO"
 
 let rec mk_composite_base_type (t : RType.t) : term =
   match t with
-  | RType.TInt -> mk_var (Variable.mk ~t:(Some t) (Alpha.fresh "i_"))
-  | RType.TBool -> mk_var (Variable.mk ~t:(Some t) (Alpha.fresh "b_"))
-  | RType.TString -> mk_var (Variable.mk ~t:(Some t) (Alpha.fresh "s_"))
-  | RType.TChar -> mk_var (Variable.mk ~t:(Some t) (Alpha.fresh "c_"))
+  | RType.TInt -> mk_var (Variable.mk ~t:(Some t) (Alpha.fresh ~s:"i" ()))
+  | RType.TBool -> mk_var (Variable.mk ~t:(Some t) (Alpha.fresh ~s:"b" ()))
+  | RType.TString -> mk_var (Variable.mk ~t:(Some t) (Alpha.fresh ~s:"s" ()))
+  | RType.TChar -> mk_var (Variable.mk ~t:(Some t) (Alpha.fresh ~s:"c" ()))
   | RType.TTup tl -> mk_tup (List.map ~f:mk_composite_base_type tl)
-  | RType.TNamed _ -> mk_var (Variable.mk ~t:(Some t) (Alpha.fresh "l_"))
+  | RType.TNamed _ -> mk_var (Variable.mk ~t:(Some t) (Alpha.fresh ~s:"l" ()))
   | RType.TFun (_, _) | RType.TParam (_, _) | RType.TVar _ ->
       failwith Fmt.(str "mk_composite_base_type: %a is not a base type." RType.pp t)
 
@@ -592,7 +592,7 @@ let mk_with_fresh_vars (vs : VarSet.t) (t : term) : VarSet.t * term =
     let f var =
       let fresh =
         let t = Some (Variable.vtype_or_new var) in
-        Variable.mk ~t (Alpha.fresh var.vname)
+        Variable.mk ~t (Alpha.fresh ~s:var.vname ())
       in
       (fresh, (mk_var var, mk_var fresh))
     in
@@ -809,8 +809,8 @@ let pp_term (frmt : Formatter.t) (x : term) =
         if paren then pf frmt "@[<hov 2>(%a@;%a)@]" (aux true) func (list ~sep:sp (aux true)) args
         else pf frmt "@[<hov 2>%a@;%a@]" (aux true) func (list ~sep:sp (aux true)) args
     | TData (cstr, args) ->
-        if List.length args = 0 then pf frmt "%s" cstr
-        else pf frmt "%s(%a)" cstr (list ~sep:comma (aux false)) args
+        if List.length args = 0 then pf frmt "%a" (styled (`Fg `Green) string) cstr
+        else pf frmt "%a(%a)" (styled (`Fg `Green) string) cstr (list ~sep:comma (aux false)) args
   in
   aux false frmt x
 

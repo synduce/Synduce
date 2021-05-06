@@ -103,8 +103,8 @@ let infer_pmrs_types (prog : t) =
 (*                                 PRETTY PRINTING                                               *)
 (* ============================================================================================= *)
 let pp_pattern (frmt : Formatter.t) ((t, args) : pattern) : unit =
-  if List.length args = 0 then Fmt.(pf frmt "%s" t)
-  else Fmt.(pf frmt "%s(%a)" t (list ~sep:comma Term.pp_term) args)
+  if List.length args = 0 then Fmt.(pf frmt "%a" (styled `Italic string) t)
+  else Fmt.(pf frmt "%a(%a)" (styled `Italic string) t (list ~sep:comma Term.pp_term) args)
 
 let pp_rewrite_rule (frmt : Formatter.t) ((nt, vargs, pat, t) : rewrite_rule) : unit =
   Fmt.(
@@ -140,17 +140,28 @@ let pp_ocaml (frmt : Formatter.t) (pmrs : t) : unit =
         match pat_opt with
         | Some pat ->
             Fmt.(
-              pf frmt "@[<hov 2>%s @[%a _x@] =@;@[match _x with %a -> %a@]@]" nt.vname
-                (list ~sep:sp Variable.pp) args pp_pattern pat pp_term rhs)
+              pf frmt "@[<hov 2>%a @[%a _x@] %a@;@[match _x with %a -> %a@]@]"
+                (styled (`Fg `Cyan) string)
+                nt.vname (list ~sep:sp Variable.pp) args
+                (styled (`Fg `Red) string)
+                "=" pp_pattern pat pp_term rhs)
         | None ->
             Fmt.(
-              pf frmt "@[<hov 2>%s @[%a@] =@;%a@]" nt.vname (list ~sep:sp Variable.pp) args pp_term
-                rhs))
+              pf frmt "@[<hov 2>%a @[%a@] %a@;%a@]"
+                (styled (`Fg `Cyan) string)
+                nt.vname (list ~sep:sp Variable.pp) args
+                (styled (`Fg `Red) string)
+                "=" pp_term rhs))
     | _ :: _ ->
         Fmt.(
-          pf frmt "@[<hov 2>%s @[%a@]=@;@[<hov 2>function@;%a@]" nt.vname (list ~sep:sp Variable.pp)
-            args
-            (list ~sep:(fun f () -> pf f "@;| ") pp_case)
+          pf frmt "@[<hov 2>%a @[%a@]%a@;@[<hov 2>%a@;%a@]"
+            (styled (`Fg `Cyan) string)
+            nt.vname (list ~sep:sp Variable.pp) args
+            (styled (`Fg `Red) string)
+            "="
+            (styled (`Fg `Yellow) string)
+            "function"
+            (list ~sep:(fun f () -> pf f "@;%a " (styled (`Fg `Yellow) string) "|") pp_case)
             cases)
   in
   let functions =
@@ -178,7 +189,7 @@ let pp_ocaml (frmt : Formatter.t) (pmrs : t) : unit =
   match functions with
   | [] -> ()
   | hd :: tl ->
-      Fmt.(pf frmt "@[let rec %a@]@." print_caml_def hd);
+      Fmt.(pf frmt "@[%a %a@]@." (styled (`Fg `Red) string) "let rec" print_caml_def hd);
       List.iter tl ~f:(fun caml_def -> Fmt.(pf frmt "@[and %a@]@." print_caml_def caml_def))
 
 (* ============================================================================================= *)

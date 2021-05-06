@@ -305,7 +305,7 @@ let solve_syntactic_definitions (unknowns : VarSet.t) (eqns : equation list) =
             | [ v ] -> Variable.vtype_or_new v
             | l -> RType.TTup (List.map ~f:Variable.vtype_or_new l)
           in
-          let v = Variable.mk ~t:(Some t) (Alpha.fresh "x") in
+          let v = Variable.mk ~t:(Some t) (Alpha.fresh ()) in
           match arg_tuple with
           | [ arg ] -> (v, [ (mk_var arg, mk_var v) ])
           | l -> (v, List.mapi l ~f:(fun i arg -> (mk_var arg, mk_sel (mk_var v) i))))

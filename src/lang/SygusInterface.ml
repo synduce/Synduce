@@ -192,7 +192,7 @@ let declaration_of_var (v : variable) =
 let sorted_vars_of_types (tl : RType.t list) : sorted_var list =
   let f t =
     (* Declare var for future parsing. *)
-    let varname = Alpha.fresh "x" in
+    let varname = Alpha.fresh () in
     (varname, sort_of_rtype t)
   in
   List.map ~f tl

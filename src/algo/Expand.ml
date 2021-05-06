@@ -53,7 +53,7 @@ let subst_repr_calls (p : psi_def) (tl : term list) : (term * term) list =
     List.fold ~init:VarSet.empty ~f:fold_f tl
   in
   let f var =
-    let rtype_var = Variable.mk ~t:(Some !AState._tau) (Alpha.fresh "x") in
+    let rtype_var = Variable.mk ~t:(Some !AState._tau) (Alpha.fresh ()) in
     [ (mk_app (mk_var fsymb) [ mk_var var ], mk_var rtype_var) ]
   in
   List.concat (List.map ~f (Set.elements rcalls))
