@@ -285,8 +285,13 @@ let combine ?(verb = false) prev_sol new_response =
   | None, (resp, _) -> (resp, None)
 
 let solve_syntactic_definitions (unknowns : VarSet.t) (eqns : equation list) =
+  (* Are all arguments free? *)
+  let ok_rhs_args _args =
+    let arg_vars = VarSet.union_list (List.map ~f:Analysis.free_variables _args) in
+    Set.is_empty (Set.inter unknowns arg_vars)
+  in
   (* Is lhs, args a full definition of the function? *)
-  let ok_args lhs args =
+  let ok_lhs_args lhs args =
     let argv = List.map args ~f:ext_var_or_none in
     let argset = VarSet.of_list (List.concat (List.filter_opt argv)) in
     if
@@ -297,6 +302,7 @@ let solve_syntactic_definitions (unknowns : VarSet.t) (eqns : equation list) =
       if List.length (List.concat args) = Set.length argset then Some args else None
     else None
   in
+  (* Make a function out of lhs of equation constraint using args. *)
   let mk_lam lhs args =
     let pre_subst =
       List.map args ~f:(fun arg_tuple ->
@@ -316,8 +322,8 @@ let solve_syntactic_definitions (unknowns : VarSet.t) (eqns : equation list) =
   let full_defs, other_eqns =
     let f (t, inv, lhs, rhs) =
       match (inv, rhs.tkind) with
-      | _, TApp ({ tkind = TVar x; _ }, args) when Set.mem unknowns x -> (
-          match ok_args lhs args with
+      | _, TApp ({ tkind = TVar x; _ }, args) when Set.mem unknowns x && ok_rhs_args args -> (
+          match ok_lhs_args lhs args with
           | Some argv ->
               let lam_args, lam_body = mk_lam lhs argv in
               Either.First (x, (lam_args, lam_body))
