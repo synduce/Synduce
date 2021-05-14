@@ -1,23 +1,24 @@
-open Base
-open Lang.Term
-open Lang
 open AState
+open Base
+open Lang.SmtInterface
+open Lang.Term
+open Smtlib
 open Utils
-open SmtInterface
-open Smtlib.Solvers
 
 let constr_eqn (_, pre, lhs, rhs) =
   let rec mk_eqn (lhs, rhs) =
-    let lhs, rhs = (Reduce.reduce_term lhs, Reduce.reduce_term rhs) in
+    let lhs, rhs = (Lang.Reduce.reduce_term lhs, Lang.Reduce.reduce_term rhs) in
     match (lhs.tkind, rhs.tkind) with
+    (* If terms are tuples, equate each tuple component and take conjunction. *)
     | TTup ltl, TTup rtl -> (
         match List.zip ltl rtl with
-        | Ok rt_lt -> mk_assoc_and (List.map ~f:mk_eqn rt_lt)
-        | _ -> failwith "Verification failed because unexpected tuple size.")
-    | _ -> mk_eq (smt_of_term lhs) (smt_of_term rhs)
+        | Ok rt_lt -> SmtLib.mk_assoc_and (List.map ~f:mk_eqn rt_lt)
+        | _ -> failwith "Verification failed: trying to equate tuples of different sizes?")
+    (* Otherwise just make a smt terms corresponding to the equation. *)
+    | _ -> SmtLib.mk_eq (smt_of_term lhs) (smt_of_term rhs)
   in
   let eqn = mk_eqn (lhs, rhs) in
-  match pre with Some inv -> mk_or (mk_not (smt_of_term inv)) eqn | None -> eqn
+  match pre with Some inv -> SmtLib.mk_or (SmtLib.mk_not (smt_of_term inv)) eqn | None -> eqn
 
 (**
    `check_solution ~p (t,u) soln`
@@ -33,21 +34,21 @@ let check_solution ?(use_acegis = false) ~(p : psi_def) ((t, u) : TermSet.t * Te
   let verb = !Config.verbose in
   Config.verbose := false;
   let start_time = Unix.gettimeofday () in
-  let target_inst = Reduce.instantiate_with_solution p.target soln in
+  let target_inst = Lang.Reduce.instantiate_with_solution p.target soln in
   let free_vars = VarSet.empty in
   let init_vardecls = decls_of_vars free_vars in
-  let solver = make_z3_solver () in
-  load_min_max_defs solver;
+  let solver = Solvers.make_z3_solver () in
+  Solvers.load_min_max_defs solver;
   let check_eqn has_sat eqn =
-    let formula = mk_not eqn in
-    spush solver;
-    smt_assert solver formula;
+    let formula = SmtLib.mk_not eqn in
+    Solvers.spush solver;
+    Solvers.smt_assert solver formula;
     let x =
-      match check_sat solver with
+      match Solvers.check_sat solver with
       | Sat -> Continue_or_stop.Stop true
       | _ -> Continue_or_stop.Continue has_sat
     in
-    spop solver;
+    Solvers.spop solver;
     x
   in
   let expand_and_check i (t0 : term) =
@@ -60,15 +61,16 @@ let check_solution ?(use_acegis = false) ~(p : psi_def) ((t, u) : TermSet.t * Te
       let smt_eqns = List.map sys_eqns ~f:constr_eqn in
       let new_free_vars =
         let f fv (_, _, lhs, rhs) =
-          Set.union fv (Set.union (Analysis.free_variables lhs) (Analysis.free_variables rhs))
+          Set.union fv
+            (Set.union (Lang.Analysis.free_variables lhs) (Lang.Analysis.free_variables rhs))
         in
         Set.diff (List.fold ~f ~init:VarSet.empty sys_eqns) free_vars
       in
       (* Solver calls. *)
-      spush solver;
-      declare_all solver (decls_of_vars new_free_vars);
+      Solvers.spush solver;
+      Solvers.declare_all solver (decls_of_vars new_free_vars);
       let has_ctex = List.fold_until ~finish:(fun x -> x) ~init:false ~f:check_eqn smt_eqns in
-      spop solver;
+      Solvers.spop solver;
       (* Result of solver calls. *)
       if has_ctex then (true, t_set, u_set, i + 1) else (false, TermSet.empty, u_set, i + num_terms))
     else (
@@ -97,12 +99,12 @@ let check_solution ?(use_acegis = false) ~(p : psi_def) ((t, u) : TermSet.t * Te
             find_ctex num_checks elts
   in
   (* Declare all variables *)
-  declare_all solver init_vardecls;
+  Solvers.declare_all solver init_vardecls;
   (match find_ctex 0 t with
   | Some _ -> failwith "Synthesizer and solver disagree on solution. That's unexpected!"
   | None -> ());
   let ctex_or_none = find_ctex 0 u in
-  close_solver solver;
+  Solvers.close_solver solver;
   let elapsed = Unix.gettimeofday () -. start_time in
   Config.verif_time := !Config.verif_time +. elapsed;
   Log.info (fun f () -> Fmt.(pf f "... finished in %3.4fs" elapsed));
@@ -114,20 +116,21 @@ let bounded_check ?(concrete_ctex = false) ~(p : psi_def)
     (soln : (string * variable list * term) list) =
   Log.info (fun f () -> Fmt.(pf f "Checking solution (bounded check)..."));
   let start_time = Unix.gettimeofday () in
-  let target_inst = Reduce.instantiate_with_solution p.target soln in
+  let target_inst = Lang.Reduce.instantiate_with_solution p.target soln in
   let free_vars = VarSet.empty in
   let init_vardecls = decls_of_vars free_vars in
-  let solver = make_z3_solver () in
-  load_min_max_defs solver;
+  let solver = Solvers.make_z3_solver () in
+  Solvers.load_min_max_defs solver;
   let check_eqn eqn =
-    let formula = mk_not eqn in
-    spush solver;
-    smt_assert solver formula;
-    let x = check_sat solver in
+    let formula = SmtLib.mk_not eqn in
+    Solvers.spush solver;
+    Solvers.smt_assert solver formula;
+    let x = Solvers.check_sat solver in
     let model =
-      if concrete_ctex then match x with Sat -> Some (get_model solver) | _ -> None else None
+      if concrete_ctex then match x with Sat -> Some (Solvers.get_model solver) | _ -> None
+      else None
     in
-    spop solver;
+    Solvers.spop solver;
     (x, model)
   in
   let check term =
@@ -138,12 +141,13 @@ let bounded_check ?(concrete_ctex = false) ~(p : psi_def)
     let smt_eqns = List.map sys_eqns ~f:(fun t -> (t, constr_eqn t)) in
     let new_free_vars =
       let f fv (_, _, lhs, rhs) =
-        Set.union fv (Set.union (Analysis.free_variables lhs) (Analysis.free_variables rhs))
+        Set.union fv
+          (Set.union (Lang.Analysis.free_variables lhs) (Lang.Analysis.free_variables rhs))
       in
       Set.diff (List.fold ~f ~init:VarSet.empty sys_eqns) free_vars
     in
-    declare_all solver init_vardecls;
-    declare_all solver (decls_of_vars new_free_vars);
+    Solvers.declare_all solver init_vardecls;
+    Solvers.declare_all solver (decls_of_vars new_free_vars);
     let rec search_ctex _eqns =
       match _eqns with
       | [] -> None
@@ -151,7 +155,7 @@ let bounded_check ?(concrete_ctex = false) ~(p : psi_def)
           match check_eqn smt_eqn with
           | Sat, Some model_response ->
               let model = model_to_constmap model_response in
-              let concr = Analysis.concretize ~model in
+              let concr = Lang.Analysis.concretize ~model in
               let t, inv, lhs, rhs = eqn in
               Some (concr t, Option.map ~f:concr inv, concr lhs, concr rhs)
           | Sat, None -> Some eqn
@@ -166,7 +170,7 @@ let bounded_check ?(concrete_ctex = false) ~(p : psi_def)
     let ctex_or_none = search_ctex smt_eqns in
     (match ctex_or_none with
     | Some (t, _, _, _) ->
-        let ctex_height = Term.term_height t in
+        let ctex_height = term_height t in
         let current_check_depth = !Config.check_depth in
         let update = max current_check_depth (ctex_height - 1) in
         Config.check_depth := update;
@@ -176,7 +180,7 @@ let bounded_check ?(concrete_ctex = false) ~(p : psi_def)
   in
   let tset =
     List.sort ~compare:term_size_compare
-      (Analysis.terms_of_max_depth (!Config.check_depth - 1) !AState._theta)
+      (Lang.Analysis.terms_of_max_depth (!Config.check_depth - 1) !AState._theta)
   in
   Log.debug_msg Fmt.(str "%i terms to check" (List.length tset));
   let ctex_or_none =
@@ -187,7 +191,7 @@ let bounded_check ?(concrete_ctex = false) ~(p : psi_def)
         | Some ctex -> Continue_or_stop.Stop (Some ctex)
         | None -> Continue_or_stop.Continue None)
   in
-  close_solver solver;
+  Solvers.close_solver solver;
   let elapsed = Unix.gettimeofday () -. start_time in
   Config.verif_time := !Config.verif_time +. elapsed;
   Log.info (fun f () -> Fmt.(pf f "... finished in %3.4fs" elapsed));

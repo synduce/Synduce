@@ -117,6 +117,11 @@ let rec term_of_smt (env : (string, variable, String.comparator_witness) Map.t) 
   | SmtTLet (_, _) -> failwith "Smt: let-terms not supported."
   | _ -> failwith "Composite identifier not supported."
 
+(* ============================================================================================= *)
+(*                           MODELS                                                              *)
+(* ============================================================================================= *)
+type term_model = (string, term, Base.String.comparator_witness) Base.Map.t
+
 let constmap_of_s_exprs (starting_map : (string, term, String.comparator_witness) Map.t)
     (s_exprs : Sexp.t list) =
   let add_sexp map sexp =
@@ -147,8 +152,6 @@ let model_to_constmap (s : solver_response) =
 (* ============================================================================================= *)
 (*                           COMMANDS                                                            *)
 (* ============================================================================================= *)
-include Smtlib.SmtLib
-
 let decls_of_vars (vars : VarSet.t) =
   let f v =
     let sort = sort_of_rtype (Variable.vtype_or_new v) in
