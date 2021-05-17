@@ -10,3 +10,4 @@ Example
 review_data/*
 tests/*.txt
 benchmarks/*.csv
+*.messages

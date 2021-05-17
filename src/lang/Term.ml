@@ -53,12 +53,15 @@ let pp_id_var f v = Fmt.(pf f "(%i : %s)" v.vid v.vname)
 
 let dump_variable f v = Fmt.(string f v.vname)
 
+(* Module of variables *)
 module Variable = struct
   module T = struct
     type t = variable
 
+    (* Variables are compared by their id, not their name. *)
     let compare x y = compare x.vid y.vid
 
+    (* Variables are compared by their id, not their name. *)
     let equal x y = x.vid = y.vid
 
     let ( = ) x y = equal x y
@@ -77,6 +80,11 @@ module Variable = struct
 
   let vtype (v : variable) = Hashtbl.find _types v.vid
 
+  (* `vtype_or_new v` returns the type of variable v, or assigns a fresh type variable
+      as its type if it doesn't have one.
+      The type of a variable will automatically be assigned to satisfy constraints
+      produced during type inference.
+  *)
   let vtype_or_new (v : variable) =
     match vtype v with
     | Some x -> x
