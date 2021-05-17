@@ -89,11 +89,11 @@ let main () =
         Fmt.(
           fun frmt () ->
             pf frmt "Solution found in %4.4fs (%3.1f%% verifying):@.%a@]" elapsed verif_ratio
-              (box (Algo.PmrsAlgos.pp_soln ~use_ocaml_syntax:is_ocaml_syntax))
+              (box (Algo.AState.pp_soln ~use_ocaml_syntax:is_ocaml_syntax))
               target);
       (* If no info required, output timing information. *)
       if not !Config.info then
-        Fmt.(pf stdout "%i,%.4f,%.4f@." !Algo.PmrsAlgos.refinement_steps !Config.verif_time elapsed)
+        Fmt.(pf stdout "%i,%.4f,%.4f@." !Algo.AState.refinement_steps !Config.verif_time elapsed)
   | Error _ -> Utils.Log.error_msg "No solution found.");
   if !Config.show_vars then Term.Variable.print_summary stdout ()
 

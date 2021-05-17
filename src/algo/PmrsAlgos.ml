@@ -1,56 +1,9 @@
+open AState
 open Base
 open Lang
 open Lang.Term
-open Utils
-open AState
 open Syguslib.Sygus
-
-let refinement_steps = ref 0
-
-type soln = { soln_rec_scheme : PMRS.t; soln_implems : (symbol * variable list * term) list }
-
-let pp_implems (frmt : Formatter.t) (implems : (symbol * variable list * term) list) =
-  let pp_single_or_tup frmt l =
-    match l with
-    | [] -> ()
-    | [ (_, v) ] -> pp_term frmt v
-    | _ :: _ ->
-        Fmt.(pf frmt "(%a)" (list ~sep:(fun _f () -> pf _f ", ") pp_term) (List.map ~f:second l))
-  in
-
-  let pp_implem frmt (s, args, t) =
-    let f v =
-      match Variable.vtype_or_new v with
-      | TTup tl ->
-          let f i typ =
-            let v' = Variable.mk ~t:(Some typ) (Alpha.fresh ~s:"j" ()) in
-            (mk_sel (mk_var v) i, mk_var v')
-          in
-          List.mapi ~f tl
-      | _ -> [ (mk_var v, mk_var v) ]
-    in
-    let subs = List.map ~f args in
-    let t' = substitution (List.concat subs) t in
-    Fmt.(
-      pf frmt "@[<hov 2>%a %a @[%a@] %a@;%a@]"
-        (styled (`Fg `Red) string)
-        "let"
-        (styled (`Fg `Cyan) string)
-        s (list ~sep:sp pp_single_or_tup) subs
-        (styled (`Fg `Red) string)
-        "=" pp_term t')
-  in
-  Fmt.((list ~sep:(fun _f () -> pf _f "@.@.") pp_implem) frmt implems)
-
-let pp_soln ?(use_ocaml_syntax = false) (frmt : Formatter.t) (solution : soln) =
-  Fmt.(
-    pf frmt "@.%a@.@.@[%a@]@." pp_implems solution.soln_implems
-      (if use_ocaml_syntax then PMRS.pp_ocaml else PMRS.pp)
-      solution.soln_rec_scheme)
-
-(* ============================================================================================= *)
-(*                             MAIN REFINEMENT LOOP                                              *)
-(* ============================================================================================= *)
+open Utils
 
 let rec refinement_loop (p : psi_def) ((t_set, u_set) : TermSet.t * TermSet.t) =
   Int.incr refinement_steps;
@@ -65,28 +18,40 @@ let rec refinement_loop (p : psi_def) ((t_set, u_set) : TermSet.t * TermSet.t) =
     Fmt.(
       str "Start refinement loop with %i terms in T, %i terms in U." (Set.length t_set)
         (Set.length u_set));
-  (* Refinement of t_set, u_set. *)
+  (* First, generate the set of constraints corresponding to the set of terms t_set. *)
   let eqns = Equations.make ~p t_set in
+  (* The solve the set of constraints. *)
   let s_resp, solution = Equations.solve ~p eqns in
   match (s_resp, solution) with
   | RSuccess _, Some sol -> (
+      (* Synthesis has succeeded, now we need to verify the solution. *)
       try
+        (* The solution is verified with a bounded check.  *)
         let check_r = Verify.check_solution ~p (t_set, u_set) sol in
         match check_r with
         | Some (new_t_set, new_u_set) ->
+            (* If check_r is some new set of MR-terms t_set, and terms u_set, this means
+               verification failed. The generalized counterexamples have been added to new_t_set,
+               which is also a superset of t_set.
+            *)
             Log.debug (fun frmt () ->
                 Fmt.(
                   pf frmt "@[<hov 2>Counterexample terms:@;@[<hov 2>%a@]" (list ~sep:comma pp_term)
                     (Set.elements (Set.diff new_t_set t_set))));
+            (* Continue looping with the new sets. *)
             refinement_loop p (new_t_set, new_u_set)
         | None ->
+            (* This case happens when verification succeeded. Return the solution. *)
             Log.print_ok ();
             Ok { soln_rec_scheme = p.target; soln_implems = sol }
-      with _ -> Error RFail)
+      with _ -> (* A failure during the bounded check is an error. *)
+                Error RFail)
   | RFail, _ ->
       Log.error_msg "SyGuS solver failed to find a solution.";
       Error RFail
   | RInfeasible, _ ->
+      (* Rare - but the synthesis solver can answer "infeasible", in which case it can give
+         counterexamples. *)
       Log.info
         Fmt.(
           fun frmt () ->
@@ -94,6 +59,8 @@ let rec refinement_loop (p : psi_def) ((t_set, u_set) : TermSet.t * TermSet.t) =
               (list ~sep:sp pp_term) (Set.elements t_set));
       Error RInfeasible
   | RUnknown, _ ->
+      (* In most cases if the synthesis solver does not find a solution and terminates, it will
+         answer unknowns. We interpret it as "no solution can be found". *)
       Log.error_msg "SyGuS solver returned unknown.";
       Error RUnknown
   | _ -> Error s_resp
@@ -119,102 +86,6 @@ let psi (p : psi_def) =
   else (
     refinement_steps := 0;
     refinement_loop p (t_set, u_set))
-
-(* ============================================================================================= *)
-(*                             ACEGIS REFINEMENT LOOP                                            *)
-(* ============================================================================================= *)
-
-let rec acegis_loop (p : psi_def) (t_set : TermSet.t) =
-  Int.incr refinement_steps;
-  let elapsed = Unix.gettimeofday () -. !Config.glob_start in
-  Log.info (fun frmt () -> Fmt.pf frmt "Refinement step %i." !refinement_steps);
-  (if not !Config.info then
-   Fmt.(
-     pf stdout "%i,%3.3f,%3.3f,%i,0@." !refinement_steps !Config.verif_time elapsed
-       (Set.length t_set)));
-  Log.debug_msg Fmt.(str "<ACEGIS> Start refinement loop with %i terms in T." (Set.length t_set));
-  (* Start of the algorithm. *)
-  let eqns = Equations.make ~force_replace_off:true ~p t_set in
-  let s_resp, solution = Equations.solve ~p eqns in
-  match (s_resp, solution) with
-  | RSuccess _, Some sol -> (
-      match Verify.bounded_check ~p sol with
-      (* A symbolic counterexample term is returned. *)
-      | Some (t, _, _, _) ->
-          Log.debug (fun frmt () ->
-              Fmt.(pf frmt "@[<hov 2><ACEGIS> Counterexample term:@;@[<hov 2>%a@]" pp_term t));
-          acegis_loop p (Set.add t_set t)
-      | None ->
-          Log.print_ok ();
-          Ok { soln_rec_scheme = p.target; soln_implems = sol })
-  | RFail, _ ->
-      Log.error_msg "<ACEGIS> SyGuS solver failed to find a solution.";
-      Error RFail
-  | RInfeasible, _ ->
-      Log.info
-        Fmt.(
-          fun frmt () ->
-            pf frmt "@[<hov 2><ACEGIS> This problem has no solution. Counterexample set:@;%a@]"
-              (list ~sep:sp pp_term) (Set.elements t_set));
-      Error RInfeasible
-  | RUnknown, _ ->
-      Log.error_msg "<ACEGIS> SyGuS solver returned unknown.";
-      Error RUnknown
-  | _ -> Error s_resp
-
-let psi_acegis (p : psi_def) =
-  let t_set = TermSet.of_list (Analysis.terms_of_max_depth 1 !AState._theta) in
-  refinement_steps := 0;
-  acegis_loop p t_set
-
-(* ============================================================================================= *)
-(*                             CCEGIS REFINEMENT LOOP                                            *)
-(* ============================================================================================= *)
-
-let rec ccegis_loop (p : psi_def) (t_set : TermSet.t) =
-  Int.incr refinement_steps;
-  let elapsed = Unix.gettimeofday () -. !Config.glob_start in
-  Log.info (fun frmt () -> Fmt.pf frmt "Refinement step %i." !refinement_steps);
-  (if not !Config.info then
-   Fmt.(
-     pf stdout "%i,%3.3f,%3.3f,%i,0@." !refinement_steps !Config.verif_time elapsed
-       (Set.length t_set)));
-  Log.debug_msg Fmt.(str "<CCEGIS> Start refinement loop with %i terms in T." (Set.length t_set));
-  (* Start of the algorithm. *)
-  let eqns = Equations.make ~force_replace_off:true ~p t_set in
-  let s_resp, solution = Equations.solve ~p eqns in
-  match (s_resp, solution) with
-  | RSuccess _, Some sol -> (
-      match Verify.bounded_check ~concrete_ctex:true ~p sol with
-      (* A concrete conterexample term is returned. *)
-      | Some (t, _, _, _) ->
-          Log.debug (fun frmt () ->
-              Fmt.(pf frmt "@[<hov 2><CCEGIS> Counterexample term:@;@[<hov 2>%a@]" pp_term t));
-          ccegis_loop p (Set.add t_set t)
-      | None ->
-          Log.print_ok ();
-          Ok { soln_rec_scheme = p.target; soln_implems = sol })
-  | RFail, _ ->
-      Log.error_msg "<CCEGIS> SyGuS solver failed to find a solution.";
-      Error RFail
-  | RInfeasible, _ ->
-      Log.info
-        Fmt.(
-          fun frmt () ->
-            pf frmt "@[<hov 2><CCEGIS> This problem has no solution. Counterexample set:@;%a@]"
-              (list ~sep:sp pp_term) (Set.elements t_set));
-      Error RInfeasible
-  | RUnknown, _ ->
-      Log.error_msg "<CCEGIS> SyGuS solver returned unknown.";
-      Error RUnknown
-  | _ -> Error s_resp
-
-let psi_ccegis (p : psi_def) =
-  let t_set =
-    TermSet.of_list (List.map ~f:Analysis.concretize (Analysis.terms_of_max_depth 1 !AState._theta))
-  in
-  refinement_steps := 0;
-  ccegis_loop p t_set
 
 (* ============================================================================================= *)
 (*                                                 MAIN ENTRY POINTS                             *)
@@ -350,7 +221,7 @@ let solve_problem (psi_comps : (string * string * string) option)
   AState._theta := theta;
   AState._alpha := t_out;
   AState._span := List.length (Analysis.terms_of_max_depth 1 theta);
-  Log.debug_msg Fmt.(str "Term span: %i." !AState._span);
+  AState.refinement_steps := 0;
   (* Solve the problem. *)
   let problem =
     {
@@ -360,6 +231,6 @@ let solve_problem (psi_comps : (string * string * string) option)
       repr_is_identity = Reduce.is_identity repr_pmrs;
     }
   in
-  if !Config.use_acegis then psi_acegis problem
-  else if !Config.use_ccegis then psi_ccegis problem
+  if !Config.use_acegis then Baselines.algo_acegis problem
+  else if !Config.use_ccegis then Baselines.algo_ccegis problem
   else psi problem
