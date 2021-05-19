@@ -158,13 +158,7 @@ let compute_rhs_with_replacing p t =
       let t0' = rewrite_top_down rewrite_rule t0 in
       (t0', !rstep)
     in
-    let steps = ref 0 in
-    let rec apply_until_irreducible t =
-      Int.incr steps;
-      let t', reduced = one_step t in
-      if reduced && !steps < Reduce._MAX then apply_until_irreducible t' else t'
-    in
-    apply_until_irreducible x
+    Reduce.until_irreducible one_step x
   in
   let app_t = mk_app (mk_var g.pmain_symb) [ t ] in
   let t' = Reduce.reduce_term (custom_reduce app_t) in

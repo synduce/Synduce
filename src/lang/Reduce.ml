@@ -4,6 +4,15 @@ open Utils
 
 let _MAX = 1000
 
+let until_irreducible f t0 =
+  let steps = ref 0 in
+  let rec apply_until_irreducible t =
+    Int.incr steps;
+    let t', reduced = f t in
+    if reduced && !steps < _MAX then apply_until_irreducible t' else t'
+  in
+  apply_until_irreducible t0
+
 (* ============================================================================================= *)
 (*                                  TERM REDUCTION                                               *)
 (* ============================================================================================= *)
@@ -57,6 +66,9 @@ let rule_lookup prules (f : variable) (fargs : term list) : term list =
   in
   second (List.unzip (Map.to_alist (Map.filter_map prules ~f)))
 
+(**
+  reduce_term reduces a term using only the lambda-calculus
+*)
 let rec reduce_term (t : term) : term =
   let case f t =
     match t.tkind with
@@ -110,13 +122,7 @@ and pmrs_until_irreducible (prog : PMRS.t) (input : term) =
     let t0' = rewrite_with rewrite_rule t0 in
     (t0', !rstep)
   in
-  let steps = ref 0 in
-  let rec apply_until_irreducible t =
-    Int.incr steps;
-    let t', reduced = one_step t in
-    if reduced && !steps < _MAX then apply_until_irreducible t' else t'
-  in
-  apply_until_irreducible input
+  until_irreducible one_step input
 
 and reduce_pmrs (prog : PMRS.t) (input : term) =
   let f_input = mk_app (mk_var prog.pmain_symb) [ input ] in
