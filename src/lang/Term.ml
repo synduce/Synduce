@@ -43,20 +43,12 @@ end
 
 type variable = { vname : string; vid : int; vattrs : Attributes.t }
 
-let sexp_of_variable v = Sexp.(List [ Atom "var"; Atom v.vname ])
-
-(*  Atom (Int.to_string v.vid); sexp_of_typ v.vtype]) *)
-
-let pp_variable f v = Fmt.((styled (`Fg `Cyan) string) f v.vname)
-
-let pp_id_var f v = Fmt.(pf f "(%i : %s)" v.vid v.vname)
-
-let dump_variable f v = Fmt.(string f v.vname)
-
 (* Module of variables *)
 module Variable = struct
   module T = struct
     type t = variable
+
+    let sexp_of_t v = Sexp.(List [ Atom "var"; Atom v.vname ])
 
     (* Variables are compared by their id, not their name. *)
     let compare x y = compare x.vid y.vid
@@ -66,8 +58,6 @@ module Variable = struct
 
     let ( = ) x y = equal x y
 
-    let sexp_of_t = sexp_of_variable
-
     let hash = Hashtbl.hash
   end
 
@@ -76,16 +66,16 @@ module Variable = struct
 
   let _types : (int, RType.t) Hashtbl.t = Hashtbl.create (module Int)
 
-  let vtype_assign (v : variable) (t : RType.t) = Hashtbl.set _types ~key:v.vid ~data:t
+  let vtype_assign (v : t) (t : RType.t) = Hashtbl.set _types ~key:v.vid ~data:t
 
-  let vtype (v : variable) = Hashtbl.find _types v.vid
+  let vtype (v : t) = Hashtbl.find _types v.vid
 
   (* `vtype_or_new v` returns the type of variable v, or assigns a fresh type variable
       as its type if it doesn't have one.
       The type of a variable will automatically be assigned to satisfy constraints
       produced during type inference.
   *)
-  let vtype_or_new (v : variable) =
+  let vtype_or_new (v : t) =
     match vtype v with
     | Some x -> x
     | None ->
@@ -116,6 +106,8 @@ module Variable = struct
   let same_name (v : t) (v2 : t) : bool = String.equal v.vname v2.vname
 
   let pp (frmt : Formatter.t) (v : t) = Fmt.(pf frmt "%s" v.vname)
+
+  let pp_id (frmt : Formatter.t) (v : t) = Fmt.(pf frmt "%s{%i}" v.vname v.vid)
 
   let pp_typed (frmt : Formatter.t) (v : t) =
     Fmt.(pf frmt "%s : %a" v.vname RType.pp (vtype_or_new v))
@@ -153,7 +145,7 @@ module VarSet = struct
 
   let of_list = Set.of_list (module Variable)
 
-  let map f vs : t = of_list (List.map ~f (elements vs))
+  let map f vs : V.t = of_list (List.map ~f (elements vs))
 
   let max_elt = Set.max_elt
 
@@ -198,11 +190,11 @@ module VarSet = struct
   let iset vs ilist =
     of_list (List.filter ~f:(fun vi -> List.mem ilist vi.vid ~equal:( = )) (elements vs))
 
-  let pp_var_names formatter vs = Fmt.(list ~sep:comma pp_variable formatter (elements vs))
+  let pp_var_names formatter vs = Fmt.(list ~sep:comma Variable.pp formatter (elements vs))
 
   let pp formatter vs = Fmt.(list ~sep:sp (parens Variable.pp_typed) formatter (elements vs))
 
-  let dump formatter vs = Fmt.Dump.(list pp_id_var formatter (elements vs))
+  let dump formatter vs = Fmt.Dump.(list Variable.pp_id formatter (elements vs))
 
   let of_sh sh =
     Hashtbl.fold sh
