@@ -49,13 +49,13 @@ let seek_types (prog : program) =
   List.iter
     ~f:(fun decl ->
       match decl with
-      | TypeDecl (_, TDParametric (p, typename, term)) -> (
+      | TypeDef (_, TDParametric (p, typename, term)) -> (
           match Lang.RType.add_type ~params:p ~typename term with
           | Ok _ -> ()
           | Error es ->
               Log.(error (fun f () -> log_with_excerpt f !text term.pos Sexp.pp_hum es));
               Log.fatal ())
-      | TypeDecl (_, TDSimple (typename, term)) -> (
+      | TypeDef (_, TDSimple (typename, term)) -> (
           match Lang.RType.add_type ~typename term with
           | Ok _ -> ()
           | Error es ->
@@ -113,8 +113,8 @@ let fterm_to_term _ allv globs locs rterm =
   f _env rterm
 
 let pmrs_of_rules loc (globs : (string, Term.variable) Hashtbl.t) (synt_objs : Term.variable list)
-    (args : Term.variable list) (pvar : Term.variable) (invariant : term option) (body : pmrs_body)
-    : PMRS.t =
+    (args : Term.variable list) (pvar : Term.variable)
+    ((requires, ensures) : term option * term option) (body : pmrs_body) : PMRS.t =
   (* Check that params and args do not have variables with the same name.
      Params and args can shadow globals though.
   *)
@@ -205,9 +205,9 @@ let pmrs_of_rules loc (globs : (string, Term.variable) Hashtbl.t) (synt_objs : T
     | Some (x, _, _, _) -> x
     | None -> loc_fatal_errmsg loc "No main rule."
   in
-  let invariant =
+  let _requires_func, ensures_func =
     let f x = fterm_to_term x.pos allv globs Term.VarSet.empty x in
-    Option.map invariant ~f
+    (Option.map ensures ~f, Option.map ~f requires)
   in
   let pmrs0 =
     PMRS.
@@ -220,8 +220,10 @@ let pmrs_of_rules loc (globs : (string, Term.variable) Hashtbl.t) (synt_objs : T
         porder = -1;
         pmain_symb = main_symb;
         pinput_typ = [ RType.TNamed "_?" ];
+        (* TODO: add requires *)
         (* Will be replaced during type inference. *)
-        poutput_typ = (RType.TNamed "_?", invariant) (* Will be replaced during type inference. *);
+        poutput_typ =
+          (RType.TNamed "_?", ensures_func) (* Will be replaced during type inference. *);
       }
   in
   PMRS.infer_pmrs_types pmrs0
@@ -253,7 +255,7 @@ let translate (prog : program) =
   (* First pass to create the global variables *)
   List.iter prog ~f:(fun decl ->
       match decl with
-      | FunDecl (loc, fname, _, _, _) | PMRSDecl (loc, _, fname, _, _, _) -> (
+      | FunDef (loc, fname, _, _, _) | PMRSDef (loc, _, fname, _, _, _, _) -> (
           match Hashtbl.add globals ~key:fname ~data:(Term.Variable.mk fname) with
           | `Ok -> ()
           | `Duplicate -> loc_fatal_errmsg loc (Fmt.str "%s already declared." fname))
@@ -264,11 +266,11 @@ let translate (prog : program) =
     prog
     ~f:(fun pmrses decl ->
       match decl with
-      | PMRSDecl (loc, params, pname, args, invariant, body) ->
+      | PMRSDef (loc, params, pname, args, requires, ensures, body) ->
           let vparams = List.map ~f:Term.Variable.mk params in
           let pvar = Hashtbl.find_exn globals pname in
           let vargs = List.map ~f:Term.Variable.mk args in
-          let pmrs = pmrs_of_rules loc globals vparams vargs pvar invariant body in
+          let pmrs = pmrs_of_rules loc globals vparams vargs pvar (requires, ensures) body in
           (match Hashtbl.add PMRS._globals ~key:pvar.vid ~data:pmrs with
           | `Ok -> Log.verbose_msg ("Parsed " ^ pname)
           | `Duplicate -> Log.error_msg (pname ^ " already declared, ignoring."));
@@ -277,7 +279,7 @@ let translate (prog : program) =
               | `Ok -> Log.verbose_msg ("Referenced " ^ x.vname)
               | `Duplicate -> ());
           Map.set pmrses ~key:pname ~data:pmrs
-      | FunDecl (loc, fname, args, invariant, body) ->
+      | FunDef (loc, fname, args, invariant, body) ->
           let vargs = List.map ~f:Term.Variable.mk args in
           let fvar = Hashtbl.find_exn globals fname in
           let func_info = translate_function loc globals fvar vargs invariant body in

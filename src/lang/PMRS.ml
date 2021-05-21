@@ -54,52 +54,6 @@ let lhs (nt, args, pat, rhs) =
   t
 
 (* ============================================================================================= *)
-(*                             BASIC PROPERTIES AND TYPE INFERENCE                               *)
-(* ============================================================================================= *)
-(* Update the order of the pmrs. *)
-let update_order (p : t) : t =
-  let order =
-    let f ~key:_ ~data:(_, args, p, _) m =
-      max m (List.length args + if Option.is_some p then 1 else 0)
-    in
-    Map.fold ~f ~init:0 p.prules
-  in
-  { p with porder = order }
-
-let infer_pmrs_types (prog : t) =
-  let infer_aux ~key ~data:(nt, args, pat, body) (map, substs) =
-    let t_body, c_body = infer_type body in
-    let t_head, c_head =
-      let head_term =
-        let t_args = List.map ~f:mk_var args in
-        match pat with
-        | Some (pat_cstr, pat_args) -> mk_app (mk_var nt) (t_args @ [ mk_data pat_cstr pat_args ])
-        | None -> mk_app (mk_var nt) t_args
-      in
-      infer_type head_term
-    in
-    let cur_loc = body.tpos in
-    let c_rule = RType.merge_subs cur_loc c_body c_head in
-    match RType.unify (RType.mkv (substs @ c_rule) @ [ (t_head.ttyp, t_body.ttyp) ]) with
-    | Some res -> (Map.set map ~key ~data:(nt, args, pat, rewrite_types (RType.mkv res) t_body), res)
-    | None ->
-        Log.loc_fatal_errmsg cur_loc
-          (Fmt.str "(%a) has type %a, expected type %a." pp_term body RType.pp t_body.ttyp RType.pp
-             t_head.ttyp)
-  in
-  let new_rules, new_subs = Map.fold prog.prules ~f:infer_aux ~init:(Map.empty (module Int), []) in
-  match RType.unify (RType.mkv new_subs) with
-  | Some usubs ->
-      Variable.update_var_types (RType.mkv usubs);
-      let typ_in, typ_out = RType.fun_typ_unpack (Variable.vtype_or_new prog.pmain_symb) in
-      Variable.update_var_types
-        [ (Variable.vtype_or_new prog.pvar, Variable.vtype_or_new prog.pmain_symb) ];
-      let invariant = Option.map ~f:(fun x -> first (infer_type x)) (second prog.poutput_typ) in
-      let output_type = (typ_out, invariant) in
-      { prog with prules = new_rules; pinput_typ = typ_in; poutput_typ = output_type }
-  | None -> failwith "Failed infering types for pmrs."
-
-(* ============================================================================================= *)
 (*                                 PRETTY PRINTING                                               *)
 (* ============================================================================================= *)
 let pp_pattern (frmt : Formatter.t) ((t, args) : pattern) : unit =
@@ -191,6 +145,53 @@ let pp_ocaml (frmt : Formatter.t) (pmrs : t) : unit =
   | hd :: tl ->
       Fmt.(pf frmt "@[%a %a@]@." (styled (`Fg `Red) string) "let rec" print_caml_def hd);
       List.iter tl ~f:(fun caml_def -> Fmt.(pf frmt "@[and %a@]@." print_caml_def caml_def))
+
+(* ============================================================================================= *)
+(*                             BASIC PROPERTIES AND TYPE INFERENCE                               *)
+(* ============================================================================================= *)
+(* Update the order of the pmrs. *)
+let update_order (p : t) : t =
+  let order =
+    let f ~key:_ ~data:(_, args, p, _) m =
+      max m (List.length args + if Option.is_some p then 1 else 0)
+    in
+    Map.fold ~f ~init:0 p.prules
+  in
+  { p with porder = order }
+
+let infer_pmrs_types (prog : t) =
+  Log.verbose Fmt.(fun fmt () -> pf fmt "@[<hov 2>Untyped PMRS input:@;@[%a@]@]" pp prog);
+  let infer_aux ~key ~data:(nt, args, pat, body) (map, substs) =
+    let t_body, c_body = infer_type body in
+    let t_head, c_head =
+      let head_term =
+        let t_args = List.map ~f:mk_var args in
+        match pat with
+        | Some (pat_cstr, pat_args) -> mk_app (mk_var nt) (t_args @ [ mk_data pat_cstr pat_args ])
+        | None -> mk_app (mk_var nt) t_args
+      in
+      infer_type head_term
+    in
+    let cur_loc = body.tpos in
+    let c_rule = RType.merge_subs cur_loc c_body c_head in
+    match RType.unify (RType.mkv (substs @ c_rule) @ [ (t_head.ttyp, t_body.ttyp) ]) with
+    | Some res -> (Map.set map ~key ~data:(nt, args, pat, rewrite_types (RType.mkv res) t_body), res)
+    | None ->
+        Log.loc_fatal_errmsg cur_loc
+          (Fmt.str "(%a) has type %a, expected type %a." pp_term body RType.pp t_body.ttyp RType.pp
+             t_head.ttyp)
+  in
+  let new_rules, new_subs = Map.fold prog.prules ~f:infer_aux ~init:(Map.empty (module Int), []) in
+  match RType.unify (RType.mkv new_subs) with
+  | Some usubs ->
+      Variable.update_var_types (RType.mkv usubs);
+      let typ_in, typ_out = RType.fun_typ_unpack (Variable.vtype_or_new prog.pmain_symb) in
+      Variable.update_var_types
+        [ (Variable.vtype_or_new prog.pvar, Variable.vtype_or_new prog.pmain_symb) ];
+      let invariant = Option.map ~f:(fun x -> first (infer_type x)) (second prog.poutput_typ) in
+      let output_type = (typ_out, invariant) in
+      { prog with prules = new_rules; pinput_typ = typ_in; poutput_typ = output_type }
+  | None -> failwith "Failed infering types for pmrs."
 
 (* ============================================================================================= *)
 (*                             TRANSLATION FROM FUNCTION to PMRS                                 *)

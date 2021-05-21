@@ -2,7 +2,7 @@ main: LET IDENT EQ TRUE VBAR
 ##
 ## Ends in an error in state: 238.
 ##
-## decl -> LET IDENT list(IDENT) EQ expr . [ TYPE LETPMRS LET EOF ]
+## def -> LET IDENT list(IDENT) EQ expr . [ TYPE LETPMRS LET EOF ]
 ## expr -> expr . QUESTION expr COLON expr [ TYPE QUESTION LETPMRS LET EOF ]
 ##
 ## The known suffix of the stack is as follows:
@@ -30,7 +30,7 @@ main: LET IDENT EQ VBAR
 ##
 ## Ends in an error in state: 237.
 ##
-## decl -> LET IDENT list(IDENT) EQ . expr [ TYPE LETPMRS LET EOF ]
+## def -> LET IDENT list(IDENT) EQ . expr [ TYPE LETPMRS LET EOF ]
 ##
 ## The known suffix of the stack is as follows:
 ## LET IDENT list(IDENT) EQ
@@ -42,8 +42,8 @@ main: LET IDENT IDENT RBRACKET
 ##
 ## Ends in an error in state: 231.
 ##
-## decl -> LET IDENT list(IDENT) . LBRACE expr RBRACE EQ expr [ TYPE LETPMRS LET EOF ]
-## decl -> LET IDENT list(IDENT) . EQ expr [ TYPE LETPMRS LET EOF ]
+## def -> LET IDENT list(IDENT) . LBRACE expr RBRACE EQ expr [ TYPE LETPMRS LET EOF ]
+## def -> LET IDENT list(IDENT) . EQ expr [ TYPE LETPMRS LET EOF ]
 ##
 ## The known suffix of the stack is as follows:
 ## LET IDENT list(IDENT)
@@ -62,7 +62,7 @@ main: LET IDENT LBRACE TRUE RBRACE EQ TRUE VBAR
 ##
 ## Ends in an error in state: 236.
 ##
-## decl -> LET IDENT list(IDENT) LBRACE expr RBRACE EQ expr . [ TYPE LETPMRS LET EOF ]
+## def -> LET IDENT list(IDENT) LBRACE expr RBRACE EQ expr . [ TYPE LETPMRS LET EOF ]
 ## expr -> expr . QUESTION expr COLON expr [ TYPE QUESTION LETPMRS LET EOF ]
 ##
 ## The known suffix of the stack is as follows:
@@ -90,7 +90,7 @@ main: LET IDENT LBRACE TRUE RBRACE EQ VBAR
 ##
 ## Ends in an error in state: 235.
 ##
-## decl -> LET IDENT list(IDENT) LBRACE expr RBRACE EQ . expr [ TYPE LETPMRS LET EOF ]
+## def -> LET IDENT list(IDENT) LBRACE expr RBRACE EQ . expr [ TYPE LETPMRS LET EOF ]
 ##
 ## The known suffix of the stack is as follows:
 ## LET IDENT list(IDENT) LBRACE expr RBRACE EQ
@@ -102,7 +102,7 @@ main: LET IDENT LBRACE TRUE RBRACE VBAR
 ##
 ## Ends in an error in state: 234.
 ##
-## decl -> LET IDENT list(IDENT) LBRACE expr RBRACE . EQ expr [ TYPE LETPMRS LET EOF ]
+## def -> LET IDENT list(IDENT) LBRACE expr RBRACE . EQ expr [ TYPE LETPMRS LET EOF ]
 ##
 ## The known suffix of the stack is as follows:
 ## LET IDENT list(IDENT) LBRACE expr RBRACE
@@ -114,7 +114,7 @@ main: LET IDENT LBRACE TRUE VBAR
 ##
 ## Ends in an error in state: 233.
 ##
-## decl -> LET IDENT list(IDENT) LBRACE expr . RBRACE EQ expr [ TYPE LETPMRS LET EOF ]
+## def -> LET IDENT list(IDENT) LBRACE expr . RBRACE EQ expr [ TYPE LETPMRS LET EOF ]
 ## expr -> expr . QUESTION expr COLON expr [ RBRACE QUESTION ]
 ##
 ## The known suffix of the stack is as follows:
@@ -142,7 +142,7 @@ main: LET IDENT LBRACE VBAR
 ##
 ## Ends in an error in state: 232.
 ##
-## decl -> LET IDENT list(IDENT) LBRACE . expr RBRACE EQ expr [ TYPE LETPMRS LET EOF ]
+## def -> LET IDENT list(IDENT) LBRACE . expr RBRACE EQ expr [ TYPE LETPMRS LET EOF ]
 ##
 ## The known suffix of the stack is as follows:
 ## LET IDENT list(IDENT) LBRACE
@@ -154,8 +154,8 @@ main: LET IDENT VBAR
 ##
 ## Ends in an error in state: 230.
 ##
-## decl -> LET IDENT . list(IDENT) LBRACE expr RBRACE EQ expr [ TYPE LETPMRS LET EOF ]
-## decl -> LET IDENT . list(IDENT) EQ expr [ TYPE LETPMRS LET EOF ]
+## def -> LET IDENT . list(IDENT) LBRACE expr RBRACE EQ expr [ TYPE LETPMRS LET EOF ]
+## def -> LET IDENT . list(IDENT) EQ expr [ TYPE LETPMRS LET EOF ]
 ##
 ## The known suffix of the stack is as follows:
 ## LET IDENT
@@ -167,10 +167,10 @@ main: LET REC IDENT EQ CIDENT LETAND VBAR
 ##
 ## Ends in an error in state: 228.
 ##
-## separated_nonempty_list(LETAND,functdecl) -> functdecl LETAND . separated_nonempty_list(LETAND,functdecl) [ TYPE LETPMRS LET LBRACKET EOF ]
+## separated_nonempty_list(LETAND,functdef) -> functdef LETAND . separated_nonempty_list(LETAND,functdef) [ TYPE LETPMRS LET LBRACKET EOF ]
 ##
 ## The known suffix of the stack is as follows:
-## functdecl LETAND
+## functdef LETAND
 ##
 
 <YOUR SYNTAX ERROR MESSAGE HERE>
@@ -296,7 +296,7 @@ main: LET REC IDENT EQ VBAR
 ##
 ## Ends in an error in state: 199.
 ##
-## functdecl -> IDENT list(IDENT) EQ . function_body [ TYPE LETPMRS LETAND LET LBRACKET EOF ]
+## functdef -> IDENT list(IDENT) EQ . function_body [ TYPE LETPMRS LETAND LET LBRACKET EOF ]
 ##
 ## The known suffix of the stack is as follows:
 ## IDENT list(IDENT) EQ
@@ -308,7 +308,7 @@ main: LET REC IDENT IDENT RBRACKET
 ##
 ## Ends in an error in state: 198.
 ##
-## functdecl -> IDENT list(IDENT) . EQ function_body [ TYPE LETPMRS LETAND LET LBRACKET EOF ]
+## functdef -> IDENT list(IDENT) . EQ function_body [ TYPE LETPMRS LETAND LET LBRACKET EOF ]
 ##
 ## The known suffix of the stack is as follows:
 ## IDENT list(IDENT)
@@ -327,7 +327,7 @@ main: LET REC IDENT VBAR
 ##
 ## Ends in an error in state: 197.
 ##
-## functdecl -> IDENT . list(IDENT) EQ function_body [ TYPE LETPMRS LETAND LET LBRACKET EOF ]
+## functdef -> IDENT . list(IDENT) EQ function_body [ TYPE LETPMRS LETAND LET LBRACKET EOF ]
 ##
 ## The known suffix of the stack is as follows:
 ## IDENT
@@ -339,10 +339,10 @@ main: LET REC LBRACKET DEFINING IDENT LBRACE
 ##
 ## Ends in an error in state: 219.
 ##
-## letpmrsdecl -> loption(separated_nonempty_list(LETAND,functdecl)) LBRACKET DEFINING list(IDENT) . RBRACKET [ TYPE LETPMRS LET LBRACKET EOF ]
+## letpmrsdef -> loption(separated_nonempty_list(LETAND,functdef)) LBRACKET DEFINING list(IDENT) . RBRACKET [ TYPE LETPMRS LET LBRACKET EOF ]
 ##
 ## The known suffix of the stack is as follows:
-## loption(separated_nonempty_list(LETAND,functdecl)) LBRACKET DEFINING list(IDENT)
+## loption(separated_nonempty_list(LETAND,functdef)) LBRACKET DEFINING list(IDENT)
 ##
 ## WARNING: This example involves spurious reductions.
 ## This implies that, although the LR(1) items shown above provide an
@@ -358,11 +358,11 @@ main: LET REC LBRACKET DEFINING RBRACKET ELSE
 ##
 ## Ends in an error in state: 221.
 ##
-## decl -> LET REC letpmrsdecl . LBRACKET EQUIV IDENT IDENT RBRACKET [ TYPE LETPMRS LET EOF ]
-## decl -> LET REC letpmrsdecl . [ TYPE LETPMRS LET EOF ]
+## def -> LET REC letpmrsdef . LBRACKET EQUIV IDENT IDENT RBRACKET [ TYPE LETPMRS LET EOF ]
+## def -> LET REC letpmrsdef . [ TYPE LETPMRS LET EOF ]
 ##
 ## The known suffix of the stack is as follows:
-## LET REC letpmrsdecl
+## LET REC letpmrsdef
 ##
 
 <YOUR SYNTAX ERROR MESSAGE HERE>
@@ -371,10 +371,10 @@ main: LET REC LBRACKET DEFINING RBRACKET LBRACKET EQUIV IDENT IDENT RBRACKET VBA
 ##
 ## Ends in an error in state: 242.
 ##
-## list(decl) -> decl . list(decl) [ EOF ]
+## list(def) -> def . list(def) [ EOF ]
 ##
 ## The known suffix of the stack is as follows:
-## decl
+## def
 ##
 
 <YOUR SYNTAX ERROR MESSAGE HERE>
@@ -383,10 +383,10 @@ main: LET REC LBRACKET DEFINING RBRACKET LBRACKET EQUIV IDENT IDENT VBAR
 ##
 ## Ends in an error in state: 225.
 ##
-## decl -> LET REC letpmrsdecl LBRACKET EQUIV IDENT IDENT . RBRACKET [ TYPE LETPMRS LET EOF ]
+## def -> LET REC letpmrsdef LBRACKET EQUIV IDENT IDENT . RBRACKET [ TYPE LETPMRS LET EOF ]
 ##
 ## The known suffix of the stack is as follows:
-## LET REC letpmrsdecl LBRACKET EQUIV IDENT IDENT
+## LET REC letpmrsdef LBRACKET EQUIV IDENT IDENT
 ##
 
 <YOUR SYNTAX ERROR MESSAGE HERE>
@@ -395,10 +395,10 @@ main: LET REC LBRACKET DEFINING RBRACKET LBRACKET EQUIV IDENT VBAR
 ##
 ## Ends in an error in state: 224.
 ##
-## decl -> LET REC letpmrsdecl LBRACKET EQUIV IDENT . IDENT RBRACKET [ TYPE LETPMRS LET EOF ]
+## def -> LET REC letpmrsdef LBRACKET EQUIV IDENT . IDENT RBRACKET [ TYPE LETPMRS LET EOF ]
 ##
 ## The known suffix of the stack is as follows:
-## LET REC letpmrsdecl LBRACKET EQUIV IDENT
+## LET REC letpmrsdef LBRACKET EQUIV IDENT
 ##
 
 <YOUR SYNTAX ERROR MESSAGE HERE>
@@ -407,10 +407,10 @@ main: LET REC LBRACKET DEFINING RBRACKET LBRACKET EQUIV VBAR
 ##
 ## Ends in an error in state: 223.
 ##
-## decl -> LET REC letpmrsdecl LBRACKET EQUIV . IDENT IDENT RBRACKET [ TYPE LETPMRS LET EOF ]
+## def -> LET REC letpmrsdef LBRACKET EQUIV . IDENT IDENT RBRACKET [ TYPE LETPMRS LET EOF ]
 ##
 ## The known suffix of the stack is as follows:
-## LET REC letpmrsdecl LBRACKET EQUIV
+## LET REC letpmrsdef LBRACKET EQUIV
 ##
 
 <YOUR SYNTAX ERROR MESSAGE HERE>
@@ -419,10 +419,10 @@ main: LET REC LBRACKET DEFINING RBRACKET LBRACKET VBAR
 ##
 ## Ends in an error in state: 222.
 ##
-## decl -> LET REC letpmrsdecl LBRACKET . EQUIV IDENT IDENT RBRACKET [ TYPE LETPMRS LET EOF ]
+## def -> LET REC letpmrsdef LBRACKET . EQUIV IDENT IDENT RBRACKET [ TYPE LETPMRS LET EOF ]
 ##
 ## The known suffix of the stack is as follows:
-## LET REC letpmrsdecl LBRACKET
+## LET REC letpmrsdef LBRACKET
 ##
 
 <YOUR SYNTAX ERROR MESSAGE HERE>
@@ -431,10 +431,10 @@ main: LET REC LBRACKET DEFINING VBAR
 ##
 ## Ends in an error in state: 218.
 ##
-## letpmrsdecl -> loption(separated_nonempty_list(LETAND,functdecl)) LBRACKET DEFINING . list(IDENT) RBRACKET [ TYPE LETPMRS LET LBRACKET EOF ]
+## letpmrsdef -> loption(separated_nonempty_list(LETAND,functdef)) LBRACKET DEFINING . list(IDENT) RBRACKET [ TYPE LETPMRS LET LBRACKET EOF ]
 ##
 ## The known suffix of the stack is as follows:
-## loption(separated_nonempty_list(LETAND,functdecl)) LBRACKET DEFINING
+## loption(separated_nonempty_list(LETAND,functdef)) LBRACKET DEFINING
 ##
 
 <YOUR SYNTAX ERROR MESSAGE HERE>
@@ -444,10 +444,10 @@ main: LET REC LBRACKET INVARIANT TRUE VBAR
 ## Ends in an error in state: 216.
 ##
 ## expr -> expr . QUESTION expr COLON expr [ RBRACKET QUESTION ]
-## letpmrsdecl -> loption(separated_nonempty_list(LETAND,functdecl)) LBRACKET INVARIANT expr . RBRACKET [ TYPE LETPMRS LET LBRACKET EOF ]
+## letpmrsdef -> loption(separated_nonempty_list(LETAND,functdef)) LBRACKET INVARIANT expr . RBRACKET [ TYPE LETPMRS LET LBRACKET EOF ]
 ##
 ## The known suffix of the stack is as follows:
-## loption(separated_nonempty_list(LETAND,functdecl)) LBRACKET INVARIANT expr
+## loption(separated_nonempty_list(LETAND,functdef)) LBRACKET INVARIANT expr
 ##
 ## WARNING: This example involves spurious reductions.
 ## This implies that, although the LR(1) items shown above provide an
@@ -471,10 +471,10 @@ main: LET REC LBRACKET INVARIANT VBAR
 ##
 ## Ends in an error in state: 215.
 ##
-## letpmrsdecl -> loption(separated_nonempty_list(LETAND,functdecl)) LBRACKET INVARIANT . expr RBRACKET [ TYPE LETPMRS LET LBRACKET EOF ]
+## letpmrsdef -> loption(separated_nonempty_list(LETAND,functdef)) LBRACKET INVARIANT . expr RBRACKET [ TYPE LETPMRS LET LBRACKET EOF ]
 ##
 ## The known suffix of the stack is as follows:
-## loption(separated_nonempty_list(LETAND,functdecl)) LBRACKET INVARIANT
+## loption(separated_nonempty_list(LETAND,functdef)) LBRACKET INVARIANT
 ##
 
 <YOUR SYNTAX ERROR MESSAGE HERE>
@@ -483,11 +483,11 @@ main: LET REC LBRACKET VBAR
 ##
 ## Ends in an error in state: 214.
 ##
-## letpmrsdecl -> loption(separated_nonempty_list(LETAND,functdecl)) LBRACKET . DEFINING list(IDENT) RBRACKET [ TYPE LETPMRS LET LBRACKET EOF ]
-## letpmrsdecl -> loption(separated_nonempty_list(LETAND,functdecl)) LBRACKET . INVARIANT expr RBRACKET [ TYPE LETPMRS LET LBRACKET EOF ]
+## letpmrsdef -> loption(separated_nonempty_list(LETAND,functdef)) LBRACKET . DEFINING list(IDENT) RBRACKET [ TYPE LETPMRS LET LBRACKET EOF ]
+## letpmrsdef -> loption(separated_nonempty_list(LETAND,functdef)) LBRACKET . INVARIANT expr RBRACKET [ TYPE LETPMRS LET LBRACKET EOF ]
 ##
 ## The known suffix of the stack is as follows:
-## loption(separated_nonempty_list(LETAND,functdecl)) LBRACKET
+## loption(separated_nonempty_list(LETAND,functdef)) LBRACKET
 ##
 
 <YOUR SYNTAX ERROR MESSAGE HERE>
@@ -496,8 +496,8 @@ main: LET REC VBAR
 ##
 ## Ends in an error in state: 196.
 ##
-## decl -> LET REC . letpmrsdecl LBRACKET EQUIV IDENT IDENT RBRACKET [ TYPE LETPMRS LET EOF ]
-## decl -> LET REC . letpmrsdecl [ TYPE LETPMRS LET EOF ]
+## def -> LET REC . letpmrsdef LBRACKET EQUIV IDENT IDENT RBRACKET [ TYPE LETPMRS LET EOF ]
+## def -> LET REC . letpmrsdef [ TYPE LETPMRS LET EOF ]
 ##
 ## The known suffix of the stack is as follows:
 ## LET REC
@@ -509,10 +509,10 @@ main: LET VBAR
 ##
 ## Ends in an error in state: 195.
 ##
-## decl -> LET . IDENT list(IDENT) LBRACE expr RBRACE EQ expr [ TYPE LETPMRS LET EOF ]
-## decl -> LET . IDENT list(IDENT) EQ expr [ TYPE LETPMRS LET EOF ]
-## decl -> LET . REC letpmrsdecl LBRACKET EQUIV IDENT IDENT RBRACKET [ TYPE LETPMRS LET EOF ]
-## decl -> LET . REC letpmrsdecl [ TYPE LETPMRS LET EOF ]
+## def -> LET . IDENT list(IDENT) LBRACE expr RBRACE EQ expr [ TYPE LETPMRS LET EOF ]
+## def -> LET . IDENT list(IDENT) EQ expr [ TYPE LETPMRS LET EOF ]
+## def -> LET . REC letpmrsdef LBRACKET EQUIV IDENT IDENT RBRACKET [ TYPE LETPMRS LET EOF ]
+## def -> LET . REC letpmrsdef [ TYPE LETPMRS LET EOF ]
 ##
 ## The known suffix of the stack is as follows:
 ## LET
@@ -594,7 +594,7 @@ main: LETPMRS IDENT EQ VBAR
 ##
 ## Ends in an error in state: 192.
 ##
-## pmrsdecl -> IDENT list(IDENT) EQ . pbody [ TYPE LETPMRS LET EOF ]
+## pmrsdef -> IDENT list(IDENT) EQ . pbody [ TYPE LETPMRS LET EOF ]
 ##
 ## The known suffix of the stack is as follows:
 ## IDENT list(IDENT) EQ
@@ -606,8 +606,8 @@ main: LETPMRS IDENT IDENT RBRACKET
 ##
 ## Ends in an error in state: 186.
 ##
-## pmrsdecl -> IDENT list(IDENT) . EQ pbody [ TYPE LETPMRS LET EOF ]
-## pmrsdecl -> IDENT list(IDENT) . LBRACE expr RBRACE EQ pbody [ TYPE LETPMRS LET EOF ]
+## pmrsdef -> IDENT list(IDENT) . EQ pbody [ TYPE LETPMRS LET EOF ]
+## pmrsdef -> IDENT list(IDENT) . LBRACE expr RBRACE EQ pbody [ TYPE LETPMRS LET EOF ]
 ##
 ## The known suffix of the stack is as follows:
 ## IDENT list(IDENT)
@@ -1383,7 +1383,7 @@ main: LETPMRS IDENT LBRACE TRUE RBRACE EQ VBAR
 ##
 ## Ends in an error in state: 190.
 ##
-## pmrsdecl -> IDENT list(IDENT) LBRACE expr RBRACE EQ . pbody [ TYPE LETPMRS LET EOF ]
+## pmrsdef -> IDENT list(IDENT) LBRACE expr RBRACE EQ . pbody [ TYPE LETPMRS LET EOF ]
 ##
 ## The known suffix of the stack is as follows:
 ## IDENT list(IDENT) LBRACE expr RBRACE EQ
@@ -1395,7 +1395,7 @@ main: LETPMRS IDENT LBRACE TRUE RBRACE VBAR
 ##
 ## Ends in an error in state: 189.
 ##
-## pmrsdecl -> IDENT list(IDENT) LBRACE expr RBRACE . EQ pbody [ TYPE LETPMRS LET EOF ]
+## pmrsdef -> IDENT list(IDENT) LBRACE expr RBRACE . EQ pbody [ TYPE LETPMRS LET EOF ]
 ##
 ## The known suffix of the stack is as follows:
 ## IDENT list(IDENT) LBRACE expr RBRACE
@@ -1468,7 +1468,7 @@ main: LETPMRS IDENT LBRACE TRUE VBAR
 ## Ends in an error in state: 188.
 ##
 ## expr -> expr . QUESTION expr COLON expr [ RBRACE QUESTION ]
-## pmrsdecl -> IDENT list(IDENT) LBRACE expr . RBRACE EQ pbody [ TYPE LETPMRS LET EOF ]
+## pmrsdef -> IDENT list(IDENT) LBRACE expr . RBRACE EQ pbody [ TYPE LETPMRS LET EOF ]
 ##
 ## The known suffix of the stack is as follows:
 ## IDENT list(IDENT) LBRACE expr
@@ -1495,7 +1495,7 @@ main: LETPMRS IDENT LBRACE VBAR
 ##
 ## Ends in an error in state: 187.
 ##
-## pmrsdecl -> IDENT list(IDENT) LBRACE . expr RBRACE EQ pbody [ TYPE LETPMRS LET EOF ]
+## pmrsdef -> IDENT list(IDENT) LBRACE . expr RBRACE EQ pbody [ TYPE LETPMRS LET EOF ]
 ##
 ## The known suffix of the stack is as follows:
 ## IDENT list(IDENT) LBRACE
@@ -1507,8 +1507,8 @@ main: LETPMRS IDENT VBAR
 ##
 ## Ends in an error in state: 185.
 ##
-## pmrsdecl -> IDENT . list(IDENT) EQ pbody [ TYPE LETPMRS LET EOF ]
-## pmrsdecl -> IDENT . list(IDENT) LBRACE expr RBRACE EQ pbody [ TYPE LETPMRS LET EOF ]
+## pmrsdef -> IDENT . list(IDENT) EQ pbody [ TYPE LETPMRS LET EOF ]
+## pmrsdef -> IDENT . list(IDENT) LBRACE expr RBRACE EQ pbody [ TYPE LETPMRS LET EOF ]
 ##
 ## The known suffix of the stack is as follows:
 ## IDENT
@@ -1545,7 +1545,7 @@ main: LETPMRS LPAR RPAR IDENT EQ VBAR
 ##
 ## Ends in an error in state: 183.
 ##
-## pmrsdecl -> LPAR loption(separated_nonempty_list(COMMA,IDENT)) RPAR IDENT list(IDENT) EQ . pbody [ TYPE LETPMRS LET EOF ]
+## pmrsdef -> LPAR loption(separated_nonempty_list(COMMA,IDENT)) RPAR IDENT list(IDENT) EQ . pbody [ TYPE LETPMRS LET EOF ]
 ##
 ## The known suffix of the stack is as follows:
 ## LPAR loption(separated_nonempty_list(COMMA,IDENT)) RPAR IDENT list(IDENT) EQ
@@ -1557,8 +1557,8 @@ main: LETPMRS LPAR RPAR IDENT IDENT RBRACKET
 ##
 ## Ends in an error in state: 67.
 ##
-## pmrsdecl -> LPAR loption(separated_nonempty_list(COMMA,IDENT)) RPAR IDENT list(IDENT) . EQ pbody [ TYPE LETPMRS LET EOF ]
-## pmrsdecl -> LPAR loption(separated_nonempty_list(COMMA,IDENT)) RPAR IDENT list(IDENT) . LBRACE expr RBRACE EQ pbody [ TYPE LETPMRS LET EOF ]
+## pmrsdef -> LPAR loption(separated_nonempty_list(COMMA,IDENT)) RPAR IDENT list(IDENT) . EQ pbody [ TYPE LETPMRS LET EOF ]
+## pmrsdef -> LPAR loption(separated_nonempty_list(COMMA,IDENT)) RPAR IDENT list(IDENT) . LBRACE expr RBRACE EQ pbody [ TYPE LETPMRS LET EOF ]
 ##
 ## The known suffix of the stack is as follows:
 ## LPAR loption(separated_nonempty_list(COMMA,IDENT)) RPAR IDENT list(IDENT)
@@ -1577,7 +1577,7 @@ main: LETPMRS LPAR RPAR IDENT LBRACE TRUE RBRACE EQ VBAR
 ##
 ## Ends in an error in state: 173.
 ##
-## pmrsdecl -> LPAR loption(separated_nonempty_list(COMMA,IDENT)) RPAR IDENT list(IDENT) LBRACE expr RBRACE EQ . pbody [ TYPE LETPMRS LET EOF ]
+## pmrsdef -> LPAR loption(separated_nonempty_list(COMMA,IDENT)) RPAR IDENT list(IDENT) LBRACE expr RBRACE EQ . pbody [ TYPE LETPMRS LET EOF ]
 ##
 ## The known suffix of the stack is as follows:
 ## LPAR loption(separated_nonempty_list(COMMA,IDENT)) RPAR IDENT list(IDENT) LBRACE expr RBRACE EQ
@@ -1589,7 +1589,7 @@ main: LETPMRS LPAR RPAR IDENT LBRACE TRUE RBRACE VBAR
 ##
 ## Ends in an error in state: 172.
 ##
-## pmrsdecl -> LPAR loption(separated_nonempty_list(COMMA,IDENT)) RPAR IDENT list(IDENT) LBRACE expr RBRACE . EQ pbody [ TYPE LETPMRS LET EOF ]
+## pmrsdef -> LPAR loption(separated_nonempty_list(COMMA,IDENT)) RPAR IDENT list(IDENT) LBRACE expr RBRACE . EQ pbody [ TYPE LETPMRS LET EOF ]
 ##
 ## The known suffix of the stack is as follows:
 ## LPAR loption(separated_nonempty_list(COMMA,IDENT)) RPAR IDENT list(IDENT) LBRACE expr RBRACE
@@ -1602,7 +1602,7 @@ main: LETPMRS LPAR RPAR IDENT LBRACE TRUE VBAR
 ## Ends in an error in state: 171.
 ##
 ## expr -> expr . QUESTION expr COLON expr [ RBRACE QUESTION ]
-## pmrsdecl -> LPAR loption(separated_nonempty_list(COMMA,IDENT)) RPAR IDENT list(IDENT) LBRACE expr . RBRACE EQ pbody [ TYPE LETPMRS LET EOF ]
+## pmrsdef -> LPAR loption(separated_nonempty_list(COMMA,IDENT)) RPAR IDENT list(IDENT) LBRACE expr . RBRACE EQ pbody [ TYPE LETPMRS LET EOF ]
 ##
 ## The known suffix of the stack is as follows:
 ## LPAR loption(separated_nonempty_list(COMMA,IDENT)) RPAR IDENT list(IDENT) LBRACE expr
@@ -1629,7 +1629,7 @@ main: LETPMRS LPAR RPAR IDENT LBRACE VBAR
 ##
 ## Ends in an error in state: 68.
 ##
-## pmrsdecl -> LPAR loption(separated_nonempty_list(COMMA,IDENT)) RPAR IDENT list(IDENT) LBRACE . expr RBRACE EQ pbody [ TYPE LETPMRS LET EOF ]
+## pmrsdef -> LPAR loption(separated_nonempty_list(COMMA,IDENT)) RPAR IDENT list(IDENT) LBRACE . expr RBRACE EQ pbody [ TYPE LETPMRS LET EOF ]
 ##
 ## The known suffix of the stack is as follows:
 ## LPAR loption(separated_nonempty_list(COMMA,IDENT)) RPAR IDENT list(IDENT) LBRACE
@@ -1641,8 +1641,8 @@ main: LETPMRS LPAR RPAR IDENT VBAR
 ##
 ## Ends in an error in state: 64.
 ##
-## pmrsdecl -> LPAR loption(separated_nonempty_list(COMMA,IDENT)) RPAR IDENT . list(IDENT) EQ pbody [ TYPE LETPMRS LET EOF ]
-## pmrsdecl -> LPAR loption(separated_nonempty_list(COMMA,IDENT)) RPAR IDENT . list(IDENT) LBRACE expr RBRACE EQ pbody [ TYPE LETPMRS LET EOF ]
+## pmrsdef -> LPAR loption(separated_nonempty_list(COMMA,IDENT)) RPAR IDENT . list(IDENT) EQ pbody [ TYPE LETPMRS LET EOF ]
+## pmrsdef -> LPAR loption(separated_nonempty_list(COMMA,IDENT)) RPAR IDENT . list(IDENT) LBRACE expr RBRACE EQ pbody [ TYPE LETPMRS LET EOF ]
 ##
 ## The known suffix of the stack is as follows:
 ## LPAR loption(separated_nonempty_list(COMMA,IDENT)) RPAR IDENT
@@ -1654,8 +1654,8 @@ main: LETPMRS LPAR RPAR VBAR
 ##
 ## Ends in an error in state: 63.
 ##
-## pmrsdecl -> LPAR loption(separated_nonempty_list(COMMA,IDENT)) RPAR . IDENT list(IDENT) EQ pbody [ TYPE LETPMRS LET EOF ]
-## pmrsdecl -> LPAR loption(separated_nonempty_list(COMMA,IDENT)) RPAR . IDENT list(IDENT) LBRACE expr RBRACE EQ pbody [ TYPE LETPMRS LET EOF ]
+## pmrsdef -> LPAR loption(separated_nonempty_list(COMMA,IDENT)) RPAR . IDENT list(IDENT) EQ pbody [ TYPE LETPMRS LET EOF ]
+## pmrsdef -> LPAR loption(separated_nonempty_list(COMMA,IDENT)) RPAR . IDENT list(IDENT) LBRACE expr RBRACE EQ pbody [ TYPE LETPMRS LET EOF ]
 ##
 ## The known suffix of the stack is as follows:
 ## LPAR loption(separated_nonempty_list(COMMA,IDENT)) RPAR
@@ -1667,8 +1667,8 @@ main: LETPMRS LPAR VBAR
 ##
 ## Ends in an error in state: 57.
 ##
-## pmrsdecl -> LPAR . loption(separated_nonempty_list(COMMA,IDENT)) RPAR IDENT list(IDENT) EQ pbody [ TYPE LETPMRS LET EOF ]
-## pmrsdecl -> LPAR . loption(separated_nonempty_list(COMMA,IDENT)) RPAR IDENT list(IDENT) LBRACE expr RBRACE EQ pbody [ TYPE LETPMRS LET EOF ]
+## pmrsdef -> LPAR . loption(separated_nonempty_list(COMMA,IDENT)) RPAR IDENT list(IDENT) EQ pbody [ TYPE LETPMRS LET EOF ]
+## pmrsdef -> LPAR . loption(separated_nonempty_list(COMMA,IDENT)) RPAR IDENT list(IDENT) LBRACE expr RBRACE EQ pbody [ TYPE LETPMRS LET EOF ]
 ##
 ## The known suffix of the stack is as follows:
 ## LPAR
@@ -1680,7 +1680,7 @@ main: LETPMRS VBAR
 ##
 ## Ends in an error in state: 56.
 ##
-## decl -> LETPMRS . pmrsdecl [ TYPE LETPMRS LET EOF ]
+## def -> LETPMRS . pmrsdef [ TYPE LETPMRS LET EOF ]
 ##
 ## The known suffix of the stack is as follows:
 ## LETPMRS
@@ -1958,7 +1958,7 @@ main: TYPE IDENT EQ VBAR
 ##
 ## Ends in an error in state: 53.
 ##
-## typedecl -> IDENT EQ . typeterm0 [ TYPE LETPMRS LET EOF ]
+## typedef -> IDENT EQ . typeterm0 [ TYPE LETPMRS LET EOF ]
 ##
 ## The known suffix of the stack is as follows:
 ## IDENT EQ
@@ -1970,7 +1970,7 @@ main: TYPE IDENT VBAR
 ##
 ## Ends in an error in state: 52.
 ##
-## typedecl -> IDENT . EQ typeterm0 [ TYPE LETPMRS LET EOF ]
+## typedef -> IDENT . EQ typeterm0 [ TYPE LETPMRS LET EOF ]
 ##
 ## The known suffix of the stack is as follows:
 ## IDENT
@@ -2007,7 +2007,7 @@ main: TYPE LPAR RPAR IDENT EQ VBAR
 ##
 ## Ends in an error in state: 50.
 ##
-## typedecl -> LPAR loption(separated_nonempty_list(COMMA,PIDENT)) RPAR IDENT EQ . typeterm0 [ TYPE LETPMRS LET EOF ]
+## typedef -> LPAR loption(separated_nonempty_list(COMMA,PIDENT)) RPAR IDENT EQ . typeterm0 [ TYPE LETPMRS LET EOF ]
 ##
 ## The known suffix of the stack is as follows:
 ## LPAR loption(separated_nonempty_list(COMMA,PIDENT)) RPAR IDENT EQ
@@ -2019,7 +2019,7 @@ main: TYPE LPAR RPAR IDENT VBAR
 ##
 ## Ends in an error in state: 49.
 ##
-## typedecl -> LPAR loption(separated_nonempty_list(COMMA,PIDENT)) RPAR IDENT . EQ typeterm0 [ TYPE LETPMRS LET EOF ]
+## typedef -> LPAR loption(separated_nonempty_list(COMMA,PIDENT)) RPAR IDENT . EQ typeterm0 [ TYPE LETPMRS LET EOF ]
 ##
 ## The known suffix of the stack is as follows:
 ## LPAR loption(separated_nonempty_list(COMMA,PIDENT)) RPAR IDENT
@@ -2031,7 +2031,7 @@ main: TYPE LPAR RPAR VBAR
 ##
 ## Ends in an error in state: 48.
 ##
-## typedecl -> LPAR loption(separated_nonempty_list(COMMA,PIDENT)) RPAR . IDENT EQ typeterm0 [ TYPE LETPMRS LET EOF ]
+## typedef -> LPAR loption(separated_nonempty_list(COMMA,PIDENT)) RPAR . IDENT EQ typeterm0 [ TYPE LETPMRS LET EOF ]
 ##
 ## The known suffix of the stack is as follows:
 ## LPAR loption(separated_nonempty_list(COMMA,PIDENT)) RPAR
@@ -2043,7 +2043,7 @@ main: TYPE LPAR VBAR
 ##
 ## Ends in an error in state: 42.
 ##
-## typedecl -> LPAR . loption(separated_nonempty_list(COMMA,PIDENT)) RPAR IDENT EQ typeterm0 [ TYPE LETPMRS LET EOF ]
+## typedef -> LPAR . loption(separated_nonempty_list(COMMA,PIDENT)) RPAR IDENT EQ typeterm0 [ TYPE LETPMRS LET EOF ]
 ##
 ## The known suffix of the stack is as follows:
 ## LPAR
@@ -2055,7 +2055,7 @@ main: TYPE PIDENT IDENT EQ VBAR
 ##
 ## Ends in an error in state: 4.
 ##
-## typedecl -> PIDENT IDENT EQ . typeterm0 [ TYPE LETPMRS LET EOF ]
+## typedef -> PIDENT IDENT EQ . typeterm0 [ TYPE LETPMRS LET EOF ]
 ##
 ## The known suffix of the stack is as follows:
 ## PIDENT IDENT EQ
@@ -2067,7 +2067,7 @@ main: TYPE PIDENT IDENT VBAR
 ##
 ## Ends in an error in state: 3.
 ##
-## typedecl -> PIDENT IDENT . EQ typeterm0 [ TYPE LETPMRS LET EOF ]
+## typedef -> PIDENT IDENT . EQ typeterm0 [ TYPE LETPMRS LET EOF ]
 ##
 ## The known suffix of the stack is as follows:
 ## PIDENT IDENT
@@ -2079,7 +2079,7 @@ main: TYPE PIDENT VBAR
 ##
 ## Ends in an error in state: 2.
 ##
-## typedecl -> PIDENT . IDENT EQ typeterm0 [ TYPE LETPMRS LET EOF ]
+## typedef -> PIDENT . IDENT EQ typeterm0 [ TYPE LETPMRS LET EOF ]
 ##
 ## The known suffix of the stack is as follows:
 ## PIDENT
@@ -2091,7 +2091,7 @@ main: TYPE VBAR
 ##
 ## Ends in an error in state: 1.
 ##
-## decl -> TYPE . typedecl [ TYPE LETPMRS LET EOF ]
+## def -> TYPE . typedef [ TYPE LETPMRS LET EOF ]
 ##
 ## The known suffix of the stack is as follows:
 ## TYPE

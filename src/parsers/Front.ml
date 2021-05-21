@@ -50,14 +50,28 @@ type pmrs_body = pmrs_rule list
 
 type function_body = PmrsBody of loc * pmrs_body | ExprBody of loc * term
 
-type decl =
-  | TypeDecl of loc * type_decl
-  | FunDecl of loc * id * id list * term option * term
-  | PMRSDecl of loc * id list * id * id list * term option * pmrs_body
-  | CamlPMRSDecl of loc * id list * term option * (id * id list * function_body) list
-  | SyntObjDecl of loc * decl * id * id
+type definition =
+  | TypeDef of loc * type_decl  (** A type definition. *)
+  | FunDef of loc * id * id list * term option * term  (** A function definition. *)
+  | PMRSDef of loc * id list * id * id list * term option * term option * pmrs_body
+      (** A PMRS declaration (loc, syntobjs, name, params, p_requires, p_ensures, body) is a PMRS where:
+     - loc is a location
+     - syntobjs is a list of identifiers of the objects to be synthesized,
+     - name is the name of the function,
+     - params is a list of identifiers of the parameters of the PMRS, i.e. all the arguments except
+       the last argument that is decomposed in the recursion.
+     - p_requires is a predicate from the input type of the PMRS (last arg of the function) to bool,
+       corresponding to the predicate that the inputs must satsify.
+     - p_ensures is a predicate on the output type. Every element in the image of the function must
+       satsify this predicate.
+  *)
+  | CamlPMRSDef of loc * id list * term option * term option * (id * id list * function_body) list
+      (** TODO: Remove once Caml syntax is fuylly supported.*)
+  | SyntObjDecl of loc * definition * id * id
+      (** Declares a synthesis objective: SyntObjDecl(loc, decl, f1, f2 ) specifies that the
+      function defined by decl must be equivalent to f1 composed with f2. *)
 
-type program = decl list
+type program = definition list
 
 (*  Pretty printing *)
 let rec pp_fterm (frmt : Formatter.t) (t : term) =
@@ -91,7 +105,7 @@ let make_rules functions =
   in
   List.concat (List.map ~f:make_rule_mult functions)
 
-let rebuild_pmrs_decl loc params inv functions =
+let rebuild_pmrs_decl loc params requires ensures functions =
   match functions with
   | (name, args, fbody) :: _ ->
       Utils.Log.verbose_msg ("Preprocessing " ^ name);
@@ -105,19 +119,19 @@ let rebuild_pmrs_decl loc params inv functions =
                 Utils.Log.error_msg Fmt.(str "%s should have at least one argument." name);
                 failwith "Not a proper recursion scheme.")
       in
-      PMRSDecl (loc, params, name, parametric_args, inv, make_rules functions)
-  | [] -> PMRSDecl (loc, params, "??", [], inv, [])
+      PMRSDef (loc, params, name, parametric_args, requires, ensures, make_rules functions)
+  | [] -> PMRSDef (loc, params, "??", [], requires, ensures, [])
 
 let preprocess (prog : program) : program * (ident * ident * ident) option =
   let obj_name = ref None in
   let rec process_decl d =
     match d with
-    | CamlPMRSDecl (loc, params, invariant, functions) ->
-        rebuild_pmrs_decl loc params invariant functions
+    | CamlPMRSDef (loc, params, requires, ensures, functions) ->
+        rebuild_pmrs_decl loc params requires ensures functions
     | SyntObjDecl (_, target_pmrs, spec_id, repr_id) ->
         let rskel_name, d =
           match process_decl target_pmrs with
-          | PMRSDecl (_, _, name, _, _, _) as d ->
+          | PMRSDef (_, _, name, _, _, _, _) as d ->
               Utils.Log.verbose_msg Fmt.(str "Synthesis objective %s = %s %s" name spec_id repr_id);
               (Some name, d)
           | d -> (None, d)

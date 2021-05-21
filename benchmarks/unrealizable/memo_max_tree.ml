@@ -17,4 +17,10 @@ let spec x t =
   let rec aux = function Leaf a -> a == x | Node (a, l, r) -> a == x || aux l || aux r in
   aux t
 
+let target x t =
+  let rec aux = function
+    | Leaf' a -> a
+    | Node' (a, n, l, r) -> if n < x then [%synt x1] else [%synt x2] x a (aux l) (aux r)
+  in
+  aux t
 (* To be continued... *)
