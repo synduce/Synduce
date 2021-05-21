@@ -2,6 +2,9 @@ open Base
 open Term
 open Utils
 
+(* ============================================================================================= *)
+(*                                  UTILITIES                                                    *)
+(* ============================================================================================= *)
 let free_variables (t : term) : VarSet.t =
   let rec f t =
     match t.tkind with
@@ -23,6 +26,31 @@ let free_variables (t : term) : VarSet.t =
 let has_ite (t : term) : bool =
   reduce t ~init:false ~join:( || ) ~case:(fun _ t ->
       match t.tkind with TIte _ -> Some true | _ -> None)
+
+let operators_of (t : term) : OpSet.t =
+  let case f t =
+    match t.tkind with
+    | TBin (binop, t1, t2) -> Some (Set.add (Set.union (f t1) (f t2)) (Operator.Binary binop))
+    | TUn (unop, t1) -> Some (Set.add (f t1) (Operator.Unary unop))
+    | _ -> None
+  in
+  reduce ~init:OpSet.empty ~join:Set.union ~case t
+
+let is_norec =
+  let case _ t =
+    match t.tkind with
+    | TVar x -> Some (not (RType.is_recursive (Variable.vtype_or_new x)))
+    | _ -> None
+  in
+  reduce ~init:true ~join:( && ) ~case
+
+let is_novariant =
+  let case _ t =
+    match t.tkind with
+    | TVar x -> Some (List.is_empty (RType.get_variants (Variable.vtype_or_new x)))
+    | _ -> None
+  in
+  reduce ~init:true ~join:( && ) ~case
 
 let subst_args fpatterns args =
   let rec f (fpat, t) =
