@@ -202,17 +202,33 @@ let make ?(force_replace_off = false) ~(p : psi_def) (tset : TermSet.t) : equati
     in
     List.concat (List.map ~f eqns)
   in
+  let eqns_with_invariants = 
+    let f (t, inv, lhs, rhs) = 
+      let env = VarSet.to_env (Set.diff (Analysis.free_variables t) p.target.psyntobjs)
+      in 
+      Log.info (fun frmt () -> (Fmt.pf frmt "Please provide a constraint for \"@[%a@]\"." pp_equation (t, inv, lhs, rhs)));
+      match (Stdio.In_channel.input_line Stdio.stdin) with 
+          | None | Some "" -> 
+            Log.info (fun frmt () -> (Fmt.pf frmt "No additional constraint provided."));
+            (t, inv, lhs, rhs) 
+          | Some x -> let sexpr = Sexplib.Sexp.of_string x
+                      in 
+                      let smtterm = (Smtlib.SmtLib.smtTerm_of_sexp sexpr)
+                      in match smtterm with | None -> (t, inv, lhs, rhs) 
+                                            | Some x -> (t, Some (SmtInterface.term_of_smt env x), lhs, rhs) (* todo: take the invariant into account *)
+    in List.map ~f pure_eqns  
+  in 
   Log.verbose (fun f () ->
-      let print_less = List.take pure_eqns !Config.pp_eqn_count in
+      let print_less = List.take eqns_with_invariants !Config.pp_eqn_count in
       Fmt.(
         pf f "Equations > make (%i) @." (Set.length tset);
         List.iter ~f:(fun eqn -> Fmt.pf f "@[%a@]@." pp_equation eqn) print_less));
 
-  match List.find ~f:(fun eq -> not (check_equation ~p eq)) pure_eqns with
+  match List.find ~f:(fun eq -> not (check_equation ~p eq)) eqns_with_invariants with
   | Some not_pure ->
       Log.error_msg Fmt.(str "Not pure: %a" pp_equation not_pure);
       failwith "Equation not pure."
-  | None -> pure_eqns
+  | None -> eqns_with_invariants
 
 let revert_projs (orig_xi : VarSet.t)
     (projections : (int, variable list, Int.comparator_witness) Map.t)
