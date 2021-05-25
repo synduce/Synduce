@@ -288,24 +288,29 @@ module Binop = struct
 end
 
 module Unop = struct
-  type t = Neg | Not | Abs
+  type t = Neg | Not | Abs | Inv
 
   let compare = Poly.compare
 
   let equal = Poly.equal
 
   let operand_type (op : t) =
-    match op with Neg -> RType.TInt | Not -> RType.TBool | Abs -> RType.TInt
+    match op with Neg -> RType.TInt | Not -> RType.TBool | Inv | Abs -> RType.TInt
 
   let result_type (op : t) =
-    match op with Neg -> RType.TInt | Not -> RType.TBool | Abs -> RType.TInt
+    match op with Neg -> RType.TInt | Not -> RType.TBool | Inv | Abs -> RType.TInt
 
-  let to_pp_string (op : t) = match op with Neg -> "-" | Not -> "¬" | Abs -> "abs"
+  let to_pp_string (op : t) = match op with Neg -> "-" | Not -> "¬" | Abs -> "abs" | Inv -> "inv"
 
-  let to_string (op : t) = match op with Neg -> "-" | Not -> "not" | Abs -> "abs"
+  let to_string (op : t) = match op with Neg -> "-" | Not -> "not" | Abs -> "abs" | Inv -> "inv"
 
   let of_string (s : string) : t option =
-    match s with "-" -> Some Neg | "not" -> Some Not | "abs " -> Some Abs | _ -> None
+    match s with
+    | "-" -> Some Neg
+    | "not" -> Some Not
+    | "abs " -> Some Abs
+    | "inv" -> Some Inv
+    | _ -> None
 
   let pp frmt op = Fmt.string frmt (to_pp_string op)
 end
@@ -765,22 +770,6 @@ let term_height =
   reduce ~init:0 ~case ~join:(fun a b -> 1 + max a b)
 
 let term_height_compare (t1 : term) (t2 : term) = compare (term_height t1) (term_height t2)
-
-let is_norec =
-  let case _ t =
-    match t.tkind with
-    | TVar x -> Some (not (RType.is_recursive (Variable.vtype_or_new x)))
-    | _ -> None
-  in
-  reduce ~init:true ~join:( && ) ~case
-
-let is_novariant =
-  let case _ t =
-    match t.tkind with
-    | TVar x -> Some (List.is_empty (RType.get_variants (Variable.vtype_or_new x)))
-    | _ -> None
-  in
-  reduce ~init:true ~join:( && ) ~case
 
 (* ============================================================================================= *)
 (*                                    PRETTY PRINTERS                                            *)

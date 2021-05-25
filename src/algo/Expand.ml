@@ -134,7 +134,7 @@ let replace_rhs_of_mains (p : psi_def) (t0 : term) : term =
 (*                                   acegis TERM EXPANSION                                        *)
 (* ============================================================================================= *)
 
-let is_max_expanded (t : term) = Term.is_novariant t
+let is_max_expanded (t : term) = Analysis.is_novariant t
 
 let simple ?(max_height = !Config.expand_cut) (t0 : term) =
   Log.verbose_msg Fmt.(str "Simple expansion of %a." pp_term t0);
@@ -151,7 +151,7 @@ let simple ?(max_height = !Config.expand_cut) (t0 : term) =
               aux (d + 1) (t', utl @ u')
           | [] -> (t, u))
   in
-  if is_novariant t0 then (TermSet.singleton t0, TermSet.empty)
+  if Analysis.is_novariant t0 then (TermSet.singleton t0, TermSet.empty)
   else
     let t, u = aux 0 ([], [ t0 ]) in
     Log.verbose Fmt.(fun f () -> pf f "t = @[<hov 2>%a@]" (list ~sep:comma pp_term) t);
