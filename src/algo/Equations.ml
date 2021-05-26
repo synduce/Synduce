@@ -204,7 +204,8 @@ let make ?(force_replace_off = false) ~(p : psi_def) (tset : TermSet.t) : equati
   in
   let eqns_with_invariants = 
     let f (t, inv, lhs, rhs) = 
-      let env = VarSet.to_env (Set.diff (Analysis.free_variables t) p.target.psyntobjs) in 
+      let env = 
+        VarSet.to_env (Set.diff (Set.union (Analysis.free_variables lhs) (Analysis.free_variables rhs)) p.target.psyntobjs) in 
       Log.info (fun frmt () -> (Fmt.pf frmt "Please provide a constraint for \"@[%a@]\"." pp_equation (t, inv, lhs, rhs)));
       match (Stdio.In_channel.input_line Stdio.stdin) with 
       | None | Some "" -> 
