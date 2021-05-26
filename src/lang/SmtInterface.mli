@@ -22,6 +22,8 @@ type id_kind =
   | IBinop of Binop.t
   (* A unary operator. *)
   | IUnop of Unop.t
+  (* A boolean value. *)
+  | IBool of bool
   (* The identified is undefined in the current environment. *)
   | INotDef
 

@@ -78,7 +78,7 @@ let constant_of_smtConst (l : smtSpecConstant) : Constant.t =
   | SCString _ | SCBinary _ | SCHexaDecimal _ ->
       failwith "No hex, bin or string constants in language."
 
-type id_kind = ICstr of string | IVar of variable | IBinop of Binop.t | IUnop of Unop.t | INotDef
+type id_kind = ICstr of string | IVar of variable | IBinop of Binop.t | IUnop of Unop.t | IBool of bool | INotDef
 
 let id_kind_of_s env s =
   match Map.find env s with
@@ -89,13 +89,18 @@ let id_kind_of_s env s =
       | None -> (
           match Unop.of_string s with
           | Some unop -> IUnop unop
-          | None -> ( match RType.type_of_variant s with Some _ -> ICstr s | None -> INotDef)))
+          | None -> ( match RType.type_of_variant s with Some _ -> ICstr s | None -> 
+            (match s with "true" -> IBool true | "false" -> IBool false |_ -> INotDef))))
 
 let rec term_of_smt (env : (string, variable, String.comparator_witness) Map.t) (st : smtTerm) :
     term =
   match st with
   | SmtTQualdId (QI (Id (SSimple s))) -> (
-      match Map.find env s with Some v -> Term.mk_var v | None -> failwith "Variable not found.")
+      match Map.find env s with Some v -> Term.mk_var v | None -> 
+        match s with 
+        | "true" -> mk_const Constant.CTrue
+        | "false" -> mk_const Constant.CFalse
+        | _ -> failwith "Variable not found.")
   | SmtTSpecConst l -> mk_const (constant_of_smtConst l)
   | SmtTApp (QI (Id (SSimple s)), args) -> (
       let args' = List.map ~f:(term_of_smt env) args in
@@ -111,6 +116,8 @@ let rec term_of_smt (env : (string, variable, String.comparator_witness) Map.t) 
           match args' with
           | [ t1 ] -> mk_un op t1
           | _ -> failwith "Smt: a unary operator with more than one argument.")
+      | IBool true -> mk_const Constant.CTrue
+      | IBool false -> mk_const Constant.CFalse
       | INotDef -> failwith "Smt: Undefined variable.")
   | SmtTExists (_, _) -> failwith "Smt: exists-terms not supported."
   | SmtTForall (_, _) -> failwith "Smt: forall-terms not supported."
