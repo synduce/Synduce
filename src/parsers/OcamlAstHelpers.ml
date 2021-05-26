@@ -111,7 +111,7 @@ and fterm_of_pattern (pat : pattern) =
   match pat.ppat_desc with
   | Ppat_var v -> mk_var (wloc pat.ppat_loc) v.txt
   | Ppat_tuple t -> mk_tup (wloc pat.ppat_loc) (List.map ~f:fterm_of_pattern t)
-  | _ -> failwith (Fmt.str "Pattern not supported.")
+  | _ -> failwith (Fmt.str "Pattern not supported: %a." Pprintast.pattern pat)
 
 and op_fterm_of_args loc (name : Longident.t) (args : (Asttypes.arg_label * expression) list) =
   let maybe_ident = simple_ident_of_longident name in
