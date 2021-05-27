@@ -286,23 +286,30 @@ let make ?(force_replace_off = false) ~(p : psi_def) (tset : TermSet.t) : equati
     in
     List.concat (List.map ~f eqns)
   in
-  let eqns_with_invariants = 
-    let f (t, inv, lhs, rhs) = 
-      let env = 
-        VarSet.to_env (Set.diff (Set.union (Analysis.free_variables lhs) (Analysis.free_variables rhs)) p.target.psyntobjs) in 
-      Log.info (fun frmt () -> (Fmt.pf frmt "Please provide a constraint for \"@[%a@]\"." pp_equation (t, inv, lhs, rhs)));
-      match (Stdio.In_channel.input_line Stdio.stdin) with 
-      | None | Some "" -> 
-          Log.info (fun frmt () -> (Fmt.pf frmt "No additional constraint provided."));
-          (t, inv, lhs, rhs) 
-      | Some x -> 
-          let sexpr = Sexplib.Sexp.of_string x in 
-          let smtterm = (Smtlib.SmtLib.smtTerm_of_sexp sexpr) in
-          match smtterm with 
-          | None -> (t, inv, lhs, rhs) 
-          | Some x -> (t, Some (SmtInterface.term_of_smt env x), lhs, rhs) (* todo: take the invariant into account *)
-    in List.map ~f pure_eqns  
-  in 
+  let eqns_with_invariants =
+    let f (t, inv, lhs, rhs) =
+      let env =
+        VarSet.to_env
+          (Set.diff
+             (Set.union (Analysis.free_variables lhs) (Analysis.free_variables rhs))
+             p.target.psyntobjs)
+      in
+      Log.info (fun frmt () ->
+          Fmt.pf frmt "Please provide a constraint for \"@[%a@]\"." pp_equation (t, inv, lhs, rhs));
+      match Stdio.In_channel.input_line Stdio.stdin with
+      | None | Some "" ->
+          Log.info (fun frmt () -> Fmt.pf frmt "No additional constraint provided.");
+          (t, inv, lhs, rhs)
+      | Some x -> (
+          let sexpr = Sexplib.Sexp.of_string x in
+          let smtterm = Smtlib.SmtLib.smtTerm_of_sexp sexpr in
+          match smtterm with
+          | None -> (t, inv, lhs, rhs)
+          | Some x -> (t, Some (SmtInterface.term_of_smt env x), lhs, rhs))
+      (* todo: take the invariant into account *)
+    in
+    List.map ~f pure_eqns
+  in
   Log.verbose (fun f () ->
       let print_less = List.take eqns_with_invariants !Config.pp_eqn_count in
       Fmt.(
