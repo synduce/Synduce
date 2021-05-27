@@ -15,7 +15,8 @@ sep () {
     echo -e "\033[44m $1 \033[0m"
 }
 
-# Tested on ubuntu 20.04
+# Tested on Ubuntu 20.04
+
 mkdir -p $HOME/.local/bin
 # set PATH so it includes user's private bin if it exists
 if [ -d "$HOME/.local/bin" ] ; then
@@ -102,3 +103,5 @@ ln -s _build/default/bin/Atropos.exe atropos
 
 sep "Calling the tool, should print help message..."
 ./atropos -h
+
+sep "Please update your environment (source $HOME/.profile) before running the tool."
