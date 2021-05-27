@@ -30,6 +30,11 @@ let interactive_lemmas = ref false
 *)
 let check_unrealizable = ref false
 
+(**
+  Attempt to lift the function if there is no solution.
+*)
+let attempt_lifting = ref true
+
 (* ============================================================================================= *)
 (*                                GLOBAL TIMING INFO                                             *)
 (* ============================================================================================= *)

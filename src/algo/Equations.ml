@@ -118,7 +118,7 @@ type unrealizability_ctex =
 let pp_unrealizability_ctex (frmt : Formatter.t) ((ctxt, m, m') : unrealizability_ctex) : unit =
   let pp_model frmt model =
     (* Print as comma-separated list of variable -> term *)
-    Fmt.(list ~sep:comma (pair ~sep:Utils.rightarrow (option pp_variable) pp_term))
+    Fmt.(list ~sep:comma (pair ~sep:Utils.rightarrow (option Variable.pp) pp_term))
       frmt
       (List.map ~f:(fun (vid, t) -> (VarSet.find_by_id ctxt vid, t)) (Map.to_alist model))
   in

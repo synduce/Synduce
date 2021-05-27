@@ -23,7 +23,8 @@ let print_usage () =
     \       --ccegis                    Use the Concrete CEGIS algorithm. Turns bmc on.\n\
     \       --no-simplify               Don't simplify equations with partial evaluation.\n\
     \       --no-gropt                  Don't optimize grammars.\n\
-    \   -C   --check-unrealizable       Check if synthesis problems are functionally realizable.\n\
+    \   -C  --check-unrealizable        Check if synthesis problems are functionally realizable.\n\
+    \   -L  --no-lifting                Do not attempt lifting.\n\
     \  Bounded checking:\n\
     \       --use-bmc                   Use acegis bounded model checking (bmc mode).\n\
     \    -b --bmc                       Maximum depth of terms for bounded model checking, in bmc \
@@ -51,6 +52,7 @@ let options =
     ('\000', "parse-only", set parse_only true, None);
     ('C', "check-unrealizable", set Config.check_unrealizable true, None);
     ('I', "interactive", set Config.interactive_lemmas true, None);
+    ('L', "no-lifting", set Config.attempt_lifting false, None);
     ('c', "simple-init", set Config.simple_init true, None);
     ('t', "no-detupling", set Config.detupling_on false, None);
     ('\000', "no-syndef", set Config.use_syntactic_definitions false, None);

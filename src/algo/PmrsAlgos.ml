@@ -22,48 +22,55 @@ let rec refinement_loop (p : psi_def) ((t_set, u_set) : TermSet.t * TermSet.t) =
   let eqns = Equations.make ~p t_set in
   (* The solve the set of constraints. *)
   let s_resp, solution = Equations.solve ~p eqns in
-  match (s_resp, solution) with
-  | RSuccess _, Some sol -> (
-      (* Synthesis has succeeded, now we need to verify the solution. *)
-      try
-        (* The solution is verified with a bounded check.  *)
-        let check_r = Verify.check_solution ~p (t_set, u_set) sol in
-        match check_r with
-        | Some (new_t_set, new_u_set) ->
-            (* If check_r is some new set of MR-terms t_set, and terms u_set, this means
-               verification failed. The generalized counterexamples have been added to new_t_set,
-               which is also a superset of t_set.
-            *)
-            Log.debug (fun frmt () ->
-                Fmt.(
-                  pf frmt "@[<hov 2>Counterexample terms:@;@[<hov 2>%a@]" (list ~sep:comma pp_term)
-                    (Set.elements (Set.diff new_t_set t_set))));
-            (* Continue looping with the new sets. *)
-            refinement_loop p (new_t_set, new_u_set)
-        | None ->
-            (* This case happens when verification succeeded. Return the solution. *)
-            Log.print_ok ();
-            Ok { soln_rec_scheme = p.target; soln_implems = sol }
-      with _ -> (* A failure during the bounded check is an error. *)
-                Error RFail)
-  | RFail, _ ->
-      Log.error_msg "SyGuS solver failed to find a solution.";
-      Error RFail
-  | RInfeasible, _ ->
-      (* Rare - but the synthesis solver can answer "infeasible", in which case it can give
-         counterexamples. *)
-      Log.info
-        Fmt.(
-          fun frmt () ->
-            pf frmt "@[<hov 2>This problem has no solution. Counterexample set:@;%a@]"
-              (list ~sep:sp pp_term) (Set.elements t_set));
-      Error RInfeasible
-  | RUnknown, _ ->
-      (* In most cases if the synthesis solver does not find a solution and terminates, it will
-         answer unknowns. We interpret it as "no solution can be found". *)
-      Log.error_msg "SyGuS solver returned unknown.";
-      Error RUnknown
-  | _ -> Error s_resp
+  let synt_res =
+    match (s_resp, solution) with
+    | RSuccess _, Some sol -> (
+        (* Synthesis has succeeded, now we need to verify the solution. *)
+        try
+          (* The solution is verified with a bounded check.  *)
+          let check_r = Verify.check_solution ~p (t_set, u_set) sol in
+          match check_r with
+          | Some (new_t_set, new_u_set) ->
+              (* If check_r is some new set of MR-terms t_set, and terms u_set, this means
+                 verification failed. The generalized counterexamples have been added to new_t_set,
+                 which is also a superset of t_set.
+              *)
+              Log.debug (fun frmt () ->
+                  Fmt.(
+                    pf frmt "@[<hov 2>Counterexample terms:@;@[<hov 2>%a@]"
+                      (list ~sep:comma pp_term)
+                      (Set.elements (Set.diff new_t_set t_set))));
+              (* Continue looping with the new sets. *)
+              refinement_loop p (new_t_set, new_u_set)
+          | None ->
+              (* This case happens when verification succeeded. Return the solution. *)
+              Log.print_ok ();
+              Ok { soln_rec_scheme = p.target; soln_implems = sol }
+        with _ -> (* A failure during the bounded check is an error. *)
+                  Error RFail)
+    | RFail, _ ->
+        Log.error_msg "SyGuS solver failed to find a solution.";
+        Error RFail
+    | RInfeasible, _ ->
+        (* Rare - but the synthesis solver can answer "infeasible", in which case it can give
+           counterexamples. *)
+        Log.info
+          Fmt.(
+            fun frmt () ->
+              pf frmt "@[<hov 2>This problem has no solution. Counterexample set:@;%a@]"
+                (list ~sep:sp pp_term) (Set.elements t_set));
+        Error RInfeasible
+    | RUnknown, _ ->
+        (* In most cases if the synthesis solver does not find a solution and terminates, it will
+           answer unknowns. We interpret it as "no solution can be found". *)
+        Log.error_msg "SyGuS solver returned unknown.";
+        Error RUnknown
+    | _ -> Error s_resp
+  in
+  match synt_res with
+  | Ok _ -> synt_res
+  | Error _ ->
+      if !Config.attempt_lifting then Lifting.scalar p (t_set, u_set) refinement_loop else synt_res
 
 let psi (p : psi_def) =
   (* Initialize sets with the most general terms. *)
