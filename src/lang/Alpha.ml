@@ -1,7 +1,5 @@
 open Base
 
-type typ = string * int
-
 let _IDS = Hashtbl.create (module Int) ~size:20
 
 let get_ids () = _IDS
@@ -14,6 +12,15 @@ let new_id () =
   let i = !_MAX_ID in
   _MAX_ID := !_MAX_ID + 1;
   i
+
+let forget (i : int) (s : string) =
+  Hashtbl.remove _IDS i;
+  match Hashtbl.find _NAMES s with
+  | Some id_list -> (
+      match List.filter ~f:(fun i' -> not (i' = i)) id_list with
+      | hd :: tl -> Hashtbl.set _NAMES ~key:s ~data:(hd :: tl)
+      | _ -> Hashtbl.remove _NAMES s)
+  | None -> ()
 
 let fresh ?(s = "x") () : string =
   match Hashtbl.find _NAMES s with

@@ -23,6 +23,7 @@ let print_usage () =
     \       --ccegis                    Use the Concrete CEGIS algorithm. Turns bmc on.\n\
     \       --no-simplify               Don't simplify equations with partial evaluation.\n\
     \       --no-gropt                  Don't optimize grammars.\n\
+    \       --check-realizable          Check if synthesis problems are functionally realizable.\n\
     \  Bounded checking:\n\
     \       --use-bmc                   Use acegis bounded model checking (bmc mode).\n\
     \    -b --bmc                       Maximum depth of terms for bounded model checking, in bmc \

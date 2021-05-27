@@ -120,6 +120,10 @@ module Variable = struct
   let pp_typed (frmt : Formatter.t) (v : t) =
     Fmt.(pf frmt "%s : %a" v.vname RType.pp (vtype_or_new v))
 
+  let free (var : t) =
+    Alpha.forget var.vid var.vname;
+    Hashtbl.remove _types var.vid
+
   let print_summary (frmt : Formatter.t) () =
     Utils.Log.(debug (wrap "Variables in tables:"));
     let le =
@@ -178,6 +182,15 @@ module VarSet = struct
       (module String)
       ~f:(fun b1 _ -> b1)
       (List.map ~f:(fun v -> (v.vname, v)) (elements vs))
+
+  (** Returns a list of pairs of variable, fresh copy of the variable. *)
+  let prime (vs : t) : (variable * variable) list =
+    Set.fold
+      ~f:(fun subs v ->
+        let primed_name = Alpha.fresh ~s:(v.vname ^ "_") () in
+        let primed_var = Variable.mk ~t:(Variable.vtype v) primed_name in
+        (v, primed_var) :: subs)
+      ~init:[] vs
 
   let add_prefix vs prefix =
     of_list (List.map ~f:(fun v -> { v with vname = prefix ^ v.vname }) (elements vs))

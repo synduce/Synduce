@@ -4,6 +4,8 @@ open Lang.Term
 open AState
 open Syguslib.Sygus
 open SygusInterface
+open SmtInterface
+open Smtlib
 open Utils
 open Either
 module SmtI = SmtInterface
@@ -92,6 +94,88 @@ let proj_unknowns (unknowns : VarSet.t) =
     match mmap with `Ok x -> x | `Duplicate_key _ -> failwith "Unexpected error while projecting."
   in
   (new_unknowns, proj_map)
+
+type unrealizability_ctex =
+  VarSet.t * (int, term, Int.comparator_witness) Map.t * (int, term, Int.comparator_witness) Map.t
+
+let pp_unrealizability_ctex (frmt : Formatter.t) ((ctxt, m, m') : unrealizability_ctex) : unit =
+  let pp_model frmt model =
+    (* Print as comma-separated list of variable -> term *)
+    Fmt.(list ~sep:comma (pair ~sep:Utils.rightarrow (option pp_variable) pp_term))
+      frmt
+      (List.map ~f:(fun (vid, t) -> (VarSet.find_by_id ctxt vid, t)) (Map.to_alist model))
+  in
+  Fmt.(pf frmt "@[M = [%a]@]@;@[M' = [%a]@]" pp_model m pp_model m')
+
+let check_realizable (unknowns : VarSet.t) (eqns : equation list) : unrealizability_ctex list =
+  Log.info (fun f () -> Fmt.(pf f "Checking unrealizability..."));
+  let start_time = Unix.gettimeofday () in
+  let solver = Solvers.make_z3_solver () in
+  Solvers.load_min_max_defs solver;
+  (* Main part of the check, appliued to each equation in eqns. *)
+  let check_eqn_accum ctexs (_t, precond, lhs, rhs) =
+    let vset =
+      Set.diff (Set.union (Analysis.free_variables lhs) (Analysis.free_variables rhs)) unknowns
+    in
+    let var_subst = VarSet.prime vset in
+    let vset' = VarSet.of_list (List.map ~f:snd var_subst) in
+    let sub = List.map ~f:(fun (v, v') -> (mk_var v, mk_var v')) var_subst in
+    (* Extract the arguments of the rhs, if it is a call to an unknown. *)
+    let maybe_rhs_args =
+      match rhs.tkind with
+      | TApp ({ tkind = TVar v; _ }, args) ->
+          if Set.mem unknowns v then
+            let fv_args = VarSet.union_list (List.map ~f:Analysis.free_variables args) in
+            if Set.are_disjoint fv_args unknowns then Some args else None
+          else None
+      | _ -> None
+    in
+    match maybe_rhs_args with
+    | None -> ctexs (* If we cannot match the expected structure, skip it. *)
+    | Some rhs_args ->
+        (* Building the constraints *)
+        let preconds = Option.map ~f:(fun pre -> (pre, substitution sub pre)) precond in
+        (* Checking. *)
+        Solvers.spush solver;
+        (* Declare the variables. *)
+        Solvers.declare_all solver (decls_of_vars (Set.union vset vset'));
+        (* Assert preconditions, if not none. *)
+        (match preconds with
+        | Some (pre, pre') ->
+            Solvers.smt_assert solver (smt_of_term pre);
+            Solvers.smt_assert solver (smt_of_term pre')
+        | None -> ());
+        (* The lhs must be different. **)
+        let lhs_diff = mk_un Not (mk_bin Eq lhs (substitution sub lhs)) in
+        Solvers.smt_assert solver (smt_of_term lhs_diff);
+        (* The rhs must be equal. *)
+        List.iter rhs_args ~f:(fun rhs_arg_term ->
+            let rhs_eq = mk_bin Eq rhs_arg_term (substitution sub rhs_arg_term) in
+            Solvers.smt_assert solver (smt_of_term rhs_eq));
+        let new_ctexs =
+          match Solvers.check_sat solver with
+          | Sat -> (
+              match Solvers.get_model solver with
+              | SExps _ ->
+                  Log.debug_msg "Got a counterexample!";
+                  ctexs
+              | _ -> ctexs)
+          | _ -> ctexs
+        in
+        Solvers.spop solver;
+        new_ctexs
+  in
+  let ctexs = List.fold ~f:check_eqn_accum ~init:[] eqns in
+  Solvers.close_solver solver;
+  let elapsed = Unix.gettimeofday () -. start_time in
+  Log.info (fun f () -> Fmt.(pf f "... finished in %3.4fs" elapsed));
+  Log.debug (fun f () ->
+      match ctexs with
+      | [] -> Fmt.pf f "No counterexample to realizability found."
+      | _ :: _ ->
+          Fmt.(
+            pf f "Counterexamples found:@[<hov 2>%a@]" (list ~sep:sp pp_unrealizability_ctex) ctexs));
+  ctexs
 
 (* ============================================================================================= *)
 (*                               BUILDING SYSTEMS OF EQUATIONS                                   *)
@@ -382,6 +466,7 @@ let constraints_of_eqns (eqns : equation list) : command list =
   List.map ~f:eqn_to_constraint detupled_equations
 
 let solve_eqns (unknowns : VarSet.t) (eqns : equation list) =
+  ignore (check_realizable unknowns eqns);
   let free_vars, all_operators, has_ite =
     let f (fvs, ops, hi) (_, _, lhs, rhs) =
       ( VarSet.union_list [ fvs; Analysis.free_variables lhs; Analysis.free_variables rhs ],

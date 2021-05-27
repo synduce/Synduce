@@ -20,13 +20,6 @@ let constr_eqn (_, pre, lhs, rhs) =
   let eqn = mk_eqn (lhs, rhs) in
   match pre with Some inv -> SmtLib.mk_or (SmtLib.mk_not (smt_of_term inv)) eqn | None -> eqn
 
-(**
-   `check_solution ~p (t,u) soln`
-
-   Checks if ᴪ(p, soln) is valid, assuming `soln` has been synthesized using the term set `t` with
-   expansion continuation `u`.
-   Returns the set (t,u) for the next step in the ctex-guided refinement loop.
-*)
 let check_solution ?(use_acegis = false) ~(p : psi_def) ((t, u) : TermSet.t * TermSet.t)
     (soln : (string * variable list * term) list) =
   if use_acegis then Log.info (fun f () -> Fmt.(pf f "Check solution."))

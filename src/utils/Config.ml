@@ -1,10 +1,5 @@
 open Base
 
-(** Toggle verbose messages. *)
-let verbose = ref false
-
-let pp_eqn_count = ref 10
-
 (** Toggle debugging. *)
 let debug = ref false
 
@@ -14,16 +9,24 @@ let debug_msg_max_chars = ref 400
 (* Toggle info messages. Set to true by default. *)
 let info = ref true
 
-(* Start time. *)
-let glob_start = ref 0.0
-
-let verif_time = ref 0.0
+(** Maximum steps of rewrites to apply during PMRS reduction (symbolic evaluation). *)
+let reduction_limit = ref 100
 
 (* Toggle to show a summary of variables used and their types. *)
 let show_vars = ref false
 
-(** Maximum steps of rewrites to apply during PMRS reduction. *)
-let reduction_limit = ref 100
+(** Toggle verbose messages. *)
+let verbose = ref false
+
+(* ============================================================================================= *)
+(*                                GLOBAL TIMING INFO                                             *)
+(* ============================================================================================= *)
+
+(* Start time. *)
+let glob_start = ref 0.0
+
+(** Total elapsed time spent in verification of solutions.  *)
+let verif_time = ref 0.0
 
 (* ============================================================================================= *)
 (*                                STORAGE AND BINARY PATHS                                       *)
@@ -94,6 +97,15 @@ let simplify_eqns = ref true
   OFF for CAV
 *)
 let optimize_grammars = ref false
+
+(**
+  Check whether a system of equations defines a "functionally realizable" synthesis problem.
+  OFF by default.
+*)
+let check_functionally_unrealizable = ref false
+
+(** When printing a system of equations, put a limit on how many equations are printed. *)
+let pp_eqn_count = ref 10
 
 (* ============================================================================================= *)
 (*                        BOUNDED EXPANSIONS / VERIFICATION PARAMETERS                           *)
