@@ -168,7 +168,7 @@ let smtSpecConstant_of_sexp (sexp : t) : smtSpecConstant option =
         Some (SCString (String.drop_prefix (String.drop_prefix s 1) 1))
       else
         try Some (SCNumeral (Int.of_string s))
-        with _ -> failwith Fmt.(str " %s : decimal not supported." s))
+        with _ -> None)
   | _ -> None
 
 let sexp_of_smtSymbol (s : smtSymbol) : t =

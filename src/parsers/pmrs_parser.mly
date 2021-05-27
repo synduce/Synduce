@@ -50,23 +50,23 @@
 
 %%
 
-main: f=list(decl); EOF                                                             { f }
+main: f=list(def); EOF                         { f }
 
 
-decl:
-    | TYPE t=typedecl                           { TypeDecl($loc, t) }
-    | LETPMRS p=pmrsdecl                        { p }
+def:
+    | TYPE t=typedef                            { TypeDef($loc, t) }
+    | LETPMRS p=pmrsdef                         { p }
     | LET f=IDENT args=list(IDENT) LBRACE t=expr RBRACE EQ body=expr
-                                                { FunDecl($loc, f, args, Some t, body) }
+                                                { FunDef($loc, f, args, Some t, body) }
     | LET f=IDENT args=list(IDENT) EQ body=expr
-                                                { FunDecl($loc, f, args, None, body) }
-    | LET REC p=letpmrsdecl LBRACKET EQUIV spec=IDENT repr=IDENT RBRACKET
+                                                { FunDef($loc, f, args, None, body) }
+    | LET REC p=letpmrsdef LBRACKET EQUIV spec=IDENT repr=IDENT RBRACKET
                                                 { SyntObjDecl($loc, p , spec, repr) }
-    | LET REC p=letpmrsdecl                     { p }
+    | LET REC p=letpmrsdef                      { p }
 
 
 
-typedecl:
+typedef:
     | param=PIDENT; name=IDENT; EQ t=typeterm0      { TDParametric([param], name, t)}
     | LPAR params=separated_list(COMMA, PIDENT) RPAR name=IDENT; EQ t=typeterm0
                                                     { TDParametric(params, name, t)}
@@ -104,25 +104,27 @@ typetermb:
     | LPAR typeapp RPAR                                 { $2 }
 
 
-pmrsdecl:
+pmrsdef:
     | LPAR p=separated_list(COMMA,IDENT) RPAR n=IDENT args=list(IDENT) EQ b=pbody
-                                                        { PMRSDecl($loc, p, n, args, None, b)}
-    | n=IDENT args=list(IDENT) EQ b=pbody               { PMRSDecl($loc, [], n, args, None, b) }
+                                                        { PMRSDef($loc, p, n, args, None, None, b)}
+
+    | n=IDENT args=list(IDENT) EQ b=pbody               { PMRSDef($loc, [], n, args, None, None, b) }
 
     | LPAR p=separated_list(COMMA,IDENT) RPAR n=IDENT args=list(IDENT) LBRACE e=expr RBRACE EQ b=pbody
-                                                        { PMRSDecl($loc, p, n, args, Some e, b)}
+                                                        { PMRSDef($loc, p, n, args, None, Some e, b)}
 
     | n=IDENT args=list(IDENT) LBRACE e=expr RBRACE EQ b=pbody
-                                                        { PMRSDecl($loc, [], n, args, Some e, b) }
+                                                        { PMRSDef($loc, [], n, args, None, Some e, b) }
 
-letpmrsdecl:
-    | decls=separated_list(LETAND, functdecl)           { CamlPMRSDecl($loc, [], None, decls) }
-    | decls=separated_list(LETAND, functdecl) LBRACKET DEFINING xi=list(IDENT) RBRACKET
-                                                        { CamlPMRSDecl($loc, xi, None, decls) }
-    | decls=separated_list(LETAND, functdecl) LBRACKET INVARIANT invariant=expr RBRACKET
-                                                        { CamlPMRSDecl($loc, [], Some invariant, decls) }
 
-functdecl:  n=IDENT args=list(IDENT) EQ rules=function_body       { n, args, rules }
+letpmrsdef:
+    | defs=separated_list(LETAND, functdef)           { CamlPMRSDef($loc, [], None, None, defs) }
+    | defs=separated_list(LETAND, functdef) LBRACKET DEFINING xi=list(IDENT) RBRACKET
+                                                        { CamlPMRSDef($loc, xi, None, None, defs) }
+    | defs=separated_list(LETAND, functdef) LBRACKET INVARIANT invariant=expr RBRACKET
+                                                        { CamlPMRSDef($loc, [], None, Some invariant, defs) }
+
+functdef:  n=IDENT args=list(IDENT) EQ rules=function_body       { n, args, rules }
 
 /* Starting vertical bar is optional. */
 function_body:

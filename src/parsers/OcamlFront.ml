@@ -76,19 +76,25 @@ let type_term_of_type_decl (decl : type_declaration) =
   in
   (tname, params, tterm)
 
-let is_recursive_flag (is_rec : Asttypes.rec_flag) =
+let _is_recursive_flag (is_rec : Asttypes.rec_flag) =
   match is_rec with Asttypes.Recursive -> Log.info (fun f () -> Fmt.(pf f "Recursive")) | _ -> ()
 
-let fun_args (expr : expression) =
+(**
+  `fun_args expr` unwraps the function arguments of expr, if expr is an expression
+    deifning a function (Pexp_fun).
+*)
+let unwrap_args (expr : expression) =
   let rec extract (e : expression) =
     match e.pexp_desc with
-    | Pexp_fun (label, default, pat, e) -> (label, default, Some pat) :: extract e
-    | Pexp_function _ -> [ (Asttypes.Nolabel, None, None) ]
-    | _ -> []
+    | Pexp_fun (label, default, pat, e) ->
+        let args_rest, body = extract e in
+        ((label, default, Some pat) :: args_rest, body)
+    | Pexp_function _ -> ([ (Asttypes.Nolabel, None, None) ], e)
+    | _ -> ([], e)
   in
   extract expr
 
-let tuple_of_idents_attribute (name : string) (attr : attribute) : string list option =
+let _tuple_of_idents_attribute (name : string) (attr : attribute) : string list option =
   let all_items_tuples items =
     all_or_none
       (List.map
@@ -102,26 +108,46 @@ let tuple_of_idents_attribute (name : string) (attr : attribute) : string list o
     | _ -> None
   else None
 
-let ensures_attribute (attr : attribute) : Front.term option =
-  if String.equal attr.attr_name.txt "ensures" then (
+(* ============================================================================================= *)
+(*                               ATTRIBUTES : ENSURES & REQUIRES                                 *)
+(* ============================================================================================= *)
+
+let parse_term_attribute ~(name : string) (attr : attribute) : Front.term option =
+  if String.equal attr.attr_name.txt name then (
     match attr.attr_payload with
     | PStr [ s ] -> (
         match s.pstr_desc with
         | Pstr_eval (ensures_expr, _) -> Some (fterm_of_expr ensures_expr)
         | _ ->
-            Log.error_msg Fmt.(str "Ignore ensures %a." (Printast.structure 0) [ s ]);
+            Log.error_msg Fmt.(str "Ignore %s %a." name (Printast.structure 0) [ s ]);
             None)
     | _ as pa ->
-        Log.error (fun f () -> Fmt.(pf f "Ensures: wrong paylod %a" (Printast.payload 0) pa));
+        Log.error (fun f () -> Fmt.(pf f "Ensures: wrong payload %a" (Printast.payload 0) pa));
         None)
   else None
 
+let get_predicate (b : value_binding) =
+  (* TODO: parse mutlitple predicates? Currently, only the first "ensures" and the first "requires"
+     is kept.
+  *)
+  let ensures_pred =
+    match List.filter_map ~f:(parse_term_attribute ~name:"ensures") b.pvb_attributes with
+    | [] -> None
+    | hd :: _ -> Some hd
+  in
+  let requires_pred =
+    match List.filter_map ~f:(parse_term_attribute ~name:"requires") b.pvb_attributes with
+    | [] -> None
+    | hd :: _ -> Some hd
+  in
+  (requires_pred, ensures_pred)
+
 (* ============================================================================================= *)
 
-let type_declarations (_ : Asttypes.rec_flag) (decls : type_declaration list) =
+let type_definitions (_ : Asttypes.rec_flag) (decls : type_declaration list) =
   let declare (decl : type_declaration) =
     let tname, params, tterm = type_term_of_type_decl decl in
-    Front.TypeDecl
+    Front.TypeDef
       ( wloc decl.ptype_loc,
         match params with
         | [] -> Front.TDSimple (tname.txt, tterm)
@@ -159,7 +185,15 @@ let rules_of_case_list loc (nont : ident) (preargs : ident list) (cases : case l
   in
   List.map ~f cases
 
+(** `as_pmrs pat expr _` interprets the binding let pat = expr as a definition of
+  a set of rules that are part of a PMRS.
+  `pat` should be a single identifier.
+  `expr` should be either a `function ...`, in which case we have one rule per match
+  case, or a `fun` expression, in which case we have only one rule without pattern
+  matching.
+ *)
 let as_pmrs (pat : pattern) (expr : expression) (_ : attribute list) =
+  (* Prepend `s preargs ..` as the head of each rule in expr. *)
   let rec as_pmrs_named s preargs expr =
     match expr.pexp_desc with
     | Pexp_fun (_, _, arg_pat, body) -> (
@@ -174,45 +208,96 @@ let as_pmrs (pat : pattern) (expr : expression) (_ : attribute list) =
           [ (loc, mk_app loc (mk_var loc s) (List.map ~f:(mk_var loc) preargs), t) ]
         with _ -> [])
   in
-  match pat.ppat_desc with Ppat_var iloc -> Some (as_pmrs_named iloc.txt [] expr) | _ -> None
+  match pat.ppat_desc with
+  | Ppat_var iloc -> Some (iloc.txt, as_pmrs_named iloc.txt [] expr)
+  | _ -> None
 
-let pmrs_head (b : value_binding) =
+let params_of (expr : expression) =
+  let pats_to_name l =
+    let f (_, _, pat) =
+      match pat with
+      | Some pattern -> (
+          match pattern.ppat_desc with Ppat_var ident -> Some ident.txt | _ -> None)
+      | None -> None
+    in
+    all_or_none (List.map ~f l)
+  in
+  Option.bind ~f:pats_to_name (List.drop_last (first (unwrap_args expr)))
+
+(** Interpret a list of value bindings as a set of mutually recursive functions
+    defining a PMRS. Each binding should be a function. Each binding will be interpreted as a
+    set of rules.
+*)
+let to_rules (vb : value_binding list) =
+  let f vb =
+    match as_pmrs vb.pvb_pat vb.pvb_expr vb.pvb_attributes with
+    | Some (fname, l) -> (Some fname, l)
+    | None -> (None, [])
+  in
+  (* Each binding is interpreted as a list of rules.
+      Each binding should be a function.
+  *)
+  let fnames, rule_sets = List.unzip (List.map ~f vb) in
+  (List.filter_opt fnames, List.concat rule_sets)
+
+let pmrs_head_of_rec_def loc (b : value_binding) (rest : value_binding list) =
   let fname = match b.pvb_pat.ppat_desc with Ppat_var id -> Some id.txt | _ -> None in
-  let ppargs =
-    let pats_to_name l =
-      let f (_, _, pat) =
-        match pat with
-        | Some pattern -> (
-            match pattern.ppat_desc with Ppat_var ident -> Some ident.txt | _ -> None)
-        | None -> None
-      in
-      all_or_none (List.map ~f l)
-    in
-    Option.bind ~f:pats_to_name (List.drop_last (fun_args b.pvb_expr))
-  in
-  let ppred =
-    match List.filter_map ~f:ensures_attribute b.pvb_attributes with
-    | [] -> None
-    | hd :: _ -> Some hd
-  in
-  match (fname, ppargs) with Some fname, Some ppargs -> Some (fname, ppargs, ppred) | _ -> None
+  let ppargs = params_of b.pvb_expr in
+  let requires, ensures = get_predicate b in
+  let _, prules = to_rules (b :: rest) in
+  let pparams = List.map ~f:(fun (x, _) -> x) (get_objects ()) in
+  reset_synt_objects ();
+  match (fname, ppargs) with
+  | Some fname, Some ppargs ->
+      [ Front.PMRSDef (loc, pparams, fname, ppargs, requires, ensures, prules) ]
+  | _ -> []
 
-let declare_value loc (is_rec : Asttypes.rec_flag) (bindings : value_binding list) =
-  let to_rules (vb : value_binding list) =
-    let f vb =
-      match as_pmrs vb.pvb_pat vb.pvb_expr vb.pvb_attributes with Some l -> l | None -> []
-    in
-    List.concat (List.map ~f vb)
-  in
+let pmrs_def_of_nonrec_def loc (b : value_binding) =
+  let fname = match b.pvb_pat.ppat_desc with Ppat_var id -> Some id.txt | _ -> None in
+  let ppargs = params_of b.pvb_expr in
+  let requires, ensures = get_predicate b in
+  let _, core = unwrap_args b.pvb_expr in
+  match core.pexp_desc with
+  | Pexp_let (Asttypes.Recursive, bindings, expr) ->
+      let fnames, rules = to_rules bindings in
+      let pparams = List.map ~f:(fun (x, _) -> x) (get_objects ()) in
+      reset_synt_objects ();
+      let is_apply_first_rule =
+        match expr.pexp_desc with
+        | Pexp_apply (f, [ (_, recursive_arg) ]) -> (
+            (* The body after let is of the form f t *)
+            match (fnames, f.pexp_desc, recursive_arg.pexp_desc) with
+            | hd_f :: _, Pexp_ident f, Pexp_ident _ ->
+                (* f should be hd_f *)
+                Option.value ~default:false
+                  (Option.map (simple_ident_of_longident f.txt) ~f:(fun x -> String.(hd_f = x)))
+            | _ -> false)
+        | _ -> false
+      in
+      if is_apply_first_rule then
+        Option.map2 fname ppargs ~f:(fun x y ->
+            Front.PMRSDef (loc, pparams, x, y, requires, ensures, rules))
+      else None
+  | _ -> None
+
+(* `define_value loc is_rec binding` attempts to extract a PMRS definition of a function
+  definition out of a Caml value definition.
+ *)
+let define_value loc (is_rec : Asttypes.rec_flag) (bindings : value_binding list) =
   match (bindings, is_rec) with
-  | hd :: _, Asttypes.Recursive -> (
-      match pmrs_head hd with
-      | Some (fname, pargs, pred) ->
-          let prules = to_rules bindings in
-          let pparams = List.map ~f:(fun (x, _) -> x) (get_objects ()) in
-          reset_synt_objects ();
-          [ Front.PMRSDecl (loc, pparams, fname, pargs, pred, prules) ]
-      | _ -> [])
+  | hd :: tl, Asttypes.Recursive ->
+      (* A recursive function may be a PMRS. *)
+      pmrs_head_of_rec_def loc hd tl
+  | [ vb ], Asttypes.Nonrecursive ->
+      (* A non-recursive function may be a parametric PMRS.
+         It should have the form:
+         let f x1 .. xn t =
+           let rec g = function ...
+           and h _ = function ..
+         in
+         g t
+      *)
+      Option.to_list (pmrs_def_of_nonrec_def loc vb)
   | _ -> []
 
 let declare_synt_obj (assert_expr : expression) =
@@ -228,9 +313,14 @@ let parse_ocaml (filename : string) =
   let definitions = read_sig filename in
   let per_def def =
     match def.pstr_desc with
-    | Pstr_type (rec_flag, ps_type_decls) -> type_declarations rec_flag ps_type_decls
-    | Pstr_value (rec_flag, binding_list) -> declare_value (wloc def.pstr_loc) rec_flag binding_list
+    | Pstr_type (rec_flag, ps_type_decls) ->
+        (* match type definitions. *)
+        type_definitions rec_flag ps_type_decls
+    | Pstr_value (rec_flag, binding_list) ->
+        (* match let .. definitions. *)
+        define_value (wloc def.pstr_loc) rec_flag binding_list
     | Pstr_eval ({ pexp_desc = Pexp_assert maybe_synt_obj; _ }, _) ->
+        (* match assert ... for declaration of synthesis objectives. *)
         declare_synt_obj maybe_synt_obj;
         []
     | _ -> []

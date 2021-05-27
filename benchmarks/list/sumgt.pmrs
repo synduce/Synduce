@@ -2,22 +2,23 @@ type 'a clist = CNil | Single of 'a | Concat of 'a clist * 'a clist
 
 type 'a list = Nil | Cons of 'a * 'a list
 
-pmrs spec c =
-    main l -> f l
-    | f Nil -> 0
-    | f Cons(hd,tl) -> (hd > c ? hd : 0) + (f tl)
+let spec c l =
+  let rec f = function Nil -> 0 | Cons (hd, tl) -> (if hd > c then hd else 0) + f tl in
+  f l
 
-pmrs (odot,f_0,s_0) target c =
-    target t           -> h t
-    | h CNil          -> s_0
-    | h Single(a)    -> f_0 c a
-    | h Concat(x, y) -> odot c (h x) (h y)
+let target c t =
+  let rec h = function
+    | CNil -> [%synt s0]
+    | Single a -> [%synt f0] c a
+    | Concat (x, y) -> [%synt odot] c (h x) (h y)
+  in
+  h t
 
-pmrs repr l =
-    repr l -> c l
-    | c CNil -> Nil
-    | c Single(a) -> Cons(a, Nil)
-    | c Concat(x, y) -> dec y x
-    | dec l CNil -> repr l
-    | dec l Single(a) -> Cons(a, repr l)
-    | dec l Concat(x, y) -> dec (Concat(l, y)) x
+let rec repr l = c l
+
+and c = function CNil -> Nil | Single a -> Cons (a, Nil) | Concat (x, y) -> dec y x
+
+and dec l = function
+  | CNil -> repr l
+  | Single a -> Cons (a, repr l)
+  | Concat (x, y) -> dec (Concat (l, y)) x

@@ -68,12 +68,13 @@ let rec sygus_of_term (t : term) : sygus_term =
   | TIte (c, a, b) -> SyApp (IdSimple "ite", List.map ~f:sygus_of_term [ c; a; b ])
   | TTup tl -> SyApp (IdSimple "mkTuple", List.map ~f:sygus_of_term tl)
   | TSel (t, i) -> SyApp (IdIndexed ("tupSel", [ INum i ]), [ sygus_of_term t ])
-  | TApp ({ tkind = TVar v; _ }, args) -> SyApp (IdSimple v.vname, List.map ~f:sygus_of_term args)
   | TData (cstr, args) -> (
       match args with
       | [] -> SyId (IdSimple cstr)
       | _ -> SyApp (IdSimple cstr, List.map ~f:sygus_of_term args))
-  | TApp (_, _) -> failwith "Sygus: application function can only be variable."
+  | TApp ({ tkind = TVar v; _ }, args) -> SyApp (IdSimple v.vname, List.map ~f:sygus_of_term args)
+  | TApp (_, _) ->
+      failwith "Sygus: application function can only be variable. TODO: add let-conversion."
   | TFun (_, _) -> failwith "Sygus: functions in terms not supported."
 
 let constant_of_literal (l : literal) : Constant.t =
@@ -150,7 +151,8 @@ let rec term_of_sygus (env : (string, variable, String.comparator_witness) Map.t
       | INotDef -> failwith Fmt.(str "Sygus: Undefined variable %s" s))
   | SyExists (_, _) -> failwith "Sygus: exists-terms not supported."
   | SyForall (_, _) -> failwith "Sygus: forall-terms not supported."
-  | SyLet (_, _) -> failwith "Sygus: let-terms not supported."
+  (* TODO: add let-conversion. *)
+  | SyLet (_, _) -> failwith "Sygus: let-terms not supported. TODO: add let-conversion."
   | _ -> failwith "Composite identifier not supported."
 
 (* ============================================================================================= *)
@@ -192,7 +194,7 @@ let declaration_of_var (v : variable) =
 let sorted_vars_of_types (tl : RType.t list) : sorted_var list =
   let f t =
     (* Declare var for future parsing. *)
-    let varname = Alpha.fresh "x" in
+    let varname = Alpha.fresh () in
     (varname, sort_of_rtype t)
   in
   List.map ~f tl

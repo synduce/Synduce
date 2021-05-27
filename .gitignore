@@ -8,3 +8,6 @@ Example
 *.txt
 *.csv
 review_data/*
+tests/*.txt
+benchmarks/*.csv
+*.messages

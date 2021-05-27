@@ -31,29 +31,9 @@ of the recursion skeleton is `theta`, the representation function must be a func
 
 The tool accepts inputs defined in two different formats: using a syntax specific for pattern-matching recursion scheme (PRMS) (files with `.pmrs` extension) or an OCaml file (`.ml` extension). The PMRS syntax is more feature complete, but we are actively working on the ML syntax.
 
-## PMRS syntax
-
-`atropos` uses a special syntax to specify recursion schemes (Pattern Matching Recursion Schemes).
-The files ending in `.pmrs` are examples of this syntax. The benchmark `benchmarks/list/mpshom.pmrs` includes detailed comments on the input format.
-
-The general syntax of a pattern matching recursion scheme is as follows:
-```
-pmrs (unknowns*) pmrs_name pmrs_args {invariant} =
-    | f x_1 ... x_n -> t
-    | g y_1 ... y_m p -> t
-    ...
-```
-- `(unknowns*)` is an optional list of string identifying the unknowns of the pmrs.
-- `pmrs_name` is the name of the pmrs.
-- `pmrs_args` are the non-recursible arguments of the pmrs. They cannot be matched. See for example the 'benchmarks/list/search.pmrs' for an example. This is useful when the function needs more than one argument.
-- `{invariant}` is an optional invariant of the function (for the reference function). `invariant` is a function of the form `fun (x1, x2, ...) -> expr(x1, x2, ...)` where `x1, x2, ..` is the output of the function, and `expr(x1, x2, ..)` a boolean expression. `invariant` indicates that `invariant(pmrs_name(x))` is true for any input `x` of the pmrs.
-- `f x_1 ... x_n -> t` is a non-pattern matching rule with arguments `x_1 ... x_n` and contractum `t`.
-- `g x_1 ... x_n p -> t` is a pattern matching rule with arguments `x_1 ... x_n` and pattern `p` and contractum `t`.
-- The first rule defines the main function of the PMRS. The type of the non-terminal symbol of
-the first rule should be the type of a function from input type of the PMRS to output type.
 
 ## ML syntax
-The interface using the Caml syntax is still in development. See the `.ml` files in the benchmarks folder. Specifications are supported through syntax extensions: optional objects such as invariants are specified through attributes, and mandatory components (functions to be synthesized) are written using `[%synt name-of-the-function]`. The Caml syntax is limited to benchmarks where the main recursive function has only one input argument for now.
+See the `.ml` files in the benchmarks folder. Specifications are supported through syntax extensions: optional objects such as invariants are specified through attributes, and mandatory components (functions to be synthesized) are written using `[%synt name-of-the-function]`.
 
 For example, in the file `benchmarks/list/sum.ml` we have the following type definitions:
 ```ocaml
@@ -96,9 +76,74 @@ The final assertions indicates that the tool should synthesize the expressions f
 Note that the representation function and the target recursion skeleton can be reused across a large set of examples. All the benchmarks in `benchmarks/list` use the same `repr` and `target`, modulo some changes in the base case when lists have a minimum size.
 Running `./atropos benchmarks/list/sum.ml` returns the solution in less than a second:
 ```ocaml
+let s0  = 0
+let f0 x = x
+let join x40 x42 = x40 + x42
 let rec hsum = function
-         CNil -> 0
-        | Single(a) -> a
-        | Concat(x, y) -> (hsum x) + (hsum y)
+    | CNil -> s0
+    | Single(a) -> f0 a
+    | Concat(x, y) -> join (hsum x) (hsum y)
 ```
-NOTE: The notation `s.0` to access the first element of the tuple `s` in the *output* format.
+
+### Ensures attribute
+
+A function can be given attributes that provide more information about their input and output domains.
+For example, in `benchmarks/list/mts.ml`, the first output element of the `mts` function is always positive
+and larger than the second output element:
+```ocaml
+let rec mts = function
+  | Nil -> (0, 0)
+  | Cons (hd, tl) ->
+      let amts, asum = mts tl in
+      let new_sum = asum + hd in
+      (max amts new_sum, new_sum)
+  (* the mts is always positive *)
+  [@@ensures fun (x, y) -> x >= 0 && x >= y]
+```
+This is specified by the `[@@ensures predicate]` where `predicate` is a function from the output domain of
+the function to which the attribute is attached, to booleans.
+
+
+### Functions with additional parameters
+
+The tool is not limited to unary functions. An example of a benchmark where the function also accepts and additional argument can be found in `benchmarks/list/sum.ml`.
+The syntax to write functions with additional non-recursible parameters is of the form:
+```ocaml
+(* The last argument t must be the one used in the recursion.
+    The other arguments a,b,c are "parameters" of the pattern-matching recursion scheme. *)
+let f a b c t =
+    (* Define mutually recursive functions. Parameters are in scope. *)
+    let rec aux = function _ -> (* .. *)
+    and aux2 = (* function defintion .. *)
+    in
+    (* Call the main recursive function *)
+    aux t
+```
+
+
+
+
+## PMRS syntax
+
+`atropos` uses a special syntax to specify recursion schemes (Pattern Matching Recursion Schemes).
+The files ending in `.pmrs` are examples of this syntax. The benchmark `benchmarks/list/mpshom.pmrs` includes detailed comments on the input format.
+
+The general syntax of a pattern matching recursion scheme is as follows:
+```
+pmrs (unknowns*) pmrs_name pmrs_args {invariant} =
+    | f x_1 ... x_n -> t
+    | g y_1 ... y_m p -> t
+    ...
+```
+- `(unknowns*)` is an optional list of string identifying the unknowns of the pmrs.
+- `pmrs_name` is the name of the pmrs.
+- `pmrs_args` are the non-recursible arguments of the pmrs. They cannot be matched. See for example the 'benchmarks/list/search.pmrs' for an example. This is useful when the function needs more than one argument.
+- `{invariant}` is an optional invariant of the function (for the reference function). `invariant` is a function of the form `fun (x1, x2, ...) -> expr(x1, x2, ...)` where `x1, x2, ..` is the output of the function, and `expr(x1, x2, ..)` a boolean expression. `invariant` indicates that `invariant(pmrs_name(x))` is true for any input `x` of the pmrs.
+- `f x_1 ... x_n -> t` is a non-pattern matching rule with arguments `x_1 ... x_n` and contractum `t`.
+- `g x_1 ... x_n p -> t` is a pattern matching rule with arguments `x_1 ... x_n` and pattern `p` and contractum `t`.
+- The first rule defines the main function of the PMRS. The type of the non-terminal symbol of
+the first rule should be the type of a function from input type of the PMRS to output type.
+
+# Evaluation
+The folder `extras/cav21` contains scripts and a readme to reproduce the results presented in the CAV21 paper.
+Please move the scripts to the root folder before executing them.

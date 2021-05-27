@@ -53,12 +53,15 @@ let pp_id_var f v = Fmt.(pf f "(%i : %s)" v.vid v.vname)
 
 let dump_variable f v = Fmt.(string f v.vname)
 
+(* Module of variables *)
 module Variable = struct
   module T = struct
     type t = variable
 
+    (* Variables are compared by their id, not their name. *)
     let compare x y = compare x.vid y.vid
 
+    (* Variables are compared by their id, not their name. *)
     let equal x y = x.vid = y.vid
 
     let ( = ) x y = equal x y
@@ -77,6 +80,11 @@ module Variable = struct
 
   let vtype (v : variable) = Hashtbl.find _types v.vid
 
+  (* `vtype_or_new v` returns the type of variable v, or assigns a fresh type variable
+      as its type if it doesn't have one.
+      The type of a variable will automatically be assigned to satisfy constraints
+      produced during type inference.
+  *)
   let vtype_or_new (v : variable) =
     match vtype v with
     | Some x -> x
@@ -111,6 +119,10 @@ module Variable = struct
 
   let pp_typed (frmt : Formatter.t) (v : t) =
     Fmt.(pf frmt "%s : %a" v.vname RType.pp (vtype_or_new v))
+
+  let free (var : t) =
+    Alpha.forget var.vid var.vname;
+    Hashtbl.remove _types var.vid
 
   let print_summary (frmt : Formatter.t) () =
     Utils.Log.(debug (wrap "Variables in tables:"));
@@ -170,6 +182,15 @@ module VarSet = struct
       (module String)
       ~f:(fun b1 _ -> b1)
       (List.map ~f:(fun v -> (v.vname, v)) (elements vs))
+
+  (** Returns a list of pairs of variable, fresh copy of the variable. *)
+  let prime (vs : t) : (variable * variable) list =
+    Set.fold
+      ~f:(fun subs v ->
+        let primed_name = Alpha.fresh ~s:(v.vname ^ "_") () in
+        let primed_var = Variable.mk ~t:(Variable.vtype v) primed_name in
+        (v, primed_var) :: subs)
+      ~init:[] vs
 
   let add_prefix vs prefix =
     of_list (List.map ~f:(fun v -> { v with vname = prefix ^ v.vname }) (elements vs))
@@ -522,14 +543,14 @@ let sexp_of_term (_ : term) = Sexp.Atom "TODO"
 
 let rec mk_composite_base_type (t : RType.t) : term =
   match t with
-  | RType.TInt -> mk_var (Variable.mk ~t:(Some t) (Alpha.fresh "i_"))
-  | RType.TBool -> mk_var (Variable.mk ~t:(Some t) (Alpha.fresh "b_"))
-  | RType.TString -> mk_var (Variable.mk ~t:(Some t) (Alpha.fresh "s_"))
-  | RType.TChar -> mk_var (Variable.mk ~t:(Some t) (Alpha.fresh "c_"))
+  | RType.TInt -> mk_var (Variable.mk ~t:(Some t) (Alpha.fresh ~s:"i" ()))
+  | RType.TBool -> mk_var (Variable.mk ~t:(Some t) (Alpha.fresh ~s:"b" ()))
+  | RType.TString -> mk_var (Variable.mk ~t:(Some t) (Alpha.fresh ~s:"s" ()))
+  | RType.TChar -> mk_var (Variable.mk ~t:(Some t) (Alpha.fresh ~s:"c" ()))
   | RType.TTup tl -> mk_tup (List.map ~f:mk_composite_base_type tl)
-  | RType.TNamed _ -> mk_var (Variable.mk ~t:(Some t) (Alpha.fresh "l_"))
+  | RType.TNamed _ -> mk_var (Variable.mk ~t:(Some t) (Alpha.fresh ~s:"l" ()))
   | RType.TFun (_, _) | RType.TParam (_, _) | RType.TVar _ ->
-      failwith Fmt.(str "not a scalar type: %a" RType.pp t)
+      failwith Fmt.(str "mk_composite_base_type: %a is not a base type." RType.pp t)
 
 (* ============================================================================================= *)
 (*                             EQUALITY                                                          *)
@@ -592,7 +613,7 @@ let mk_with_fresh_vars (vs : VarSet.t) (t : term) : VarSet.t * term =
     let f var =
       let fresh =
         let t = Some (Variable.vtype_or_new var) in
-        Variable.mk ~t (Alpha.fresh var.vname)
+        Variable.mk ~t (Alpha.fresh ~s:var.vname ())
       in
       (fresh, (mk_var var, mk_var fresh))
     in
@@ -809,8 +830,8 @@ let pp_term (frmt : Formatter.t) (x : term) =
         if paren then pf frmt "@[<hov 2>(%a@;%a)@]" (aux true) func (list ~sep:sp (aux true)) args
         else pf frmt "@[<hov 2>%a@;%a@]" (aux true) func (list ~sep:sp (aux true)) args
     | TData (cstr, args) ->
-        if List.length args = 0 then pf frmt "%s" cstr
-        else pf frmt "%s(%a)" cstr (list ~sep:comma (aux false)) args
+        if List.length args = 0 then pf frmt "%a" (styled (`Fg `Green) string) cstr
+        else pf frmt "%a(%a)" (styled (`Fg `Green) string) cstr (list ~sep:comma (aux false)) args
   in
   aux false frmt x
 

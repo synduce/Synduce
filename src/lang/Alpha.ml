@@ -1,12 +1,11 @@
 open Base
 
-type typ = string * int
-
 let _IDS = Hashtbl.create (module Int) ~size:20
 
 let get_ids () = _IDS
 
 let _NAMES = Hashtbl.create (module String) ~size:100
+
 let _MAX_ID = ref 0
 
 let new_id () =
@@ -14,16 +13,35 @@ let new_id () =
   _MAX_ID := !_MAX_ID + 1;
   i
 
-let rec fresh (s : string) : string =
-  if Hashtbl.mem _NAMES s then
-    fresh (s^(Int.to_string (new_id ())))
-  else
-    (Hashtbl.add_multi _NAMES ~key:s ~data:!_MAX_ID; s)
+let forget (i : int) (s : string) =
+  Hashtbl.remove _IDS i;
+  match Hashtbl.find _NAMES s with
+  | Some id_list -> (
+      match List.filter ~f:(fun i' -> not (i' = i)) id_list with
+      | hd :: tl -> Hashtbl.set _NAMES ~key:s ~data:(hd :: tl)
+      | _ -> Hashtbl.remove _NAMES s)
+  | None -> ()
+
+let fresh ?(s = "x") () : string =
+  match Hashtbl.find _NAMES s with
+  | Some (id0 :: ids) ->
+      let new_id = id0 + 1 in
+      let fresh_name = s ^ Int.to_string new_id in
+      Hashtbl.set _NAMES ~key:s ~data:(new_id :: id0 :: ids);
+      fresh_name
+  | Some [] ->
+      let fresh_name = s ^ "0" in
+      Hashtbl.set _NAMES ~key:s ~data:[ 0 ];
+      fresh_name
+  | _ ->
+      Hashtbl.set _NAMES ~key:s ~data:[];
+      s
 
 let mk_with_id (i : int) (s : string) (f : int -> 'a) : 'a =
   if i > 0 then f i
   else
     let id = new_id () in
     match Hashtbl.add _IDS ~key:id ~data:s with
-    | _ -> ();
-      f id
+    | _ ->
+        ();
+        f id

@@ -23,12 +23,12 @@ show_benchmarks = [
         ["mits", ["", "in-order mts", "yes", "mits"]],
         ["mpps", ["", "post-order mps", "yes", "mpps"]]
     ]],
-    ["zippers", [
+    ["treepaths", [
         ["sum", ["", "sum", "no", "sum"]],
         ["height", ["From ", "height", "no", "height"]],
         ["maxPathWeight", ["Tree to", "max weighted path", "no", "max w. path"]],
         ["maxPathWeight2", [
-            "Zipper", "max w. path (hom)", "no", "max w. path"]],
+            "Path", "max w. path (hom)", "no", "max w. path"]],
         ["leftmostodd", ["", "leftmost odd", "no", "leftmost o."]],
         ["mips", ["", "{\\tt mips}", "yes", "{\\tt mips}"]]
     ]],
