@@ -95,8 +95,13 @@ let proj_unknowns (unknowns : VarSet.t) =
   in
   (new_unknowns, proj_map)
 
+(* ============================================================================================= *)
+(*                               CHECKING UNREALIZABILITY                                        *)
+(* ============================================================================================= *)
+
 type unrealizability_ctex =
   VarSet.t * (int, term, Int.comparator_witness) Map.t * (int, term, Int.comparator_witness) Map.t
+(** A counterexample to realizability is a pair of models: a pair of maps from variable ids to terms. *)
 
 let pp_unrealizability_ctex (frmt : Formatter.t) ((ctxt, m, m') : unrealizability_ctex) : unit =
   let pp_model frmt model =
@@ -107,13 +112,19 @@ let pp_unrealizability_ctex (frmt : Formatter.t) ((ctxt, m, m') : unrealizabilit
   in
   Fmt.(pf frmt "@[M = [%a]@]@;@[M' = [%a]@]" pp_model m pp_model m')
 
-let check_realizable (unknowns : VarSet.t) (eqns : equation list) : unrealizability_ctex list =
+(** Check if system of equations defines a functionally realizable synthesis problem.
+  If any equation defines an unsolvable problem, an unrealizability_ctex is added to the
+  list of counterexamples to be returned.
+  If the returned list is empty, the problem may be solvable/realizable.
+  If the returned list is not empty, the problem is not solvable / unrealizable.
+*)
+let check_unrealizable (unknowns : VarSet.t) (eqns : equation list) : unrealizability_ctex list =
   Log.info (fun f () -> Fmt.(pf f "Checking unrealizability..."));
   let start_time = Unix.gettimeofday () in
   let solver = Solvers.make_z3_solver () in
   Solvers.load_min_max_defs solver;
   (* Main part of the check, appliued to each equation in eqns. *)
-  let check_eqn_accum ctexs (_t, precond, lhs, rhs) =
+  let check_eqn_accum ctexs (_, precond, lhs, rhs) =
     let vset =
       Set.diff (Set.union (Analysis.free_variables lhs) (Analysis.free_variables rhs)) unknowns
     in
@@ -123,9 +134,10 @@ let check_realizable (unknowns : VarSet.t) (eqns : equation list) : unrealizabil
     (* Extract the arguments of the rhs, if it is a call to an unknown. *)
     let maybe_rhs_args =
       match rhs.tkind with
-      | TApp ({ tkind = TVar v; _ }, args) ->
-          if Set.mem unknowns v then
+      | TApp ({ tkind = TVar f_v; _ }, args) ->
+          if Set.mem unknowns f_v then
             let fv_args = VarSet.union_list (List.map ~f:Analysis.free_variables args) in
+            (* Check there are no unknowns in the args. *)
             if Set.are_disjoint fv_args unknowns then Some args else None
           else None
       | _ -> None
@@ -156,9 +168,28 @@ let check_realizable (unknowns : VarSet.t) (eqns : equation list) : unrealizabil
           match Solvers.check_sat solver with
           | Sat -> (
               match Solvers.get_model solver with
-              | SExps _ ->
-                  Log.debug_msg "Got a counterexample!";
-                  ctexs
+              | SExps s ->
+                  let model = model_to_constmap (SExps s) in
+                  let m0, m0' =
+                    Map.partitioni_tf
+                      ~f:(fun ~key ~data:_ -> Option.is_some (VarSet.find_by_name vset key))
+                      model
+                  in
+                  (* Remap the names to ids of the original variables in m' *)
+                  let m, m' =
+                    List.fold var_subst
+                      ~init:(Map.empty (module Int), Map.empty (module Int))
+                      ~f:(fun (m, m') (v, v') ->
+                        Variable.free v';
+                        ( (match Map.find m0 v.vname with
+                          | Some data -> Map.set m ~key:v.vid ~data
+                          | None -> m),
+                          match Map.find m0' v'.vname with
+                          | Some data -> Map.set m' ~key:v.vid ~data
+                          | None -> m' ))
+                  in
+
+                  (vset, m, m') :: ctexs
               | _ -> ctexs)
           | _ -> ctexs
         in
@@ -174,7 +205,9 @@ let check_realizable (unknowns : VarSet.t) (eqns : equation list) : unrealizabil
       | [] -> Fmt.pf f "No counterexample to realizability found."
       | _ :: _ ->
           Fmt.(
-            pf f "Counterexamples found:@[<hov 2>%a@]" (list ~sep:sp pp_unrealizability_ctex) ctexs));
+            pf f "Counterexamples found:@;@[<hov 2>%a@]"
+              (list ~sep:sp pp_unrealizability_ctex)
+              ctexs));
   ctexs
 
 (* ============================================================================================= *)
@@ -308,7 +341,7 @@ let make ?(force_replace_off = false) ~(p : psi_def) (tset : TermSet.t) : equati
           | Some x -> (t, Some (SmtInterface.term_of_smt env x), lhs, rhs))
       (* todo: take the invariant into account *)
     in
-    List.map ~f pure_eqns
+    if !Config.interactive_lemmas then List.map ~f pure_eqns else pure_eqns
   in
   Log.verbose (fun f () ->
       let print_less = List.take eqns_with_invariants !Config.pp_eqn_count in
@@ -490,51 +523,57 @@ let constraints_of_eqns (eqns : equation list) : command list =
   List.map ~f:eqn_to_constraint detupled_equations
 
 let solve_eqns (unknowns : VarSet.t) (eqns : equation list) =
-  ignore (check_realizable unknowns eqns);
-  let free_vars, all_operators, has_ite =
-    let f (fvs, ops, hi) (_, _, lhs, rhs) =
-      ( VarSet.union_list [ fvs; Analysis.free_variables lhs; Analysis.free_variables rhs ],
-        Set.union ops (Set.union (Grammars.operators_of lhs) (Grammars.operators_of rhs)),
-        hi || Analysis.has_ite lhs || Analysis.has_ite rhs )
-    in
-    let fvs, ops, hi = List.fold eqns ~f ~init:(VarSet.empty, Set.empty (module Operator), false) in
-    (Set.diff fvs unknowns, ops, hi)
-  in
-  (* Commands *)
-  let set_logic = CSetLogic (Grammars.logic_of_operator all_operators) in
-  let synth_objs = synthfuns_of_unknowns ~bools:has_ite ~eqns ~ops:all_operators unknowns in
-  let sort_decls = declare_sorts_of_vars free_vars in
-  let var_decls = List.map ~f:declaration_of_var (Set.elements free_vars) in
-  let constraints = constraints_of_eqns eqns in
-  let extra_defs =
-    (if Set.mem all_operators (Binary Max) then [ max_definition ] else [])
-    @ if Set.mem all_operators (Binary Min) then [ min_definition ] else []
-  in
-  let commands =
-    set_logic :: (extra_defs @ sort_decls @ synth_objs @ var_decls @ constraints @ [ CCheckSynth ])
-  in
-  (* Call the solver. *)
-  let handle_response (resp : solver_response) =
-    let parse_synth_fun (fname, fargs, _, fbody) =
-      let args =
-        let f (varname, sort) = Variable.mk ~t:(rtype_of_sort sort) varname in
-        List.map ~f fargs
+  let aux_solve () =
+    let free_vars, all_operators, has_ite =
+      let f (fvs, ops, hi) (_, _, lhs, rhs) =
+        ( VarSet.union_list [ fvs; Analysis.free_variables lhs; Analysis.free_variables rhs ],
+          Set.union ops (Set.union (Grammars.operators_of lhs) (Grammars.operators_of rhs)),
+          hi || Analysis.has_ite lhs || Analysis.has_ite rhs )
       in
-      let local_vars = VarSet.of_list args in
-      let body, _ = infer_type (term_of_sygus (VarSet.to_env local_vars) fbody) in
-      (fname, args, body)
+      let fvs, ops, hi =
+        List.fold eqns ~f ~init:(VarSet.empty, Set.empty (module Operator), false)
+      in
+      (Set.diff fvs unknowns, ops, hi)
     in
-    match resp with
-    | RSuccess resps ->
-        let soln = List.map ~f:parse_synth_fun resps in
-        (resp, Some soln)
-    | RInfeasible -> (RInfeasible, None)
-    | RFail -> (RFail, None)
-    | RUnknown -> (RUnknown, None)
+    (* Commands *)
+    let set_logic = CSetLogic (Grammars.logic_of_operator all_operators) in
+    let synth_objs = synthfuns_of_unknowns ~bools:has_ite ~eqns ~ops:all_operators unknowns in
+    let sort_decls = declare_sorts_of_vars free_vars in
+    let var_decls = List.map ~f:declaration_of_var (Set.elements free_vars) in
+    let constraints = constraints_of_eqns eqns in
+    let extra_defs =
+      (if Set.mem all_operators (Binary Max) then [ max_definition ] else [])
+      @ if Set.mem all_operators (Binary Min) then [ min_definition ] else []
+    in
+    let commands =
+      set_logic :: (extra_defs @ sort_decls @ synth_objs @ var_decls @ constraints @ [ CCheckSynth ])
+    in
+    (* Call the solver. *)
+    let handle_response (resp : solver_response) =
+      let parse_synth_fun (fname, fargs, _, fbody) =
+        let args =
+          let f (varname, sort) = Variable.mk ~t:(rtype_of_sort sort) varname in
+          List.map ~f fargs
+        in
+        let local_vars = VarSet.of_list args in
+        let body, _ = infer_type (term_of_sygus (VarSet.to_env local_vars) fbody) in
+        (fname, args, body)
+      in
+      match resp with
+      | RSuccess resps ->
+          let soln = List.map ~f:parse_synth_fun resps in
+          (resp, Some soln)
+      | RInfeasible -> (RInfeasible, None)
+      | RFail -> (RFail, None)
+      | RUnknown -> (RUnknown, None)
+    in
+    match Syguslib.Solvers.SygusSolver.solve_commands commands with
+    | Some resp -> handle_response resp
+    | None -> (RFail, None)
   in
-  match Syguslib.Solvers.SygusSolver.solve_commands commands with
-  | Some resp -> handle_response resp
-  | None -> (RFail, None)
+  if !Config.check_unrealizable then
+    match check_unrealizable unknowns eqns with [] -> aux_solve () | _ :: _ -> (RInfeasible, None)
+  else aux_solve ()
 
 let solve_eqns_proxy (unknowns : VarSet.t) (eqns : equation list) =
   if !Config.syndef_on then

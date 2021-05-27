@@ -11,16 +11,16 @@ let rec pred = function
 and aux = function Leaf' a -> a | Node' (_a, n, _l, _r) -> n
 
 (** Reference function : contains.
-  ⚠️  This syntax is not yet supported (PMRS with a parameter).
   *)
 let spec x t =
-  let rec aux = function Leaf a -> a == x | Node (a, l, r) -> a == x || aux l || aux r in
+  let rec aux = function Leaf a -> a = x | Node (a, l, r) -> a = x || aux l || aux r in
   aux t
 
 let target x t =
   let rec aux = function
-    | Leaf' a -> a
-    | Node' (a, n, l, r) -> if n < x then [%synt x1] else [%synt x2] x a (aux l) (aux r)
+    | Leaf' a -> [%synt f1] x a
+    | Node' (a, n, l, r) ->
+        if n < x then [%synt xi_1] x a (aux l) else [%synt xi_2] x a (aux l) (aux r)
   in
   aux t
 (* To be continued... *)

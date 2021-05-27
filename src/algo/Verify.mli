@@ -28,15 +28,3 @@ val bounded_check :
     Returns the first equation for which checking has failed (the first element is the counterexample).
     Returns None if the check passed.
 *)
-(*
-type unrealizability_ctex =
-  VarSet.t * (int, term, Int.comparator_witness) Map.t * (int, term, Int.comparator_witness) Map.t
-(** A counterexample to realizability is a pair of models: a pair of maps from variable ids to terms. *)
-
-val check_realizable : VarSet.t -> Equations.equation list -> unrealizability_ctex list
-(** Check if system of equations defines a functionally realizable synthesis problem.
-  If any equation defines an unsolvable problem, an unrealizability_ctex is added to the
-  list of counterexamples to be returned.
-  If the returned list is empty, the problem may be solvable.
-  If the returned list is not empty, the problem is not solvable.
-*) *)

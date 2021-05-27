@@ -19,6 +19,18 @@ let show_vars = ref false
 let verbose = ref false
 
 (* ============================================================================================= *)
+(*                                TEMPORARY OPTIONS                                              *)
+(* ============================================================================================= *)
+
+let interactive_lemmas = ref false
+
+(**
+  Check whether a system of equations defines a "functionally realizable" synthesis problem.
+  OFF by default.
+*)
+let check_unrealizable = ref false
+
+(* ============================================================================================= *)
 (*                                GLOBAL TIMING INFO                                             *)
 (* ============================================================================================= *)
 
@@ -97,12 +109,6 @@ let simplify_eqns = ref true
   OFF for CAV
 *)
 let optimize_grammars = ref false
-
-(**
-  Check whether a system of equations defines a "functionally realizable" synthesis problem.
-  OFF by default.
-*)
-let check_functionally_unrealizable = ref false
 
 (** When printing a system of equations, put a limit on how many equations are printed. *)
 let pp_eqn_count = ref 10
