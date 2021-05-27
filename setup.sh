@@ -21,7 +21,7 @@ mkdir -p $HOME/.local/bin
 # set PATH so it includes user's private bin if it exists
 if [ -d "$HOME/.local/bin" ] ; then
     export PATH="$HOME/.local/bin:$PATH"
-    echo "Please add $HOME/.local/bin to your path (in .bashrc or .zshrc or ..)"
+    echo "Please add $HOME/.local/bin to your path (e.g. add it in .profile)"
 fi
 
 sep "Installing packages z3 and python3"

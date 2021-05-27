@@ -6,11 +6,13 @@
 
 (license MIT)
 
-(authors "Victor Nicolet")
+(authors "Victor Nicolet" "Danya Lette")
 
 (maintainers "victorn@cs.toronto.edu")
 
 (homepage "https://github.com/victornicolet/atropos")
+
+(bug_reports "https://github.com/victornicolet/atropos/issues")
 
 (generate_opam_files true)
 
