@@ -207,7 +207,7 @@ let pmrs_of_rules loc (globs : (string, Term.variable) Hashtbl.t) (synt_objs : T
   in
   let _requires_func, ensures_func =
     let f x = fterm_to_term x.pos allv globs Term.VarSet.empty x in
-    (Option.map ensures ~f, Option.map ~f requires)
+    (Option.map requires ~f, Option.map ~f ensures)
   in
   let pmrs0 =
     PMRS.
