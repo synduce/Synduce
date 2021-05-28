@@ -25,6 +25,7 @@ if [ -d "$HOME/.local/bin" ] ; then
 fi
 
 sep "Installing packages z3 and python3"
+sudo apt update
 sudo apt install z3 python3
 
 sep "Installing CVC4"

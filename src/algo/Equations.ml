@@ -529,8 +529,16 @@ let constraints_of_eqns (eqns : equation list) : command list =
 let solve_eqns (unknowns : VarSet.t) (eqns : equation list) =
   let aux_solve () =
     let free_vars, all_operators, has_ite =
-      let f (fvs, ops, hi) (_, _, lhs, rhs) =
-        ( VarSet.union_list [ fvs; Analysis.free_variables lhs; Analysis.free_variables rhs ],
+      let f (fvs, ops, hi) (_, precond, lhs, rhs) =
+        let set' =
+          VarSet.union_list
+            [
+              Analysis.free_variables lhs;
+              Analysis.free_variables rhs;
+              Option.value_map precond ~f:Analysis.free_variables ~default:VarSet.empty;
+            ]
+        in
+        ( Set.union fvs set',
           Set.union ops (Set.union (Grammars.operators_of lhs) (Grammars.operators_of rhs)),
           hi || Analysis.has_ite lhs || Analysis.has_ite rhs )
       in
@@ -580,7 +588,7 @@ let solve_eqns (unknowns : VarSet.t) (eqns : equation list) =
   else aux_solve ()
 
 let solve_eqns_proxy (unknowns : VarSet.t) (eqns : equation list) =
-  if !Config.syndef_on then
+  if !Config.use_syntactic_definitions then
     let partial_soln, new_unknowns, new_eqns = solve_syntactic_definitions unknowns eqns in
     if Set.length new_unknowns > 0 then
       combine (Some partial_soln) (solve_eqns new_unknowns new_eqns)
@@ -645,7 +653,7 @@ let split_solve partial_soln (unknowns : VarSet.t) (eqns : equation list) =
 
 let solve_stratified (unknowns : VarSet.t) (eqns : equation list) =
   let psol, u, e =
-    if !Config.syndef_on then
+    if !Config.use_syntactic_definitions then
       let c_soln, no_c_unknowns, no_c_eqns = solve_constant_eqns unknowns eqns in
       let partial_soln', new_unknowns, new_eqns =
         solve_syntactic_definitions no_c_unknowns no_c_eqns
@@ -659,20 +667,88 @@ let solve_stratified (unknowns : VarSet.t) (eqns : equation list) =
     | resp, Some soln -> (resp, Some (psol @ soln))
     | resp, None -> (resp, None)
 
+(* ============================================================================================= *)
+(*                               PREPROCESSING SYSTEM OF EQUATIONS                               *)
+(* ============================================================================================= *)
+type partial_soln = (string * variable list * term) list
+
+type preprocessing_action_result =
+  VarSet.t
+  * equation list
+  * (solver_response * partial_soln option -> solver_response * partial_soln option)
+(** A preprocessing action should return a new system of equations,
+   and optionally a new set of unknowns together with a postprocessing function. *)
+
+let preprocess_none u eqs = (u, eqs, fun x -> x)
+
+(** Project unknowns that return tuple into a tuple of unknowns and change the equations
+    accordingly.
+*)
+let preprocess_detuple (unknowns : VarSet.t) (eqns : equation list) : preprocessing_action_result =
+  let new_unknowns, projections = proj_unknowns unknowns in
+  let new_eqns = proj_and_detuple_eqns projections eqns in
+  let postprocessing (resp, soln) =
+    match soln with
+    | Some soln ->
+        let soln =
+          if Map.length projections > 0 then revert_projs unknowns projections soln else soln
+        in
+        (resp, Some soln)
+    | None -> (resp, None)
+  in
+  (new_unknowns, new_eqns, postprocessing)
+
+let preprocess_deconstruct_if (unknowns : VarSet.t) (eqns : equation list) :
+    preprocessing_action_result =
+  let and_opt precond t =
+    match precond with Some pre -> Some (mk_bin And pre t) | None -> Some t
+  in
+  let eqns' =
+    let f (t, precond, lhs, rhs) =
+      match rhs.tkind with
+      | TIte (rhs_c, rhs_bt, rhs_bf) -> (
+          match lhs.tkind with
+          | TIte (lhs_c, lhs_bt, lhs_bf) when Terms.equal rhs_c lhs_c ->
+              [
+                (t, and_opt precond rhs_c, lhs_bt, rhs_bt);
+                (t, and_opt precond (mk_un Not rhs_c), lhs_bf, rhs_bf);
+              ]
+          | _ ->
+              [
+                (t, and_opt precond rhs_c, lhs, rhs_bt);
+                (t, and_opt precond (mk_un Not rhs_c), lhs, rhs_bf);
+              ])
+      | _ -> [ (t, precond, lhs, rhs) ]
+    in
+    List.concat_map ~f eqns
+  in
+  (unknowns, eqns', fun x -> x)
+
+(* ============================================================================================= *)
+(*                              MAIN ENTRY POINT                                                 *)
+(* ============================================================================================= *)
+
+(** Main entry point: solve a ssytem of equations by synthesizing the unknowns.
+*)
 let solve ~(p : psi_def) (eqns : equation list) =
   let unknowns = p.target.psyntobjs in
+  let preprocessing_actions =
+    [
+      preprocess_deconstruct_if;
+      (if !Config.detupling_on then preprocess_detuple else preprocess_none);
+    ]
+  in
   let soln_final =
-    if !Config.detupling_on then
-      let new_unknowns, projections = proj_unknowns p.target.psyntobjs in
-      let new_eqns = proj_and_detuple_eqns projections eqns in
-      match solve_stratified new_unknowns new_eqns with
-      | resp, Some soln0 ->
-          let soln =
-            if Map.length projections > 0 then revert_projs unknowns projections soln0 else soln0
-          in
-          (resp, Some soln)
-      | resp, None -> (resp, None)
-    else solve_stratified unknowns eqns
+    (* Apply the preprocessing actions, and construct the postprocessing in reverse. *)
+    let unknowns', eqns', postprocessing_actions =
+      List.fold preprocessing_actions ~init:(unknowns, eqns, [])
+        ~f:(fun (u, e, post_acts) pre_act ->
+          let u', e', post = pre_act u e in
+          (u', e', post :: post_acts))
+    in
+    (* Apply the postprocessing after solving. *)
+    List.fold postprocessing_actions ~init:(solve_stratified unknowns' eqns')
+      ~f:(fun partial_solution post_act -> post_act partial_solution)
   in
   (match soln_final with
   | _, Some soln -> Utils.Log.debug_msg Fmt.(str "@[<hov 2>Solution found: @;%a" pp_soln soln)

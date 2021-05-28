@@ -74,7 +74,7 @@ let detupling_on = ref true
   use them.
   Turn off with --no-syndef
  *)
-let syndef_on = ref true
+let use_syntactic_definitions = ref true
 
 (** Separate systems of equations into subsystems, and solve independently each subsystem.
   Use option -s or --split-solving-off to turn off.
