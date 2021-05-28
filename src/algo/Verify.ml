@@ -2,23 +2,26 @@ open AState
 open Base
 open Lang.SmtInterface
 open Lang.Term
+open Equations
 open Smtlib
 open Utils
 
-let constr_eqn (_, pre, lhs, rhs) =
-  let rec mk_eqn (lhs, rhs) =
+let constr_eqn (eqn : equation) =
+  let rec mk_equality (lhs, rhs) =
     let lhs, rhs = (Lang.Reduce.reduce_term lhs, Lang.Reduce.reduce_term rhs) in
     match (lhs.tkind, rhs.tkind) with
     (* If terms are tuples, equate each tuple component and take conjunction. *)
     | TTup ltl, TTup rtl -> (
         match List.zip ltl rtl with
-        | Ok rt_lt -> SmtLib.mk_assoc_and (List.map ~f:mk_eqn rt_lt)
+        | Ok rt_lt -> SmtLib.mk_assoc_and (List.map ~f:mk_equality rt_lt)
         | _ -> failwith "Verification failed: trying to equate tuples of different sizes?")
     (* Otherwise just make a smt terms corresponding to the equation. *)
     | _ -> SmtLib.mk_eq (smt_of_term lhs) (smt_of_term rhs)
   in
-  let eqn = mk_eqn (lhs, rhs) in
-  match pre with Some inv -> SmtLib.mk_or (SmtLib.mk_not (smt_of_term inv)) eqn | None -> eqn
+  let equality = mk_equality (eqn.elhs, eqn.erhs) in
+  match eqn.eprecond with
+  | Some inv -> SmtLib.mk_or (SmtLib.mk_not (smt_of_term inv)) equality
+  | None -> equality
 
 let check_solution ?(use_acegis = false) ~(p : psi_def) ((t, u) : TermSet.t * TermSet.t)
     (soln : (string * variable list * term) list) =
@@ -53,9 +56,11 @@ let check_solution ?(use_acegis = false) ~(p : psi_def) ((t, u) : TermSet.t * Te
       in
       let smt_eqns = List.map sys_eqns ~f:constr_eqn in
       let new_free_vars =
-        let f fv (_, _, lhs, rhs) =
+        let f fv eqn =
           Set.union fv
-            (Set.union (Lang.Analysis.free_variables lhs) (Lang.Analysis.free_variables rhs))
+            (Set.union
+               (Lang.Analysis.free_variables eqn.elhs)
+               (Lang.Analysis.free_variables eqn.erhs))
         in
         Set.diff (List.fold ~f ~init:VarSet.empty sys_eqns) free_vars
       in
@@ -133,9 +138,11 @@ let bounded_check ?(concrete_ctex = false) ~(p : psi_def)
     in
     let smt_eqns = List.map sys_eqns ~f:(fun t -> (t, constr_eqn t)) in
     let new_free_vars =
-      let f fv (_, _, lhs, rhs) =
+      let f fv (eqn : Equations.equation) =
         Set.union fv
-          (Set.union (Lang.Analysis.free_variables lhs) (Lang.Analysis.free_variables rhs))
+          (Set.union
+             (Lang.Analysis.free_variables eqn.elhs)
+             (Lang.Analysis.free_variables eqn.erhs))
       in
       Set.diff (List.fold ~f ~init:VarSet.empty sys_eqns) free_vars
     in
@@ -149,8 +156,15 @@ let bounded_check ?(concrete_ctex = false) ~(p : psi_def)
           | Sat, Some model_response ->
               let model = model_to_constmap model_response in
               let concr = Lang.Analysis.concretize ~model in
-              let t, inv, lhs, rhs = eqn in
-              Some (concr t, Option.map ~f:concr inv, concr lhs, concr rhs)
+              let t, inv, lhs, rhs = (eqn.eterm, eqn.eprecond, eqn.elhs, eqn.erhs) in
+              Some
+                {
+                  eterm = concr t;
+                  eprecond = Option.map ~f:concr inv;
+                  elhs = concr lhs;
+                  erhs = concr rhs;
+                  eelim = [];
+                }
           | Sat, None -> Some eqn
           | Error msg, _ ->
               Log.error_msg Fmt.(str "Solver failed with message: %s." msg);
@@ -162,8 +176,8 @@ let bounded_check ?(concrete_ctex = false) ~(p : psi_def)
     in
     let ctex_or_none = search_ctex smt_eqns in
     (match ctex_or_none with
-    | Some (t, _, _, _) ->
-        let ctex_height = term_height t in
+    | Some eqn ->
+        let ctex_height = term_height eqn.eterm in
         let current_check_depth = !Config.check_depth in
         let update = max current_check_depth (ctex_height - 1) in
         Config.check_depth := update;

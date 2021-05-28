@@ -25,10 +25,11 @@ let rec acegis_loop (p : psi_def) (t_set : TermSet.t) =
   | RSuccess _, Some sol -> (
       match Verify.bounded_check ~p sol with
       (* A symbolic counterexample term is returned. *)
-      | Some (t, _, _, _) ->
+      | Some eqn ->
           Log.debug (fun frmt () ->
-              Fmt.(pf frmt "@[<hov 2><ACEGIS> Counterexample term:@;@[<hov 2>%a@]" pp_term t));
-          acegis_loop p (Set.add t_set t)
+              Fmt.(
+                pf frmt "@[<hov 2><ACEGIS> Counterexample term:@;@[<hov 2>%a@]" pp_term eqn.eterm));
+          acegis_loop p (Set.add t_set eqn.eterm)
       | None ->
           Log.print_ok ();
           Ok { soln_rec_scheme = p.target; soln_implems = sol })
@@ -72,10 +73,11 @@ let rec ccegis_loop (p : psi_def) (t_set : TermSet.t) =
   | RSuccess _, Some sol -> (
       match Verify.bounded_check ~concrete_ctex:true ~p sol with
       (* A concrete conterexample term is returned. *)
-      | Some (t, _, _, _) ->
+      | Some eqn ->
           Log.debug (fun frmt () ->
-              Fmt.(pf frmt "@[<hov 2><CCEGIS> Counterexample term:@;@[<hov 2>%a@]" pp_term t));
-          ccegis_loop p (Set.add t_set t)
+              Fmt.(
+                pf frmt "@[<hov 2><CCEGIS> Counterexample term:@;@[<hov 2>%a@]" pp_term eqn.eterm));
+          ccegis_loop p (Set.add t_set eqn.eterm)
       | None ->
           Log.print_ok ();
           Ok { soln_rec_scheme = p.target; soln_implems = sol })
