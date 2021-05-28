@@ -337,10 +337,13 @@ let make ?(force_replace_off = false) ~(p : psi_def) (tset : TermSet.t) : equati
           let sexpr = Sexplib.Sexp.of_string x in
           let smtterm = Smtlib.SmtLib.smtTerm_of_sexp sexpr in
           let pred_term = SmtInterface.term_of_smt env in
-          let term = fun x -> match inv with None -> pred_term x | Some inv -> { tpos=inv.tpos; tkind=TBin (Binop.And, inv, pred_term x); ttyp=inv.ttyp } in 
-          match smtterm with
-          | None -> (t, inv, lhs, rhs)
-          | Some x -> (t, Some (term x), lhs, rhs))
+          let term x =
+            match inv with
+            | None -> pred_term x
+            | Some inv ->
+                { tpos = inv.tpos; tkind = TBin (Binop.And, inv, pred_term x); ttyp = inv.ttyp }
+          in
+          match smtterm with None -> (t, inv, lhs, rhs) | Some x -> (t, Some (term x), lhs, rhs))
     in
     if !Config.interactive_lemmas then List.map ~f pure_eqns else pure_eqns
   in
