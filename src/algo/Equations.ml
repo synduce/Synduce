@@ -10,26 +10,35 @@ open Utils
 open Either
 module SmtI = SmtInterface
 
-type equation = term * term option * term * term
+type equation = {
+  eterm : term;  (** The term from which the equation originates. *)
+  eprecond : term option;  (** An optional precondition to the equation. *)
+  elhs : term;  (** The left-hand side of the equation, containing no unknowns. *)
+  erhs : term;  (** The right-hand side of the equation, possibly with unknowns. *)
+  eelim : (term * term) list;  (** The substitution used to eliminate recursion. *)
+}
+(**
+  Represents an equational constraint.
+*)
 
-let pp_equation (f : Formatter.t) ((orig, inv, lhs, rhs) : equation) =
-  match inv with
+let pp_equation (f : Formatter.t) (eqn : equation) =
+  match eqn.eprecond with
   | Some inv ->
       Fmt.(
-        pf f "@[<hov 2>E(%a) := @;@[<hov 2>%a %a@;@[%a@;%a@;%a@]@]@]"
+        pf f "@[<hov 2>E(%a)<%a> := @;@[<hov 2>%a %a@;@[%a@;%a@;%a@]@]@]"
           (styled `Italic pp_term)
-          orig pp_term inv
+          eqn.eterm pp_subs eqn.eelim pp_term inv
           (styled (`Fg `Red) string)
-          "=>" pp_term lhs
+          "=>" pp_term eqn.elhs
           (styled (`Fg `Red) string)
-          "=" pp_term rhs)
+          "=" pp_term eqn.erhs)
   | None ->
       Fmt.(
-        pf f "@[<hov 2>E(%a) := @;@[<hov 2>%a %a %a@]@]"
+        pf f "@[<hov 2>E(%a)<%a> := @;@[<hov 2>%a %a %a@]@]"
           (styled `Italic pp_term)
-          orig pp_term lhs
+          eqn.eterm pp_subs eqn.eelim pp_term eqn.elhs
           (styled (`Fg `Red) string)
-          "=" pp_term rhs)
+          "=" pp_term eqn.erhs)
 
 (* ============================================================================================= *)
 (*                        PROJECTION : OPTIMIZATION FOR TUPLES                                   *)
@@ -44,6 +53,9 @@ let projection_eqns (lhs : term) (rhs : term) =
   | TTup lhs_tl, TTup rhs_tl -> List.map ~f:(fun (r, l) -> (r, l)) (List.zip_exn lhs_tl rhs_tl)
   | _ -> [ (lhs, rhs) ]
 
+(** [invar invariants lhs_e rhs_e] filters the terms in `invariants` that have no free variable
+  in common with  [lhs_e] or [rhs_e] and return the conjuction of all these invariants.
+  *)
 let invar invariants lhs_e rhs_e =
   let f inv_expr =
     not
@@ -58,10 +70,10 @@ let invar invariants lhs_e rhs_e =
 let proj_and_detuple_eqns (projections : (int, variable list, Int.comparator_witness) Map.t)
     (eqns : equation list) =
   let apply_p = Analysis.apply_projections projections in
-  let f (t, pre, lhs, rhs) =
-    let lhs' = apply_p lhs and rhs' = apply_p rhs in
+  let f eqn =
+    let lhs' = apply_p eqn.elhs and rhs' = apply_p eqn.erhs in
     let eqs = projection_eqns lhs' rhs' in
-    List.map ~f:(fun (_l, _r) -> (t, pre, _l, _r)) eqs
+    List.map ~f:(fun (_l, _r) -> { eqn with elhs = _l; erhs = _r }) eqs
   in
   List.concat (List.map ~f eqns)
 
@@ -124,16 +136,18 @@ let check_unrealizable (unknowns : VarSet.t) (eqns : equation list) : unrealizab
   let solver = Solvers.make_z3_solver () in
   Solvers.load_min_max_defs solver;
   (* Main part of the check, appliued to each equation in eqns. *)
-  let check_eqn_accum ctexs (_, precond, lhs, rhs) =
+  let check_eqn_accum ctexs eqn =
     let vset =
-      Set.diff (Set.union (Analysis.free_variables lhs) (Analysis.free_variables rhs)) unknowns
+      Set.diff
+        (Set.union (Analysis.free_variables eqn.elhs) (Analysis.free_variables eqn.erhs))
+        unknowns
     in
     let var_subst = VarSet.prime vset in
     let vset' = VarSet.of_list (List.map ~f:snd var_subst) in
     let sub = List.map ~f:(fun (v, v') -> (mk_var v, mk_var v')) var_subst in
     (* Extract the arguments of the rhs, if it is a call to an unknown. *)
     let maybe_rhs_args =
-      match rhs.tkind with
+      match eqn.erhs.tkind with
       | TApp ({ tkind = TVar f_v; _ }, args) ->
           if Set.mem unknowns f_v then
             let fv_args = VarSet.union_list (List.map ~f:Analysis.free_variables args) in
@@ -146,7 +160,7 @@ let check_unrealizable (unknowns : VarSet.t) (eqns : equation list) : unrealizab
     | None -> ctexs (* If we cannot match the expected structure, skip it. *)
     | Some rhs_args ->
         (* Building the constraints *)
-        let preconds = Option.map ~f:(fun pre -> (pre, substitution sub pre)) precond in
+        let preconds = Option.map ~f:(fun pre -> (pre, substitution sub pre)) eqn.eprecond in
         (* Checking. *)
         Solvers.spush solver;
         (* Declare the variables. *)
@@ -158,7 +172,7 @@ let check_unrealizable (unknowns : VarSet.t) (eqns : equation list) : unrealizab
             Solvers.smt_assert solver (smt_of_term pre')
         | None -> ());
         (* The lhs must be different. **)
-        let lhs_diff = mk_un Not (mk_bin Eq lhs (substitution sub lhs)) in
+        let lhs_diff = mk_un Not (mk_bin Eq eqn.elhs (substitution sub eqn.elhs)) in
         Solvers.smt_assert solver (smt_of_term lhs_diff);
         (* The rhs must be equal. *)
         List.iter rhs_args ~f:(fun rhs_arg_term ->
@@ -214,12 +228,12 @@ let check_unrealizable (unknowns : VarSet.t) (eqns : equation list) : unrealizab
 (*                               BUILDING SYSTEMS OF EQUATIONS                                   *)
 (* ============================================================================================= *)
 
-let check_equation ~(p : psi_def) ((_, pre, lhs, rhs) : equation) : bool =
-  (match (Expand.nonreduced_terms_all p lhs, Expand.nonreduced_terms_all p rhs) with
+let check_equation ~(p : psi_def) (eqn : equation) : bool =
+  (match (Expand.nonreduced_terms_all p eqn.elhs, Expand.nonreduced_terms_all p eqn.erhs) with
   | [], [] -> true
   | _ -> false)
   &&
-  match pre with
+  match eqn.eprecond with
   | None -> true
   | Some t -> ( match Expand.nonreduced_terms_all p t with [] -> true | _ -> false)
 
@@ -308,38 +322,63 @@ let make ?(force_replace_off = false) ~(p : psi_def) (tset : TermSet.t) : equati
           pf frmt "Invariants:@[<hov 2>%a@]" (list ~sep:comma pp_term) (Set.elements invariants))
   else Log.verbose_msg "No invariants.";
   let pure_eqns =
-    let f (t, lhs, rhs) =
+    let f (eterm, lhs, rhs) =
       let applic x = substitution all_subs (Reduce.reduce_term (substitution all_subs x)) in
+      (* Compute the lhs and rhs of the equations. *)
       let lhs' = Reduce.reduce_term (applic lhs) and rhs' = Reduce.reduce_term (applic rhs) in
       let lhs'', rhs'' =
         if !Config.simplify_eqns then (Eval.simplify lhs', Eval.simplify rhs') else (lhs', rhs')
       in
+      (* Filter the relevant part of the recursion elimination substitution, and only retain a map
+             from recursive-typed variable to scalar variables replacing calls.
+      *)
+      let eelim =
+        List.remove_consecutive_duplicates
+          ~equal:(fun (x1, _) (x2, _) -> Terms.equal x1 x2)
+          (List.filter_map all_subs ~f:(fun (t_rec, t_scalar) ->
+               match
+                 Set.to_list
+                   (Set.inter (Analysis.free_variables t_rec) (Analysis.free_variables eterm))
+               with
+               | [] -> None
+               | x :: _ -> Some (mk_var x, t_scalar)))
+      in
+      (* If possible project equation of tuples into tuple of equations. *)
       let projs = projection_eqns lhs'' rhs'' in
-      List.map ~f:(fun (lhs, rhs) -> (t, invar invariants lhs rhs, lhs, rhs)) projs
+      List.map
+        ~f:(fun (elhs, erhs) ->
+          (* Select the relevant preconditions. *)
+          let eprecond = invar invariants elhs erhs in
+          { eterm; eprecond; elhs; erhs; eelim })
+        projs
     in
     List.concat (List.map ~f eqns)
   in
   let eqns_with_invariants =
-    let f (t, inv, lhs, rhs) =
+    let f eqn =
       let env =
         VarSet.to_env
           (Set.diff
-             (Set.union (Analysis.free_variables lhs) (Analysis.free_variables rhs))
+             (Set.union (Analysis.free_variables eqn.elhs) (Analysis.free_variables eqn.erhs))
              p.target.psyntobjs)
       in
       Log.info (fun frmt () ->
-          Fmt.pf frmt "Please provide a constraint for \"@[%a@]\"." pp_equation (t, inv, lhs, rhs));
+          Fmt.pf frmt "Please provide a constraint for \"@[%a@]\"." pp_equation eqn);
       match Stdio.In_channel.input_line Stdio.stdin with
       | None | Some "" ->
           Log.info (fun frmt () -> Fmt.pf frmt "No additional constraint provided.");
-          (t, inv, lhs, rhs)
+          eqn
       | Some x -> (
           let sexpr = Sexplib.Sexp.of_string x in
           let smtterm = Smtlib.SmtLib.smtTerm_of_sexp sexpr in
-          match smtterm with
-          | None -> (t, inv, lhs, rhs)
-          | Some x -> (t, Some (SmtInterface.term_of_smt env x), lhs, rhs))
-      (* todo: take the invariant into account *)
+          let pred_term = SmtInterface.term_of_smt env in
+          let term x =
+            match eqn.eprecond with
+            | None -> pred_term x
+            | Some inv ->
+                { tpos = inv.tpos; tkind = TBin (Binop.And, inv, pred_term x); ttyp = inv.ttyp }
+          in
+          match smtterm with None -> eqn | Some x -> { eqn with eprecond = Some (term x) })
     in
     if !Config.interactive_lemmas then List.map ~f pure_eqns else pure_eqns
   in
@@ -455,15 +494,15 @@ let solve_syntactic_definitions (unknowns : VarSet.t) (eqns : equation list) =
     (new_args, Reduce.reduce_term (substitution (List.concat subst) lhs))
   in
   let full_defs, other_eqns =
-    let f (t, inv, lhs, rhs) =
-      match (inv, rhs.tkind) with
+    let f eqn =
+      match (eqn.eprecond, eqn.erhs.tkind) with
       | _, TApp ({ tkind = TVar x; _ }, args) when Set.mem unknowns x && ok_rhs_args args -> (
-          match ok_lhs_args lhs args with
+          match ok_lhs_args eqn.elhs args with
           | Some argv ->
-              let lam_args, lam_body = mk_lam lhs argv in
+              let lam_args, lam_body = mk_lam eqn.elhs argv in
               Either.First (x, (lam_args, lam_body))
-          | None -> Either.Second (t, inv, lhs, rhs))
-      | _ -> Either.Second (t, inv, lhs, rhs)
+          | None -> Either.Second eqn)
+      | _ -> Either.Second eqn
     in
     List.partition_map ~f eqns
   in
@@ -474,10 +513,10 @@ let solve_syntactic_definitions (unknowns : VarSet.t) (eqns : equation list) =
           let t, _ = infer_type (mk_fun (List.map ~f:(fun x -> PatVar x) lhs_args) lhs_body) in
           (mk_var x, t))
     in
-    List.map other_eqns ~f:(fun (t, inv, lhs, rhs) ->
-        let new_lhs = Reduce.reduce_term (substitution substs lhs) in
-        let new_rhs = Reduce.reduce_term (substitution substs rhs) in
-        (t, inv, new_lhs, new_rhs))
+    List.map other_eqns ~f:(fun eqn ->
+        let new_lhs = Reduce.reduce_term (substitution substs eqn.elhs) in
+        let new_rhs = Reduce.reduce_term (substitution substs eqn.erhs) in
+        { eqn with elhs = new_lhs; erhs = new_rhs })
   in
   let partial_soln =
     List.map ~f:(fun (x, (lhs_args, lhs_body)) -> (x.vname, lhs_args, lhs_body)) full_defs
@@ -494,7 +533,13 @@ let synthfuns_of_unknowns ?(bools = false) ?(eqns = []) ?(ops = OpSet.empty) (un
   in
   let f xi =
     let args, ret_sort = xi_formals xi in
-    let guess = if !Config.optimize_grammars then Grammars.make_guess eqns xi else None in
+    let guess =
+      if !Config.optimize_grammars then
+        Grammars.make_guess
+          (List.map ~f:(fun eqn -> (eqn.eterm, eqn.eprecond, eqn.elhs, eqn.erhs)) eqns)
+          xi
+      else None
+    in
     let grammar = Grammars.generate_grammar ~guess ~bools ops args ret_sort in
     CSynthFun (xi.vname, args, ret_sort, grammar)
   in
@@ -502,9 +547,9 @@ let synthfuns_of_unknowns ?(bools = false) ?(eqns = []) ?(ops = OpSet.empty) (un
 
 let constraints_of_eqns (eqns : equation list) : command list =
   let detupled_equations =
-    let f (_, pre, lhs, rhs) =
-      let eqs = projection_eqns lhs rhs in
-      List.map ~f:(fun (_l, _r) -> (pre, _l, _r)) eqs
+    let f eqn =
+      let eqs = projection_eqns eqn.elhs eqn.erhs in
+      List.map ~f:(fun (_l, _r) -> (eqn.eprecond, _l, _r)) eqs
     in
     List.concat (List.map ~f eqns)
   in
@@ -525,8 +570,17 @@ let constraints_of_eqns (eqns : equation list) : command list =
 let solve_eqns (unknowns : VarSet.t) (eqns : equation list) =
   let aux_solve () =
     let free_vars, all_operators, has_ite =
-      let f (fvs, ops, hi) (_, _, lhs, rhs) =
-        ( VarSet.union_list [ fvs; Analysis.free_variables lhs; Analysis.free_variables rhs ],
+      let f (fvs, ops, hi) eqn =
+        let precond, lhs, rhs = (eqn.eprecond, eqn.elhs, eqn.erhs) in
+        let set' =
+          VarSet.union_list
+            [
+              Analysis.free_variables lhs;
+              Analysis.free_variables rhs;
+              Option.value_map precond ~f:Analysis.free_variables ~default:VarSet.empty;
+            ]
+        in
+        ( Set.union fvs set',
           Set.union ops (Set.union (Grammars.operators_of lhs) (Grammars.operators_of rhs)),
           hi || Analysis.has_ite lhs || Analysis.has_ite rhs )
       in
@@ -576,7 +630,7 @@ let solve_eqns (unknowns : VarSet.t) (eqns : equation list) =
   else aux_solve ()
 
 let solve_eqns_proxy (unknowns : VarSet.t) (eqns : equation list) =
-  if !Config.syndef_on then
+  if !Config.use_syntactic_definitions then
     let partial_soln, new_unknowns, new_eqns = solve_syntactic_definitions unknowns eqns in
     if Set.length new_unknowns > 0 then
       combine (Some partial_soln) (solve_eqns new_unknowns new_eqns)
@@ -588,20 +642,20 @@ let solve_eqns_proxy (unknowns : VarSet.t) (eqns : equation list) =
 *)
 let solve_constant_eqns (unknowns : VarSet.t) (eqns : equation list) =
   let constant_soln, other_eqns =
-    let f (t, inv, lhs, rhs) =
-      match rhs.tkind with
+    let f eqn =
+      match eqn.erhs.tkind with
       | TVar x when Set.mem unknowns x ->
           (* TODO check that lhs is a constant term. (Should be the case if wf) *)
-          Either.first (x, lhs)
-      | _ -> Either.Second (t, inv, lhs, rhs)
+          Either.first (x, eqn.elhs)
+      | _ -> Either.Second eqn
     in
     List.partition_map ~f eqns
   in
   let resolved = VarSet.of_list (List.map ~f:Utils.first constant_soln) in
   let new_eqns =
     let substs = List.map ~f:(fun (x, lhs) -> (mk_var x, lhs)) constant_soln in
-    List.map other_eqns ~f:(fun (t, inv, lhs, rhs) ->
-        (t, inv, substitution substs lhs, substitution substs rhs))
+    List.map other_eqns ~f:(fun eqn ->
+        { eqn with elhs = substitution substs eqn.elhs; erhs = substitution substs eqn.erhs })
   in
   let partial_soln = List.map ~f:(fun (x, lhs) -> (x.vname, [], lhs)) constant_soln in
   if List.length partial_soln > 0 then
@@ -614,13 +668,17 @@ let split_solve partial_soln (unknowns : VarSet.t) (eqns : equation list) =
     let f (l, u, e) xi =
       (* Separate in set of equation where u appears and rest *)
       let eqn_u, rest =
-        List.partition_tf e ~f:(fun (_, _, lhs, rhs) ->
-            let fv = Set.union (Analysis.free_variables lhs) (Analysis.free_variables rhs) in
+        List.partition_tf e ~f:(fun eqn ->
+            let fv =
+              Set.union (Analysis.free_variables eqn.elhs) (Analysis.free_variables eqn.erhs)
+            in
             Set.mem fv xi)
       in
       let eqn_only_u, eqn_u =
-        List.partition_tf eqn_u ~f:(fun (_, _, lhs, rhs) ->
-            let fv = Set.union (Analysis.free_variables lhs) (Analysis.free_variables rhs) in
+        List.partition_tf eqn_u ~f:(fun eqn ->
+            let fv =
+              Set.union (Analysis.free_variables eqn.elhs) (Analysis.free_variables eqn.erhs)
+            in
             Set.is_empty (Set.inter fv (Set.diff unknowns (VarSet.singleton xi))))
       in
       match eqn_u with
@@ -641,7 +699,7 @@ let split_solve partial_soln (unknowns : VarSet.t) (eqns : equation list) =
 
 let solve_stratified (unknowns : VarSet.t) (eqns : equation list) =
   let psol, u, e =
-    if !Config.syndef_on then
+    if !Config.use_syntactic_definitions then
       let c_soln, no_c_unknowns, no_c_eqns = solve_constant_eqns unknowns eqns in
       let partial_soln', new_unknowns, new_eqns =
         solve_syntactic_definitions no_c_unknowns no_c_eqns
@@ -655,20 +713,93 @@ let solve_stratified (unknowns : VarSet.t) (eqns : equation list) =
     | resp, Some soln -> (resp, Some (psol @ soln))
     | resp, None -> (resp, None)
 
+(* ============================================================================================= *)
+(*                               PREPROCESSING SYSTEM OF EQUATIONS                               *)
+(* ============================================================================================= *)
+type partial_soln = (string * variable list * term) list
+
+type preprocessing_action_result =
+  VarSet.t
+  * equation list
+  * (solver_response * partial_soln option -> solver_response * partial_soln option)
+(** A preprocessing action should return a new system of equations,
+   and optionally a new set of unknowns together with a postprocessing function. *)
+
+let preprocess_none u eqs = (u, eqs, fun x -> x)
+
+(** Project unknowns that return tuple into a tuple of unknowns and change the equations
+    accordingly.
+*)
+let preprocess_detuple (unknowns : VarSet.t) (eqns : equation list) : preprocessing_action_result =
+  let new_unknowns, projections = proj_unknowns unknowns in
+  let new_eqns = proj_and_detuple_eqns projections eqns in
+  let postprocessing (resp, soln) =
+    match soln with
+    | Some soln ->
+        let soln =
+          if Map.length projections > 0 then revert_projs unknowns projections soln else soln
+        in
+        (resp, Some soln)
+    | None -> (resp, None)
+  in
+  (new_unknowns, new_eqns, postprocessing)
+
+let preprocess_deconstruct_if (unknowns : VarSet.t) (eqns : equation list) :
+    preprocessing_action_result =
+  let and_opt precond t =
+    match precond with Some pre -> Some (mk_bin And pre t) | None -> Some t
+  in
+  let eqns' =
+    let f eqn =
+      match eqn.erhs.tkind with
+      | TIte (rhs_c, rhs_bt, rhs_bf) -> (
+          match eqn.elhs.tkind with
+          | TIte (lhs_c, lhs_bt, lhs_bf) when Terms.equal rhs_c lhs_c ->
+              [
+                { eqn with eprecond = and_opt eqn.eprecond rhs_c; elhs = lhs_bt; erhs = rhs_bt };
+                {
+                  eqn with
+                  eprecond = and_opt eqn.eprecond (mk_un Not rhs_c);
+                  elhs = lhs_bf;
+                  erhs = rhs_bf;
+                };
+              ]
+          | _ ->
+              [
+                { eqn with eprecond = and_opt eqn.eprecond rhs_c; erhs = rhs_bt };
+                { eqn with eprecond = and_opt eqn.eprecond (mk_un Not rhs_c); erhs = rhs_bf };
+              ])
+      | _ -> [ eqn ]
+    in
+    List.concat_map ~f eqns
+  in
+  (unknowns, eqns', fun x -> x)
+
+(* ============================================================================================= *)
+(*                              MAIN ENTRY POINT                                                 *)
+(* ============================================================================================= *)
+
+(** Main entry point: solve a ssytem of equations by synthesizing the unknowns.
+*)
 let solve ~(p : psi_def) (eqns : equation list) =
   let unknowns = p.target.psyntobjs in
+  let preprocessing_actions =
+    [
+      preprocess_deconstruct_if;
+      (if !Config.detupling_on then preprocess_detuple else preprocess_none);
+    ]
+  in
   let soln_final =
-    if !Config.detupling_on then
-      let new_unknowns, projections = proj_unknowns p.target.psyntobjs in
-      let new_eqns = proj_and_detuple_eqns projections eqns in
-      match solve_stratified new_unknowns new_eqns with
-      | resp, Some soln0 ->
-          let soln =
-            if Map.length projections > 0 then revert_projs unknowns projections soln0 else soln0
-          in
-          (resp, Some soln)
-      | resp, None -> (resp, None)
-    else solve_stratified unknowns eqns
+    (* Apply the preprocessing actions, and construct the postprocessing in reverse. *)
+    let unknowns', eqns', postprocessing_actions =
+      List.fold preprocessing_actions ~init:(unknowns, eqns, [])
+        ~f:(fun (u, e, post_acts) pre_act ->
+          let u', e', post = pre_act u e in
+          (u', e', post :: post_acts))
+    in
+    (* Apply the postprocessing after solving. *)
+    List.fold postprocessing_actions ~init:(solve_stratified unknowns' eqns')
+      ~f:(fun partial_solution post_act -> post_act partial_solution)
   in
   (match soln_final with
   | _, Some soln -> Utils.Log.debug_msg Fmt.(str "@[<hov 2>Solution found: @;%a" pp_soln soln)

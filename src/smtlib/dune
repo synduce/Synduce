@@ -1,6 +1,6 @@
 (library
  (name smtlib)
- (public_name Atropos.Lib.SmtLib)
+ (public_name Synduce.Lib.SmtLib)
  (libraries base utils fmt stdio)
  (preprocess
   (pps ppx_let)))

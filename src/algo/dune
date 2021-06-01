@@ -1,4 +1,4 @@
 (library
  (name algo)
- (public_name Atropos.Lib.Algo)
+ (public_name Synduce.Lib.Algo)
  (libraries base fmt utils lang))

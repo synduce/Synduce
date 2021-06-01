@@ -1,2 +1,2 @@
 all:
-	dune build bin/Atropos.exe
+	dune build bin/Synduce.exe

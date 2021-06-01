@@ -89,7 +89,7 @@ kw_time = "time"
 kw_steps = "#st"
 kw_tlast = "Tlast"
 kw_ver = "ver.%"
-kw_toolname = "Atropos"
+kw_toolname = "Synduce"
 kw_baseline = "Baseline"
 kw_acegis = "Symbolic CEGIS"
 kw_ccegis = "Concrete CEGIS"
@@ -255,10 +255,10 @@ def produce_txt_table(tex_output_file, data):
         outp.write("\n")
         outp.close()
         print("============== SUMMARY ================")
-        print("Summary of relative improvement of Atropos over baseline.")
-        print("improvement = baseline synt. time / Atropos synt. time")
-        print("∞ means baseline timed out, but atropos did not")
-        print("-∞ means Atropos timed out, but baseline did not,")
+        print("Summary of relative improvement of Synduce over baseline.")
+        print("improvement = baseline synt. time / Synduce synt. time")
+        print("∞ means baseline timed out, but Synduce did not")
+        print("-∞ means Synduce timed out, but baseline did not,")
         print("! means both timed out.")
         print("---------------------------------------------")
         print("%10s,%20s : %s" % ("Category", "benchmark name", "improvement"))
@@ -287,7 +287,7 @@ def produce_txt_table(tex_output_file, data):
 
         print("---------------------------------------------")
         print("Data for %i benchmarks." % count_data_points)
-        print("Num timeouts (baseline or Atropos): %i" % count_timeouts)
+        print("Num timeouts (baseline or Synduce): %i" % count_timeouts)
         print("Not counting when baseline times out, count improvements of")
         print("> 100x : %i" % count_100x)
         print("> 10x  : %i" % count_10x)
@@ -297,7 +297,7 @@ def produce_txt_table(tex_output_file, data):
 
 
 # TABLE 2 =====================================================================
-caption2 = "Extended Experimental Results. Three algorithms are compared: the selective bounding\nCEGIS in Atropos, symbolic CEGIS and concrete CEGIS. Benchmarks are grouped by categories\nintroduced in Section 6.1 of the paper.\n#st indicates the number of refinement rounds.\nver.% indicates the percentage of total time spent verifying solutions.\nT_last is the elapsed time before the last call to the SyGuS solver in the last refinement\nstep before timeout (`.` indicates that there was no previous round).\nAll times are in seconds. A '-' indicates timeout (10 min).\n"
+caption2 = "Extended Experimental Results. Three algorithms are compared: the selective bounding\nCEGIS in Synduce, symbolic CEGIS and concrete CEGIS. Benchmarks are grouped by categories\nintroduced in Section 6.1 of the paper.\n#st indicates the number of refinement rounds.\nver.% indicates the percentage of total time spent verifying solutions.\nT_last is the elapsed time before the last call to the SyGuS solver in the last refinement\nstep before timeout (`.` indicates that there was no previous round).\nAll times are in seconds. A '-' indicates timeout (10 min).\n"
 
 
 def table2(tex_output_file, data):
@@ -325,14 +325,14 @@ def table2(tex_output_file, data):
                     times = ["?", "?", "?", "?"]
                     csvline += times
             # Make fastest bold
-            t_atropos = floti(csvline[0])
+            t_Synduce = floti(csvline[0])
             t_acegis = floti(csvline[4])
             t_ccegis = floti(csvline[8])
-            if t_atropos <= t_acegis and t_atropos <= t_ccegis:
+            if t_Synduce <= t_acegis and t_Synduce <= t_ccegis:
                 csvline[0] = "%s" % csvline[0]
-            if t_acegis < t_atropos and t_acegis < t_ccegis:
+            if t_acegis < t_Synduce and t_acegis < t_ccegis:
                 csvline[4] = "%s" % csvline[4]
-            if t_ccegis < t_atropos and t_ccegis < t_acegis:
+            if t_ccegis < t_Synduce and t_ccegis < t_acegis:
                 csvline[8] = "%s" % csvline[8]
             # Put percentage in italic
             csvline[1] = format_verif(csvline[1])
@@ -352,7 +352,7 @@ def table2(tex_output_file, data):
     txt_out.close()
 
 
-caption3 = "Optimization Evaluation Results:\nWe evaluate Atropos and symbolic CEGIS with some optimizations turned off:\n  -ini indicates that optimized initialization is off,\n  -sys indicates tuple components and independent subsystems is turned off, and\n  -stx that syntactic definitions are turned off.\n  on (and off) indicate that all optimizations are turned on (resp. off).\nBenchmarks are grouped by categories introduced in Section 6.1 of the paper.\n\# indicates the number of refinement rounds for the given algorithm, and\n\#i indicate the number of refinement rounds without the optimized initialization.\nAll times are in seconds. A '-' indicates timeout (10 min).\n"
+caption3 = "Optimization Evaluation Results:\nWe evaluate Synduce and symbolic CEGIS with some optimizations turned off:\n  -ini indicates that optimized initialization is off,\n  -sys indicates tuple components and independent subsystems is turned off, and\n  -stx that syntactic definitions are turned off.\n  on (and off) indicate that all optimizations are turned on (resp. off).\nBenchmarks are grouped by categories introduced in Section 6.1 of the paper.\n\# indicates the number of refinement rounds for the given algorithm, and\n\#i indicate the number of refinement rounds without the optimized initialization.\nAll times are in seconds. A '-' indicates timeout (10 min).\n"
 
 
 def table3(tex_output_file, data):

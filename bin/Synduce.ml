@@ -8,7 +8,7 @@ module Config = Lib.Utils.Config
 let parse_only = ref false
 
 let print_usage () =
-  pf stdout "Usage : atropos [options] input_file@.";
+  pf stdout "Usage : Synduce [options] input_file@.";
   pf stdout
     "Options:\n\
     \    -h --help                      Print this message.\n\
@@ -35,7 +35,7 @@ let print_usage () =
     \       --parse-only                Just parse the input.\n\
     \       --show-vars                 Print variables and their types at the end.\n\
      -> Try:\n\
-     ./atropos benchmarks/list/mps.ml@.";
+     ./Synduce benchmarks/list/mps.ml@.";
   Caml.exit 0
 
 let options =
@@ -53,7 +53,7 @@ let options =
     ('I', "interactive", set Config.interactive_lemmas true, None);
     ('c', "simple-init", set Config.simple_init true, None);
     ('t', "no-detupling", set Config.detupling_on false, None);
-    ('\000', "no-syndef", set Config.syndef_on false, None);
+    ('\000', "no-syndef", set Config.use_syntactic_definitions false, None);
     ('\000', "no-simplify", set Config.simplify_eqns false, None);
     ('\000', "no-gropt", set Config.optimize_grammars false, None);
     ('s', "no-splitting", set Config.split_solve_on false, None);

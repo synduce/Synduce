@@ -164,7 +164,7 @@ let rules_of_case_list loc (nont : ident) (preargs : ident list) (cases : case l
         match pat.ppat_desc with
         | Ppat_var ident -> [ mk_var (wloc pat.ppat_loc) ident.txt ]
         | Ppat_tuple pats -> List.map ~f:fterm_of_pattern pats
-        | _ -> failwith "Pattern not supported.")
+        | _ -> failwith (Fmt.str "Pattern not supported: %a." Pprintast.pattern pat))
     | None -> []
   in
   let f (c : case) =
@@ -199,7 +199,7 @@ let as_pmrs (pat : pattern) (expr : expression) (_ : attribute list) =
     | Pexp_fun (_, _, arg_pat, body) -> (
         match arg_pat.ppat_desc with
         | Ppat_var id -> as_pmrs_named s (preargs @ [ id.txt ]) body
-        | _ -> failwith "pattern not supported")
+        | _ -> failwith (Fmt.str "Pattern not supported: %a." Pprintast.pattern pat))
     | Pexp_function cl -> rules_of_case_list (wloc pat.ppat_loc) s preargs cl
     | _ -> (
         try

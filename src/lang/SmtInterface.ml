@@ -118,7 +118,7 @@ let rec term_of_smt (env : (string, variable, String.comparator_witness) Map.t) 
           | _ -> failwith "Smt: a unary operator with more than one argument.")
       | IBool true -> mk_const Constant.CTrue
       | IBool false -> mk_const Constant.CFalse
-      | INotDef -> failwith "Smt: Undefined variable.")
+      | INotDef -> failwith Fmt.(str "Smt: Undefined variable: %s" s))
   | SmtTExists (_, _) -> failwith "Smt: exists-terms not supported."
   | SmtTForall (_, _) -> failwith "Smt: forall-terms not supported."
   | SmtTLet (_, _) -> failwith "Smt: let-terms not supported."

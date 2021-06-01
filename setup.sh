@@ -25,6 +25,7 @@ if [ -d "$HOME/.local/bin" ] ; then
 fi
 
 sep "Installing packages z3 and python3"
+sudo apt update
 sudo apt install z3 python3
 
 sep "Installing CVC4"
@@ -98,10 +99,10 @@ opam install . --deps-only
 sep "Compiling the tool..."
 make
 
-sep "Create link atropos to _build/default/bin/Atropos.exe"
-ln -s _build/default/bin/Atropos.exe atropos
+sep "Create link Synduce to _build/default/bin/Synduce.exe"
+ln -s _build/default/bin/Synduce.exe Synduce
 
 sep "Calling the tool, should print help message..."
-./atropos -h
+./Synduce -h
 
 sep "Please update your environment (source $HOME/.profile) before running the tool."
