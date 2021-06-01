@@ -7,8 +7,8 @@ description:
 maintainer: ["victorn@cs.toronto.edu"]
 authors: ["Victor Nicolet" "Danya Lette"]
 license: "MIT"
-homepage: "https://github.com/victornicolet/atropos"
-bug-reports: "https://github.com/victornicolet/atropos/issues"
+homepage: "https://github.com/victornicolet/Synduce"
+bug-reports: "https://github.com/victornicolet/Synduce/issues"
 depends: [
   "dune" {>= "2.6"}
   "base" {>= "v0.14.0"}

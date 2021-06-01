@@ -1,6 +1,6 @@
 (lang dune 2.6)
 
-(name Atropos)
+(name Synduce)
 
 (version 0.1)
 
@@ -10,16 +10,16 @@
 
 (maintainers "victorn@cs.toronto.edu")
 
-(homepage "https://github.com/victornicolet/atropos")
+(homepage "https://github.com/victornicolet/Synduce")
 
-(bug_reports "https://github.com/victornicolet/atropos/issues")
+(bug_reports "https://github.com/victornicolet/Synduce/issues")
 
 (generate_opam_files true)
 
 (using menhir 2.0)
 
 (package
- (name Atropos)
+ (name Synduce)
  (synopsis "Recursive Function Synthesizer")
  (description
   "Executable and libraries for automatic synthesis of recursive functions.")

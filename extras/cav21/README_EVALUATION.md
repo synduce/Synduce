@@ -17,7 +17,7 @@ The script `kick_the_tires.sh` runs a subset of the benchmarks presented in the 
 a text version of Table 1. Running `./kick_the_tires.sh` should take no more than a minute.
 - The script first generates experimental data for 17 of the 43 benchmarks of the paper.
 - Then it reports a summary of the experiments: you observe see that the 17 benchmarks have been run
-  successfully (Atropos and the baseline have not timed out).
+  successfully (Synduce and the baseline have not timed out).
 - A text version of Table 1 is printed. The missing data for the other benchmarks is indicated by a
   question mark "?" where relevant. You should see the 17 benchmarks for which this first phase
   collects data, among the 43 benchmarks. The synthesis times reported should be less than a second.
@@ -27,7 +27,7 @@ a text version of Table 1. Running `./kick_the_tires.sh` should take no more tha
 You can try running the tool on one of the benchmarks, for example the `sum` example in the list
 parallelization category:
 ```
-./atropos benchmarks/list/sumhom.pmrs
+./Synduce benchmarks/list/sumhom.pmrs
 ```
 The tool first prints out a summary of the problem it needs to solve: the reference function `spec`,
 the target recursion skeleton `target` and the representation function `repr`. It then starts
@@ -48,15 +48,15 @@ target⟨odot, f_0, s_0⟩(): int clist -> int =
   }
 ```
 
-# Evaluating Atropos
+# Evaluating Synduce
 
-The main claim of the paper is that Atropos successfully synthesizes solutions for a wide range of
+The main claim of the paper is that Synduce successfully synthesizes solutions for a wide range of
 benchmarks, with a significant improvement over a baseline method that is itself implemented in the
 tool. This claim is backed by the results presented in Table 1. The Appendix also contains
 additional experimental results in Tables 2 and 3. The reviewer may want to reproduce the results
 presented by running the tools on the benchmarks. Naturally, we expect the results of reproducing
 the experiments in a virtual machine and on a different computer to be different from the ones
-presented in the paper. However, Atropos should still perform better than the baseline in general.
+presented in the paper. However, Synduce should still perform better than the baseline in general.
 We also expect that the tool should not time out on the set of benchmarks used in the paper.
 
 We have set the timeout to 4min for the review (instead of 10min in the paper) to allow the
@@ -106,7 +106,7 @@ The script will generate Table `TABLE_NO` (= 1, 2 or 3) in the `review_data/tabl
 temporary results in `review_data/tmp.csv`. The reviewer should observe the same results as the
 ones reported in the paper, with possibly a few differences as we collected more data for some
 benchmarks. One difference is that the *mts* benchmark of the *Enforcing tail recursion* category
-has been corrected, and Atropos synthesizes a solution even without the optimizations on (the
+has been corrected, and Synduce synthesizes a solution even without the optimizations on (the
 numbers in Table 3 will differ). This has been signaled during the rebuttal period.
 
 
@@ -117,8 +117,8 @@ file, we give an overview and some information specific to this review.
 
 The tool prints a help message if called with the `h` option, e.g.:
 ```
-./atropos -h
-Usage : atropos [options] input_file
+./Synduce -h
+Usage : Synduce [options] input_file
 Options:
     -h --help                      Print this message.
     -v --verbose                   Print verbose.
@@ -140,7 +140,7 @@ Options:
        --parse-only                Just parse the input.
        --show-vars                 Print variables and their types at the end.
 -> Try:
-./atropos benchmarks/list/mps.ml
+./Synduce benchmarks/list/mps.ml
 ```
 The reviewers may be interested in running the tool with the `--acegis` option to run the baseline
 algorithm (symbolic CEGIS). The `--ccegis` flag runs the concrete CEGIS algorithm that is
@@ -163,7 +163,7 @@ generate the tables).
 ### Running the tool on a benchmark
 
 For example, the reviewer can run the tool on the `mips` example used in Section 1 (the input file
-is `benchmarks/tree/mips.pmrs`). To do so, run `./atropos benchmarks/tree/mips.ml`. Synthesis should
+is `benchmarks/tree/mips.pmrs`). To do so, run `./Synduce benchmarks/tree/mips.ml`. Synthesis should
 take less than a second. In the following, we detail the output produced by the tool.
 
 The first message is a confirmation of the synthesis problem the tool is trying to solve: it must

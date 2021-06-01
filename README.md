@@ -1,9 +1,9 @@
-# Atropos
+# Synduce
 
 ## Requirements and building
 The script `setup.sh` installs all the dependencies and packages from a fresh Ubuntu installation.
 
-You will need [**Z3**](https://github.com/Z3Prover/z3) and [**CVC4**](https://cvc4.github.io) installed on your system. *Atropos* detects where your binaries are using `which z3` and `which cvc4`. Atropos needs a CVC4 version >= 1.8.
+You will need [**Z3**](https://github.com/Z3Prover/z3) and [**CVC4**](https://cvc4.github.io) installed on your system. *Synduce* detects where your binaries are using `which z3` and `which cvc4`. Synduce needs a CVC4 version >= 1.8.
 
 
 You will need a recent [OCaml](https://ocaml.org/releases/4.11.1.html) installation and the [OCaml Package Manager (opam)](https://opam.ocaml.org) to get started.
@@ -20,7 +20,7 @@ Once all the dependencies are installed, call ```make``` from the root of the pr
 - `./benchmarks/` contains benchmarks and sample inputs. `parse_examples/parsing.pmrs` is an example of the input syntax for the PMRS with recursive type definitions. The syntax is similar to Caml, except for the recursion scheme declarations. Call `./benchmarks/report.py` to see a list of benchmarks. The `./benchmarks/unrealizable` folder contains examples on which the tool either fails or runs forever because no solution exists.
 
 ### Basic Usage
-`./atropos -h` should get you started.
+`./Synduce -h` should get you started.
 
 The subfolders of the `benchmarks` folder contains input examples. An input problem is defined by three components: a reference function, a representation function and a recursion skeleton. By default, the tool looks for a reference function called `spec`, a representation function `repr` and a recursion skeleton `target`.
 
@@ -74,7 +74,7 @@ The functions to be synthesized are `[%synt s0]`, `[%synt f0]` and `[%synt join]
 The final assertions indicates that the tool should synthesize the expressions for `s0`, `f0` and `join` such that the function `hsum` is functionally equivalent to using `clist_to_list` and then `sum` (i.e. for any input `x` we have `hsum x = sum (clist_to_list x)`).
 
 Note that the representation function and the target recursion skeleton can be reused across a large set of examples. All the benchmarks in `benchmarks/list` use the same `repr` and `target`, modulo some changes in the base case when lists have a minimum size.
-Running `./atropos benchmarks/list/sum.ml` returns the solution in less than a second:
+Running `./Synduce benchmarks/list/sum.ml` returns the solution in less than a second:
 ```ocaml
 let s0  = 0
 let f0 x = x
@@ -125,7 +125,7 @@ let f a b c t =
 
 ## PMRS syntax
 
-`atropos` uses a special syntax to specify recursion schemes (Pattern Matching Recursion Schemes).
+`Synduce` uses a special syntax to specify recursion schemes (Pattern Matching Recursion Schemes).
 The files ending in `.pmrs` are examples of this syntax. The benchmark `benchmarks/list/mpshom.pmrs` includes detailed comments on the input format.
 
 The general syntax of a pattern matching recursion scheme is as follows:

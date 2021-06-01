@@ -332,14 +332,14 @@ def produce_full_tex_table(tex_output_file, data):
                     times = ["?", "?", "?", "?"]
                     csvline += times
             # Make fastest bold
-            t_atropos = floti(csvline[0])
+            t_Synduce = floti(csvline[0])
             t_acegis = floti(csvline[4])
             t_ccegis = floti(csvline[8])
-            if t_atropos <= t_acegis and t_atropos <= t_ccegis:
+            if t_Synduce <= t_acegis and t_Synduce <= t_ccegis:
                 csvline[0] = "{\\bf %s}" % csvline[0]
-            if t_acegis < t_atropos and t_acegis < t_ccegis:
+            if t_acegis < t_Synduce and t_acegis < t_ccegis:
                 csvline[4] = "{\\bf %s}" % csvline[4]
-            if t_ccegis < t_atropos and t_ccegis < t_acegis:
+            if t_ccegis < t_Synduce and t_ccegis < t_acegis:
                 csvline[8] = "{\\bf %s}" % csvline[8]
             # Put percentage in italic
             csvline[1] = format_verif(csvline[1])

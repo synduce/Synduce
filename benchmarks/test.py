@@ -128,7 +128,7 @@ benchmark_set = [
 ]
 
 root = os.getcwd()
-exec_path = os.path.join(root, "_build/default/bin/Atropos.exe")
+exec_path = os.path.join(root, "_build/default/bin/Synduce.exe")
 
 sys.stdout.flush()
 
@@ -137,14 +137,14 @@ if __name__ == "__main__":
     if len(sys.argv) > 1:
         table_no = int(sys.argv[1])
         if table_no == 1:
-            # Table 1 : compare Atropos and Baseline
+            # Table 1 : compare Synduce and Baseline
             algos = [
                     ["requation", "--no-gropt"],
                     ["acegis", "--acegis --no-gropt"]
             ]
             optims = [["all", ""]]
         elif table_no == 2:
-            # Table 2 : compare Atropos, Baseline and Concrete CEGIS
+            # Table 2 : compare Synduce, Baseline and Concrete CEGIS
             algos = [
                     ["requation", "--no-gropt"],
                     ["acegis", "--acegis --no-gropt"],
@@ -153,7 +153,7 @@ if __name__ == "__main__":
             optims = [["all", ""]]
 
         elif table_no == 3:
-            # Table 2 : compare Atropos, Baseline with optimizations on/off
+            # Table 2 : compare Synduce, Baseline with optimizations on/off
             algos = [
                 ["requation", "--no-gropt"],
                 ["acegis", "--acegis --no-gropt"],

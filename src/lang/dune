@@ -1,6 +1,6 @@
 (library
  (name lang)
- (public_name Atropos.Lib.Lang)
+ (public_name Synduce.Lib.Lang)
  (libraries
   base
   fmt
