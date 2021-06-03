@@ -172,12 +172,16 @@ let check_unrealizable (unknowns : VarSet.t) (eqns : equation list) : unrealizab
             Solvers.smt_assert solver (smt_of_term pre')
         | None -> ());
         (* The lhs must be different. **)
-        let lhs_diff = mk_un Not (mk_bin Eq eqn.elhs (substitution sub eqn.elhs)) in
-        Solvers.smt_assert solver (smt_of_term lhs_diff);
+        let lhs_diff =
+          let projs = projection_eqns eqn.elhs (substitution sub eqn.elhs) in
+          List.map ~f:(fun (lhs, rhs) -> mk_un Not (mk_bin Eq lhs rhs)) projs
+        in
+        List.iter lhs_diff ~f:(fun eqn -> Solvers.smt_assert solver (smt_of_term eqn));
         (* The rhs must be equal. *)
         List.iter rhs_args ~f:(fun rhs_arg_term ->
-            let rhs_eq = mk_bin Eq rhs_arg_term (substitution sub rhs_arg_term) in
-            Solvers.smt_assert solver (smt_of_term rhs_eq));
+            let rhs_eqs = projection_eqns rhs_arg_term (substitution sub rhs_arg_term) in
+            List.iter rhs_eqs ~f:(fun (lhs, rhs) ->
+                Solvers.smt_assert solver (smt_of_term (mk_bin Eq lhs rhs))));
         let new_ctexs =
           match Solvers.check_sat solver with
           | Sat -> (

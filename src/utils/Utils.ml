@@ -64,6 +64,12 @@ let rightarrow frmt () = Fmt.(pf frmt " ->@;")
 
 let leftarrow frmt () = Fmt.(pf frmt " <-@;")
 
+let list_or_space ~sep ~f frmt li =
+  match li with [] -> Fmt.pf frmt " " | _ as l -> Fmt.(pf frmt " %a " (list ~sep f) l)
+
+let option_or_space ~f frmt o =
+  match o with Some x -> Fmt.(pf frmt "%a" f x) | None -> Fmt.(pf frmt " ")
+
 (* ============================================================================================= *)
 (*                  LISTS HELPERS                                                                *)
 (* ============================================================================================= *)

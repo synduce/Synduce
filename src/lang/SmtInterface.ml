@@ -62,7 +62,9 @@ let rec smt_of_term (t : term) : smtTerm =
   | TConst c -> term_of_const c
   | TVar x -> mk_var x.vname
   | TIte (c, a, b) -> mk_ite (smt_of_term c) (smt_of_term a) (smt_of_term b)
-  | TTup tl -> mk_simple_app "mkTuple" (List.map ~f:smt_of_term tl)
+  | TTup tl ->
+      Log.error_msg Fmt.(str "SMT: creating tuple %a might cause errors in Z3." pp_term t);
+      mk_simple_app "mkTuple" (List.map ~f:smt_of_term tl)
   | TSel (t, i) -> SmtTApp (QI (IdC (SSimple "tupleSel", [ INum i ])), [ smt_of_term t ])
   | TApp ({ tkind = TVar v; _ }, args) -> mk_simple_app v.vname (List.map ~f:smt_of_term args)
   | TData (cstr, args) -> mk_simple_app cstr (List.map ~f:smt_of_term args)
@@ -78,7 +80,13 @@ let constant_of_smtConst (l : smtSpecConstant) : Constant.t =
   | SCString _ | SCBinary _ | SCHexaDecimal _ ->
       failwith "No hex, bin or string constants in language."
 
-type id_kind = ICstr of string | IVar of variable | IBinop of Binop.t | IUnop of Unop.t | IBool of bool | INotDef
+type id_kind =
+  | ICstr of string
+  | IVar of variable
+  | IBinop of Binop.t
+  | IUnop of Unop.t
+  | IBool of bool
+  | INotDef
 
 let id_kind_of_s env s =
   match Map.find env s with
@@ -89,18 +97,23 @@ let id_kind_of_s env s =
       | None -> (
           match Unop.of_string s with
           | Some unop -> IUnop unop
-          | None -> ( match RType.type_of_variant s with Some _ -> ICstr s | None -> 
-            (match s with "true" -> IBool true | "false" -> IBool false |_ -> INotDef))))
+          | None -> (
+              match RType.type_of_variant s with
+              | Some _ -> ICstr s
+              | None -> (
+                  match s with "true" -> IBool true | "false" -> IBool false | _ -> INotDef))))
 
 let rec term_of_smt (env : (string, variable, String.comparator_witness) Map.t) (st : smtTerm) :
     term =
   match st with
   | SmtTQualdId (QI (Id (SSimple s))) -> (
-      match Map.find env s with Some v -> Term.mk_var v | None -> 
-        match s with 
-        | "true" -> mk_const Constant.CTrue
-        | "false" -> mk_const Constant.CFalse
-        | _ -> failwith "Variable not found.")
+      match Map.find env s with
+      | Some v -> Term.mk_var v
+      | None -> (
+          match s with
+          | "true" -> mk_const Constant.CTrue
+          | "false" -> mk_const Constant.CFalse
+          | _ -> failwith "Variable not found."))
   | SmtTSpecConst l -> mk_const (constant_of_smtConst l)
   | SmtTApp (QI (Id (SSimple s)), args) -> (
       let args' = List.map ~f:(term_of_smt env) args in

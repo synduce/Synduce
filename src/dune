@@ -1,4 +1,4 @@
 (library
  (name Lib)
  (public_name Synduce.Lib)
- (libraries base fmt unix ppx_let utils lang parsers algo))
+ (libraries base fmt unix ppx_let utils lang parsers algo codegen))
