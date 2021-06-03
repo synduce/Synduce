@@ -407,8 +407,7 @@ let make ?(force_replace_off = false) ~(p : psi_def) (tset : TermSet.t) : equati
           let term x =
             match eqn.eprecond with
             | None -> pred_term x
-            | Some inv ->
-                { tpos = inv.tpos; tkind = TBin (Binop.And, inv, pred_term x); ttyp = inv.ttyp }
+            | Some inv -> mk_bin Binop.And inv (pred_term x)
           in
           match smtterm with None -> eqn | Some x -> { eqn with eprecond = Some (term x) })
     in
