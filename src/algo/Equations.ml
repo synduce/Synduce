@@ -111,18 +111,39 @@ let proj_unknowns (unknowns : VarSet.t) =
 (*                               CHECKING UNREALIZABILITY                                        *)
 (* ============================================================================================= *)
 
-type unrealizability_ctex =
-  VarSet.t * (int, term, Int.comparator_witness) Map.t * (int, term, Int.comparator_witness) Map.t
+type unrealizability_ctex = {
+  uvars : VarSet.t;
+  ueqns_ids : int * int;
+  umodel1 : (int, term, Int.comparator_witness) Map.t;
+  umodel2 : (int, term, Int.comparator_witness) Map.t;
+}
 (** A counterexample to realizability is a pair of models: a pair of maps from variable ids to terms. *)
 
-let pp_unrealizability_ctex (frmt : Formatter.t) ((ctxt, m, m') : unrealizability_ctex) : unit =
+let pp_unrealizability_ctex (frmt : Formatter.t) (uc : unrealizability_ctex) : unit =
   let pp_model frmt model =
     (* Print as comma-separated list of variable -> term *)
     Fmt.(list ~sep:comma (pair ~sep:Utils.rightarrow (option pp_variable) pp_term))
       frmt
-      (List.map ~f:(fun (vid, t) -> (VarSet.find_by_id ctxt vid, t)) (Map.to_alist model))
+      (List.map ~f:(fun (vid, t) -> (VarSet.find_by_id uc.uvars vid, t)) (Map.to_alist model))
   in
-  Fmt.(pf frmt "@[M = [%a]@]@;@[M' = [%a]@]" pp_model m pp_model m')
+  let i, j = uc.ueqns_ids in
+  Fmt.(pf frmt "@[M<%i> = [%a]@]@;@[M'<%i> = [%a]@]" i pp_model uc.umodel1 j pp_model uc.umodel2)
+
+let reinterpret_model (m0i, m0j') var_subst =
+  List.fold var_subst
+    ~init:(Map.empty (module Int), Map.empty (module Int))
+    ~f:(fun (m, m') (v, v') ->
+      Variable.free v';
+      match Map.find m0i v.vname with
+      | Some data -> (
+          let new_m = Map.set m ~key:v.vid ~data in
+          match Map.find m0j' v'.vname with
+          | Some data -> (new_m, Map.set m' ~key:v.vid ~data)
+          | None -> (new_m, m'))
+      | None -> (
+          match Map.find m0j' v'.vname with
+          | Some data -> (m, Map.set m' ~key:v.vid ~data)
+          | None -> (m, m')))
 
 (** Check if system of equations defines a functionally realizable synthesis problem.
   If any equation defines an unsolvable problem, an unrealizability_ctex is added to the
@@ -135,51 +156,61 @@ let check_unrealizable (unknowns : VarSet.t) (eqns : equation list) : unrealizab
   let start_time = Unix.gettimeofday () in
   let solver = Solvers.make_z3_solver () in
   Solvers.load_min_max_defs solver;
-  (* Main part of the check, appliued to each equation in eqns. *)
-  let check_eqn_accum ctexs eqn =
-    let vset =
+  (* Main part of the check, applied to each equation in eqns. *)
+  let check_eqn_accum (ctexs : unrealizability_ctex list) ((i, eqn_i), (j, eqn_j)) =
+    let vseti =
       Set.diff
-        (Set.union (Analysis.free_variables eqn.elhs) (Analysis.free_variables eqn.erhs))
+        (Set.union (Analysis.free_variables eqn_i.elhs) (Analysis.free_variables eqn_i.erhs))
         unknowns
     in
-    let var_subst = VarSet.prime vset in
-    let vset' = VarSet.of_list (List.map ~f:snd var_subst) in
+    let vsetj =
+      Set.diff
+        (Set.union (Analysis.free_variables eqn_j.elhs) (Analysis.free_variables eqn_j.erhs))
+        unknowns
+    in
+    let var_subst = VarSet.prime vsetj in
+    let vsetj' = VarSet.of_list (List.map ~f:snd var_subst) in
     let sub = List.map ~f:(fun (v, v') -> (mk_var v, mk_var v')) var_subst in
     (* Extract the arguments of the rhs, if it is a call to an unknown. *)
     let maybe_rhs_args =
-      match eqn.erhs.tkind with
-      | TApp ({ tkind = TVar f_v; _ }, args) ->
-          if Set.mem unknowns f_v then
-            let fv_args = VarSet.union_list (List.map ~f:Analysis.free_variables args) in
+      match (eqn_i.erhs.tkind, eqn_j.erhs.tkind) with
+      | TApp ({ tkind = TVar f_v_i; _ }, args_i), TApp ({ tkind = TVar f_v_j; _ }, args_j) ->
+          if
+            Set.mem unknowns f_v_i && Set.mem unknowns f_v_j
+            && Variable.(f_v_i = f_v_j)
+            && List.length args_i = List.length args_j
+          then
+            let fv_args =
+              VarSet.union_list (List.map ~f:Analysis.free_variables (args_i @ args_j))
+            in
             (* Check there are no unknowns in the args. *)
-            if Set.are_disjoint fv_args unknowns then Some args else None
+            if Set.are_disjoint fv_args unknowns then Some (args_i, args_j) else None
           else None
       | _ -> None
     in
     match maybe_rhs_args with
     | None -> ctexs (* If we cannot match the expected structure, skip it. *)
-    | Some rhs_args ->
-        (* Building the constraints *)
-        let preconds = Option.map ~f:(fun pre -> (pre, substitution sub pre)) eqn.eprecond in
-        (* Checking. *)
+    | Some (rhs_args_i, rhs_args_j) ->
+        (* (push). *)
         Solvers.spush solver;
         (* Declare the variables. *)
-        Solvers.declare_all solver (decls_of_vars (Set.union vset vset'));
-        (* Assert preconditions, if not none. *)
-        (match preconds with
-        | Some (pre, pre') ->
-            Solvers.smt_assert solver (smt_of_term pre);
-            Solvers.smt_assert solver (smt_of_term pre')
+        Solvers.declare_all solver (decls_of_vars (Set.union vseti vsetj'));
+        (* Assert preconditions, if they exist. *)
+        (match eqn_i.eprecond with
+        | Some pre_i -> Solvers.smt_assert solver (smt_of_term pre_i)
         | None -> ());
-        (* The lhs must be different. **)
+        (match eqn_j.eprecond with
+        | Some pre_j -> Solvers.smt_assert solver (smt_of_term (substitution sub pre_j))
+        | None -> ());
+        (* The lhs of i and j must be different. **)
         let lhs_diff =
-          let projs = projection_eqns eqn.elhs (substitution sub eqn.elhs) in
+          let projs = projection_eqns eqn_i.elhs (substitution sub eqn_j.elhs) in
           List.map ~f:(fun (lhs, rhs) -> mk_un Not (mk_bin Eq lhs rhs)) projs
         in
         List.iter lhs_diff ~f:(fun eqn -> Solvers.smt_assert solver (smt_of_term eqn));
         (* The rhs must be equal. *)
-        List.iter rhs_args ~f:(fun rhs_arg_term ->
-            let rhs_eqs = projection_eqns rhs_arg_term (substitution sub rhs_arg_term) in
+        List.iter2_exn rhs_args_i rhs_args_j ~f:(fun rhs_i_arg_term rhs_j_arg_term ->
+            let rhs_eqs = projection_eqns rhs_i_arg_term (substitution sub rhs_j_arg_term) in
             List.iter rhs_eqs ~f:(fun (lhs, rhs) ->
                 Solvers.smt_assert solver (smt_of_term (mk_bin Eq lhs rhs))));
         let new_ctexs =
@@ -188,33 +219,23 @@ let check_unrealizable (unknowns : VarSet.t) (eqns : equation list) : unrealizab
               match Solvers.get_model solver with
               | SExps s ->
                   let model = model_to_constmap (SExps s) in
-                  let m0, m0' =
+                  let m0i, m0j' =
                     Map.partitioni_tf
-                      ~f:(fun ~key ~data:_ -> Option.is_some (VarSet.find_by_name vset key))
+                      ~f:(fun ~key ~data:_ -> Option.is_some (VarSet.find_by_name vseti key))
                       model
                   in
                   (* Remap the names to ids of the original variables in m' *)
-                  let m, m' =
-                    List.fold var_subst
-                      ~init:(Map.empty (module Int), Map.empty (module Int))
-                      ~f:(fun (m, m') (v, v') ->
-                        Variable.free v';
-                        ( (match Map.find m0 v.vname with
-                          | Some data -> Map.set m ~key:v.vid ~data
-                          | None -> m),
-                          match Map.find m0' v'.vname with
-                          | Some data -> Map.set m' ~key:v.vid ~data
-                          | None -> m' ))
-                  in
-
-                  (vset, m, m') :: ctexs
+                  let m, m' = reinterpret_model (m0i, m0j') var_subst in
+                  { uvars = Set.union vseti vsetj; ueqns_ids = (i, j); umodel1 = m; umodel2 = m' }
+                  :: ctexs
               | _ -> ctexs)
           | _ -> ctexs
         in
         Solvers.spop solver;
         new_ctexs
   in
-  let ctexs = List.fold ~f:check_eqn_accum ~init:[] eqns in
+  let eqns_indexed = List.mapi ~f:(fun i eqn -> (i, eqn)) eqns in
+  let ctexs = List.fold ~f:check_eqn_accum ~init:[] (combinations eqns_indexed) in
   Solvers.close_solver solver;
   let elapsed = Unix.gettimeofday () -. start_time in
   Log.info (fun f () -> Fmt.(pf f "... finished in %3.4fs" elapsed));
@@ -223,8 +244,15 @@ let check_unrealizable (unknowns : VarSet.t) (eqns : equation list) : unrealizab
       | [] -> Fmt.pf f "No counterexample to realizability found."
       | _ :: _ ->
           Fmt.(
-            pf f "Counterexamples found:@;@[<hov 2>%a@]"
-              (list ~sep:sp pp_unrealizability_ctex)
+            pf f
+              "@[Counterexamples found!@;\
+               @[<hov 2>❔ Equations:@;\
+               @[<v>%a@]@]@;\
+               @[<hov 2>❔ Counterexample models:@;\
+               @[<v>%a@]@]@]"
+              (list ~sep:sp (box (pair ~sep:colon int (box pp_equation))))
+              eqns_indexed
+              (list ~sep:sep_and pp_unrealizability_ctex)
               ctexs));
   ctexs
 
