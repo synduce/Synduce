@@ -22,7 +22,12 @@ let verbose = ref false
 (*                                TEMPORARY OPTIONS                                              *)
 (* ============================================================================================= *)
 
+(**
+  Prompt user to input a precondition (lemma) for each equation, while the equations are being generated from a set of terms in Equations.make. 
+*)
 let interactive_lemmas = ref false
+
+let interactive_lemmas_loop = ref false
 
 (**
   Check whether a system of equations defines a "functionally realizable" synthesis problem.

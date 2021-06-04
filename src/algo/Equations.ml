@@ -411,7 +411,8 @@ let make ?(force_replace_off = false) ~(p : psi_def) (tset : TermSet.t) : equati
           in
           match smtterm with None -> eqn | Some x -> { eqn with eprecond = Some (term x) })
     in
-    if !Config.interactive_lemmas then List.map ~f pure_eqns else pure_eqns
+    if !Config.interactive_lemmas || !Config.interactive_lemmas_loop then List.map ~f pure_eqns
+    else pure_eqns
   in
   Log.verbose (fun f () ->
       let print_less = List.take eqns_with_invariants !Config.pp_eqn_count in
@@ -656,7 +657,7 @@ let solve_eqns (unknowns : VarSet.t) (eqns : equation list) =
     | Some resp -> handle_response resp
     | None -> (RFail, None)
   in
-  if !Config.check_unrealizable then
+  if !Config.check_unrealizable || !Config.interactive_lemmas_loop then
     match check_unrealizable unknowns eqns with [] -> aux_solve () | _ :: _ -> (RInfeasible, None)
   else aux_solve ()
 

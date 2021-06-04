@@ -46,24 +46,36 @@ let rec refinement_loop (p : psi_def) ((t_set, u_set) : TermSet.t * TermSet.t) =
             Ok { soln_rec_scheme = p.target; soln_implems = sol }
       with _ -> (* A failure during the bounded check is an error. *)
                 Error RFail)
-  | RFail, _ ->
-      Log.error_msg "SyGuS solver failed to find a solution.";
-      Error RFail
-  | RInfeasible, _ ->
-      (* Rare - but the synthesis solver can answer "infeasible", in which case it can give
-         counterexamples. *)
-      Log.info
-        Fmt.(
-          fun frmt () ->
-            pf frmt "@[<hov 2>This problem has no solution. Counterexample set:@;%a@]"
-              (list ~sep:sp pp_term) (Set.elements t_set));
-      Error RInfeasible
-  | RUnknown, _ ->
-      (* In most cases if the synthesis solver does not find a solution and terminates, it will
-         answer unknowns. We interpret it as "no solution can be found". *)
-      Log.error_msg "SyGuS solver returned unknown.";
-      Error RUnknown
-  | _ -> Error s_resp
+  | _ -> (
+      if
+        !Config.interactive_lemmas_loop
+        &&
+        (Log.info (fun frmt () -> Fmt.pf frmt "No luck. Try again? (Y/N)");
+         match Stdio.In_channel.input_line Stdio.stdin with
+         | None | Some "" | Some "N" -> false
+         | Some "Y" -> true
+         | _ -> false)
+      then refinement_loop p (t_set, u_set)
+      else
+        match (s_resp, solution) with
+        | RFail, _ ->
+            Log.error_msg "SyGuS solver failed to find a solution.";
+            Error RFail
+        | RInfeasible, _ ->
+            (* Rare - but the synthesis solver can answer "infeasible", in which case it can give
+               counterexamples. *)
+            Log.info
+              Fmt.(
+                fun frmt () ->
+                  pf frmt "@[<hov 2>This problem has no solution. Counterexample set:@;%a@]"
+                    (list ~sep:sp pp_term) (Set.elements t_set));
+            Error RInfeasible
+        | RUnknown, _ ->
+            (* In most cases if the synthesis solver does not find a solution and terminates, it will
+               answer unknowns. We interpret it as "no solution can be found". *)
+            Log.error_msg "SyGuS solver returned unknown.";
+            Error RUnknown
+        | _ -> Error s_resp)
 
 let psi (p : psi_def) =
   (* Initialize sets with the most general terms. *)
