@@ -1,4 +1,5 @@
 open Base
+open Lang
 open Lang.Term
 
 val check_solution :
@@ -28,3 +29,10 @@ val bounded_check :
     Returns the first equation for which checking has failed (the first element is the counterexample).
     Returns None if the check passed.
 *)
+
+val invert : PMRS.t -> Constant.t -> term list option
+(**
+  Solve an equation of the form f(x1,..,xn) = c where f is a recursive function and t is a constant.
+  Returns Some list of terms, one for each input of the function f, if the equation admits a solution.
+  Returns None if the equation has no solution.
+ *)

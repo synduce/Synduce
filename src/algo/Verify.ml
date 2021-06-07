@@ -1,10 +1,15 @@
 open AState
 open Base
+open Lang
 open Lang.SmtInterface
 open Lang.Term
 open Equations
 open Smtlib
 open Utils
+
+(* ============================================================================================= *)
+(*                               Checking correctness of solutions                               *)
+(* ============================================================================================= *)
 
 let constr_eqn (eqn : equation) =
   let rec mk_equality (lhs, rhs) =
@@ -203,3 +208,48 @@ let bounded_check ?(concrete_ctex = false) ~(p : psi_def)
   Config.verif_time := !Config.verif_time +. elapsed;
   Log.info (fun f () -> Fmt.(pf f "... finished in %3.4fs" elapsed));
   ctex_or_none
+
+(* ============================================================================================= *)
+(*                                 Other verification/checking functions                         *)
+(* ============================================================================================= *)
+
+let invert (recf : PMRS.t) (c : Constant.t) : term list option =
+  let check_bounded_sol solver terms =
+    let f accum t =
+      let vars = Analysis.free_variables t in
+      let f_t = Reduce.reduce_pmrs recf t in
+      let f_t_eq_c = mk_bin Eq f_t (mk_const c) in
+      Solvers.spush solver;
+      Solvers.declare_all solver (SmtInterface.decls_of_vars vars);
+      Solvers.smt_assert solver (smt_of_term f_t_eq_c);
+      let sol =
+        match Solvers.check_sat solver with
+        | Sat ->
+            let model_as_subst = model_to_subst vars (Solvers.get_model solver) in
+            Continue_or_stop.Stop (Some (Reduce.reduce_term (substitution model_as_subst t)))
+        | _ -> Continue_or_stop.Continue accum
+      in
+      Solvers.spop solver;
+      sol
+    in
+    Set.fold_until ~init:None ~finish:(fun x -> x) ~f terms
+  in
+  match recf.pinput_typ with
+  | [ typ1 ] ->
+      let x1 = Variable.mk ~t:(Some typ1) (Alpha.fresh ()) in
+      let solver = Solvers.make_z3_solver () in
+      let rec expand_loop u =
+        match Set.min_elt u with
+        | Some t0 -> (
+            let tset, u' = Expand.simple t0 in
+            match check_bounded_sol solver tset with
+            | Some s -> Some s
+            | None -> expand_loop (Set.union (Set.remove u t0) u'))
+        | None -> None
+      in
+      let res = expand_loop (TermSet.singleton (mk_var x1)) in
+      Solvers.close_solver solver;
+      Option.map ~f:(fun x -> [ x ]) res
+  | _ ->
+      Log.error_msg "rec_inverse: only PMRS with a single input argument supported for now.";
+      None

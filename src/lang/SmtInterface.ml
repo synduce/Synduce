@@ -169,6 +169,13 @@ let model_to_constmap (s : solver_response) =
   | SExps s_exprs -> constmap_of_s_exprs empty_map s_exprs
   | Error _ -> failwith "Smt solver error"
 
+let model_to_subst (ctx : VarSet.t) (s : solver_response) =
+  let map = Map.to_alist (model_to_constmap s) in
+  let f (vname, t) =
+    match VarSet.find_by_name ctx vname with Some v -> [ (Term.mk_var v, t) ] | None -> []
+  in
+  List.concat_map ~f map
+
 (* ============================================================================================= *)
 (*                           COMMANDS                                                            *)
 (* ============================================================================================= *)

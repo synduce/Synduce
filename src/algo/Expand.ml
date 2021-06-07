@@ -46,7 +46,7 @@ let subst_recursive_calls (p : psi_def) (tl : term list) : (term * term) list * 
   in
   List.fold ~f ~init:([], TermSet.empty) (Set.elements rcalls)
 
-let subst_repr_calls (p : psi_def) (tl : term list) : (term * term) list =
+let _subst_repr_calls (p : psi_def) (tl : term list) : (term * term) list =
   let fsymb = p.repr.pmain_symb in
   let rcalls =
     let fold_f rcalled_vars t = Set.union rcalled_vars (identify_rcalls p fsymb t) in
