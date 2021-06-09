@@ -196,13 +196,19 @@ let solve_problem (psi_comps : (string * string * string) option)
   let repr_pmrs =
     match repr with Either.First p -> p | Either.Second (f, a, b) -> PMRS.func_to_pmrs f a b
   in
+  let tinv_pmrs =
+    match reference_f.pspec.requires with
+    | Some t -> (
+        match t.tkind with TVar func_var -> Hashtbl.find PMRS._globals func_var.vid | _ -> None)
+    | None -> None
+  in
   let problem =
     sync_args
       {
         psi_target = target_f;
         psi_reference = reference_f;
         psi_repr = repr_pmrs;
-        psi_tinv = None;
+        psi_tinv = tinv_pmrs;
         psi_repr_is_identity = Reduce.is_identity repr_pmrs;
       }
   in
@@ -213,8 +219,11 @@ let solve_problem (psi_comps : (string * string * string) option)
         pf fmt " Ψ (%a) := ∀ x : %a. (%s o %s)(x) = %s(x)"
           (list ~sep:comma Term.Variable.pp)
           (Set.elements xi) (list ~sep:sp RType.pp) args_t spec_fname repr_fname target_fname);
+  (* Print reference function. *)
   Log.info Fmt.(fun fmt () -> pf fmt "%a" PMRS.pp problem.psi_reference);
+  (* Print target recursion skeleton. *)
   Log.info Fmt.(fun fmt () -> pf fmt "%a" PMRS.pp problem.psi_target);
+  (* Print representation function. *)
   Log.info
     Fmt.(
       fun fmt () ->
@@ -222,10 +231,14 @@ let solve_problem (psi_comps : (string * string * string) option)
         | Either.First pmrs -> pf fmt "%a" PMRS.pp pmrs
         | Either.Second (fv, args, body) ->
             pf fmt "%s(%a) = %a" fv.vname (list ~sep:comma Term.pp_fpattern) args Term.pp_term body);
+  (* Print the condition on the reference function's input, if there is one. *)
+  (match problem.psi_tinv with
+  | Some tinv -> Log.info (fun formt () -> Fmt.(pf formt "%a" PMRS.pp tinv))
+  | None -> ());
   (* Set global information. *)
   AState._tau := tau;
   AState._theta := theta;
-  AState._alpha := t_out;
+  AState._alpha := (t_out, reference_f.pspec.ensures);
   AState._span := List.length (Analysis.terms_of_max_depth 1 theta);
   AState.refinement_steps := 0;
   (* Solve the problem. *)

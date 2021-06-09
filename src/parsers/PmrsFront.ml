@@ -214,16 +214,14 @@ let pmrs_of_rules loc (globs : (string, Term.variable) Hashtbl.t) (synt_objs : T
       {
         pvar;
         pargs = args;
+        pinput_typ = [ RType.TNamed "_?" ];
+        poutput_typ = RType.TNamed "_?";
+        pspec = { ensures = ensures_func; requires = _requires_func };
         psyntobjs = Term.VarSet.of_list synt_objs;
         pnon_terminals = nont;
         prules = rules;
         porder = -1;
         pmain_symb = main_symb;
-        pinput_typ = [ RType.TNamed "_?" ];
-        (* TODO: add requires *)
-        (* Will be replaced during type inference. *)
-        poutput_typ =
-          (RType.TNamed "_?", ensures_func) (* Will be replaced during type inference. *);
       }
   in
   PMRS.infer_pmrs_types pmrs0
