@@ -6,28 +6,18 @@ val rtype_of_smtSort : SmtLib.smtSort -> RType.t option
       `smt_sort`, and `None` if no such type exists.
 *)
 
+val sort_of_rtype : RType.t -> SmtLib.smtSort
+
 val smt_of_term : term -> SmtLib.smtTerm
 (** `smt_of_term t` generates a smt-term from the term t. If t is not a valid term, raises errors.
       TODO: return a Result.t instead of failing.
  *)
 
-(** In an environment, and identifier is assigned a specific kind for parsing. *)
-type id_kind =
-  (* A type constructor (e.g. Cons, Node, ...) *)
-  | ICstr of string
-  (* A variable. *)
-  | IVar of variable
-  (* A binary operator. *)
-  | IBinop of Binop.t
-  (* A unary operator. *)
-  | IUnop of Unop.t
-  (* A boolean value. *)
-  | IBool of bool
-  (* The identified is undefined in the current environment. *)
-  | INotDef
-
-val id_kind_of_s : (string, variable, 'a) Base.Map.t -> string -> id_kind
-(** Returns the kind of a string identified given a map from variable names to variables. *)
+val smt_of_pmrs : PMRS.t -> SmtLib.command list
+(**
+      Convert a PMRS into a set of commands. Once the commands have been passed to the solver,
+      the PMRS can be used as a function in the solver.
+*)
 
 val term_of_smt :
   (string, variable, Base.String.comparator_witness) Base.Map.t -> SmtLib.smtTerm -> term

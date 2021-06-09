@@ -603,11 +603,6 @@ type solver_response =
   | SExps of Sexp.t list [@sexp.list]
 [@@deriving_sexp]
 
-type solver_kind =
-  | Z3_SMT2 of int  (** Z3 smt2 solver with timeout *)
-  | Z3_SMT2_Timeout_Fast  (** Z3 smt2 soler with fast timeout (1 sec) *)
-  | CVC4_Default  (** CVC4 solver *)
-
 (* Parse solver reponses *)
 let parse_response (r : Sexp.t list) : solver_response =
   match r with

@@ -1,5 +1,6 @@
 open AState
 open Base
+open Counterexamples
 open Lang
 open Lang.Term
 open Syguslib.Sygus
@@ -46,7 +47,23 @@ let add_lemmas_interactively ~(p : psi_def) (lstate : refinement_loop_state) : r
 
 let synthesize_lemmas ~(p : psi_def) synt_failure_info (lstate : refinement_loop_state) :
     (refinement_loop_state, solver_response) Result.t =
-  let _ = p in
+  (*
+    Example: the synt_failure_info should be a list of unrealizability counterexamples, which
+    are pairs of counterexamples.
+    Each counterexample can be classfied as positive or negative w.r.t to the predicate p.psi_tinv.
+    The lemma corresponding to a particular term should be refined to eliminate the counterexample
+    (a counterexample cex is also asscociated to a particular term through cex.ctex_eqn.eterm)
+   *)
+  let _ =
+    match synt_failure_info with
+    | _, Either.Second unrealizability_ctexs ->
+        (* Forget about the specific association in pairs. *)
+        let ctexs = List.concat_map unrealizability_ctexs ~f:(fun uc -> [ uc.ci; uc.cj ]) in
+        (* Classify in negative and positive cexs. *)
+        let _positive_ctexs, _negative_ctexs = classify_ctexs ~p ctexs in
+        ()
+    | _ -> ()
+  in
   if
     !Config.interactive_lemmas_loop
     &&

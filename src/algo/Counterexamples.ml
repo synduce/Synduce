@@ -158,3 +158,15 @@ let check_unrealizable (unknowns : VarSet.t) (eqns : equation_system) : unrealiz
               (list ~sep:sep_and pp_unrealizability_ctex)
               ctexs));
   ctexs
+
+(** Classify counterexamples into positive or negative counterexamples with respect
+    to the Tinv predicate in the problem.
+*)
+let classify_ctexs ~(p : psi_def) (ctexs : ctex list) : ctex list * ctex list =
+  let _ = p in
+  let solver = Solvers.make_cvc4_solver () in
+  Solvers.set_logic solver "DT_LIA";
+  let f _ctex = true in
+  let postives, negatives = List.partition_tf ~f ctexs in
+  Solvers.close_solver solver;
+  (postives, negatives)

@@ -190,3 +190,41 @@ let decls_of_vars (vars : VarSet.t) =
     DeclareConst (SSimple v.vname, sort)
   in
   List.map ~f (Set.elements vars)
+
+(* ============================================================================================= *)
+(*                             TRANSLATION FROM PMRS TO SMT define-funs-rec                      *)
+(* ============================================================================================= *)
+
+(* Work in progress *)
+let build_match_cases _pmrs _nont vars _relevant_rules =
+  let build_with matched_var _rest = Some (mk_var matched_var.vname, []) in
+  match (List.last vars, List.drop_last vars) with
+  | Some x, Some rest -> build_with x rest
+  | _ -> None
+
+let smt_of_pmrs (pmrs : PMRS.t) : command list =
+  let fun_of_nont (nont : variable) =
+    let args_t, out_t = RType.fun_typ_unpack (Variable.vtype_or_new nont) in
+    let vars, formals =
+      List.unzip
+        (List.map
+           ~f:(fun rt ->
+             let v = Variable.mk ~t:(Some rt) "x" in
+             (v, (mk_symb v.vname, sort_of_rtype rt)))
+           args_t)
+    in
+    let body =
+      let relevant_rules = Map.data (Map.filter_keys ~f:(fun k -> k = nont.vid) pmrs.prules) in
+      let all_pattern_matching =
+        List.for_all relevant_rules ~f:(fun (_, _, pat, _) -> Option.is_some pat)
+      in
+      if all_pattern_matching then
+        match build_match_cases pmrs nont vars relevant_rules with
+        | Some (x, match_cases) -> SmtTMatch (x, match_cases)
+        | None -> smt_of_term (mk_const Constant.CTrue)
+      else smt_of_term (mk_const Constant.CTrue)
+    in
+    ((SSimple nont.vname, formals, sort_of_rtype out_t), body)
+  in
+  let decls, bodies = List.unzip (List.map ~f:fun_of_nont (Set.elements pmrs.pnon_terminals)) in
+  [ DefineFunsRec (decls, bodies) ]

@@ -71,7 +71,7 @@ let pp_pattern (frmt : Formatter.t) ((t, args) : pattern) : unit =
 
 let pp_rewrite_rule (frmt : Formatter.t) ((nt, vargs, pat, t) : rewrite_rule) : unit =
   Fmt.(
-    pf frmt "@[<hov 2>@[<hov 2>%s %a %a  ⟹@] @;%a@]" nt.vname (list ~sep:comma Variable.pp) vargs
+    pf frmt "@[<hov 2>@[<hov 2>%s %a %a  ⟹@] @;%a@]" nt.vname (list ~sep:sp Variable.pp) vargs
       (option pp_pattern) pat (box pp_term) t)
 
 let pp (frmt : Formatter.t) (pmrs : t) : unit =
