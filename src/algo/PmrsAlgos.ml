@@ -5,7 +5,7 @@ open Lang.Term
 open Syguslib.Sygus
 open Utils
 
-let rec refinement_loop (p : psi_def) ((t_set, u_set) : TermSet.t * TermSet.t) =
+let rec refinement_loop (p : psi_def) (lstate : refinement_loop_state) =
   Int.incr refinement_steps;
   (* Output status information before entering process. *)
   let elapsed = Unix.gettimeofday () -. !Config.glob_start in
@@ -13,23 +13,26 @@ let rec refinement_loop (p : psi_def) ((t_set, u_set) : TermSet.t * TermSet.t) =
   (if not !Config.info then
    Fmt.(
      pf stdout "%i,%3.3f,%3.3f,%i,%i@." !refinement_steps !Config.verif_time elapsed
-       (Set.length t_set) (Set.length u_set)));
+       (Set.length lstate.t_set) (Set.length lstate.u_set)));
   Log.debug_msg
     Fmt.(
-      str "Start refinement loop with %i terms in T, %i terms in U." (Set.length t_set)
-        (Set.length u_set));
+      str "Start refinement loop with %i terms in T, %i terms in U." (Set.length lstate.t_set)
+        (Set.length lstate.u_set));
+  let lstate =
+    if !Config.interactive_lemmas then Lemmas.add_lemmas_interactively ~p lstate else lstate
+  in
   (* First, generate the set of constraints corresponding to the set of terms t_set. *)
-  let eqns = Equations.make ~p t_set in
+  let eqns = Equations.make ~p ~lemmas:lstate.lemma lstate.t_set in
   (* The solve the set of constraints. *)
   let s_resp, solution = Equations.solve ~p eqns in
   match (s_resp, solution) with
-  | RSuccess _, Some sol -> (
+  | RSuccess _, First sol -> (
       (* Synthesis has succeeded, now we need to verify the solution. *)
       try
         (* The solution is verified with a bounded check.  *)
-        let check_r = Verify.check_solution ~p (t_set, u_set) sol in
+        let check_r = Verify.check_solution ~p lstate sol in
         match check_r with
-        | Some (new_t_set, new_u_set) ->
+        | Some (t_set, u_set) ->
             (* If check_r is some new set of MR-terms t_set, and terms u_set, this means
                verification failed. The generalized counterexamples have been added to new_t_set,
                which is also a superset of t_set.
@@ -37,45 +40,19 @@ let rec refinement_loop (p : psi_def) ((t_set, u_set) : TermSet.t * TermSet.t) =
             Log.debug (fun frmt () ->
                 Fmt.(
                   pf frmt "@[<hov 2>Counterexample terms:@;@[<hov 2>%a@]" (list ~sep:comma pp_term)
-                    (Set.elements (Set.diff new_t_set t_set))));
+                    (Set.elements (Set.diff t_set lstate.t_set))));
             (* Continue looping with the new sets. *)
-            refinement_loop p (new_t_set, new_u_set)
+            refinement_loop p { lstate with t_set; u_set }
         | None ->
             (* This case happens when verification succeeded. Return the solution. *)
             Log.print_ok ();
-            Ok { soln_rec_scheme = p.target; soln_implems = sol }
+            Ok { soln_rec_scheme = p.psi_target; soln_implems = sol }
       with _ -> (* A failure during the bounded check is an error. *)
                 Error RFail)
-  | _ -> (
-      if
-        !Config.interactive_lemmas_loop
-        &&
-        (Log.info (fun frmt () -> Fmt.pf frmt "No luck. Try again? (Y/N)");
-         match Stdio.In_channel.input_line Stdio.stdin with
-         | None | Some "" | Some "N" -> false
-         | Some "Y" -> true
-         | _ -> false)
-      then refinement_loop p (t_set, u_set)
-      else
-        match (s_resp, solution) with
-        | RFail, _ ->
-            Log.error_msg "SyGuS solver failed to find a solution.";
-            Error RFail
-        | RInfeasible, _ ->
-            (* Rare - but the synthesis solver can answer "infeasible", in which case it can give
-               counterexamples. *)
-            Log.info
-              Fmt.(
-                fun frmt () ->
-                  pf frmt "@[<hov 2>This problem has no solution. Counterexample set:@;%a@]"
-                    (list ~sep:sp pp_term) (Set.elements t_set));
-            Error RInfeasible
-        | RUnknown, _ ->
-            (* In most cases if the synthesis solver does not find a solution and terminates, it will
-               answer unknowns. We interpret it as "no solution can be found". *)
-            Log.error_msg "SyGuS solver returned unknown.";
-            Error RUnknown
-        | _ -> Error s_resp)
+  | _ as synt_failure_info -> (
+      match Lemmas.synthesize_lemmas ~p synt_failure_info lstate with
+      | Ok new_lstate -> refinement_loop p new_lstate
+      | Error synt_failure -> Error synt_failure)
 
 let psi (p : psi_def) =
   (* Initialize sets with the most general terms. *)
@@ -85,7 +62,7 @@ let psi (p : psi_def) =
       let s = TermSet.of_list (Analysis.expand_once x0) in
       Set.partition_tf ~f:(Expand.is_mr_all p) s
     else
-      let init_set = MGT.most_general_terms p.target in
+      let init_set = MGT.most_general_terms p.psi_target in
       Set.fold init_set ~init:(TermSet.empty, TermSet.empty) ~f:(fun (t, u) mgt ->
           let t', u' = Expand.to_maximally_reducible p mgt in
           (Set.union t t', Set.union u u'))
@@ -97,13 +74,23 @@ let psi (p : psi_def) =
     failwith "Cannot solve problem.")
   else (
     refinement_steps := 0;
-    refinement_loop p (t_set, u_set))
+    refinement_loop p { t_set; u_set; lemma = Lemmas.empty_lemma })
 
 (* ============================================================================================= *)
 (*                                                 MAIN ENTRY POINTS                             *)
 (* ============================================================================================= *)
 
 let no_synth () = failwith "No synthesis objective found."
+
+let sync_args p : psi_def =
+  let subs =
+    match List.zip p.psi_reference.pargs p.psi_target.pargs with
+    | Unequal_lengths ->
+        failwith "Reference and target recursion scheme must have the same number of parameters."
+    | Ok var_subs -> List.map ~f:(fun (v1, v2) -> (mk_var v2, mk_var v1)) var_subs
+  in
+  let target' = PMRS.subst_rule_rhs ~p:{ p.psi_target with pargs = p.psi_reference.pargs } subs in
+  { p with psi_target = target' }
 
 let solve_problem (psi_comps : (string * string * string) option)
     (pmrs : (string, PMRS.t, Base.String.comparator_witness) Map.t) :
@@ -132,8 +119,8 @@ let solve_problem (psi_comps : (string * string * string) option)
             let repr_fun = Variable.mk ~t:(Some (TFun (xt, xt))) repr_fname in
             (Either.Second (repr_fun, [ PatVar x ], mk_var x), RType.TFun (xt, xt)))
   in
-  (* Original function. *)
-  let orig_f, tau =
+  (* Reference function. *)
+  let reference_f, tau =
     match Map.find pmrs spec_fname with
     | Some pmrs -> (
         match List.last pmrs.pinput_typ with
@@ -181,10 +168,10 @@ let solve_problem (psi_comps : (string * string * string) option)
       Log.error_msg "Representation function should be a function.";
       Log.fatal ());
   Term.(
-    let orig_out = Variable.vtype_or_new orig_f.pmain_symb in
+    let reference_out = Variable.vtype_or_new reference_f.pmain_symb in
     let target_out = Variable.vtype_or_new target_f.pmain_symb in
-    Log.debug_msg Fmt.(str "ɑ : unify %a and %a" RType.pp orig_out RType.pp target_out);
-    match (orig_out, target_out) with
+    Log.debug_msg Fmt.(str "ɑ : unify %a and %a" RType.pp reference_out RType.pp target_out);
+    match (reference_out, target_out) with
     | TFun (_, tout), TFun (_, tout') -> (
         match RType.unify_one tout tout' with
         | Some subs -> Variable.update_var_types (RType.mkv subs)
@@ -203,9 +190,22 @@ let solve_problem (psi_comps : (string * string * string) option)
         Either.Second (f, a, b')
   in
   let target_f = PMRS.infer_pmrs_types target_f in
-  let orig_f = PMRS.infer_pmrs_types orig_f in
+  let reference_f = PMRS.infer_pmrs_types reference_f in
   let args_t = target_f.pinput_typ in
-  let t_out = orig_f.poutput_typ in
+  let t_out = reference_f.poutput_typ in
+  let repr_pmrs =
+    match repr with Either.First p -> p | Either.Second (f, a, b) -> PMRS.func_to_pmrs f a b
+  in
+  let problem =
+    sync_args
+      {
+        psi_target = target_f;
+        psi_reference = reference_f;
+        psi_repr = repr_pmrs;
+        psi_tinv = None;
+        psi_repr_is_identity = Reduce.is_identity repr_pmrs;
+      }
+  in
   (* Print summary information about the problem, before solving.*)
   Log.info
     Fmt.(
@@ -213,8 +213,8 @@ let solve_problem (psi_comps : (string * string * string) option)
         pf fmt " Ψ (%a) := ∀ x : %a. (%s o %s)(x) = %s(x)"
           (list ~sep:comma Term.Variable.pp)
           (Set.elements xi) (list ~sep:sp RType.pp) args_t spec_fname repr_fname target_fname);
-  Log.info Fmt.(fun fmt () -> pf fmt "%a" PMRS.pp orig_f);
-  Log.info Fmt.(fun fmt () -> pf fmt "%a" PMRS.pp target_f);
+  Log.info Fmt.(fun fmt () -> pf fmt "%a" PMRS.pp problem.psi_reference);
+  Log.info Fmt.(fun fmt () -> pf fmt "%a" PMRS.pp problem.psi_target);
   Log.info
     Fmt.(
       fun fmt () ->
@@ -222,12 +222,6 @@ let solve_problem (psi_comps : (string * string * string) option)
         | Either.First pmrs -> pf fmt "%a" PMRS.pp pmrs
         | Either.Second (fv, args, body) ->
             pf fmt "%s(%a) = %a" fv.vname (list ~sep:comma Term.pp_fpattern) args Term.pp_term body);
-  let repr_pmrs =
-    match repr with Either.First p -> p | Either.Second (f, a, b) -> PMRS.func_to_pmrs f a b
-  in
-  if not (List.length orig_f.pargs = List.length target_f.pargs) then
-    failwith "Specification and target recursion scheme must have the same number of parameters."
-  else ();
   (* Set global information. *)
   AState._tau := tau;
   AState._theta := theta;
@@ -235,14 +229,6 @@ let solve_problem (psi_comps : (string * string * string) option)
   AState._span := List.length (Analysis.terms_of_max_depth 1 theta);
   AState.refinement_steps := 0;
   (* Solve the problem. *)
-  let problem =
-    {
-      target = target_f;
-      orig = orig_f;
-      repr = repr_pmrs;
-      repr_is_identity = Reduce.is_identity repr_pmrs;
-    }
-  in
   if !Config.use_acegis then Baselines.algo_acegis problem
   else if !Config.use_ccegis then Baselines.algo_ccegis problem
   else psi problem

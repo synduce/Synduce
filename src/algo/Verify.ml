@@ -3,7 +3,6 @@ open Base
 open Lang
 open Lang.SmtInterface
 open Lang.Term
-open Equations
 open Smtlib
 open Utils
 
@@ -28,14 +27,14 @@ let constr_eqn (eqn : equation) =
   | Some inv -> SmtLib.mk_or (SmtLib.mk_not (smt_of_term inv)) equality
   | None -> equality
 
-let check_solution ?(use_acegis = false) ~(p : psi_def) ((t, u) : TermSet.t * TermSet.t)
+let check_solution ?(use_acegis = false) ~(p : psi_def) (lstate : refinement_loop_state)
     (soln : (string * variable list * term) list) =
   if use_acegis then Log.info (fun f () -> Fmt.(pf f "Check solution."))
   else Log.info (fun f () -> Fmt.(pf f "Checking solution..."));
   let verb = !Config.verbose in
   Config.verbose := false;
   let start_time = Unix.gettimeofday () in
-  let target_inst = Lang.Reduce.instantiate_with_solution p.target soln in
+  let target_inst = Lang.Reduce.instantiate_with_solution p.psi_target soln in
   let free_vars = VarSet.empty in
   let init_vardecls = decls_of_vars free_vars in
   let solver = Solvers.make_z3_solver () in
@@ -57,7 +56,9 @@ let check_solution ?(use_acegis = false) ~(p : psi_def) ((t, u) : TermSet.t * Te
     let num_terms = Set.length t_set in
     if num_terms > 0 then (
       let sys_eqns =
-        Equations.make ~force_replace_off:true ~p:{ p with target = target_inst } t_set
+        Equations.make ~force_replace_off:true
+          ~p:{ p with psi_target = target_inst }
+          ~lemmas:lstate.lemma t_set
       in
       let smt_eqns = List.map sys_eqns ~f:constr_eqn in
       let new_free_vars =
@@ -96,17 +97,17 @@ let check_solution ?(use_acegis = false) ~(p : psi_def) ((t, u) : TermSet.t * Te
       | [] -> None
       | hd :: tl ->
           let has_ctex, t_set, u_set, num_checks = expand_and_check num_checks hd in
-          if has_ctex then Some (Set.union t t_set, terms_to_expand)
+          if has_ctex then Some (Set.union lstate.t_set t_set, terms_to_expand)
           else
             let elts = Set.union u_set (TermSet.of_list tl) in
             find_ctex num_checks elts
   in
   (* Declare all variables *)
   Solvers.declare_all solver init_vardecls;
-  (match find_ctex 0 t with
+  (match find_ctex 0 lstate.t_set with
   | Some _ -> failwith "Synthesizer and solver disagree on solution. That's unexpected!"
   | None -> ());
-  let ctex_or_none = find_ctex 0 u in
+  let ctex_or_none = find_ctex 0 lstate.u_set in
   Solvers.close_solver solver;
   let elapsed = Unix.gettimeofday () -. start_time in
   Config.verif_time := !Config.verif_time +. elapsed;
@@ -119,7 +120,7 @@ let bounded_check ?(concrete_ctex = false) ~(p : psi_def)
     (soln : (string * variable list * term) list) =
   Log.info (fun f () -> Fmt.(pf f "Checking solution (bounded check)..."));
   let start_time = Unix.gettimeofday () in
-  let target_inst = Lang.Reduce.instantiate_with_solution p.target soln in
+  let target_inst = Lang.Reduce.instantiate_with_solution p.psi_target soln in
   let free_vars = VarSet.empty in
   let init_vardecls = decls_of_vars free_vars in
   let solver = Solvers.make_z3_solver () in
@@ -138,12 +139,13 @@ let bounded_check ?(concrete_ctex = false) ~(p : psi_def)
   in
   let check term =
     let sys_eqns =
-      Equations.make ~force_replace_off:true ~p:{ p with target = target_inst }
-        (TermSet.singleton term)
+      Equations.make ~force_replace_off:true
+        ~p:{ p with psi_target = target_inst }
+        ~lemmas:Lemmas.empty_lemma (TermSet.singleton term)
     in
     let smt_eqns = List.map sys_eqns ~f:(fun t -> (t, constr_eqn t)) in
     let new_free_vars =
-      let f fv (eqn : Equations.equation) =
+      let f fv (eqn : equation) =
         Set.union fv
           (Set.union
              (Lang.Analysis.free_variables eqn.elhs)
@@ -177,7 +179,9 @@ let bounded_check ?(concrete_ctex = false) ~(p : psi_def)
           | SExps _, _ | Unsat, _ -> search_ctex tl
           | Unknown, _ ->
               Log.error_msg Fmt.(str "SMT solver returned unkown. The solution might be incorrect.");
-              search_ctex tl)
+              search_ctex tl
+          | Success, _ ->
+              (* Should not be a valid answer, but keep searching anyway. *) search_ctex tl)
     in
     let ctex_or_none = search_ctex smt_eqns in
     (match ctex_or_none with

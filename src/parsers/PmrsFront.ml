@@ -283,7 +283,7 @@ let translate (prog : program) =
           let vargs = List.map ~f:Term.Variable.mk args in
           let fvar = Hashtbl.find_exn globals fname in
           let func_info = translate_function loc globals fvar vargs invariant body in
-          (match Hashtbl.add Term._globals ~key:fvar.vid ~data:func_info with
+          (match Hashtbl.add Term._globals ~key:fvar.vname ~data:func_info with
           | `Ok -> Log.verbose_msg ("Parsed " ^ fvar.vname)
           | `Duplicate -> Log.error_msg (fvar.vname ^ " already declared."));
           pmrses

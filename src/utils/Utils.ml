@@ -62,7 +62,7 @@ let ast frmt () = Fmt.(pf frmt "@;*@;")
 
 let colon frmt () = Fmt.(pf frmt "@;:@;")
 
-let rightarrow frmt () = Fmt.(pf frmt " ->@;")
+let rightarrow frmt () = Fmt.(pf frmt " ⟶ @;")
 
 let leftarrow frmt () = Fmt.(pf frmt " <-@;")
 

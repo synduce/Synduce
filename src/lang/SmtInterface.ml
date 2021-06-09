@@ -101,19 +101,24 @@ let id_kind_of_s env s =
               match RType.type_of_variant s with
               | Some _ -> ICstr s
               | None -> (
-                  match s with "true" -> IBool true | "false" -> IBool false | _ -> INotDef))))
+                  match s with
+                  | "true" -> IBool true
+                  | "false" -> IBool false
+                  | _ -> (
+                      (* Last possibility: a global function or a pmrs. *)
+                      match Option.first_some (PMRS.find_by_name s) (Term.find_global s) with
+                      | Some v -> IVar v
+                      | _ -> INotDef)))))
 
 let rec term_of_smt (env : (string, variable, String.comparator_witness) Map.t) (st : smtTerm) :
     term =
   match st with
   | SmtTQualdId (QI (Id (SSimple s))) -> (
-      match Map.find env s with
-      | Some v -> Term.mk_var v
-      | None -> (
-          match s with
-          | "true" -> mk_const Constant.CTrue
-          | "false" -> mk_const Constant.CFalse
-          | _ -> failwith "Variable not found."))
+      match id_kind_of_s env s with
+      | IVar v -> Term.mk_var v
+      | IBool true -> mk_const Constant.CTrue
+      | IBool false -> mk_const Constant.CFalse
+      | _ -> failwith Fmt.(str "Smt: undefined variable %s" s))
   | SmtTSpecConst l -> mk_const (constant_of_smtConst l)
   | SmtTApp (QI (Id (SSimple s)), args) -> (
       let args' = List.map ~f:(term_of_smt env) args in
@@ -165,7 +170,7 @@ let constmap_of_s_exprs (starting_map : (string, term, String.comparator_witness
 let model_to_constmap (s : solver_response) =
   let empty_map = Map.empty (module String) in
   match s with
-  | Unknown | Unsat | Sat -> empty_map
+  | Unknown | Unsat | Sat | Success -> empty_map
   | SExps s_exprs -> constmap_of_s_exprs empty_map s_exprs
   | Error _ -> failwith "Smt solver error"
 

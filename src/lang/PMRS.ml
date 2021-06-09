@@ -40,6 +40,10 @@ type variables = variable Map.M(String).t
 *)
 let _globals : (int, t) Hashtbl.t = Hashtbl.create (module Int)
 
+let find_by_name (pmrs_name : string) =
+  let matches = Hashtbl.filter ~f:(fun p -> String.(p.pvar.vname = pmrs_name)) _globals in
+  Option.map ~f:(fun (_, p) -> p.pvar) (Hashtbl.choose matches)
+
 (** Mapping nonterminals to the PMRS they belong to, index by the nonterminal
     variable id.
 *)
@@ -265,6 +269,7 @@ let inverted_rule_lookup ?(boundvars = VarSet.empty) rules (func : term) (args :
   in
   Map.filter_map ~f:filter rules
 
+(** Apply a substitution to all the right hand side of the PMRS rules. *)
 let subst_rule_rhs ~(p : t) (substs : (term * term) list) =
   let rules' =
     let f (nt, args, pat, body) =

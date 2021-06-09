@@ -32,7 +32,13 @@ let is_sat s = match s with Sat -> true | _ -> false
 
 let is_unsat s = match s with Unsat -> true | _ -> false
 
-type online_solver = { pid : int; inputc : OC.t; outputc : IC.t; declared : String.t Hash_set.t }
+type online_solver = {
+  pid : int;
+  inputc : OC.t;
+  outputc : IC.t;
+  mutable scope_level : int;
+  declared : (string, int) Hashtbl.t;
+}
 
 let solver_write (solver : online_solver) (c : command) : unit =
   write_command solver.inputc c;
@@ -48,23 +54,38 @@ let solver_read (solver : online_solver) : solver_response =
   parse_response [ l ]
 
 let exec_command (solver : online_solver) (c : command) =
-  if !log_queries then log c;
-  (match c with
-  | DefineSmtSort (s, _, _)
-  | DeclareDatatype (s, _)
-  | DeclareConst (s, _)
-  | DefineFunRec (s, _, _, _)
-  | DefineFun (s, _, _, _)
-  | DeclareFun (s, _, _) ->
-      Hash_set.add solver.declared (str_of_symb s)
-  | _ -> ());
-  solver_write solver c;
-  solver_read solver
-
-let silent_command (solver : online_solver) (c : command) =
-  if !log_queries then log c;
-  solver_write solver c;
-  ignore (solver_read solver)
+  (* Guard execution of command for declarations and keep track of scope level and declared
+     variables.
+  *)
+  let do_exec =
+    match c with
+    | DefineSmtSort (s, _, _)
+    | DeclareDatatype (s, _)
+    | DeclareConst (s, _)
+    | DefineFunRec (s, _, _, _)
+    | DefineFun (s, _, _, _)
+    | DeclareFun (s, _, _) -> (
+        match Hashtbl.find solver.declared (str_of_symb s) with
+        | Some _ ->
+            (* Do not write command if variable is already declared. *)
+            false
+        | None ->
+            Hashtbl.set solver.declared ~key:(str_of_symb s) ~data:solver.scope_level;
+            true)
+    | Push i ->
+        solver.scope_level <- solver.scope_level + i;
+        true
+    | Pop i ->
+        solver.scope_level <- solver.scope_level - i;
+        Hashtbl.filter_inplace solver.declared ~f:(fun level -> level <= solver.scope_level);
+        true
+    | _ -> true
+  in
+  if do_exec then (
+    if !log_queries then log c;
+    solver_write solver c;
+    solver_read solver)
+  else Error (Fmt.str "Variable already declared")
 
 (* keep track of all solvers we spawn, so we can close our read/write
    FDs when the solvers exit *)
@@ -98,12 +119,18 @@ let make_solver (path : string) : online_solver =
   OC.set_binary_mode out_chan false;
   IC.set_binary_mode in_chan false;
   let solver =
-    { pid; inputc = out_chan; outputc = in_chan; declared = Hash_set.create (module String) }
+    {
+      pid;
+      inputc = out_chan;
+      outputc = in_chan;
+      declared = Hashtbl.create (module String);
+      scope_level = 0;
+    }
   in
   online_solvers := (pid, solver) :: !online_solvers;
   try
     match exec_command solver mk_print_success with
-    | SExps [ Sexp.Atom "success" ] -> solver
+    | Success -> solver
     | _ -> failwith "could not configure solver to :print-success"
   with Sys_error s -> failwith ("couldn't talk to solver, double-check path. Sys_error " ^ s)
 
@@ -156,8 +183,8 @@ let declare_all s decls = List.iter ~f:(fun decl -> ignore (exec_command s decl)
 (*   (remove_duplicate_decls s.declared decls) *)
 
 let load_min_max_defs s =
-  silent_command s mk_max_def;
-  silent_command s mk_min_def
+  ignore (exec_command s mk_max_def);
+  ignore (exec_command s mk_min_def)
 
 let smt_assert s term = ignore (exec_command s (Assert term))
 
@@ -165,6 +192,6 @@ let check_sat s = exec_command s CheckSat
 
 let get_model s = exec_command s GetModel
 
-let spush solver = silent_command solver (mk_push 1)
+let spush solver = ignore (exec_command solver (mk_push 1))
 
-let spop solver = silent_command solver (mk_pop 1)
+let spop solver = ignore (exec_command solver (mk_pop 1))

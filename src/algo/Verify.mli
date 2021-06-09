@@ -1,3 +1,4 @@
+open AState
 open Base
 open Lang
 open Lang.Term
@@ -5,7 +6,7 @@ open Lang.Term
 val check_solution :
   ?use_acegis:bool ->
   p:AState.psi_def ->
-  TermSet.t * TermSet.t ->
+  refinement_loop_state ->
   (string * variable list * term) list ->
   ((term, Terms.comparator_witness) Set.t * (term, Terms.comparator_witness) Set.t) option
 (**
@@ -22,7 +23,7 @@ val bounded_check :
   ?concrete_ctex:bool ->
   p:AState.psi_def ->
   (string * variable list * term) list ->
-  Equations.equation option
+  AState.equation option
 (** Perform a bounded check of the solution. As opposed to check_solution this does not take advantage
     of partial bounding techniques.
     Consequently, it does not require sets of terms as arguments but only a problem definition and a solution.
