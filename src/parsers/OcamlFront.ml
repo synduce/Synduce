@@ -303,11 +303,19 @@ let define_value loc (is_rec : Asttypes.rec_flag) (bindings : value_binding list
 let declare_synt_obj (assert_expr : expression) =
   let t = fterm_of_expr assert_expr in
   match t.kind with
+  (* assert (target = repr @ reference) *)
   | FTBin (T.Binop.Eq, target, { kind = FTApp (_, [ repr; reference ]); _ }) -> (
       match (target.kind, repr.kind, reference.kind) with
       | FTVar target, FTVar reprname, FTVar refname -> psi_comps := Some (target, refname, reprname)
       | _ -> ())
-  | _ -> ()
+  (* assert (target = reference)  (repr is identity) *)
+  | FTBin (T.Binop.Eq, target, reference) -> (
+      match (target.kind, reference.kind) with
+      | FTVar target, FTVar refname -> psi_comps := Some (target, refname, "repr")
+      | _ -> ())
+  | _ ->
+      Log.debug_msg Fmt.(str "Ignore (assert %a)" pp_fterm t);
+      ()
 
 let parse_ocaml (filename : string) =
   let definitions = read_sig filename in

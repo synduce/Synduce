@@ -1,0 +1,16 @@
+(library
+ (name codegen)
+ (public_name Synduce.Lib.Codegen)
+ (libraries
+  base
+  compiler-libs
+  fmt
+  lang
+  ppx_let
+  sexplib
+  smtlib
+  syguslib
+  unix
+  utils)
+ (preprocess
+  (pps ppx_let ppx_sexp_conv)))

@@ -166,9 +166,7 @@ let smtSpecConstant_of_sexp (sexp : t) : smtSpecConstant option =
       else if String.is_prefix ~prefix:"#b" s then Some (SCHexaDecimal (String.drop_prefix s 2))
       else if String.is_prefix ~prefix:"\"" s then
         Some (SCString (String.drop_prefix (String.drop_prefix s 1) 1))
-      else
-        try Some (SCNumeral (Int.of_string s))
-        with _ -> None)
+      else try Some (SCNumeral (Int.of_string s)) with _ -> None)
   | _ -> None
 
 let sexp_of_smtSymbol (s : smtSymbol) : t =
@@ -596,28 +594,29 @@ let remove_duplicate_decls (s : String.t Hash_set.t) (decls : command list) =
   List.map ~f:snd uniq_decls @ List.map ~f:snd nondecls
 
 (* Reading solver responses *)
-type solver_response = Error of string | Sat | Unsat | Unknown | SExps of Sexp.t list [@sexp.list]
+type solver_response =
+  | Error of string
+  | Sat
+  | Unsat
+  | Unknown
+  | Success
+  | SExps of Sexp.t list [@sexp.list]
 [@@deriving_sexp]
-
-type solver_kind =
-  | Z3_SMT2 of int (* Z3 smt2 solver with timeout *)
-  | Z3_SMT2_Timeout_Fast (* Z3 smt2 soler with fast timeout (1 sec) *)
-  | CVC4_Default
-
-(* CVC4 solver *)
 
 (* Parse solver reponses *)
 let parse_response (r : Sexp.t list) : solver_response =
   match r with
   | [ Sexp.Atom "sat" ] -> Sat
   | [ Sexp.Atom "unsat" ] -> Unsat
-  | [ Sexp.Atom "unkown" ] -> Unknown
+  | [ Sexp.Atom "unknown" ] -> Unknown
+  | [ Sexp.Atom "success" ] -> Success
   | _ -> SExps r
 
 let pp_solver_response f r =
   match r with
   | Sat -> Fmt.pf f "sat"
   | Unsat -> Fmt.pf f "unsat"
-  | Unknown -> Fmt.pf f "unkown"
+  | Unknown -> Fmt.pf f "unknown"
+  | Success -> Fmt.pf f "success"
   | SExps sl -> Fmt.(pf f "%a" (list ~sep:sp Sexp.pp) sl)
   | Error s -> Fmt.(pf f "(error %s)" s)

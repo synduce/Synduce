@@ -62,7 +62,9 @@ let rec smt_of_term (t : term) : smtTerm =
   | TConst c -> term_of_const c
   | TVar x -> mk_var x.vname
   | TIte (c, a, b) -> mk_ite (smt_of_term c) (smt_of_term a) (smt_of_term b)
-  | TTup tl -> mk_simple_app "mkTuple" (List.map ~f:smt_of_term tl)
+  | TTup tl ->
+      Log.error_msg Fmt.(str "SMT: creating tuple %a might cause errors in Z3." pp_term t);
+      mk_simple_app "mkTuple" (List.map ~f:smt_of_term tl)
   | TSel (t, i) -> SmtTApp (QI (IdC (SSimple "tupleSel", [ INum i ])), [ smt_of_term t ])
   | TApp ({ tkind = TVar v; _ }, args) -> mk_simple_app v.vname (List.map ~f:smt_of_term args)
   | TData (cstr, args) -> mk_simple_app cstr (List.map ~f:smt_of_term args)
@@ -78,7 +80,13 @@ let constant_of_smtConst (l : smtSpecConstant) : Constant.t =
   | SCString _ | SCBinary _ | SCHexaDecimal _ ->
       failwith "No hex, bin or string constants in language."
 
-type id_kind = ICstr of string | IVar of variable | IBinop of Binop.t | IUnop of Unop.t | IBool of bool | INotDef
+type id_kind =
+  | ICstr of string
+  | IVar of variable
+  | IBinop of Binop.t
+  | IUnop of Unop.t
+  | IBool of bool
+  | INotDef
 
 let id_kind_of_s env s =
   match Map.find env s with
@@ -89,18 +97,28 @@ let id_kind_of_s env s =
       | None -> (
           match Unop.of_string s with
           | Some unop -> IUnop unop
-          | None -> ( match RType.type_of_variant s with Some _ -> ICstr s | None -> 
-            (match s with "true" -> IBool true | "false" -> IBool false |_ -> INotDef))))
+          | None -> (
+              match RType.type_of_variant s with
+              | Some _ -> ICstr s
+              | None -> (
+                  match s with
+                  | "true" -> IBool true
+                  | "false" -> IBool false
+                  | _ -> (
+                      (* Last possibility: a global function or a pmrs. *)
+                      match Option.first_some (PMRS.find_by_name s) (Term.find_global s) with
+                      | Some v -> IVar v
+                      | _ -> INotDef)))))
 
 let rec term_of_smt (env : (string, variable, String.comparator_witness) Map.t) (st : smtTerm) :
     term =
   match st with
   | SmtTQualdId (QI (Id (SSimple s))) -> (
-      match Map.find env s with Some v -> Term.mk_var v | None -> 
-        match s with 
-        | "true" -> mk_const Constant.CTrue
-        | "false" -> mk_const Constant.CFalse
-        | _ -> failwith "Variable not found.")
+      match id_kind_of_s env s with
+      | IVar v -> Term.mk_var v
+      | IBool true -> mk_const Constant.CTrue
+      | IBool false -> mk_const Constant.CFalse
+      | _ -> failwith Fmt.(str "Smt: undefined variable %s" s))
   | SmtTSpecConst l -> mk_const (constant_of_smtConst l)
   | SmtTApp (QI (Id (SSimple s)), args) -> (
       let args' = List.map ~f:(term_of_smt env) args in
@@ -152,9 +170,16 @@ let constmap_of_s_exprs (starting_map : (string, term, String.comparator_witness
 let model_to_constmap (s : solver_response) =
   let empty_map = Map.empty (module String) in
   match s with
-  | Unknown | Unsat | Sat -> empty_map
+  | Unknown | Unsat | Sat | Success -> empty_map
   | SExps s_exprs -> constmap_of_s_exprs empty_map s_exprs
   | Error _ -> failwith "Smt solver error"
+
+let model_to_subst (ctx : VarSet.t) (s : solver_response) =
+  let map = Map.to_alist (model_to_constmap s) in
+  let f (vname, t) =
+    match VarSet.find_by_name ctx vname with Some v -> [ (Term.mk_var v, t) ] | None -> []
+  in
+  List.concat_map ~f map
 
 (* ============================================================================================= *)
 (*                           COMMANDS                                                            *)
@@ -165,3 +190,41 @@ let decls_of_vars (vars : VarSet.t) =
     DeclareConst (SSimple v.vname, sort)
   in
   List.map ~f (Set.elements vars)
+
+(* ============================================================================================= *)
+(*                             TRANSLATION FROM PMRS TO SMT define-funs-rec                      *)
+(* ============================================================================================= *)
+
+(* Work in progress *)
+let build_match_cases _pmrs _nont vars _relevant_rules =
+  let build_with matched_var _rest = Some (mk_var matched_var.vname, []) in
+  match (List.last vars, List.drop_last vars) with
+  | Some x, Some rest -> build_with x rest
+  | _ -> None
+
+let smt_of_pmrs (pmrs : PMRS.t) : command list =
+  let fun_of_nont (nont : variable) =
+    let args_t, out_t = RType.fun_typ_unpack (Variable.vtype_or_new nont) in
+    let vars, formals =
+      List.unzip
+        (List.map
+           ~f:(fun rt ->
+             let v = Variable.mk ~t:(Some rt) "x" in
+             (v, (mk_symb v.vname, sort_of_rtype rt)))
+           args_t)
+    in
+    let body =
+      let relevant_rules = Map.data (Map.filter_keys ~f:(fun k -> k = nont.vid) pmrs.prules) in
+      let all_pattern_matching =
+        List.for_all relevant_rules ~f:(fun (_, _, pat, _) -> Option.is_some pat)
+      in
+      if all_pattern_matching then
+        match build_match_cases pmrs nont vars relevant_rules with
+        | Some (x, match_cases) -> SmtTMatch (x, match_cases)
+        | None -> smt_of_term (mk_const Constant.CTrue)
+      else smt_of_term (mk_const Constant.CTrue)
+    in
+    ((SSimple nont.vname, formals, sort_of_rtype out_t), body)
+  in
+  let decls, bodies = List.unzip (List.map ~f:fun_of_nont (Set.elements pmrs.pnon_terminals)) in
+  [ DefineFunsRec (decls, bodies) ]

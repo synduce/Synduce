@@ -19,10 +19,10 @@ let rec acegis_loop (p : psi_def) (t_set : TermSet.t) =
        (Set.length t_set)));
   Log.debug_msg Fmt.(str "<ACEGIS> Start refinement loop with %i terms in T." (Set.length t_set));
   (* Start of the algorithm. *)
-  let eqns = Equations.make ~force_replace_off:true ~p t_set in
+  let eqns = Equations.make ~force_replace_off:true ~p ~lemmas:Lemmas.empty_lemma t_set in
   let s_resp, solution = Equations.solve ~p eqns in
   match (s_resp, solution) with
-  | RSuccess _, Some sol -> (
+  | RSuccess _, First sol -> (
       match Verify.bounded_check ~p sol with
       (* A symbolic counterexample term is returned. *)
       | Some eqn ->
@@ -32,7 +32,7 @@ let rec acegis_loop (p : psi_def) (t_set : TermSet.t) =
           acegis_loop p (Set.add t_set eqn.eterm)
       | None ->
           Log.print_ok ();
-          Ok { soln_rec_scheme = p.target; soln_implems = sol })
+          Ok { soln_rec_scheme = p.psi_target; soln_implems = sol })
   | RFail, _ ->
       Log.error_msg "<ACEGIS> SyGuS solver failed to find a solution.";
       Error RFail
@@ -67,10 +67,10 @@ let rec ccegis_loop (p : psi_def) (t_set : TermSet.t) =
        (Set.length t_set)));
   Log.debug_msg Fmt.(str "<CCEGIS> Start refinement loop with %i terms in T." (Set.length t_set));
   (* Start of the algorithm. *)
-  let eqns = Equations.make ~force_replace_off:true ~p t_set in
+  let eqns = Equations.make ~force_replace_off:true ~p ~lemmas:Lemmas.empty_lemma t_set in
   let s_resp, solution = Equations.solve ~p eqns in
   match (s_resp, solution) with
-  | RSuccess _, Some sol -> (
+  | RSuccess _, First sol -> (
       match Verify.bounded_check ~concrete_ctex:true ~p sol with
       (* A concrete conterexample term is returned. *)
       | Some eqn ->
@@ -80,7 +80,7 @@ let rec ccegis_loop (p : psi_def) (t_set : TermSet.t) =
           ccegis_loop p (Set.add t_set eqn.eterm)
       | None ->
           Log.print_ok ();
-          Ok { soln_rec_scheme = p.target; soln_implems = sol })
+          Ok { soln_rec_scheme = p.psi_target; soln_implems = sol })
   | RFail, _ ->
       Log.error_msg "<CCEGIS> SyGuS solver failed to find a solution.";
       Error RFail
