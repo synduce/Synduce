@@ -2,7 +2,8 @@ datatype clist = cnil | single(int) | concat(clist, clist)
 datatype list = nil | cons(int, list)
 
 function rep(cl: clist): list
-    decreases cl
+    decreases clen(cl), cl
+    // ensures len(rep(cl)) == clen(cl)
 {
     match cl
     case cnil => nil
@@ -10,13 +11,16 @@ function rep(cl: clist): list
     case concat(x, y) => dec(y, x)
 }
 function dec(l1: clist, l2: clist): list
-    decreases l2, l1
+    decreases clen(l1) + clen(l2), l2
+    // ensures len(dec(l1, l2)) == clen(l1) + clen(l2)
 {
     match l2
     case cnil => rep(l1)
     case single(a) => cons(a, rep(l1))
     case concat(x, y) => dec(concat(y, l1), x)
 }
+
+
 
 function spec(l: list):int
 {
@@ -30,9 +34,16 @@ function clen(cl: clist): int
     ensures clen(cl) >= 0
 {
     match cl
-    case cnil => 0
+    case cnil => 1
     case single(a) => 1
     case concat(x, y) => clen(x) + clen(y)
+}
+function len(l: list):int
+    ensures len(l) >=0
+{
+    match l
+    case nil => 0
+    case cons(head, tail)=> 1+ len(tail)
 }
 
 function target(cl : clist): int
@@ -46,7 +57,7 @@ function target(cl : clist): int
 lemma sumLemma(x:clist, y:clist)
     // ensures target(concat(x, y)) == spec(rep(concat(x, y)))
     ensures spec(dec(y, x)) == target(y) + target(x)
-    decreases clen(y)+clen(x), clen(y), clen(x), y, x
+    decreases clen(x)+clen(y), x, y
 {
     match x
     case cnil => {
@@ -105,7 +116,6 @@ lemma sumLemma(x:clist, y:clist)
                 target(concat(x2, y)) + target(x1);
                 target(y) + target(x2) + target(x1);
             }
-            sumLemma(y1, y2);
         }
     }
 }
