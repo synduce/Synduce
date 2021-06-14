@@ -48,6 +48,44 @@ and dec_parametric t args =
   | t -> sort_of_rtype t
 (* Not really parametric? *)
 
+let declare_datatype_of_rtype (t0 : RType.t) : (smtSymbol list * command) list =
+  let declare_orig tname t =
+    let params =
+      match t with
+      | RType.TParam (params, _t) ->
+          List.concat_map
+            ~f:
+              RType.(
+                function
+                | TVar i ->
+                    let param_name = "T" ^ Int.to_string i in
+                    [ (mk_symb param_name, (TVar i, TNamed param_name)) ]
+                | _ -> [])
+            params
+      | _ -> []
+    in
+    let smt_sort : smtSortDec = (mk_symb tname, List.length params) in
+    let constructors =
+      List.map
+        ~f:(fun (cstr_name, cstr_args) ->
+          ( mk_symb cstr_name,
+            List.mapi cstr_args ~f:(fun i t ->
+                ( mk_symb Fmt.(str "%s_%i" cstr_name i),
+                  sort_of_rtype (RType.sub_all (snd (List.unzip params)) t) )) ))
+        (RType.get_variants t)
+    in
+    let smt_constrs : datatype_dec =
+      match params with
+      | [] -> DDConstr constructors
+      | _ -> DDParametric (fst (List.unzip params), constructors)
+    in
+    [ ([ fst smt_sort ], DeclareDatatypes ([ smt_sort ], [ smt_constrs ])) ]
+  in
+  match RType.base_name t0 with
+  | Some tname -> (
+      match RType.get_type tname with Some orig_t -> declare_orig tname orig_t | None -> [])
+  | None -> []
+
 let term_of_const (c : Constant.t) : smtTerm =
   match c with
   | Constant.CInt i -> SmtTSpecConst (SCNumeral i)
@@ -142,6 +180,11 @@ let rec term_of_smt (env : (string, variable, String.comparator_witness) Map.t) 
   | SmtTLet (_, _) -> failwith "Smt: let-terms not supported."
   | _ -> failwith "Composite identifier not supported."
 
+let sorted_vars_of_vars (vars : VarSet.t) : smtSortedVar list =
+  List.map
+    ~f:(fun v -> (mk_symb v.vname, sort_of_rtype (Variable.vtype_or_new v)))
+    (Set.elements vars)
+
 (* ============================================================================================= *)
 (*                           MODELS                                                              *)
 (* ============================================================================================= *)
@@ -184,6 +227,7 @@ let model_to_subst (ctx : VarSet.t) (s : solver_response) =
 (* ============================================================================================= *)
 (*                           COMMANDS                                                            *)
 (* ============================================================================================= *)
+
 let decls_of_vars (vars : VarSet.t) =
   let f v =
     let sort = sort_of_rtype (Variable.vtype_or_new v) in
@@ -195,36 +239,101 @@ let decls_of_vars (vars : VarSet.t) =
 (*                             TRANSLATION FROM PMRS TO SMT define-funs-rec                      *)
 (* ============================================================================================= *)
 
+let smtPattern_of_term (t : term) : smtPattern option =
+  match t.tkind with
+  | TVar x -> Some (Pat (mk_symb x.vname))
+  | TData (constr, args) ->
+      let maybe_pat_args =
+        let f t = match t.tkind with TVar x -> Some (mk_symb x.vname) | _ -> None in
+        all_or_none (List.map ~f args)
+      in
+      Option.map maybe_pat_args ~f:(fun pat_args -> PatComp (mk_symb constr, pat_args))
+  | _ -> None
+
 (* Work in progress *)
-let build_match_cases _pmrs _nont vars _relevant_rules =
-  let build_with matched_var _rest = Some (mk_var matched_var.vname, []) in
+let build_match_cases _pmrs _nont vars (relevant_rules : PMRS.rewrite_rule list) :
+    (smtTerm * match_case list) option =
+  let build_with matched_var rest_args =
+    let rule_to_match_case (_, var_args, pat, body) =
+      let pattern =
+        match pat with Some (d, l) -> smtPattern_of_term (mk_data d l) | None -> None
+      in
+      let case_body =
+        let sub =
+          match List.map2 ~f:(fun v x -> (Term.mk_var v, Term.mk_var x)) var_args rest_args with
+          | Ok zipped -> zipped
+          | Unequal_lengths -> failwith "Unexpected."
+        in
+        smt_of_term (substitution sub body)
+      in
+      Option.map ~f:(fun x -> (x, case_body)) pattern
+    in
+    Option.map
+      ~f:(fun l -> (mk_var matched_var.vname, l))
+      (all_or_none (List.map ~f:rule_to_match_case relevant_rules))
+  in
   match (List.last vars, List.drop_last vars) with
   | Some x, Some rest -> build_with x rest
   | _ -> None
 
-let smt_of_pmrs (pmrs : PMRS.t) : command list =
-  let fun_of_nont (nont : variable) =
+let single_rule_case _pmrs _nont vars (rules : PMRS.rewrite_rule list) : smtTerm option =
+  match rules with
+  | [ (_, args, _, body) ] ->
+      let sub =
+        match List.map2 ~f:(fun v x -> (Term.mk_var v, Term.mk_var x)) args vars with
+        | Ok zipped -> zipped
+        | Unequal_lengths -> failwith "Unexpected."
+      in
+      Some (smt_of_term (substitution sub body))
+  | _ -> None
+
+let _smt_of_pmrs (pmrs : PMRS.t) : (smtSymbol list * command) list * command =
+  (* Sort declarations. *)
+  let datatype_decls = List.concat_map ~f:declare_datatype_of_rtype pmrs.PMRS.pinput_typ in
+  (* Define recursive functions. *)
+  let fun_of_nont (nont : variable) : (func_dec * smtTerm) option =
     let args_t, out_t = RType.fun_typ_unpack (Variable.vtype_or_new nont) in
     let vars, formals =
       List.unzip
         (List.map
            ~f:(fun rt ->
-             let v = Variable.mk ~t:(Some rt) "x" in
+             let v = Variable.mk ~t:(Some rt) (Alpha.fresh ~s:("x" ^ nont.vname) ()) in
              (v, (mk_symb v.vname, sort_of_rtype rt)))
            args_t)
     in
-    let body =
-      let relevant_rules = Map.data (Map.filter_keys ~f:(fun k -> k = nont.vid) pmrs.prules) in
+    let maybe_body =
+      let relevant_rules =
+        Map.data (Map.filter ~f:(fun (k, _, _, _) -> k.vid = nont.vid) pmrs.prules)
+      in
       let all_pattern_matching =
         List.for_all relevant_rules ~f:(fun (_, _, pat, _) -> Option.is_some pat)
       in
       if all_pattern_matching then
         match build_match_cases pmrs nont vars relevant_rules with
-        | Some (x, match_cases) -> SmtTMatch (x, match_cases)
-        | None -> smt_of_term (mk_const Constant.CTrue)
-      else smt_of_term (mk_const Constant.CTrue)
+        | Some (x, match_cases) -> Some (SmtTMatch (x, match_cases))
+        | None -> single_rule_case pmrs nont vars relevant_rules
+      else single_rule_case pmrs nont vars relevant_rules
     in
-    ((SSimple nont.vname, formals, sort_of_rtype out_t), body)
+    Option.map maybe_body ~f:(fun body ->
+        ((SSimple nont.vname, formals, sort_of_rtype out_t), body))
   in
-  let decls, bodies = List.unzip (List.map ~f:fun_of_nont (Set.elements pmrs.pnon_terminals)) in
-  [ DefineFunsRec (decls, bodies) ]
+  let decls, bodies =
+    List.unzip (List.filter_map ~f:fun_of_nont (Set.elements pmrs.pnon_terminals))
+  in
+  (datatype_decls, DefineFunsRec (decls, bodies))
+
+let smt_of_pmrs (pmrs : PMRS.t) : command list =
+  (* TODO : order of declarations matters. *)
+  let deps = PMRS.depends pmrs in
+  let sort_decls_of_deps, decls_of_deps = List.unzip (List.map ~f:_smt_of_pmrs deps) in
+  let sort_decls, main_decl = _smt_of_pmrs pmrs in
+  let datatype_decls =
+    List.map ~f:snd
+      (List.dedup_and_sort
+         ~compare:(fun (sorts, _) (sorts', _) ->
+           List.compare
+             (fun a b -> String.compare (string_of_smtSymbol a) (string_of_smtSymbol b))
+             sorts sorts')
+         (List.concat sort_decls_of_deps @ sort_decls))
+  in
+  datatype_decls @ decls_of_deps @ [ main_decl ]

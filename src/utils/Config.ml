@@ -23,7 +23,7 @@ let verbose = ref false
 (* ============================================================================================= *)
 
 (**
-  Prompt user to input a precondition (lemma) for each equation, while the equations are being generated from a set of terms in Equations.make. 
+  Prompt user to input a precondition (lemma) for each equation, while the equations are being generated from a set of terms in Equations.make.
 *)
 let interactive_lemmas = ref false
 
@@ -63,6 +63,14 @@ let z3_binary_path = try FileUtil.which "z3" with _ -> failwith "Z3 not found."
 let dryadsynth_binary_path = try FileUtil.which "DryadSynth" with _ -> ""
 
 let eusolver_binary_path = try FileUtil.which "eusolver" with _ -> ""
+
+(* Smt solver logging. *)
+
+let smt_solver_log_file = ref "/tmp/solver.smt2"
+
+let smt_log_queries = ref true
+
+let smt_solve_verbose = ref true
 
 (* ============================================================================================= *)
 (*                  SYSTEM OF EQUATIONS OPTIMIZATION FLAGS                                       *)

@@ -88,14 +88,24 @@ let rec fun_typ_pack (targs : t list) (tout : t) =
 (* ============================================================================================= *)
 (* Type names and storage *)
 
+let rec base_name (typ : t) : string option =
+  match typ with
+  | TParam (_, t) -> base_name t
+  | TNamed s -> Some s
+  | TInt -> Some "Int"
+  | TBool -> Some "Bool"
+  | TChar -> Some "Char"
+  | TString -> Some "String"
+  | _ -> None
+
+let _unsafe_pair_t_ t = (Option.value_exn (base_name t), t)
+
 (**
    This hashtable maps type names to the type term of their declaration.
    It is initialized with the builtin types int, bool, char and string.
 *)
 let _types : (ident, t) Hashtbl.t =
-  Hashtbl.of_alist_exn
-    (module String)
-    [ ("Int", TInt); ("Bool", TBool); ("Char", TChar); ("String", TString) ]
+  Hashtbl.of_alist_exn (module String) (List.map ~f:_unsafe_pair_t_ [ TInt; TBool; TChar; TString ])
 
 (**
    This hashtable maps variant names to the type name.
@@ -159,6 +169,9 @@ let rec occurs (x : int) (typ : t) : bool =
   | TVar y -> x = y
 
 type substitution = (int * t) list
+(** A substitution is a list pairs of type variable id, type.
+  Applied to a (parametric) type to subsitute tyep parameters with types.
+ *)
 
 (* unify one pair *)
 let rec unify_one (s : t) (t : t) : substitution option =
@@ -260,22 +273,29 @@ let add_all_variants ~(params : (ident * int) list) ~(main_type : t) ~(typename 
   List.iter ~f:add_one_variant tl
 
 (**
-   get_variants t returns a list of variants of a given types.
-   If the type is a sum type with constructore, it returns a list of paris
-   of constructor, list of the types of the arguments of the constructor.
+   get_variants t returns a list of variants of a given type.
+   If the type is a sum type with constructors, it returns a list of pairs
+   of constructors, list of the types of the arguments of the constructor.
    If the type has no variant, the list is empty.
 *)
 let get_variants (typ : t) : (string * t list) list =
-  let variantnames params tname =
+  let variantnames in_params tname =
     let f variant_name =
       let var_args =
         match type_of_variant variant_name with
         | Some (typ', tl') -> (
             match typ' with
             | TParam (params', _) when List.length params' > 0 -> (
-                match unify (List.zip_exn params params') with
+                match unify (List.zip_exn in_params params') with
                 | Some subs -> List.map ~f:(sub_all (mkv subs)) tl'
-                | None -> failwith "TODO")
+                | None ->
+                    Log.error_msg
+                      Fmt.(
+                        str
+                          "Internal type error: %a and %s should have the same numbers of \
+                           parameters. "
+                          pp typ tname);
+                    failwith "Type error.")
             | TNamed _ -> tl'
             | _ -> failwith "Unexpexcted")
         | None -> []
@@ -286,6 +306,9 @@ let get_variants (typ : t) : (string * t list) list =
     | Some variants -> List.map ~f variants
     | None -> []
   in
+  (* A type can be parametric, in which case we need to replace the type parameters
+     in the definition by the type parameters in the input type.
+  *)
   match typ with
   | TParam (params, TNamed tname) -> variantnames params tname
   | TNamed tname -> variantnames [] tname

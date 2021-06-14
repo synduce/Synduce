@@ -197,7 +197,7 @@ let solve_problem (psi_comps : (string * string * string) option)
     match repr with Either.First p -> p | Either.Second (f, a, b) -> PMRS.func_to_pmrs f a b
   in
   let tinv_pmrs =
-    match reference_f.pspec.requires with
+    match target_f.pspec.requires with
     | Some t -> (
         match t.tkind with TVar func_var -> Hashtbl.find PMRS._globals func_var.vid | _ -> None)
     | None -> None
