@@ -156,3 +156,12 @@ let check_depth = ref 5
 let set_check_depth (s : string) =
   let i = Int.of_string s in
   if i > 0 && i < 1024 then check_depth := i
+
+(** A time limit for induction proofs.
+  Infinity if set to negative.
+*)
+let induction_proof_tlimit = ref (-1)
+
+let set_induction_proof_tlimit (s : string) =
+  let i = Int.of_string s in
+  induction_proof_tlimit := i

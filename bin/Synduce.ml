@@ -26,10 +26,13 @@ let print_usage () =
     \   -C   --check-unrealizable       Check if synthesis problems are functionally realizable.\n\
     \  Bounded checking:\n\
     \       --use-bmc                   Use acegis bounded model checking (bmc mode).\n\
-    \    -b --bmc                       Maximum depth of terms for bounded model checking, in bmc \
+    \    -b --bmc=MAX_DEPTH             Maximum depth of terms for bounded model checking, in bmc \
      mode.\n\
-    \    -v --verification              Number of expand calls for bounded model checking, in opt \
+    \    -v --verification=NUM          Number of expand calls for bounded model checking, in opt \
      mode.\n\
+    \  Background solver parameters:\n\
+    \       --ind-tlimit=TIMEOUT        Set the solver to timeout after TIMEOUT ms when doing an \
+     induction proof.\n\
     \  Debugging:\n\
     \  -I   --interactive               Request additional lemmas interactively.\n\
     \  -L   --interactive-loop          Request lemmas interactively in a loop.\n\
@@ -61,6 +64,8 @@ let options =
     ('s', "no-splitting", set Config.split_solve_on false, None);
     ('n', "verification", None, Some Config.set_num_expansions_check);
     ('b', "bmc", None, Some Config.set_check_depth);
+    (* Background solver parameters *)
+    ('\000', "ind-tlimit", None, Some Config.set_induction_proof_tlimit);
     ('\000', "use-dryadsynth", set Syguslib.Solvers.SygusSolver.default_solver DryadSynth, None);
   ]
 

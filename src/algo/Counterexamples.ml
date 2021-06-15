@@ -159,69 +159,76 @@ let check_unrealizable (unknowns : VarSet.t) (eqns : equation_system) : unrealiz
               ctexs));
   ctexs
 
+let satisfies_tinv ~(p : psi_def) (tinv : PMRS.t) (ctex : ctex) : bool =
+  let cvc4_instance = Solvers.make_cvc4_solver () in
+  Solvers.set_logic cvc4_instance "ALL";
+  Solvers.set_option cvc4_instance "quant-ind" "true";
+  if !Config.induction_proof_tlimit >= 0 then
+    Solvers.set_option cvc4_instance "tlimit" (Int.to_string !Config.induction_proof_tlimit);
+  Solvers.load_min_max_defs cvc4_instance;
+  (* Declare Tinv, repr and reference functions. *)
+  List.iter
+    ~f:(fun x -> ignore (Solvers.exec_command cvc4_instance x))
+    (smt_of_pmrs tinv
+    @ (if p.psi_repr_is_identity then [] else smt_of_pmrs p.psi_repr)
+    @ smt_of_pmrs p.psi_reference);
+
+  let fv =
+    Set.union (Analysis.free_variables ctex.ctex_eqn.eterm) (VarSet.of_list p.psi_reference.pargs)
+  in
+  let f_compose_r t =
+    let repr_of_v = if p.psi_repr_is_identity then t else mk_app_v p.psi_repr.pvar [ t ] in
+    mk_app_v p.psi_reference.pvar (List.map ~f:mk_var p.psi_reference.pargs @ [ repr_of_v ])
+  in
+  (* Create the formula. *)
+  let formula =
+    (* Assert that Tinv(t) is true. *)
+    let term_sat_tinv = mk_app_v tinv.pvar [ ctex.ctex_eqn.eterm ] in
+    (* Assert that the preconditions hold. *)
+    let preconds =
+      let subs =
+        List.map
+          ~f:(fun (orig_rec_var, elimv) -> (elimv, f_compose_r orig_rec_var))
+          ctex.ctex_eqn.eelim
+      in
+      Option.to_list (Option.map ~f:(substitution subs) ctex.ctex_eqn.eprecond)
+    in
+    (* Assert that the variables have the values assigned by the model. *)
+    let model_sat =
+      let f v =
+        let v_val = Map.find_exn ctex.ctex_model v.vid in
+        match
+          List.find
+            ~f:(fun (_, elimv) -> match elimv.tkind with TVar v' -> v.vid = v'.vid | _ -> false)
+            ctex.ctex_eqn.eelim
+        with
+        | Some (original_recursion_var, _) ->
+            mk_bin Binop.Eq (f_compose_r original_recursion_var) v_val
+        | None -> mk_bin Binop.Eq (mk_var v) v_val
+      in
+      List.map ~f (Set.elements ctex.ctex_vars)
+    in
+    SmtLib.mk_assoc_and (List.map ~f:smt_of_term (term_sat_tinv :: preconds @ model_sat))
+  in
+  SmtLib.(Solvers.smt_assert cvc4_instance (mk_exists (sorted_vars_of_vars fv) formula));
+  let resp = Solvers.check_sat cvc4_instance in
+  Log.verbose (fun frmt () ->
+      if Solvers.is_unsat resp then
+        Fmt.(pf frmt "(%a) does not satisfy %s." (box pp_ctex) ctex tinv.pvar.vname)
+      else if Solvers.is_unsat resp then
+        Fmt.(pf frmt "(%a) satisfies %s." (box pp_ctex) ctex tinv.pvar.vname)
+      else Fmt.(pf frmt "%s-satisfiability of (%a) is unknown." tinv.pvar.vname (box pp_ctex) ctex));
+  Solvers.close_solver cvc4_instance;
+  not (Solvers.is_unsat resp)
+
 (** Classify counterexamples into positive or negative counterexamples with respect
     to the Tinv predicate in the problem.
 *)
 let classify_ctexs ~(p : psi_def) (ctexs : ctex list) : ctex list * ctex list =
   let classify_with_tinv tinv =
-    let cvc4_instance = Solvers.make_cvc4_solver () in
-    Solvers.set_logic cvc4_instance "ALL";
-    Solvers.set_option cvc4_instance "quant-ind" "true";
-    Solvers.set_option cvc4_instance "incremental" "true";
-    Solvers.load_min_max_defs cvc4_instance;
-    (* Declare Tinv, repr and reference functions. *)
-    List.iter
-      ~f:(fun x -> ignore (Solvers.exec_command cvc4_instance x))
-      (smt_of_pmrs tinv
-      @ (if p.psi_repr_is_identity then [] else smt_of_pmrs p.psi_repr)
-      @ smt_of_pmrs p.psi_reference);
-
     (* TODO: DT_LIA for z3, DTLIA for cvc4... Should write a type to represent logics. *)
-    let f (ctex : ctex) =
-      let fv = Analysis.free_variables ctex.ctex_eqn.eterm in
-      (* Create the formula. *)
-      let formula =
-        let term_sat_tinv = mk_app_v tinv.pvar [ ctex.ctex_eqn.eterm ] in
-        let model_sat =
-          let f v =
-            let v_val = Map.find_exn ctex.ctex_model v.vid in
-            match
-              List.find
-                ~f:(fun (_, elimv) ->
-                  match elimv.tkind with TVar v' -> v.vid = v'.vid | _ -> false)
-                ctex.ctex_eqn.eelim
-            with
-            | Some (original_recursion_var, _) ->
-                let repr_of_v =
-                  if p.psi_repr_is_identity then original_recursion_var
-                  else mk_app_v p.psi_repr.pvar [ original_recursion_var ]
-                in
-                let ref_repr_v =
-                  mk_app_v p.psi_reference.pvar
-                    (List.map ~f:mk_var p.psi_reference.pargs @ [ repr_of_v ])
-                in
-                mk_bin Binop.Eq ref_repr_v v_val
-            | None -> mk_bin Binop.Eq (mk_var v) v_val
-          in
-          List.map ~f (Set.elements ctex.ctex_vars)
-        in
-        SmtLib.mk_assoc_and (List.map ~f:smt_of_term (term_sat_tinv :: model_sat))
-      in
-      Solvers.spush cvc4_instance;
-      SmtLib.(Solvers.smt_assert cvc4_instance (mk_exists (sorted_vars_of_vars fv) formula));
-      let resp = Solvers.check_sat cvc4_instance in
-      Solvers.spop cvc4_instance;
-      Log.verbose (fun frmt () ->
-          if Solvers.is_unsat resp then
-            Fmt.(pf frmt "(%a) does not satisfy %s." (box pp_ctex) ctex tinv.pvar.vname)
-          else if Solvers.is_unsat resp then
-            Fmt.(pf frmt "(%a) satisfies %s." (box pp_ctex) ctex tinv.pvar.vname)
-          else
-            Fmt.(pf frmt "%s-satisfiability of (%a) is unknown." tinv.pvar.vname (box pp_ctex) ctex));
-      not (Solvers.is_unsat resp)
-    in
-    let postives, negatives = List.partition_tf ~f ctexs in
-    Solvers.close_solver cvc4_instance;
-    (postives, negatives)
+    let f (ctex : ctex) = satisfies_tinv ~p tinv ctex in
+    let unknowns, negatives = List.partition_tf ~f ctexs in
+    (unknowns, negatives)
   in
   match p.psi_tinv with Some tinv -> classify_with_tinv tinv | None -> ([], [])
