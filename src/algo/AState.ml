@@ -119,6 +119,16 @@ let pp_equation (f : Formatter.t) (eqn : equation) =
           (styled (`Fg `Red) string)
           "=" pp_term eqn.erhs)
 
+let pp_ctex (f : Formatter.t) (ctex : ctex) : unit =
+  let pp_model frmt model =
+    (* Print as comma-separated list of variable -> term *)
+    Fmt.(list ~sep:comma (pair ~sep:Utils.rightarrow (option pp_variable) pp_term))
+      frmt
+      (List.map ~f:(fun (vid, t) -> (VarSet.find_by_id ctex.ctex_vars vid, t)) (Map.to_alist model))
+  in
+  Fmt.pf f "@[M = [%a]@]@;@[for %a@]@;@[with elim. %a@]" pp_model ctex.ctex_model pp_term
+    ctex.ctex_eqn.eterm pp_subs ctex.ctex_eqn.eelim
+
 let pp_implems (frmt : Formatter.t) (implems : (symbol * variable list * term) list) =
   let pp_single_or_tup frmt l =
     match l with

@@ -211,7 +211,14 @@ let classify_ctexs ~(p : psi_def) (ctexs : ctex list) : ctex list * ctex list =
       SmtLib.(Solvers.smt_assert cvc4_instance (mk_exists (sorted_vars_of_vars fv) formula));
       let resp = Solvers.check_sat cvc4_instance in
       Solvers.spop cvc4_instance;
-      Solvers.is_unsat resp
+      Log.verbose (fun frmt () ->
+          if Solvers.is_unsat resp then
+            Fmt.(pf frmt "(%a) does not satisfy %s." (box pp_ctex) ctex tinv.pvar.vname)
+          else if Solvers.is_unsat resp then
+            Fmt.(pf frmt "(%a) satisfies %s." (box pp_ctex) ctex tinv.pvar.vname)
+          else
+            Fmt.(pf frmt "%s-satisfiability of (%a) is unknown." tinv.pvar.vname (box pp_ctex) ctex));
+      not (Solvers.is_unsat resp)
     in
     let postives, negatives = List.partition_tf ~f ctexs in
     Solvers.close_solver cvc4_instance;
