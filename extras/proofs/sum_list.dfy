@@ -87,7 +87,6 @@ lemma sumLemma(x:clist, y:clist)
     case concat(x1, x2) => {
         match y
         case cnil => {
-            // sumLemma(x2, y);
             assert target(concat(x2, y)) == target(x2);
             sumLemma(x1, concat(x2, y));
             calc == {
