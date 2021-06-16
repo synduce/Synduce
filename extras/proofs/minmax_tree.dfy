@@ -30,7 +30,7 @@ function max(a:int, b:int): (x: int)
 function g(s: (int, int), t: tree): (out: (int, int))
     decreases t
     ensures out.0 == min(s.0, h(t).0)
-    ensures out.1 == min(s.1, h(t).1)
+    ensures out.1 == max(s.1, h(t).1)
 {
     match t
     case Leaf(x) =>
@@ -91,7 +91,8 @@ ensures target(t).1 == spec(rep(t)).1
     {}
     case Node(a, l, r)=>
     {
-
+        maxLemma(l);
+        maxLemma(r);
     }
 }
 
