@@ -1,0 +1,13 @@
+
+let join x3 x4 = x4 × x3
+
+let j2 x5 x6 = x6 × x5
+
+target⟨join, j2⟩(): int ptree -> int  = 
+{
+  ‣ main  PNil  ⟹  1
+  ‣ main  PNode(a, l)  ⟹  join a (sum l)
+    sum  LNil  ⟹  1
+    sum  Cons(hd, tl)  ⟹  j2 (main hd) (sum tl)
+  
+  }

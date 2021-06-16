@@ -1,0 +1,12 @@
+
+let f0 x = x
+
+let join x0 x1 x2 = max (max x0 x1) (max x0 x2)
+
+target⟨join, f0⟩(): int tree -> int  = 
+{
+  ‣ main t1   ⟹  h t1
+    h  Leaf(x)  ⟹  f0 x
+    h  Node(a, l, r)  ⟹  join a (h l) (h r)
+  
+  }

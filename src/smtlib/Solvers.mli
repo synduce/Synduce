@@ -2,12 +2,6 @@ open Base
 module OC = Stdio.Out_channel
 module IC = Stdio.In_channel
 
-val log_queries : bool ref
-
-val solve_verbose : bool ref
-
-val log_file : string
-
 type solver_response = SmtLib.solver_response
 
 val is_sat : solver_response -> bool
@@ -21,6 +15,8 @@ type online_solver = {
   s_outputc : IC.t;
   mutable s_scope_level : int;
   s_declared : (string, int) Base.Hashtbl.t;
+  s_log_file : string;
+  s_log_outc : OC.t;
 }
 
 val exec_command : online_solver -> SmtLib.command -> solver_response
@@ -54,6 +50,8 @@ val get_model : online_solver -> solver_response
 val load_min_max_defs : online_solver -> unit
 
 val set_logic : online_solver -> string -> unit
+
+val set_option : online_solver -> string -> string -> unit
 
 val smt_assert : online_solver -> SmtLib.smtTerm -> unit
 

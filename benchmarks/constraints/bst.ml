@@ -2,7 +2,7 @@ type 'a tree = Leaf of 'a | Node of 'a * 'a tree * 'a tree
 
 let rec tree_min = function Leaf x -> x | Node (a, l, r) -> min a (min (tree_min l) (tree_min r))
 
-let rec tree_max = function Leaf x -> x | Node (a, l, r) -> max a (min (tree_min l) (tree_min r))
+let rec tree_max = function Leaf x -> x | Node (a, l, r) -> max a (min (tree_max l) (tree_max r))
 
 let rec is_bst t = aux (tree_max t) (tree_min t) t
 
@@ -18,7 +18,7 @@ let spec x t =
     | Node (a, l, r) -> if a < x then 1 + f l + f r else f l + f r
   in
   f t
-  [@@ensures fun x -> x >= 0] [@@requires is_bst]
+  [@@ensures fun x -> x >= 0]
 
 let target y t =
   let rec g = function
@@ -26,3 +26,4 @@ let target y t =
     | Node (a, l, r) -> if a < y then [%synt xi_1] (g l) (g r) else [%synt xi_2] (g l)
   in
   g t
+  [@@requires is_bst]

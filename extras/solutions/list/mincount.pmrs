@@ -1,0 +1,13 @@
+
+let s_0  = 0
+
+let odot (j, j0) (j1, j2) = (min j j1, j = j1 ? j0 + j2 : j1 > j ? j0 : j2)
+
+let f_0 x = (x, 1)
+
+target⟨odot, f_0, s_0⟩(l): int clist -> (int * int)  = 
+{
+  ‣ h  Single(a)  ⟹  f_0 a
+  ‣ h  Concat(x, y)  ⟹  odot (h x) (h y)
+  
+  }

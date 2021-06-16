@@ -5,26 +5,6 @@ open Utils
 module OC = Stdio.Out_channel
 module IC = Stdio.In_channel
 
-(* Logging utilities. *)
-let log_queries = ref true
-
-let solve_verbose = ref false
-
-let log_file = "/tmp/solver.smt2"
-
-let log_out = ref None
-
-let open_log () = log_out := Some (OC.create log_file)
-
-let log c =
-  match !log_out with
-  | Some oc -> write_command oc c
-  | None -> (
-      open_log ();
-      match !log_out with
-      | Some oc -> write_command oc c
-      | None -> Log.(error (wrap "Failed to open log file.")))
-
 (* Solver response and other types. *)
 type solver_response = SmtLib.solver_response
 
@@ -39,7 +19,27 @@ type online_solver = {
   s_outputc : IC.t;
   mutable s_scope_level : int;
   s_declared : (string, int) Hashtbl.t;
+  s_log_file : string;
+  s_log_outc : OC.t;
 }
+
+(* Logging utilities. *)
+
+let log_out = ref None
+
+let open_log () = log_out := Some (OC.create !Config.smt_solver_log_file)
+
+let log ?(solver = None) c =
+  match solver with
+  | Some s -> write_command s.s_log_outc c
+  | None -> (
+      match !log_out with
+      | Some oc -> write_command oc c
+      | None -> (
+          open_log ();
+          match !log_out with
+          | Some oc -> write_command oc c
+          | None -> Log.(error (wrap "Failed to open log file."))))
 
 let solver_write (solver : online_solver) (c : command) : unit =
   write_command solver.s_inputc c;
@@ -48,11 +48,23 @@ let solver_write (solver : online_solver) (c : command) : unit =
 
 let solver_read (solver : online_solver) : solver_response =
   let l =
-    try Sexp.input_sexp solver.s_outputc
+    try Ok (Sexp.input_sexp solver.s_outputc)
     with Sys_error _ ->
-      failwith Fmt.(str "%s:%s:%s" Caml.__FILE__ "solver_read" "Couldn't read solver answer.")
+      Error (Sexp.List [ Atom "solver_read"; Atom "Couldn't read solver answer." ])
   in
-  parse_response [ l ]
+  match Result.map ~f:(fun l -> parse_response [ l ]) l with
+  | Ok r -> r
+  | Error sexps -> SExps [ Atom "error"; sexps ]
+
+let already_declared (solver : online_solver) (s : smtSymbol) : bool =
+  match Hashtbl.find solver.s_declared (str_of_symb s) with
+  | Some _ ->
+      (* Do not write command if variable is already declared. *)
+      true
+  | None -> false
+
+let solver_declare (solver : online_solver) (s : smtSymbol) : unit =
+  Hashtbl.set solver.s_declared ~key:(str_of_symb s) ~data:solver.s_scope_level
 
 let exec_command (solver : online_solver) (c : command) =
   (* Guard execution of command for declarations and keep track of scope level and declared
@@ -65,14 +77,21 @@ let exec_command (solver : online_solver) (c : command) =
     | DeclareConst (s, _)
     | DefineFunRec (s, _, _, _)
     | DefineFun (s, _, _, _)
-    | DeclareFun (s, _, _) -> (
-        match Hashtbl.find solver.s_declared (str_of_symb s) with
-        | Some _ ->
-            (* Do not write command if variable is already declared. *)
-            false
-        | None ->
-            Hashtbl.set solver.s_declared ~key:(str_of_symb s) ~data:solver.s_scope_level;
-            true)
+    | DeclareFun (s, _, _) ->
+        if already_declared solver s then false
+        else (
+          solver_declare solver s;
+          true)
+    | DefineFunsRec (decls, _) ->
+        if List.exists ~f:(fun (a, _, _) -> already_declared solver a) decls then false
+        else (
+          List.iter ~f:(fun (a, _, _) -> solver_declare solver a) decls;
+          true)
+    | DeclareDatatypes (sl, _) ->
+        if List.exists ~f:(fun (a, _) -> already_declared solver a) sl then false
+        else (
+          List.iter ~f:(fun (a, _) -> solver_declare solver a) sl;
+          true)
     | Push i ->
         solver.s_scope_level <- solver.s_scope_level + i;
         true
@@ -83,7 +102,7 @@ let exec_command (solver : online_solver) (c : command) =
     | _ -> true
   in
   if do_exec then (
-    if !log_queries then log c;
+    if !Config.smt_log_queries then log ~solver:(Some solver) c;
     solver_write solver c;
     solver_read solver)
   else Error (Fmt.str "Variable already declared")
@@ -96,9 +115,11 @@ let handle_sigchild (_ : int) : unit =
   if List.length !online_solvers = 0 then ignore @@ Unix.waitpid [] (-1)
   else
     let pid, _ = Unix.waitpid [] (-1) in
-    (if !solve_verbose then Fmt.(pf stdout "[WARNING] Solver (pid %d) exited!@." pid));
+    if !Config.smt_solve_verbose then Log.error_msg (Fmt.str "Solver (pid %d) exited!" pid);
     match List.Assoc.find !online_solvers ~equal:( = ) pid with
     | Some solver ->
+        if !Config.smt_solve_verbose then
+          Log.debug_msg (Fmt.str "Solver %s logged in %s" solver.s_name solver.s_log_file);
         IC.close solver.s_outputc;
         OC.close solver.s_inputc
     | None -> ()
@@ -121,6 +142,7 @@ let make_solver ~(name : string) (path : string) (options : string array) : onli
   let out_chan = out_channel_of_descr solver_stdin_writer in
   OC.set_binary_mode out_chan false;
   IC.set_binary_mode in_chan false;
+  let log_file = Caml.Filename.temp_file (name ^ "_") ".smt2" in
   let solver =
     {
       s_name = name;
@@ -129,6 +151,8 @@ let make_solver ~(name : string) (path : string) (options : string array) : onli
       s_outputc = in_chan;
       s_declared = Hashtbl.create (module String);
       s_scope_level = 0;
+      s_log_file = log_file;
+      s_log_outc = OC.create log_file;
     }
   in
   online_solvers := (pid, solver) :: !online_solvers;
@@ -139,8 +163,15 @@ let make_solver ~(name : string) (path : string) (options : string array) : onli
   with Sys_error s -> failwith ("couldn't talk to solver, double-check path. Sys_error " ^ s)
 
 let close_solver solver =
+  Log.debug
+    Fmt.(
+      fun fmt () ->
+        pf fmt "Closing %s, log can be found in %a" solver.s_name
+          (styled (`Fg `Blue) string)
+          solver.s_log_file);
   OC.output_string solver.s_inputc (Sexp.to_string (sexp_of_command mk_exit));
-  IC.close solver.s_outputc
+  IC.close solver.s_outputc;
+  OC.close solver.s_log_outc
 
 (** Returns empty response if commands is empty, otherwise, executes the LAST command in the
     command list.
@@ -199,6 +230,9 @@ let load_min_max_defs s =
   ignore (exec_command s mk_min_def)
 
 let set_logic solver logic_id = ignore (exec_command solver (SetLogic (SSimple logic_id)))
+
+let set_option solver option_id option_value =
+  ignore (exec_command solver (SetOption (option_id, option_value)))
 
 let smt_assert s term = ignore (exec_command s (mk_assert term))
 

@@ -25,8 +25,8 @@ if [ -d "$HOME/.local/bin" ] ; then
 fi
 
 sep "Installing packages z3 and python3"
-sudo apt update
-sudo apt install z3 python3
+sudo apt-get update
+sudo apt-get install -y z3 python3
 
 sep "Installing CVC4"
 CVC4_VERSION=$(cvc4 --version | sed -n 's/^.*CVC4 version \([0-9]*.[0-9]*\).*$/\1/p')
@@ -35,7 +35,7 @@ then
     msg_fail "CVC4 not installed !"
     sep
     echo "Installing CVC4 1.8 in $HOME/.local/bin"
-    wget https://github.com/CVC4/CVC4/releases/download/1.8/cvc4-1.8-x86_64-linux-opt
+    wget -q https://github.com/CVC4/CVC4/releases/download/1.8/cvc4-1.8-x86_64-linux-opt
     sudo chmod u+x cvc4-1.8-x86_64-linux-opt
     mv cvc4-1.8-x86_64-linux-opt $HOME/.local/bin/cvc4
 else
@@ -59,9 +59,8 @@ then
     msg_fail "Opam not installed ! Trying to install opam..."
     sudo apt-get install opam
     eval $(opam config env)
-    opam init
-    opam install depext
-    opam config setup -a
+    opam init -a
+    opam install -y depext
     if [ $? -eq 0 ]; then
 	    msg_success "Opam installed"
 	    msg_success "If the script fails, check Opam is configured : opam config setup -a"
@@ -93,14 +92,17 @@ fi
 
 sep "Installing Ocaml dependencies"
 opam update
-opam install core
-opam install . --deps-only
+opam install -y core
+opam install -y . --deps-only
 
 sep "Compiling the tool..."
 make
 
-sep "Create link Synduce to _build/default/bin/Synduce.exe"
-ln -s _build/default/bin/Synduce.exe Synduce
+if [ -e Synduce ]
+then
+    sep "Create link Synduce to _build/default/bin/Synduce.exe"
+    ln -s _build/default/bin/Synduce.exe Synduce
+fi
 
 sep "Calling the tool, should print help message..."
 ./Synduce -h

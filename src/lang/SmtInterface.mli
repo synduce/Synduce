@@ -13,6 +13,11 @@ val smt_of_term : term -> SmtLib.smtTerm
       TODO: return a Result.t instead of failing.
  *)
 
+val sorted_vars_of_vars : VarSet.t -> SmtLib.smtSortedVar list
+(**
+      Convert a set of variables into a list of smt sorted vars.
+ *)
+
 val smt_of_pmrs : PMRS.t -> SmtLib.command list
 (**
       Convert a PMRS into a set of commands. Once the commands have been passed to the solver,

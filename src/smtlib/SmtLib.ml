@@ -51,7 +51,7 @@ and match_case = smtPattern * smtTerm
 
 and var_binding = smtSymbol * smtTerm
 
-type smdSortDec = smtSymbol * numeral
+type smtSortDec = smtSymbol * numeral
 
 type smtSelectorDec = smtSymbol * smtSort
 
@@ -59,7 +59,7 @@ type smtConstructorDec = smtSymbol * smtSelectorDec list
 
 type datatype_dec =
   | DDConstr of smtConstructorDec list
-  | DDPar of smtSymbol list * smtConstructorDec list
+  | DDParametric of smtSymbol list * smtConstructorDec list
 
 type func_dec = smtSymbol * smtSortedVar list * smtSort
 
@@ -77,7 +77,7 @@ type command =
   | CheckSatAssuming of prop_literal list
   | DeclareConst of smtSymbol * smtSort
   | DeclareDatatype of smtSymbol * datatype_dec
-  | DeclareDatatypes of smdSortDec list * datatype_dec list
+  | DeclareDatatypes of smtSortDec list * datatype_dec list
   | DeclareFun of smtSymbol * smtSort list * smtSort
   | DeclareSmtSort of smtSymbol * numeral
   | DefineFun of func_def
@@ -363,7 +363,7 @@ let sexp_of_smtConstructorDec ((s, sdecs) : smtConstructorDec) : t =
 let sexp_of_datatype_dec (dtdec : datatype_dec) : t =
   match dtdec with
   | DDConstr cd_list -> List (List.map ~f:sexp_of_smtConstructorDec cd_list)
-  | DDPar (symbs, cd_list) ->
+  | DDParametric (symbs, cd_list) ->
       List
         [
           Atom "par";
@@ -385,7 +385,7 @@ let sexp_of_func_def ((s, svs, srt, t) : func_def) : t list =
 let sexp_of_prop_literal (pl : prop_literal) : t =
   match pl with PL x -> sexp_of_smtSymbol x | PLNot x -> List [ Atom "not"; sexp_of_smtSymbol x ]
 
-let sexp_of_smtSortDec ((s, n) : smdSortDec) : t = List [ sexp_of_smtSymbol s; sexp_of_numeral n ]
+let sexp_of_smtSortDec ((s, n) : smtSortDec) : t = List [ sexp_of_smtSymbol s; sexp_of_numeral n ]
 
 let sexp_of_command (c : command) =
   match c with
@@ -455,7 +455,7 @@ let sexp_of_command (c : command) =
         List (Atom "simplify" :: sexp_of_smtTerm t :: List.concat (List.map ~f:sexps_of_option ol))
 
 let write_command (out : OC.t) (c : command) : unit =
-  let comm_s = Sexp.to_string (sexp_of_command c) in
+  let comm_s = Sexp.to_string_hum (sexp_of_command c) in
   OC.output_lines out [ comm_s ];
   OC.flush out
 
@@ -517,6 +517,8 @@ let mk_le t1 t2 = mk_simple_app "<=" [ t1; t2 ]
 let mk_ge t1 t2 = mk_simple_app ">=" [ t1; t2 ]
 
 let mk_not t1 = mk_simple_app "not" [ t1 ]
+
+let mk_exists (sorted_vars : smtSortedVar list) (term : smtTerm) = SmtTExists (sorted_vars, term)
 
 (* Commands *)
 let mk_assert (t : smtTerm) = Assert t

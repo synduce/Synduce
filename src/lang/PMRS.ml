@@ -289,3 +289,15 @@ let subst_rule_rhs ~(p : t) (substs : (term * term) list) =
     Map.map ~f p.prules
   in
   { p with prules = rules' }
+
+(**
+  Given an input PMRS, returns a list of PMRS that this PMRS depends on.
+  *)
+let depends (p : t) : t list =
+  let f (_, _, _, rule_body) =
+    let vars = Analysis.free_variables rule_body in
+    List.filter_map ~f:(fun v -> Hashtbl.find _globals v.vid) (Set.elements vars)
+  in
+  List.dedup_and_sort
+    ~compare:(fun p1 p2 -> String.compare p1.pvar.vname p2.pvar.vname)
+    (List.concat_map ~f (Map.data p.prules))

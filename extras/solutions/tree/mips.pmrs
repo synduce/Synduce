@@ -1,0 +1,12 @@
+
+let s0  = (0, 0)
+
+let join1 x5 (j, j0) (j1, j2) = (x5 + (j + j1), max j0 (x5 + (j + j2)))
+
+target⟨join1, s0⟩(): int tree -> (int * int)  = 
+{
+  ‣ main_mips t1   ⟹  mips t1
+    mips  Nil  ⟹  s0
+    mips  Node(a, l, r)  ⟹  join1 a (mips l) (mips r)
+  
+  }

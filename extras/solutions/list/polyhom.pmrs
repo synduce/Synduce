@@ -1,0 +1,13 @@
+
+let s0  = (0, 1)
+
+let odot x (j, j0) (j1, j2) = (j1 + (j × j2), j0 × j2)
+
+target⟨odot, s0⟩(x): int clist -> (int * int)  = 
+{
+  ‣ main t   ⟹  h t
+    h  CNil  ⟹  s0
+    h  Single(a)  ⟹  (a, x)
+    h  Concat(y, z)  ⟹  odot x (h y) (h z)
+  
+  }

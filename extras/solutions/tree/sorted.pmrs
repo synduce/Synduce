@@ -1,0 +1,10 @@
+
+let join x (j, j0) (j1, j2) = (x, ((j < x) && (x < j1)) && (j0 && j2))
+
+target⟨join⟩(): int tree -> (int * bool)  = 
+{
+  ‣ main t1   ⟹  h t1
+    h  Leaf(a)  ⟹  (a, true)
+    h  Node(a, l, r)  ⟹  join a (h l) (h r)
+  
+  }
