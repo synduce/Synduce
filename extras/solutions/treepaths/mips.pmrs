@@ -1,0 +1,14 @@
+
+let s0  = (0, 0)
+
+let joinl x23 (j, j0) (j1, j2) = (x23 + (j + j1), max j0 (x23 + (j + j2)))
+
+let joinr x29 (j3, j4) (j5, j6) = (x29 + (j3 + j5), max j6 (x29 + (j4 + j5)))
+
+target⟨s0, joinl, joinr⟩(): int zipper -> (int * int)  = 
+{
+  ‣ main  Top  ⟹  s0
+  ‣ main  Zip(Left, a, child, z)  ⟹  joinl a (spec child) (main z)
+  ‣ main  Zip(Right, a, child, z)  ⟹  joinr a (spec child) (main z)
+  
+  }

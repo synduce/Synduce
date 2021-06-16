@@ -18,6 +18,19 @@ let show_vars = ref false
 (** Toggle verbose messages. *)
 let verbose = ref false
 
+(** Optional output folder for solution.
+    If None, the solution is only printed on the standard output.
+    If Some path, the solution is written in path/inputfilename
+*)
+let output_folder : string option ref = ref None
+
+let set_output_folder s = output_folder := Some s
+
+let get_output_file s =
+  Option.map !output_folder ~f:(fun o_f ->
+      let base = Caml.Filename.basename s in
+      Caml.Filename.concat o_f base)
+
 (* ============================================================================================= *)
 (*                                TEMPORARY OPTIONS                                              *)
 (* ============================================================================================= *)

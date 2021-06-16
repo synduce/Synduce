@@ -1,0 +1,12 @@
+
+let s0  = (0, 0)
+
+let odot x11 (j, j0) (j1, j2) =
+  (x11 + (j + j1), max j0 (j + (max j2 (x11 + j1))))
+
+target⟨odot, s0⟩(): int tree -> (int * int)  = 
+{
+  ‣ search_tree  Empty  ⟹  s0
+  ‣ search_tree  Node(a, l, r)  ⟹  odot a (search_tree l) (search_tree r)
+  
+  }
