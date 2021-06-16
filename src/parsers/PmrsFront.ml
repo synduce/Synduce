@@ -214,16 +214,14 @@ let pmrs_of_rules loc (globs : (string, Term.variable) Hashtbl.t) (synt_objs : T
       {
         pvar;
         pargs = args;
+        pinput_typ = [ RType.TNamed "_?" ];
+        poutput_typ = RType.TNamed "_?";
+        pspec = { ensures = ensures_func; requires = _requires_func };
         psyntobjs = Term.VarSet.of_list synt_objs;
         pnon_terminals = nont;
         prules = rules;
         porder = -1;
         pmain_symb = main_symb;
-        pinput_typ = [ RType.TNamed "_?" ];
-        (* TODO: add requires *)
-        (* Will be replaced during type inference. *)
-        poutput_typ =
-          (RType.TNamed "_?", ensures_func) (* Will be replaced during type inference. *);
       }
   in
   PMRS.infer_pmrs_types pmrs0
@@ -283,7 +281,7 @@ let translate (prog : program) =
           let vargs = List.map ~f:Term.Variable.mk args in
           let fvar = Hashtbl.find_exn globals fname in
           let func_info = translate_function loc globals fvar vargs invariant body in
-          (match Hashtbl.add Term._globals ~key:fvar.vid ~data:func_info with
+          (match Hashtbl.add Term._globals ~key:fvar.vname ~data:func_info with
           | `Ok -> Log.verbose_msg ("Parsed " ^ fvar.vname)
           | `Duplicate -> Log.error_msg (fvar.vname ^ " already declared."));
           pmrses

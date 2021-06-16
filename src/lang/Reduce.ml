@@ -25,7 +25,7 @@ type func_resolution =
 let resolve_func (func : term) =
   match func.tkind with
   | TVar x -> (
-      match Hashtbl.find Term._globals x.vid with
+      match Hashtbl.find Term._globals x.vname with
       | Some (_, vargs, _, body) -> FRFun (vargs, body)
       | None -> (
           match Hashtbl.find PMRS._globals x.vid with

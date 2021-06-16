@@ -421,9 +421,11 @@ type termkind =
 
 and term = { tpos : position * position; tkind : termkind; ttyp : RType.t }
 
-let _globals : (int, Variable.t * fpattern list * term option * term) Hashtbl.t =
-  Hashtbl.create (module Int)
+let _globals : (string, Variable.t * fpattern list * term option * term) Hashtbl.t =
+  Hashtbl.create (module String)
 
+let find_global (s : string) =
+  match Hashtbl.find _globals s with Some (v, _, _, _) -> Some v | None -> None
 (* F-Patterns helpers *)
 
 let rec fpat_ty fp =

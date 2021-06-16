@@ -1,228 +1,11 @@
+open AState
 open Base
 open Lang
 open Lang.Term
-open AState
+open Projection
 open Syguslib.Sygus
 open SygusInterface
-open SmtInterface
-open Smtlib
 open Utils
-open Either
-module SmtI = SmtInterface
-
-type equation = {
-  eterm : term;  (** The term from which the equation originates. *)
-  eprecond : term option;  (** An optional precondition to the equation. *)
-  elhs : term;  (** The left-hand side of the equation, containing no unknowns. *)
-  erhs : term;  (** The right-hand side of the equation, possibly with unknowns. *)
-  eelim : (term * term) list;  (** The substitution used to eliminate recursion. *)
-}
-(**
-  Represents an equational constraint.
-*)
-
-let pp_equation (f : Formatter.t) (eqn : equation) =
-  match eqn.eprecond with
-  | Some inv ->
-      Fmt.(
-        pf f "@[<hov 2>E(%a)<%a> := @;@[<hov 2>%a %a@;@[%a@;%a@;%a@]@]@]"
-          (styled `Italic pp_term)
-          eqn.eterm pp_subs eqn.eelim pp_term inv
-          (styled (`Fg `Red) string)
-          "=>" pp_term eqn.elhs
-          (styled (`Fg `Red) string)
-          "=" pp_term eqn.erhs)
-  | None ->
-      Fmt.(
-        pf f "@[<hov 2>E(%a)<%a> := @;@[<hov 2>%a %a %a@]@]"
-          (styled `Italic pp_term)
-          eqn.eterm pp_subs eqn.eelim pp_term eqn.elhs
-          (styled (`Fg `Red) string)
-          "=" pp_term eqn.erhs)
-
-(* ============================================================================================= *)
-(*                        PROJECTION : OPTIMIZATION FOR TUPLES                                   *)
-(* ============================================================================================= *)
-
-let mk_projs (targs : RType.t list) (tl : RType.t list) (xi : Variable.t) =
-  let f i t = Variable.mk ~t:(Some (RType.fun_typ_pack targs t)) (xi.vname ^ Int.to_string i) in
-  List.mapi ~f tl
-
-let projection_eqns (lhs : term) (rhs : term) =
-  match (lhs.tkind, rhs.tkind) with
-  | TTup lhs_tl, TTup rhs_tl -> List.map ~f:(fun (r, l) -> (r, l)) (List.zip_exn lhs_tl rhs_tl)
-  | _ -> [ (lhs, rhs) ]
-
-(** [invar invariants lhs_e rhs_e] filters the terms in `invariants` that have no free variable
-  in common with  [lhs_e] or [rhs_e] and return the conjuction of all these invariants.
-  *)
-let invar invariants lhs_e rhs_e =
-  let f inv_expr =
-    not
-      (Set.is_empty
-         (Set.inter
-            (Set.union (Analysis.free_variables lhs_e) (Analysis.free_variables rhs_e))
-            (Analysis.free_variables inv_expr)))
-  in
-  let conjs = List.filter ~f (Set.elements invariants) in
-  mk_assoc Binop.And conjs
-
-let proj_and_detuple_eqns (projections : (int, variable list, Int.comparator_witness) Map.t)
-    (eqns : equation list) =
-  let apply_p = Analysis.apply_projections projections in
-  let f eqn =
-    let lhs' = apply_p eqn.elhs and rhs' = apply_p eqn.erhs in
-    let eqs = projection_eqns lhs' rhs' in
-    List.map ~f:(fun (_l, _r) -> { eqn with elhs = _l; erhs = _r }) eqs
-  in
-  List.concat (List.map ~f eqns)
-
-let proj_unknowns (unknowns : VarSet.t) =
-  let unknowns_projs, new_unknowns =
-    let f (l, vs) xi =
-      match Variable.vtype_or_new xi with
-      | RType.TFun _ -> (
-          let targs, tout = RType.fun_typ_unpack (Variable.vtype_or_new xi) in
-          match tout with
-          | TTup tl ->
-              let new_vs = mk_projs targs tl xi in
-              (l @ [ (xi, Some new_vs) ], Set.union vs (VarSet.of_list new_vs))
-          | _ -> (l @ [ (xi, None) ], Set.add vs xi))
-      | _ -> (l @ [ (xi, None) ], Set.add vs xi)
-    in
-    List.fold ~f ~init:([], VarSet.empty) (Set.elements unknowns)
-  in
-  let proj_map =
-    let mmap =
-      Map.of_alist
-        (module Int)
-        (List.map
-           ~f:(fun (x, p) -> (x.vid, p))
-           (* Only select relevant xi for projection *)
-           (List.filter_map
-              ~f:(fun (_x, _o) -> match _o with Some o -> Some (_x, o) | None -> None)
-              unknowns_projs))
-    in
-    match mmap with `Ok x -> x | `Duplicate_key _ -> failwith "Unexpected error while projecting."
-  in
-  (new_unknowns, proj_map)
-
-(* ============================================================================================= *)
-(*                               CHECKING UNREALIZABILITY                                        *)
-(* ============================================================================================= *)
-
-type unrealizability_ctex =
-  VarSet.t * (int, term, Int.comparator_witness) Map.t * (int, term, Int.comparator_witness) Map.t
-(** A counterexample to realizability is a pair of models: a pair of maps from variable ids to terms. *)
-
-let pp_unrealizability_ctex (frmt : Formatter.t) ((ctxt, m, m') : unrealizability_ctex) : unit =
-  let pp_model frmt model =
-    (* Print as comma-separated list of variable -> term *)
-    Fmt.(list ~sep:comma (pair ~sep:Utils.rightarrow (option Variable.pp) pp_term))
-      frmt
-      (List.map ~f:(fun (vid, t) -> (VarSet.find_by_id ctxt vid, t)) (Map.to_alist model))
-  in
-  Fmt.(pf frmt "@[M = [%a]@]@;@[M' = [%a]@]" pp_model m pp_model m')
-
-(** Check if system of equations defines a functionally realizable synthesis problem.
-  If any equation defines an unsolvable problem, an unrealizability_ctex is added to the
-  list of counterexamples to be returned.
-  If the returned list is empty, the problem may be solvable/realizable.
-  If the returned list is not empty, the problem is not solvable / unrealizable.
-*)
-let check_unrealizable (unknowns : VarSet.t) (eqns : equation list) : unrealizability_ctex list =
-  Log.info (fun f () -> Fmt.(pf f "Checking unrealizability..."));
-  let start_time = Unix.gettimeofday () in
-  let solver = Solvers.make_z3_solver () in
-  Solvers.load_min_max_defs solver;
-  (* Main part of the check, appliued to each equation in eqns. *)
-  let check_eqn_accum ctexs eqn =
-    let vset =
-      Set.diff
-        (Set.union (Analysis.free_variables eqn.elhs) (Analysis.free_variables eqn.erhs))
-        unknowns
-    in
-    let var_subst = VarSet.prime vset in
-    let vset' = VarSet.of_list (List.map ~f:snd var_subst) in
-    let sub = List.map ~f:(fun (v, v') -> (mk_var v, mk_var v')) var_subst in
-    (* Extract the arguments of the rhs, if it is a call to an unknown. *)
-    let maybe_rhs_args =
-      match eqn.erhs.tkind with
-      | TApp ({ tkind = TVar f_v; _ }, args) ->
-          if Set.mem unknowns f_v then
-            let fv_args = VarSet.union_list (List.map ~f:Analysis.free_variables args) in
-            (* Check there are no unknowns in the args. *)
-            if Set.are_disjoint fv_args unknowns then Some args else None
-          else None
-      | _ -> None
-    in
-    match maybe_rhs_args with
-    | None -> ctexs (* If we cannot match the expected structure, skip it. *)
-    | Some rhs_args ->
-        (* Building the constraints *)
-        let preconds = Option.map ~f:(fun pre -> (pre, substitution sub pre)) eqn.eprecond in
-        (* Checking. *)
-        Solvers.spush solver;
-        (* Declare the variables. *)
-        Solvers.declare_all solver (decls_of_vars (Set.union vset vset'));
-        (* Assert preconditions, if not none. *)
-        (match preconds with
-        | Some (pre, pre') ->
-            Solvers.smt_assert solver (smt_of_term pre);
-            Solvers.smt_assert solver (smt_of_term pre')
-        | None -> ());
-        (* The lhs must be different. **)
-        let lhs_diff = mk_un Not (mk_bin Eq eqn.elhs (substitution sub eqn.elhs)) in
-        Solvers.smt_assert solver (smt_of_term lhs_diff);
-        (* The rhs must be equal. *)
-        List.iter rhs_args ~f:(fun rhs_arg_term ->
-            let rhs_eq = mk_bin Eq rhs_arg_term (substitution sub rhs_arg_term) in
-            Solvers.smt_assert solver (smt_of_term rhs_eq));
-        let new_ctexs =
-          match Solvers.check_sat solver with
-          | Sat -> (
-              match Solvers.get_model solver with
-              | SExps s ->
-                  let model = model_to_constmap (SExps s) in
-                  let m0, m0' =
-                    Map.partitioni_tf
-                      ~f:(fun ~key ~data:_ -> Option.is_some (VarSet.find_by_name vset key))
-                      model
-                  in
-                  (* Remap the names to ids of the original variables in m' *)
-                  let m, m' =
-                    List.fold var_subst
-                      ~init:(Map.empty (module Int), Map.empty (module Int))
-                      ~f:(fun (m, m') (v, v') ->
-                        Variable.free v';
-                        ( (match Map.find m0 v.vname with
-                          | Some data -> Map.set m ~key:v.vid ~data
-                          | None -> m),
-                          match Map.find m0' v'.vname with
-                          | Some data -> Map.set m' ~key:v.vid ~data
-                          | None -> m' ))
-                  in
-
-                  (vset, m, m') :: ctexs
-              | _ -> ctexs)
-          | _ -> ctexs
-        in
-        Solvers.spop solver;
-        new_ctexs
-  in
-  let ctexs = List.fold ~f:check_eqn_accum ~init:[] eqns in
-  Solvers.close_solver solver;
-  let elapsed = Unix.gettimeofday () -. start_time in
-  Log.info (fun f () -> Fmt.(pf f "... finished in %3.4fs" elapsed));
-  Log.debug (fun f () ->
-      match ctexs with
-      | [] -> Fmt.pf f "No counterexample to realizability found."
-      | _ :: _ ->
-          Fmt.(
-            pf f "Counterexamples found:@;@[<hov 2>%a@]"
-              (list ~sep:sp pp_unrealizability_ctex)
-              ctexs));
-  ctexs
 
 (* ============================================================================================= *)
 (*                               BUILDING SYSTEMS OF EQUATIONS                                   *)
@@ -240,27 +23,27 @@ let check_equation ~(p : psi_def) (eqn : equation) : bool =
 (**
    Compute the left hand side of an equation of p from term t.
    The result is a maximally reduced term with some applicative
-   terms of the form (p.orig x) where x is a variable.
+   terms of the form (p.psi_reference x) where x is a variable.
 *)
 let compute_lhs p t =
-  let t' = Reduce.reduce_pmrs p.repr t in
-  let r_t = Expand.replace_rhs_of_main p p.repr t' in
+  let t' = Reduce.reduce_pmrs p.psi_repr t in
+  let r_t = Expand.replace_rhs_of_main p p.psi_repr t' in
   let subst_params =
-    let l = List.zip_exn p.orig.pargs p.target.pargs in
+    let l = List.zip_exn p.psi_reference.pargs p.psi_target.pargs in
     List.map l ~f:(fun (v1, v2) -> (mk_var v1, mk_var v2))
   in
-  let f_r_t = Reduce.reduce_pmrs p.orig r_t in
+  let f_r_t = Reduce.reduce_pmrs p.psi_reference r_t in
   let final = substitution subst_params f_r_t in
   Expand.replace_rhs_of_mains p (Reduce.reduce_term final)
 
 let remap_rec_calls p t =
-  let g = p.target in
+  let g = p.psi_target in
   let t' = Expand.replace_rhs_of_main p g t in
   let f a _t =
     match _t.tkind with
     | TApp ({ tkind = TVar x; _ }, args) ->
         if a && Variable.equal x g.pmain_symb then
-          match args with [ arg ] -> First (compute_lhs p arg) | _ -> Second a
+          match args with [ arg ] -> Either.First (compute_lhs p arg) | _ -> Either.Second a
         else if Set.mem g.psyntobjs x then Second true
         else Second a
     | _ -> Second a
@@ -269,7 +52,7 @@ let remap_rec_calls p t =
   if Term.term_equal res t' then t (* Don't revert step taken before *) else res
 
 let compute_rhs_with_replacing p t =
-  let g = p.target in
+  let g = p.psi_target in
   let custom_reduce x =
     let one_step t0 =
       let rstep = ref false in
@@ -299,10 +82,13 @@ let compute_rhs_with_replacing p t =
 let compute_rhs ?(force_replace_off = false) p t =
   if not force_replace_off then compute_rhs_with_replacing p t
   else
-    let res = Expand.replace_rhs_of_mains p (Reduce.reduce_term (Reduce.reduce_pmrs p.target t)) in
+    let res =
+      Expand.replace_rhs_of_mains p (Reduce.reduce_term (Reduce.reduce_pmrs p.psi_target t))
+    in
     res
 
-let make ?(force_replace_off = false) ~(p : psi_def) (tset : TermSet.t) : equation list =
+let make ?(force_replace_off = false) ~(p : psi_def) ~(lemmas : lemma) (tset : TermSet.t) :
+    equation list =
   let eqns =
     let fold_f eqns t =
       let lhs = compute_lhs p t in
@@ -343,56 +129,42 @@ let make ?(force_replace_off = false) ~(p : psi_def) (tset : TermSet.t) : equati
                | [] -> None
                | x :: _ -> Some (mk_var x, t_scalar)))
       in
+      let precond_from_lemmas =
+        match Map.find lemmas.lem_map eterm with
+        | Some lemma_for_eterm ->
+            let t = Reduce.reduce_term (applic lemma_for_eterm) in
+            Some t
+        | None -> None
+      in
       (* If possible project equation of tuples into tuple of equations. *)
       let projs = projection_eqns lhs'' rhs'' in
       List.map
         ~f:(fun (elhs, erhs) ->
           (* Select the relevant preconditions. *)
-          let eprecond = invar invariants elhs erhs in
+          let eprecond =
+            match invar invariants elhs erhs with
+            | Some im_f -> (
+                match precond_from_lemmas with
+                | Some pl -> Some (mk_bin And im_f pl)
+                | None -> Some im_f)
+            | None -> precond_from_lemmas
+          in
           { eterm; eprecond; elhs; erhs; eelim })
         projs
     in
     List.concat (List.map ~f eqns)
   in
-  let eqns_with_invariants =
-    let f eqn =
-      let env =
-        VarSet.to_env
-          (Set.diff
-             (Set.union (Analysis.free_variables eqn.elhs) (Analysis.free_variables eqn.erhs))
-             p.target.psyntobjs)
-      in
-      Log.info (fun frmt () ->
-          Fmt.pf frmt "Please provide a constraint for \"@[%a@]\"." pp_equation eqn);
-      match Stdio.In_channel.input_line Stdio.stdin with
-      | None | Some "" ->
-          Log.info (fun frmt () -> Fmt.pf frmt "No additional constraint provided.");
-          eqn
-      | Some x -> (
-          let sexpr = Sexplib.Sexp.of_string x in
-          let smtterm = Smtlib.SmtLib.smtTerm_of_sexp sexpr in
-          let pred_term = SmtInterface.term_of_smt env in
-          let term x =
-            match eqn.eprecond with
-            | None -> pred_term x
-            | Some inv ->
-                { tpos = inv.tpos; tkind = TBin (Binop.And, inv, pred_term x); ttyp = inv.ttyp }
-          in
-          match smtterm with None -> eqn | Some x -> { eqn with eprecond = Some (term x) })
-    in
-    if !Config.interactive_lemmas then List.map ~f pure_eqns else pure_eqns
-  in
   Log.verbose (fun f () ->
-      let print_less = List.take eqns_with_invariants !Config.pp_eqn_count in
+      let print_less = List.take pure_eqns !Config.pp_eqn_count in
       Fmt.(
         pf f "Equations > make (%i) @." (Set.length tset);
         List.iter ~f:(fun eqn -> Fmt.pf f "@[%a@]@." pp_equation eqn) print_less));
 
-  match List.find ~f:(fun eq -> not (check_equation ~p eq)) eqns_with_invariants with
+  match List.find ~f:(fun eq -> not (check_equation ~p eq)) pure_eqns with
   | Some not_pure ->
       Log.error_msg Fmt.(str "Not pure: %a" pp_equation not_pure);
       failwith "Equation not pure."
-  | None -> eqns_with_invariants
+  | None -> pure_eqns
 
 let revert_projs (orig_xi : VarSet.t)
     (projections : (int, variable list, Int.comparator_witness) Map.t)
@@ -439,8 +211,9 @@ let revert_projs (orig_xi : VarSet.t)
 (* ============================================================================================= *)
 (*                               SOLVING SYSTEMS OF EQUATIONS                                    *)
 (* ============================================================================================= *)
+type partial_soln = (string * variable list * term) list
 
-let pp_soln (f : Formatter.t) soln =
+let pp_partial_soln (f : Formatter.t) soln =
   Fmt.(
     list ~sep:comma (fun fmrt (s, args, bod) ->
         match args with
@@ -451,12 +224,14 @@ let pp_soln (f : Formatter.t) soln =
     f soln
 
 let combine ?(verb = false) prev_sol new_response =
-  match (prev_sol, new_response) with
-  | Some soln, (resp, Some soln') ->
-      if verb then Log.debug_msg Fmt.(str "Partial solution:@;@[<hov 2>%a@]" pp_soln soln');
-      (resp, Some (soln @ soln'))
-  | _, (resp, None) -> (resp, None)
-  | None, (resp, _) -> (resp, None)
+  Either.(
+    match (prev_sol, new_response) with
+    | First soln, (resp, First soln') ->
+        if verb then
+          Log.debug_msg Fmt.(str "Partial solution:@;@[<hov 2>%a@]" pp_partial_soln soln');
+        (resp, First (soln @ soln'))
+    | Second ctexs, (resp, Second ctexs') -> (resp, Second (ctexs @ ctexs'))
+    | Second ctexs, (resp, First _) | First _, (resp, Second ctexs) -> (resp, Second ctexs))
 
 let solve_syntactic_definitions (unknowns : VarSet.t) (eqns : equation list) =
   (* Are all arguments free? *)
@@ -522,7 +297,7 @@ let solve_syntactic_definitions (unknowns : VarSet.t) (eqns : equation list) =
     List.map ~f:(fun (x, (lhs_args, lhs_body)) -> (x.vname, lhs_args, lhs_body)) full_defs
   in
   if List.length partial_soln > 0 then
-    Log.debug_msg Fmt.(str "Syntactic definition:@;@[<hov 2>%a@]" pp_soln partial_soln);
+    Log.debug_msg Fmt.(str "Syntactic definition:@;@[<hov 2>%a@]" pp_partial_soln partial_soln);
   (partial_soln, Set.diff unknowns resolved, new_eqns)
 
 let synthfuns_of_unknowns ?(bools = false) ?(eqns = []) ?(ops = OpSet.empty) (unknowns : VarSet.t) =
@@ -567,7 +342,8 @@ let constraints_of_eqns (eqns : equation list) : command list =
   in
   List.map ~f:eqn_to_constraint detupled_equations
 
-let solve_eqns (unknowns : VarSet.t) (eqns : equation list) =
+let solve_eqns (unknowns : VarSet.t) (eqns : equation list) :
+    solver_response * (partial_soln, Counterexamples.unrealizability_ctex list) Either.t =
   let aux_solve () =
     let free_vars, all_operators, has_ite =
       let f (fvs, ops, hi) eqn =
@@ -616,25 +392,27 @@ let solve_eqns (unknowns : VarSet.t) (eqns : equation list) =
       match resp with
       | RSuccess resps ->
           let soln = List.map ~f:parse_synth_fun resps in
-          (resp, Some soln)
-      | RInfeasible -> (RInfeasible, None)
-      | RFail -> (RFail, None)
-      | RUnknown -> (RUnknown, None)
+          (resp, Either.First soln)
+      | RInfeasible -> (RInfeasible, Either.Second [])
+      | RFail -> (RFail, Either.Second [])
+      | RUnknown -> (RUnknown, Either.Second [])
     in
     match Syguslib.Solvers.SygusSolver.solve_commands commands with
     | Some resp -> handle_response resp
-    | None -> (RFail, None)
+    | None -> (RFail, Either.Second [])
   in
   if !Config.check_unrealizable then
-    match check_unrealizable unknowns eqns with [] -> aux_solve () | _ :: _ -> (RInfeasible, None)
+    match Counterexamples.check_unrealizable unknowns eqns with
+    | [] -> aux_solve ()
+    | _ as ctexs -> (RInfeasible, Either.Second ctexs)
   else aux_solve ()
 
 let solve_eqns_proxy (unknowns : VarSet.t) (eqns : equation list) =
   if !Config.use_syntactic_definitions then
     let partial_soln, new_unknowns, new_eqns = solve_syntactic_definitions unknowns eqns in
     if Set.length new_unknowns > 0 then
-      combine (Some partial_soln) (solve_eqns new_unknowns new_eqns)
-    else (RSuccess [], Some partial_soln)
+      combine (Either.First partial_soln) (solve_eqns new_unknowns new_eqns)
+    else (RSuccess [], Either.First partial_soln)
   else solve_eqns unknowns eqns
 
 (* Solve the trivial equations first, avoiding the overhead from the
@@ -659,7 +437,7 @@ let solve_constant_eqns (unknowns : VarSet.t) (eqns : equation list) =
   in
   let partial_soln = List.map ~f:(fun (x, lhs) -> (x.vname, [], lhs)) constant_soln in
   if List.length partial_soln > 0 then
-    Log.debug_msg Fmt.(str "Constant:@;@[<hov 2>%a@]" pp_soln partial_soln);
+    Log.debug_msg Fmt.(str "Constant:@;@[<hov 2>%a@]" pp_partial_soln partial_soln);
   (partial_soln, Set.diff unknowns resolved, new_eqns)
 
 let split_solve partial_soln (unknowns : VarSet.t) (eqns : equation list) =
@@ -694,7 +472,7 @@ let split_solve partial_soln (unknowns : VarSet.t) (eqns : equation list) =
     if Set.length u > 0 then combine ~verb:true prev_sol (solve_eqns_proxy u e)
     else (prev_resp, prev_sol)
   in
-  List.fold split_eqn_systems ~init:(RSuccess [], Some partial_soln)
+  List.fold split_eqn_systems ~init:(RSuccess [], Either.First partial_soln)
     ~f:(fun (prev_resp, prev_sol) (u, e) -> solve_eqn_aux prev_resp prev_sol u e)
 
 let solve_stratified (unknowns : VarSet.t) (eqns : equation list) =
@@ -709,19 +487,21 @@ let solve_stratified (unknowns : VarSet.t) (eqns : equation list) =
   in
   if !Config.split_solve_on then split_solve psol u e
   else
-    match solve_eqns u e with
-    | resp, Some soln -> (resp, Some (psol @ soln))
-    | resp, None -> (resp, None)
+    Either.(
+      match solve_eqns u e with
+      | resp, First soln -> (resp, First (psol @ soln))
+      | resp, Second ctexs -> (resp, Second ctexs))
 
 (* ============================================================================================= *)
 (*                               PREPROCESSING SYSTEM OF EQUATIONS                               *)
 (* ============================================================================================= *)
-type partial_soln = (string * variable list * term) list
 
 type preprocessing_action_result =
   VarSet.t
   * equation list
-  * (solver_response * partial_soln option -> solver_response * partial_soln option)
+  * (solver_response * (partial_soln, Counterexamples.unrealizability_ctex list) Either.t ->
+    solver_response * (partial_soln, Counterexamples.unrealizability_ctex list) Either.t)
+
 (** A preprocessing action should return a new system of equations,
    and optionally a new set of unknowns together with a postprocessing function. *)
 
@@ -734,13 +514,14 @@ let preprocess_detuple (unknowns : VarSet.t) (eqns : equation list) : preprocess
   let new_unknowns, projections = proj_unknowns unknowns in
   let new_eqns = proj_and_detuple_eqns projections eqns in
   let postprocessing (resp, soln) =
-    match soln with
-    | Some soln ->
-        let soln =
-          if Map.length projections > 0 then revert_projs unknowns projections soln else soln
-        in
-        (resp, Some soln)
-    | None -> (resp, None)
+    Either.(
+      match soln with
+      | First soln ->
+          let soln =
+            if Map.length projections > 0 then revert_projs unknowns projections soln else soln
+          in
+          (resp, First soln)
+      | Second ctexs -> (resp, Second ctexs))
   in
   (new_unknowns, new_eqns, postprocessing)
 
@@ -779,10 +560,13 @@ let preprocess_deconstruct_if (unknowns : VarSet.t) (eqns : equation list) :
 (*                              MAIN ENTRY POINT                                                 *)
 (* ============================================================================================= *)
 
-(** Main entry point: solve a ssytem of equations by synthesizing the unknowns.
+(** Main entry point: solve a ssytem of equations by synthesizing the unknowns. Returns either a
+  solution as a list of implementations for the unknowns (a triple of unknown name, arguments of a
+  function and body of a function) or a list of unrealizability counterexamples.
 *)
-let solve ~(p : psi_def) (eqns : equation list) =
-  let unknowns = p.target.psyntobjs in
+let solve ~(p : psi_def) (eqns : equation list) :
+    solver_response * (partial_soln, Counterexamples.unrealizability_ctex list) Either.t =
+  let unknowns = p.psi_target.psyntobjs in
   let preprocessing_actions =
     [
       preprocess_deconstruct_if;
@@ -801,7 +585,9 @@ let solve ~(p : psi_def) (eqns : equation list) =
     List.fold postprocessing_actions ~init:(solve_stratified unknowns' eqns')
       ~f:(fun partial_solution post_act -> post_act partial_solution)
   in
-  (match soln_final with
-  | _, Some soln -> Utils.Log.debug_msg Fmt.(str "@[<hov 2>Solution found: @;%a" pp_soln soln)
-  | _ -> ());
+  Either.(
+    match soln_final with
+    | _, First soln ->
+        Utils.Log.debug_msg Fmt.(str "@[<hov 2>Solution found: @;%a" pp_partial_soln soln)
+    | _ -> ());
   soln_final

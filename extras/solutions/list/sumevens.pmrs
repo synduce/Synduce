@@ -1,0 +1,15 @@
+
+let s_0  = 0
+
+let f_0 x = (x % 2) = 0 ? x : 0
+
+let odot x0 x1 = x1 + x0
+
+target⟨odot, f_0, s_0⟩(l): int clist -> int  = 
+{
+  ‣ target t   ⟹  h t
+    h  CNil  ⟹  s_0
+    h  Single(a)  ⟹  f_0 a
+    h  Concat(x, y)  ⟹  odot (h x) (h y)
+  
+  }

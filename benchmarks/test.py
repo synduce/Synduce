@@ -119,12 +119,12 @@ benchmark_set = [
     ["list_to_tree/search.pmrs", ""],
     ["list_to_tree/search_v2.pmrs", ""],
     ["list_to_tree/search_v3.pmrs", ""],
-    # ["list_to_tree/mls.pmrs", ""]
-    # ["list/maxhom.pmrs", ""],
-    # ["list/sumodds.pmrs", ""],
-    # ["list/sumgt.pmrs", ""],
-    # ["list/sndminhom.pmrs", ""],
-    #  ["list/mincount.pmrs", ""],
+    ["list_to_tree/mls.pmrs", ""],
+    ["list/maxhom.pmrs", ""],
+    ["list/sumodds.pmrs", ""],
+    ["list/sumgt.ml", ""],
+    ["list/sndminhom.pmrs", ""],
+    ["list/mincount.pmrs", ""],
 ]
 
 root = os.getcwd()
@@ -136,7 +136,11 @@ sys.stdout.flush()
 if __name__ == "__main__":
     if len(sys.argv) > 1:
         table_no = int(sys.argv[1])
-        if table_no == 1:
+        if table_no == -1:
+            algos = [["requation", ""]]
+            optims = [["all", ""]]
+
+        elif table_no == 1:
             # Table 1 : compare Synduce and Baseline
             algos = [
                     ["requation", "--no-gropt"],
@@ -168,7 +172,11 @@ if __name__ == "__main__":
             ]
     else:
         print(
-            "Usage:python3 test.py TABLE_NO [USE_REDUCED_SET]\n\tRun the experiments to generate data for table TABLE_NO (1, 2, or 3).\n\tIf an additional argument is provided, only a reduced set of benchmarks is run.\n\t\tUSE_REDUCED_SET=0 kick-the-tire benchmarks set\n\t\tUSE_REDUCE_SET !=0 reduced set of benchmarks\n")
+            "Usage:python3 test.py TABLE_NO [USE_REDUCED_SET]\n\
+            \tRun the experiments to generate data for table TABLE_NO (1, 2, or 3) or -1 for running tests.\n\
+            \tIf an additional argument is provided, only a reduced set of benchmarks is run.\n\
+            \t\tUSE_REDUCED_SET=0 kick-the-tire benchmarks set\n\
+            \t\tUSE_REDUCE_SET !=0 reduced set of benchmarks\n")
         exit()
 
     if len(sys.argv) > 2:
@@ -187,11 +195,20 @@ if __name__ == "__main__":
 
     for filename_with_opt in input_files:
         filename = filename_with_opt[0]
+        category = filename.split("/")[0]
         extra_opt = filename_with_opt[1]
         for algo in algos:
             for optim in optims:
                 print("B:%s,%s+%s" % (filename, algo[0], optim[0]))
                 sys.stdout.flush()
-                os.system("%s %s %s -i %s %s %s" %
-                          (timeout, exec_path, algo[1], optim[1], extra_opt,
-                           os.path.realpath(os.path.join("benchmarks", filename))))
+                if table_no > 0:
+                    os.system("%s %s %s -i %s %s %s" %
+                              (timeout, exec_path, algo[1], optim[1], extra_opt,
+                               os.path.realpath(os.path.join("benchmarks", filename))))
+                else:
+                    os.system("%s %s %s -i %s %s %s -o %s" %
+                              (timeout, exec_path, algo[1], optim[1], extra_opt,
+                               os.path.realpath(os.path.join(
+                                   "benchmarks", filename)),
+                               "extras/solutions/%s/" % category
+                               ))

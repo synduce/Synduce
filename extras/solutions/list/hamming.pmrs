@@ -1,0 +1,15 @@
+
+let s0  = 0
+
+let f0 x x0 = x = x0 ? 0 : 1
+
+let odot x1 x2 = x1 + x2
+
+target⟨odot, f0, s0⟩(l): int zipclist -> int  = 
+{
+  ‣ target t   ⟹  h t
+    h  CNil  ⟹  s0
+    h  Single(a1, a2)  ⟹  f0 a1 a2
+    h  Concat(x, y)  ⟹  odot (h x) (h y)
+  
+  }

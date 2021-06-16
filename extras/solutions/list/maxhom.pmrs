@@ -1,0 +1,13 @@
+
+let f_0 x = x
+
+let odot x0 x1 = max x0 x1
+
+let s_0  = 0
+
+target⟨odot, f_0, s_0⟩(l): int clist -> int  = 
+{
+  ‣ h  Single(a)  ⟹  f_0 a
+  ‣ h  Concat(x, y)  ⟹  odot (h x) (h y)
+  
+  }
