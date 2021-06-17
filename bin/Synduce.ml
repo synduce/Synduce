@@ -36,6 +36,7 @@ let print_usage () =
     \  Debugging:\n\
     \  -I   --interactive               Request additional lemmas interactively.\n\
     \  -L   --interactive-loop          Request lemmas interactively in a loop.\n\
+    \  -X   --classify-ctex             Manually classify ctex as pos or neg.\n\
     \       --parse-only                Just parse the input.\n\
     \       --show-vars                 Print variables and their types at the end.\n\
      -> Try:\n\
@@ -56,6 +57,7 @@ let options =
     ('C', "check-unrealizable", set Config.check_unrealizable true, None);
     ('I', "interactive", set Config.interactive_lemmas true, None);
     ('L', "interactive-loop", set Config.interactive_lemmas_loop true, None);
+    ('X', "classify-ctex", set Config.classify_ctex true, None);
     ('c', "simple-init", set Config.simple_init true, None);
     ('t', "no-detupling", set Config.detupling_on false, None);
     ('\000', "no-syndef", set Config.use_syntactic_definitions false, None);

@@ -112,6 +112,18 @@ let verify_lemma_candidate _psi _lemma_candidates _negative_ctexs (terms : (stri
   in
   Solvers.close_solver solver
 
+let classify_ctexs_opt ~(p : psi_def) ctexs =
+  if !Config.classify_ctex then
+    let f (p, n) ctex =
+      Log.info (fun frmt () ->
+          Fmt.(pf frmt "Classify this counterexample: %a (P/N)" (box pp_ctex) ctex));
+      match Stdio.In_channel.input_line Stdio.stdin with
+      | Some "N" -> (p, ctex :: n)
+      | _ -> (ctex :: p, n)
+    in
+    List.fold ~f ~init:([], []) ctexs
+  else classify_ctexs ~p ctexs
+
 let synthesize_lemmas ~(p : psi_def) synt_failure_info (lstate : refinement_loop_state) :
     (refinement_loop_state, solver_response) Result.t =
   (*
@@ -127,7 +139,7 @@ let synthesize_lemmas ~(p : psi_def) synt_failure_info (lstate : refinement_loop
         (* Forget about the specific association in pairs. *)
         let ctexs = List.concat_map unrealizability_ctexs ~f:(fun uc -> [ uc.ci; uc.cj ]) in
         (* Classify in negative and positive cexs. *)
-        let _positive_ctexs, negative_ctexs = classify_ctexs ~p ctexs in
+        let _positive_ctexs, negative_ctexs = classify_ctexs_opt ~p ctexs in
         let set_logic = CSetLogic "DTLIA" in
         (* TODO: How to choose logic? *)
         let synth_objs = List.mapi ~f:synthfun_of_ctex negative_ctexs in
