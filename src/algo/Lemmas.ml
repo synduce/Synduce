@@ -4,6 +4,9 @@ open Counterexamples
 open Lang
 open Lang.Term
 open Syguslib.Sygus
+open SygusInterface
+module Smt = SmtInterface
+open Smtlib
 open Utils
 
 let empty_lemma = { lem_map = Map.empty (module Terms) }
@@ -45,6 +48,70 @@ let add_lemmas_interactively ~(p : psi_def) (lstate : refinement_loop_state) : r
   in
   { lstate with lemma = Set.fold ~f ~init:lstate.lemma lstate.t_set }
 
+let ith_synth_fun index = "lemma_" ^ Int.to_string index
+
+let synthfun_of_ctex index ctex =
+  let args =
+    List.map
+      ~f:(fun scalar -> (scalar.vname, sort_of_rtype RType.TInt))
+      (Set.elements ctex.ctex_vars)
+  in
+  let ret_sort = sort_of_rtype RType.TBool in
+  let grammar = Grammars.generate_grammar ~guess:None ~bools:true OpSet.empty args ret_sort in
+  CSynthFun (ith_synth_fun index, args, ret_sort, grammar)
+
+let constraint_of_ctex index ctex =
+  let var_list = List.map ~f:(fun t -> sygus_of_term t) (Map.data ctex.ctex_model) in
+  (* TODO: check that order of terms in Map.data model is the same as order of arguments to xi *)
+  CConstraint (SyApp (IdSimple "not", [ SyApp (IdSimple (ith_synth_fun index), var_list) ]))
+
+let log_soln s vs t =
+  Log.verbose (fun frmt () ->
+      Fmt.pf frmt "Lemma candidate: \"%s %s = @[%a@]\"." s
+        (String.concat ~sep:" " (List.map ~f:(fun v -> v.vname) vs))
+        pp_term t)
+
+let handle_lemma_synth_response (resp : solver_response option) =
+  let parse_synth_fun (fname, fargs, _, fbody) =
+    let args =
+      let f (varname, sort) = Variable.mk ~t:(rtype_of_sort sort) varname in
+      List.map ~f fargs
+    in
+    let local_vars = VarSet.of_list args in
+    let body, _ = infer_type (term_of_sygus (VarSet.to_env local_vars) fbody) in
+    (fname, args, body)
+  in
+  match resp with
+  | Some (RSuccess resps) ->
+      let soln = List.map ~f:parse_synth_fun resps in
+      let _ = List.iter ~f:(fun (s, vs, t) -> log_soln s vs t) soln in
+      Some soln
+  | Some RInfeasible | Some RFail | Some RUnknown | None -> None
+
+let verify_lemma_candidate _psi _lemma_candidates _negative_ctexs (terms : (string * term) list) =
+  Log.info (fun f () -> Fmt.(pf f "Checking lemma candidate..."));
+  let _start_time = Unix.gettimeofday () in
+  let solver = Solvers.make_cvc4_solver () in
+  let _ = Solvers.set_logic solver "ALL" in
+  let _lemma_names =
+    VarSet.of_list
+      (List.map ~f:(fun (synth_name, _term) -> Variable.mk ~t:(Some RType.TBool) synth_name) terms)
+  in
+  Solvers.load_min_max_defs solver;
+  (* TODO:  check if TInv => lemma candidates *)
+  (* TODO: If not, get counterexample *)
+  let _ =
+    match Solvers.check_sat solver with
+    | Sat -> (
+        match Solvers.get_model solver with
+        | SExps s ->
+            let _model = Smt.model_to_constmap (SExps s) in
+            ()
+        | _ -> ())
+    | _ -> ()
+  in
+  Solvers.close_solver solver
+
 let synthesize_lemmas ~(p : psi_def) synt_failure_info (lstate : refinement_loop_state) :
     (refinement_loop_state, solver_response) Result.t =
   (*
@@ -54,16 +121,25 @@ let synthesize_lemmas ~(p : psi_def) synt_failure_info (lstate : refinement_loop
     The lemma corresponding to a particular term should be refined to eliminate the counterexample
     (a counterexample cex is also asscociated to a particular term through cex.ctex_eqn.eterm)
    *)
-  let _ =
+  let lemma_candidates, negative_ctex =
     match synt_failure_info with
     | _, Either.Second unrealizability_ctexs ->
         (* Forget about the specific association in pairs. *)
         let ctexs = List.concat_map unrealizability_ctexs ~f:(fun uc -> [ uc.ci; uc.cj ]) in
         (* Classify in negative and positive cexs. *)
-        let _positive_ctexs, _negative_ctexs = classify_ctexs ~p ctexs in
-        ()
-    | _ -> ()
+        let _positive_ctexs, negative_ctexs = classify_ctexs ~p ctexs in
+        let set_logic = CSetLogic "DTLIA" in
+        (* TODO: How to choose logic? *)
+        let synth_objs = List.mapi ~f:synthfun_of_ctex negative_ctexs in
+        let constraints = List.mapi ~f:constraint_of_ctex negative_ctexs in
+        let extra_defs = [ max_definition; min_definition ] in
+        let commands = set_logic :: (extra_defs @ synth_objs @ constraints @ [ CCheckSynth ]) in
+        ( handle_lemma_synth_response (Syguslib.Solvers.SygusSolver.solve_commands commands),
+          negative_ctexs )
+    | _ -> failwith "There is no synt_failure_info in synthesize_lemmas."
   in
+  let terms = List.mapi ~f:(fun i ctex -> (ith_synth_fun i, ctex.ctex_eqn.eterm)) negative_ctex in
+  let _ = verify_lemma_candidate p lemma_candidates negative_ctex terms in
   if
     !Config.interactive_lemmas_loop
     &&
