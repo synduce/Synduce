@@ -2,6 +2,12 @@ open Base
 open Term
 open Utils
 
+let rec vars_of_pattern (p : pattern) : VarSet.t =
+  match p with
+  | PatAny | PatConstant _ -> VarSet.empty
+  | PatVar v -> VarSet.singleton v
+  | PatConstr (_, tl) | PatTuple tl -> VarSet.union_list (List.map ~f:vars_of_pattern tl)
+
 let free_variables (t : term) : VarSet.t =
   let rec f t =
     match t.tkind with
@@ -14,9 +20,12 @@ let free_variables (t : term) : VarSet.t =
     | TSel (t, _) -> f t
     | TFun (vl, t1) ->
         let v1 = f t1 in
-        Set.diff v1 (fpat_vars (PatTup vl))
+        Set.diff v1 (fpat_vars (FPatTup vl))
     | TApp (ft, targs) -> Set.union (f ft) (VarSet.union_list (List.map ~f targs))
     | TData (_, mems) -> VarSet.union_list (List.map ~f mems)
+    | TMatch (tm, cases) ->
+        Set.union (f tm)
+          (VarSet.union_list (List.map ~f:(fun (p, t) -> Set.diff (vars_of_pattern p) (f t)) cases))
   in
   f t
 
@@ -24,11 +33,11 @@ let has_ite (t : term) : bool =
   reduce t ~init:false ~join:( || ) ~case:(fun _ t ->
       match t.tkind with TIte _ -> Some true | _ -> None)
 
-let subst_args fpatterns args =
+let subst_args (fpatterns : fpattern list) (args : term list) =
   let rec f (fpat, t) =
     match (fpat, t.tkind) with
-    | PatVar x, _ -> [ (mk_var x, t) ]
-    | PatTup pl, TTup tl -> (
+    | FPatVar x, _ -> [ (mk_var x, t) ]
+    | FPatTup pl, TTup tl -> (
         match List.zip pl tl with Ok ptl -> List.concat (List.map ~f ptl) | _ -> failwith "no sub")
     | _ -> failwith "no sub"
   in
@@ -72,13 +81,13 @@ let unify (terms : term list) =
   | [] -> None
   | hd :: tl -> if List.for_all ~f:(fun x -> Terms.equal x hd) tl then Some hd else None
 
-(**cat /tmt
+(**
    matches ~boundvars ~pattern t returns a map from variables in pattern to subterms of t
    if the term t matches the pattern.
    During the matching process the variables in boundvars cannot be substituted in the
    pattern.
 *)
-let matches ?(boundvars = VarSet.empty) (t : term) ~(pattern : term) =
+let matches ?(boundvars = VarSet.empty) (t : term) ~(pattern : term) : term VarMap.t option =
   let rec aux pat t =
     match (pat.tkind, t.tkind) with
     | TVar vpat, _ -> (
@@ -110,7 +119,7 @@ let matches ?(boundvars = VarSet.empty) (t : term) ~(pattern : term) =
   match aux pattern t with
   | Error _ -> None
   | Ok substs -> (
-      let im = Map.empty (module Variable) in
+      let im = VarMap.empty in
       let f accum (var, t) = Map.add_multi ~key:var ~data:t accum in
       try
         let substs =
@@ -124,7 +133,8 @@ let matches ?(boundvars = VarSet.empty) (t : term) ~(pattern : term) =
         Some substs
       with _ -> None)
 
-let matches_subpattern ?(boundvars = VarSet.empty) (t : term) ~(pattern : term) =
+let matches_subpattern ?(boundvars = VarSet.empty) (t : term) ~(pattern : term) :
+    (term * (term * term) list * VarSet.t) option =
   let match_locations = ref [] in
   let rrule (pat : term) =
     match matches ~boundvars t ~pattern:pat with
@@ -150,6 +160,62 @@ let matches_subpattern ?(boundvars = VarSet.empty) (t : term) ~(pattern : term) 
   in
   let substs = List.map ~f:(fun (a, b) -> (mk_var a, b)) (Map.to_alist unified_map) in
   if Set.is_empty loc_set then None else Some (pat_skel, substs, loc_set)
+
+(** [matches_pattern t p] returns Some map if [t] matches [p], where the map binds the variables of
+  the pattern to the relevant subterms of [t].
+  If [t] does not match the pattern [p] then None is returned.
+*)
+let matches_pattern (t : term) (p : pattern) : term VarMap.t option =
+  let combine ~key:_ = function
+    | `Both (v1, v2) -> if Terms.equal v1 v2 then Some v1 else None
+    | `Right v1 | `Left v1 -> Some v1
+  in
+  let rec aux (p, t) =
+    match p with
+    | PatAny ->
+        (* Any matches anything, and no binding is created. *)
+        Some VarMap.empty
+    | PatVar x ->
+        (* A variable matches anything, but we add a binding.  *)
+        Some (VarMap.singleton x t)
+    | PatConstant c -> (
+        (* A constant must be matched by the same constant. *)
+        match t.tkind with
+        | TConst c' -> if Constant.equal c c' then Some VarMap.empty else None
+        | _ -> None)
+    | PatConstr (c, args) -> (
+        (* A constructor is matched by a constructor, and all argument must match.
+           A variable can be bound several times, but in that cases it must bind
+           to the same term.
+        *)
+        match t.tkind with
+        | TData (c', args') when String.equal c c' -> (
+            match List.zip args args' with
+            | Unequal_lengths -> None
+            | Ok pairs ->
+                Option.map
+                  (all_or_none (List.map ~f:aux pairs))
+                  ~f:(fun maps ->
+                    match maps with
+                    | [] -> VarMap.empty
+                    | init :: tl -> List.fold ~f:(Map.merge ~f:combine) ~init tl))
+        | _ -> None)
+    | PatTuple args -> (
+        (* Matching a tuple is almost the same as matching a constructor.*)
+        match t.tkind with
+        | TTup args' -> (
+            match List.zip args args' with
+            | Unequal_lengths -> None
+            | Ok pairs ->
+                Option.map
+                  (all_or_none (List.map ~f:aux pairs))
+                  ~f:(fun maps ->
+                    match maps with
+                    | [] -> VarMap.empty
+                    | init :: tl -> List.fold ~f:(Map.merge ~f:combine) ~init tl))
+        | _ -> None)
+  in
+  aux (p, t)
 
 (* ============================================================================================= *)
 (*                                  TERM EXPANSION                                               *)

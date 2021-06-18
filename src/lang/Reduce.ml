@@ -102,6 +102,15 @@ let rec reduce_term (t : term) : term =
             | _, _ -> None))
     | TSel (t, i) -> (
         match f t with { tkind = TTup tl; _ } -> Some (List.nth_exn tl i) | _ -> None)
+    | TMatch (t, cases) -> (
+        match
+          List.filter_opt
+            (List.map
+               ~f:(fun (p, t') -> Option.map ~f:(fun m -> (m, t')) (Analysis.matches_pattern t p))
+               cases)
+        with
+        | [] -> None
+        | (subst_map, rhs_t) :: _ -> Some (substitution (VarMap.to_subst subst_map) rhs_t))
     | _ -> None
   in
   transform ~case t
@@ -147,7 +156,7 @@ let instantiate_with_solution (p : PMRS.t) (soln : (string * variable list * ter
       | Some xi -> (
           match args with
           | [] -> [ (Term.mk_var xi, body) ]
-          | _ -> [ (Term.mk_var xi, mk_fun (List.map ~f:(fun x -> PatVar x) args) body) ])
+          | _ -> [ (Term.mk_var xi, mk_fun (List.map ~f:(fun x -> FPatVar x) args) body) ])
       | None -> []
     in
     List.concat (List.map ~f soln)

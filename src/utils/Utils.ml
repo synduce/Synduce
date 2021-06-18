@@ -89,6 +89,8 @@ let option_or_space ~f frmt o =
 (* ============================================================================================= *)
 (*                  LISTS HELPERS                                                                *)
 (* ============================================================================================= *)
+let list_map_snd (l : ('a * 'b) list) ~(f : 'b -> 'c) : ('a * 'c) list =
+  List.map ~f:(fun (a, b) -> (a, f b)) l
 
 let cartesian_nary_product (elts : 'a list list) : 'a list list =
   let f acc l =
