@@ -24,6 +24,10 @@ val smt_of_pmrs : PMRS.t -> SmtLib.command list
       the PMRS can be used as a function in the solver.
 *)
 
+val mk_def_fun_command : string -> (string * RType.t) list -> RType.t -> term -> SmtLib.command
+
+val mk_assert : SmtLib.smtTerm -> SmtLib.command
+
 val term_of_smt :
   (string, variable, Base.String.comparator_witness) Base.Map.t -> SmtLib.smtTerm -> term
 (** Convert a term to a smt-term in an environment (a map from string to variables). *)

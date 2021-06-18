@@ -520,6 +520,8 @@ let mk_not t1 = mk_simple_app "not" [ t1 ]
 
 let mk_exists (sorted_vars : smtSortedVar list) (term : smtTerm) = SmtTExists (sorted_vars, term)
 
+let mk_forall (sorted_vars : smtSortedVar list) (term : smtTerm) = SmtTForall (sorted_vars, term)
+
 (* Commands *)
 let mk_assert (t : smtTerm) = Assert t
 

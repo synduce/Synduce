@@ -5,9 +5,10 @@ open Lang
 open Lang.Term
 open Syguslib.Sygus
 open SygusInterface
-module Smt = SmtInterface
-open Smtlib
 open Utils
+open Smtlib
+module Smt = SmtInterface
+module S = Smtlib.SmtLib
 
 let empty_lemma = { lem_map = Map.empty (module Terms) }
 
@@ -88,20 +89,41 @@ let handle_lemma_synth_response (resp : solver_response option) =
       Some soln
   | Some RInfeasible | Some RFail | Some RUnknown | None -> None
 
-let verify_lemma_candidate _psi _lemma_candidates _negative_ctexs (terms : (string * term) list) =
+let smt_of_lemma_validity _lemma =
+  (* TODO: complete this function *)
+  (* General form: assert not forall (scalar vars in ctex + rec type vars in term) (if (TInv(term) and (recursion elim equations) and (relevant conditions)) then lemma (scalar vars in ctex)) *)
+  S.mk_assert (S.mk_not (S.mk_forall [ (S.SSimple "x", S.mk_int_sort) ] S.mk_false))
+
+let verify_lemma_candidate ~(p : psi_def) (lemma_candidates : (symbol * variable list * term) list)
+    _negative_ctexs =
   Log.info (fun f () -> Fmt.(pf f "Checking lemma candidate..."));
   let _start_time = Unix.gettimeofday () in
-  let solver = Solvers.make_cvc4_solver () in
-  let _ = Solvers.set_logic solver "ALL" in
-  let _lemma_names =
-    VarSet.of_list
-      (List.map ~f:(fun (synth_name, _term) -> Variable.mk ~t:(Some RType.TBool) synth_name) terms)
-  in
+  let solver = Smtlib.Solvers.make_cvc4_solver () in
+  Solvers.set_logic solver "ALL";
+  Solvers.set_option solver "quant-ind" "true";
+  Solvers.set_option solver "produce-models" "true";
+  if !Config.induction_proof_tlimit >= 0 then
+    Solvers.set_option solver "tlimit" (Int.to_string !Config.induction_proof_tlimit);
   Solvers.load_min_max_defs solver;
-  (* TODO:  check if TInv => lemma candidates *)
-  (* TODO: If not, get counterexample *)
+  (* Declare Tinv, repr and reference functions. *)
+  List.iter
+    ~f:(fun x -> ignore (Solvers.exec_command solver x))
+    ((match p.psi_tinv with None -> [] | Some tinv -> Smt.smt_of_pmrs tinv)
+    @ (if p.psi_repr_is_identity then [] else Smt.smt_of_pmrs p.psi_repr)
+    @ Smt.smt_of_pmrs p.psi_reference
+    (* Declare lemmas. *)
+    @ List.map
+        ~f:(fun (name, vars, body) ->
+          Smt.mk_def_fun_command name
+            (List.map ~f:(fun v -> (v.vname, RType.TInt)) vars)
+            RType.TBool body)
+        lemma_candidates
+    (* Check if lemmas are valid. *)
+    @ List.map ~f:smt_of_lemma_validity lemma_candidates);
   let _ =
     match Solvers.check_sat solver with
+    (* TODO: If not unsat, lemma isn't valid. So, get counterexamples *)
+    (* TODO: Check lemmas separately instead of all at once. *)
     | Sat -> (
         match Solvers.get_model solver with
         | SExps s ->
@@ -133,7 +155,7 @@ let synthesize_lemmas ~(p : psi_def) synt_failure_info (lstate : refinement_loop
     The lemma corresponding to a particular term should be refined to eliminate the counterexample
     (a counterexample cex is also asscociated to a particular term through cex.ctex_eqn.eterm)
    *)
-  let lemma_candidates, negative_ctex =
+  let maybe_lemmas, negative_ctex =
     match synt_failure_info with
     | _, Either.Second unrealizability_ctexs ->
         (* Forget about the specific association in pairs. *)
@@ -143,6 +165,7 @@ let synthesize_lemmas ~(p : psi_def) synt_failure_info (lstate : refinement_loop
         let set_logic = CSetLogic "DTLIA" in
         (* TODO: How to choose logic? *)
         let synth_objs = List.mapi ~f:synthfun_of_ctex negative_ctexs in
+        (* TODO: Should synth lemma per term, not per ctex *)
         let constraints = List.mapi ~f:constraint_of_ctex negative_ctexs in
         let extra_defs = [ max_definition; min_definition ] in
         let commands = set_logic :: (extra_defs @ synth_objs @ constraints @ [ CCheckSynth ]) in
@@ -150,8 +173,11 @@ let synthesize_lemmas ~(p : psi_def) synt_failure_info (lstate : refinement_loop
           negative_ctexs )
     | _ -> failwith "There is no synt_failure_info in synthesize_lemmas."
   in
-  let terms = List.mapi ~f:(fun i ctex -> (ith_synth_fun i, ctex.ctex_eqn.eterm)) negative_ctex in
-  let _ = verify_lemma_candidate p lemma_candidates negative_ctex terms in
+  let _ =
+    match maybe_lemmas with
+    | None -> ()
+    | Some lemma_candidates -> verify_lemma_candidate ~p lemma_candidates negative_ctex
+  in
   if
     !Config.interactive_lemmas_loop
     &&

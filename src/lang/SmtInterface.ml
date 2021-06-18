@@ -358,6 +358,13 @@ let _smt_of_pmrs (pmrs : PMRS.t) : (smtSymbol list * command) list * command lis
   in
   (datatype_decls, definition_commands)
 
+let mk_def_fun_command (name : string) (args : (string * RType.t) list) (rtype : RType.t)
+    (body : term) =
+  let smt_args = List.map ~f:(fun (name, rtype) -> (mk_symb name, sort_of_rtype rtype)) args in
+  DefineFun (mk_symb name, smt_args, sort_of_rtype rtype, smt_of_term body)
+
+let mk_assert = mk_assert
+
 let smt_of_pmrs (pmrs : PMRS.t) : command list =
   (* TODO : order of declarations matters. *)
   let deps = PMRS.depends pmrs in
