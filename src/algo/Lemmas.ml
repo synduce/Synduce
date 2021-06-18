@@ -22,6 +22,7 @@ let add_lemmas_interactively ~(p : psi_def) (lstate : refinement_loop_state) : r
   let f existing_lemmas t =
     let vars = Set.union (Analysis.free_variables t) env_in_p in
     let env = VarSet.to_env vars in
+
     Log.info (fun frmt () -> Fmt.pf frmt "Please provide a constraint for \"@[%a@]\"." pp_term t);
     Log.verbose (fun frmt () ->
         Fmt.pf frmt "Environment:@;@[functions %s, %s and %s@]@;and @[%a@]."
@@ -89,13 +90,39 @@ let handle_lemma_synth_response (resp : solver_response option) =
       Some soln
   | Some RInfeasible | Some RFail | Some RUnknown | None -> None
 
-let smt_of_lemma_validity _lemma =
-  (* TODO: complete this function *)
-  (* General form: assert not forall (scalar vars in ctex + rec type vars in term) (if (TInv(term) and (recursion elim equations) and (relevant conditions)) then lemma (scalar vars in ctex)) *)
-  S.mk_assert (S.mk_not (S.mk_forall [ (S.SSimple "x", S.mk_int_sort) ] S.mk_false))
+let smt_of_lemma_validity ~(p : psi_def) _lemma (ctex : ctex option) =
+  match ctex with
+  | None -> []
+  | Some ctex ->
+      (* TODO: complete this function *)
+      (* General form: assert not forall (scalar vars in ctex + rec type vars in term) (if (TInv(term) and (recursion elim equations) and (relevant conditions)) then lemma (scalar vars in ctex)) *)
+      let mk_sort maybe_rtype =
+        match maybe_rtype with
+        | None -> S.mk_int_sort
+        | Some rtype -> (
+            match RType.base_name rtype with
+            | None -> S.mk_int_sort
+            | Some name -> S.mk_simple_sort name)
+      in
+      let quants =
+        List.map
+          ~f:(fun var -> (S.SSimple var.vname, mk_sort (Variable.vtype var)))
+          (Set.elements (Set.union ctex.ctex_vars (Analysis.free_variables ctex.ctex_eqn.eterm)))
+      in
+      let tinv_app =
+        match p.psi_tinv with
+        | None -> failwith "No TInv has been specified. Cannot check lemma validity."
+        | Some pmrs -> S.mk_simple_app pmrs.pvar.vname [ Smt.smt_of_term ctex.ctex_eqn.eterm ]
+      in
+      let rec_elim_eqns = S.mk_true in
+      (* TODO: fill in rec_elim_eqns *)
+      let if_condition = S.mk_and tinv_app rec_elim_eqns in
+      let if_then = S.mk_true in
+      (* TODO: fill in if_then *)
+      [ S.mk_assert (S.mk_not (S.mk_forall quants (S.mk_or (S.mk_not if_condition) if_then))) ]
 
 let verify_lemma_candidate ~(p : psi_def) (lemma_candidates : (symbol * variable list * term) list)
-    _negative_ctexs =
+    negative_ctexs =
   Log.info (fun f () -> Fmt.(pf f "Checking lemma candidate..."));
   let _start_time = Unix.gettimeofday () in
   let solver = Smtlib.Solvers.make_cvc4_solver () in
@@ -119,7 +146,11 @@ let verify_lemma_candidate ~(p : psi_def) (lemma_candidates : (symbol * variable
             RType.TBool body)
         lemma_candidates
     (* Check if lemmas are valid. *)
-    @ List.map ~f:smt_of_lemma_validity lemma_candidates);
+    @ List.concat_mapi
+        ~f:(fun i lem -> smt_of_lemma_validity ~p lem (List.nth negative_ctexs i))
+        (* TODO: associate lemma with term instead of ctex *)
+        lemma_candidates);
+
   let _ =
     match Solvers.check_sat solver with
     (* TODO: If not unsat, lemma isn't valid. So, get counterexamples *)

@@ -475,6 +475,8 @@ let mk_seq_sort t = Comp (Id (SSimple "Seq"), [ t ])
 
 let mk_tuple_sort lt = Comp (Id (SSimple "Tuple"), lt)
 
+let mk_simple_sort name = SmtSort (Id (SSimple name))
+
 (* Terms *)
 let mk_qi s = QI (Id (SSimple s))
 
