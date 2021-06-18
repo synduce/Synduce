@@ -1,3 +1,4 @@
+open Lwt
 open AState
 open Base
 open Lang
@@ -159,20 +160,27 @@ let check_unrealizable (unknowns : VarSet.t) (eqns : equation_system) : unrealiz
               ctexs));
   ctexs
 
-let satisfies_tinv ~(p : psi_def) (tinv : PMRS.t) (ctex : ctex) : bool =
-  let cvc4_instance = Solvers.make_cvc4_solver () in
-  Solvers.set_logic cvc4_instance "ALL";
-  Solvers.set_option cvc4_instance "quant-ind" "true";
-  if !Config.induction_proof_tlimit >= 0 then
-    Solvers.set_option cvc4_instance "tlimit" (Int.to_string !Config.induction_proof_tlimit);
-  Solvers.load_min_max_defs cvc4_instance;
+let check_tinv_unsat ~(p : psi_def) (tinv : PMRS.t) (ctex : ctex) : Solvers.Asyncs.response =
+  let open Solvers in
+  let%lwt cvc4_instance = Asyncs.make_cvc4_solver () in
+  let%lwt () = Asyncs.set_logic cvc4_instance "ALL" in
+  let%lwt () = Asyncs.set_option cvc4_instance "quant-ind" "true" in
+  let%lwt () =
+    if !Config.induction_proof_tlimit >= 0 then
+      Asyncs.set_option cvc4_instance "tlimit" (Int.to_string !Config.induction_proof_tlimit)
+    else return ()
+  in
+  let%lwt () = Asyncs.load_min_max_defs cvc4_instance in
   (* Declare Tinv, repr and reference functions. *)
-  List.iter
-    ~f:(fun x -> ignore (Solvers.exec_command cvc4_instance x))
-    (smt_of_pmrs tinv
-    @ (if p.psi_repr_is_identity then [] else smt_of_pmrs p.psi_repr)
-    @ smt_of_pmrs p.psi_reference);
-
+  let%lwt () =
+    Lwt_list.iter_p
+      (fun x ->
+        let%lwt _ = Asyncs.exec_command cvc4_instance x in
+        return ())
+      (smt_of_pmrs tinv
+      @ (if p.psi_repr_is_identity then [] else smt_of_pmrs p.psi_repr)
+      @ smt_of_pmrs p.psi_reference)
+  in
   let fv =
     Set.union (Analysis.free_variables ctex.ctex_eqn.eterm) (VarSet.of_list p.psi_reference.pargs)
   in
@@ -210,15 +218,19 @@ let satisfies_tinv ~(p : psi_def) (tinv : PMRS.t) (ctex : ctex) : bool =
     in
     SmtLib.mk_assoc_and (List.map ~f:smt_of_term (term_sat_tinv :: preconds @ model_sat))
   in
-  SmtLib.(Solvers.smt_assert cvc4_instance (mk_exists (sorted_vars_of_vars fv) formula));
-  let resp = Solvers.check_sat cvc4_instance in
+  let%lwt _ = Asyncs.smt_assert cvc4_instance (SmtLib.mk_exists (sorted_vars_of_vars fv) formula) in
+  let%lwt resp = Solvers.Asyncs.check_sat cvc4_instance in
+  let%lwt () = Asyncs.close_solver cvc4_instance in
+  return resp
+
+let satisfies_tinv ~(p : psi_def) (tinv : PMRS.t) (ctex : ctex) : bool =
+  let resp = Lwt_main.run (check_tinv_unsat ~p tinv ctex) in
   Log.verbose (fun frmt () ->
       if Solvers.is_unsat resp then
         Fmt.(pf frmt "(%a) does not satisfy %s." (box pp_ctex) ctex tinv.pvar.vname)
       else if Solvers.is_unsat resp then
         Fmt.(pf frmt "(%a) satisfies %s." (box pp_ctex) ctex tinv.pvar.vname)
       else Fmt.(pf frmt "%s-satisfiability of (%a) is unknown." tinv.pvar.vname (box pp_ctex) ctex));
-  Solvers.close_solver cvc4_instance;
   not (Solvers.is_unsat resp)
 
 (** Classify counterexamples into positive or negative counterexamples with respect

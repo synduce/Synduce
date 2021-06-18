@@ -1,4 +1,6 @@
 (library
  (name algo)
  (public_name Synduce.Lib.Algo)
- (libraries base fmt utils lang))
+ (libraries base fmt utils lang lwt)
+ (preprocess
+  (pps ppx_let lwt_ppx)))

@@ -1,4 +1,4 @@
-open Base
+open Core
 open Sexplib
 open SmtLib
 open Utils
@@ -66,7 +66,7 @@ let already_declared (solver : online_solver) (s : smtSymbol) : bool =
 let solver_declare (solver : online_solver) (s : smtSymbol) : unit =
   Hashtbl.set solver.s_declared ~key:(str_of_symb s) ~data:solver.s_scope_level
 
-let exec_command (solver : online_solver) (c : command) =
+let exec_command (solver : online_solver) (c : command) : solver_response =
   (* Guard execution of command for declarations and keep track of scope level and declared
      variables.
   *)
@@ -112,41 +112,50 @@ let exec_command (solver : online_solver) (c : command) =
 let online_solvers : (int * online_solver) list ref = ref []
 
 let handle_sigchild (_ : int) : unit =
-  if List.length !online_solvers = 0 then ignore @@ Unix.waitpid [] (-1)
+  if List.length !online_solvers = 0 then ignore @@ Unix.wait (`Group (Pid.of_int (-1)))
   else
-    let pid, _ = Unix.waitpid [] (-1) in
-    if !Config.smt_solve_verbose then Log.error_msg (Fmt.str "Solver (pid %d) exited!" pid);
+    let pid =
+      let pid, msg = Unix.wait (`Group (Pid.of_int (-1))) in
+      let pid = Pid.to_int pid in
+      if !Config.smt_solve_verbose then Log.error_msg (Fmt.str "Solver (pid %d) exited!" pid);
+      (match msg with
+      | Ok _ -> ()
+      | Error (`Exit_non_zero i) ->
+          if !Config.smt_solve_verbose then Log.error_msg (Fmt.str "Non-zero error = %i" i)
+      | Error (`Signal sign) ->
+          if !Config.smt_solve_verbose then
+            Log.error_msg (Fmt.str "Signal : %s" (Signal.to_string sign)));
+      pid
+    in
     match List.Assoc.find !online_solvers ~equal:( = ) pid with
     | Some solver ->
         if !Config.smt_solve_verbose then
-          Log.debug_msg (Fmt.str "Solver %s logged in %s" solver.s_name solver.s_log_file);
+          Log.debug_msg (Fmt.str "Solver %s log is in: %s" solver.s_name solver.s_log_file);
         IC.close solver.s_outputc;
         OC.close solver.s_inputc
     | None -> ()
 
 let () = Caml.Sys.set_signal Caml.Sys.sigchld (Caml.Sys.Signal_handle handle_sigchild)
 
-let make_solver ~(name : string) (path : string) (options : string array) : online_solver =
+let make_solver ~(name : string) (path : string) (options : string list) : online_solver =
   let open Unix in
-  let solver_stdin, solver_stdin_writer = pipe () in
-  let solver_stdout_reader, solver_stdout = pipe () in
+  let pinfo = create_process ~prog:path ~args:options in
   (* If the ocaml ends of the pipes aren't marked close-on-exec, they
-     will remain open in the fork/exec'd z3 process, and z3 won't exit
+     will remain open in the fork/exec'd solver process, and the solver won't exit
      when our main ocaml process ends. *)
-  set_close_on_exec solver_stdin_writer;
-  set_close_on_exec solver_stdout_reader;
-  let pid =
-    create_process path (Array.append [| path |] options) solver_stdin solver_stdout stderr
-  in
-  let in_chan = in_channel_of_descr solver_stdout_reader in
-  let out_chan = out_channel_of_descr solver_stdin_writer in
+  set_close_on_exec pinfo.stdout;
+  set_close_on_exec pinfo.stderr;
+  (* The stdout of the solver is our input channel. *)
+  let in_chan = in_channel_of_descr pinfo.stdout in
+  (* The stdin of the solver is our output channel.  *)
+  let out_chan = out_channel_of_descr pinfo.stdin in
   OC.set_binary_mode out_chan false;
   IC.set_binary_mode in_chan false;
   let log_file = Caml.Filename.temp_file (name ^ "_") ".smt2" in
   let solver =
     {
       s_name = name;
-      s_pid = pid;
+      s_pid = Pid.to_int pinfo.pid;
       s_inputc = out_chan;
       s_outputc = in_chan;
       s_declared = Hashtbl.create (module String);
@@ -155,7 +164,7 @@ let make_solver ~(name : string) (path : string) (options : string array) : onli
       s_log_outc = OC.create log_file;
     }
   in
-  online_solvers := (pid, solver) :: !online_solvers;
+  online_solvers := (Pid.to_int pinfo.pid, solver) :: !online_solvers;
   try
     match exec_command solver mk_print_success with
     | Success -> solver
@@ -186,11 +195,11 @@ let call_solver solver commands =
 (* TODO: change the path of the solver. *)
 
 (** Create a process with a Z3 solver. *)
-let make_z3_solver () = make_solver ~name:"Z3" Utils.Config.z3_binary_path [| "-in"; "-smt2" |]
+let make_z3_solver () = make_solver ~name:"Z3" Utils.Config.z3_binary_path [ "-in"; "-smt2" ]
 
 (** Create a process with a CVC4 solver. *)
 let make_cvc4_solver () =
-  make_solver ~name:"CVC4" Utils.Config.cvc4_binary_path [| "--lang=smt2.6"; "--incremental" |]
+  make_solver ~name:"CVC4" Utils.Config.cvc4_binary_path [ "--lang=smt2.6"; "--incremental" ]
 
 let call_solver_default solver commands =
   match solver with
@@ -239,3 +248,187 @@ let smt_assert s term = ignore (exec_command s (mk_assert term))
 let spop solver = ignore (exec_command solver (mk_pop 1))
 
 let spush solver = ignore (exec_command solver (mk_push 1))
+
+(* ============================================================================================= *)
+(*                          Async solver for parallel solving                                    *)
+(* ============================================================================================= *)
+
+(** Async versions of the solver operations for use in concurrent threads.  *)
+module Asyncs = struct
+  open Lwt
+
+  type response = solver_response t
+
+  type solver = {
+    s_name : string;
+    s_pid : int;
+    s_inputc : Lwt_io.output_channel;
+    s_outputc : Lwt_io.input_channel;
+    mutable s_scope_level : int;
+    s_declared : (string, int) Hashtbl.t;
+    s_log_file : string;
+    s_log_outc : OC.t;
+  }
+
+  let online_solvers : (int * solver) list ref = ref []
+
+  let already_declared (solver : solver) (s : smtSymbol) : bool =
+    match Hashtbl.find solver.s_declared (str_of_symb s) with
+    | Some _ ->
+        (* Do not write command if variable is already declared. *)
+        true
+    | None -> false
+
+  let solver_read (solver : solver) : response =
+    try
+      let%lwt s = Lwt_io.read_line solver.s_outputc in
+      return (parse_response [ Sexp.of_string s ])
+    with _ -> return (Error "Error reading solver response.")
+
+  let solver_write (solver : solver) (c : command) : unit t =
+    let comm_s = Sexp.to_string_hum (sexp_of_command c) in
+    let%lwt () = Lwt_io.write_line solver.s_inputc comm_s in
+    Lwt_io.flush solver.s_inputc
+
+  let solver_declare (solver : solver) (s : smtSymbol) : unit =
+    Hashtbl.set solver.s_declared ~key:(str_of_symb s) ~data:solver.s_scope_level
+
+  let open_log () = log_out := Some (OC.create !Config.smt_solver_log_file)
+
+  let log ?(solver = None) c =
+    match solver with
+    | Some s -> write_command s.s_log_outc c
+    | None -> (
+        match !log_out with
+        | Some oc -> write_command oc c
+        | None -> (
+            open_log ();
+            match !log_out with
+            | Some oc -> write_command oc c
+            | None -> Log.(error (wrap "Failed to open log file."))))
+
+  let exec_command (solver : solver) (c : command) : response =
+    (* Guard execution of command for declarations and keep track of scope level and declared
+       variables.
+    *)
+    let do_exec =
+      match c with
+      | DefineSmtSort (s, _, _)
+      | DeclareDatatype (s, _)
+      | DeclareConst (s, _)
+      | DefineFunRec (s, _, _, _)
+      | DefineFun (s, _, _, _)
+      | DeclareFun (s, _, _) ->
+          if already_declared solver s then false
+          else (
+            solver_declare solver s;
+            true)
+      | DefineFunsRec (decls, _) ->
+          if List.exists ~f:(fun (a, _, _) -> already_declared solver a) decls then false
+          else (
+            List.iter ~f:(fun (a, _, _) -> solver_declare solver a) decls;
+            true)
+      | DeclareDatatypes (sl, _) ->
+          if List.exists ~f:(fun (a, _) -> already_declared solver a) sl then false
+          else (
+            List.iter ~f:(fun (a, _) -> solver_declare solver a) sl;
+            true)
+      | Push i ->
+          solver.s_scope_level <- solver.s_scope_level + i;
+          true
+      | Pop i ->
+          solver.s_scope_level <- solver.s_scope_level - i;
+          Hashtbl.filter_inplace solver.s_declared ~f:(fun level -> level <= solver.s_scope_level);
+          true
+      | _ -> true
+    in
+    if do_exec then (
+      if !Config.smt_log_queries then log ~solver:(Some solver) c;
+      let%lwt () = solver_write solver c in
+      solver_read solver)
+    else return (Error (Fmt.str "Variable already declared"))
+
+  let make_solver ~(name : string) (path : string) (options : string list) : solver t =
+    let open Unix in
+    let pinfo = create_process ~prog:path ~args:options in
+    (* If the ocaml ends of the pipes aren't marked close-on-exec, they
+       will remain open in the fork/exec'd solver process, and the solver won't exit
+       when our main ocaml process ends. *)
+    set_close_on_exec pinfo.stdout;
+    set_close_on_exec pinfo.stderr;
+    (* The stdout of the solver is our input channel. *)
+    let in_chan = Lwt_io.of_unix_fd ~mode:Lwt_io.input pinfo.stdout in
+    (* The stdin of the solver is our output channel.  *)
+    let out_chan = Lwt_io.of_unix_fd ~mode:Lwt_io.output pinfo.stdin in
+    let log_file = Caml.Filename.temp_file (name ^ "_") ".smt2" in
+    let solver =
+      {
+        s_name = name;
+        s_pid = Pid.to_int pinfo.pid;
+        s_inputc = out_chan;
+        s_outputc = in_chan;
+        s_declared = Hashtbl.create (module String);
+        s_scope_level = 0;
+        s_log_file = log_file;
+        s_log_outc = OC.create log_file;
+      }
+    in
+    online_solvers := (Pid.to_int pinfo.pid, solver) :: !online_solvers;
+    try
+      let%lwt r = exec_command solver mk_print_success in
+      match r with
+      | Success -> return solver
+      | _ -> failwith "could not configure solver to :print-success"
+    with Sys_error s -> failwith ("couldn't talk to solver, double-check path. Sys_error " ^ s)
+
+  let make_z3_solver () = make_solver ~name:"Z3" Utils.Config.z3_binary_path [ "-in"; "-smt2" ]
+
+  (** Create a process with a CVC4 solver. *)
+  let make_cvc4_solver () =
+    make_solver ~name:"CVC4" Utils.Config.cvc4_binary_path [ "--lang=smt2.6"; "--incremental" ]
+
+  let close_solver (solver : solver) : unit t =
+    Log.debug
+      Fmt.(
+        fun fmt () ->
+          pf fmt "Closing %s, log can be found in %a" solver.s_name
+            (styled (`Fg `Blue) string)
+            solver.s_log_file);
+    let%lwt _ = exec_command solver mk_exit in
+    let%lwt () = Lwt_io.close solver.s_outputc in
+    return (OC.close solver.s_log_outc)
+
+  let check_sat s : response = exec_command s mk_check_sat
+
+  let declare_all (s : solver) (decls : command list) : unit t =
+    List.fold
+      ~f:(fun _ decl ->
+        let%lwt _ = exec_command s decl in
+        return ())
+      decls ~init:(return ())
+
+  let get_model (s : solver) : response = exec_command s GetModel
+
+  let load_min_max_defs (s : solver) : unit t =
+    (exec_command s mk_max_def >>= fun _ -> exec_command s mk_min_def) >>= fun _ -> return ()
+
+  let set_logic solver logic_id : unit t =
+    let%lwt _ = exec_command solver (SetLogic (SSimple logic_id)) in
+    return ()
+
+  let set_option (solver : solver) (option_id : string) (option_value : string) : unit t =
+    let%lwt _ = exec_command solver (SetOption (option_id, option_value)) in
+    return ()
+
+  let smt_assert (s : solver) (term : smtTerm) : unit Lwt.t =
+    let%lwt _ = exec_command s (mk_assert term) in
+    return ()
+
+  let spop (solver : solver) : unit Lwt.t =
+    let%lwt _ = exec_command solver (mk_pop 1) in
+    return ()
+
+  let spush (solver : solver) : unit Lwt.t =
+    let%lwt _ = exec_command solver (mk_push 1) in
+    return ()
+end

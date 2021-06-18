@@ -1,4 +1,4 @@
-open Base
+open Core
 module OC = Stdio.Out_channel
 module IC = Stdio.In_channel
 
@@ -23,7 +23,7 @@ val exec_command : online_solver -> SmtLib.command -> solver_response
 
 val handle_sigchild : int -> unit
 
-val make_solver : name:string -> string -> string array -> online_solver
+val make_solver : name:string -> string -> string list -> online_solver
 
 val close_solver : online_solver -> unit
 
@@ -58,3 +58,48 @@ val smt_assert : online_solver -> SmtLib.smtTerm -> unit
 val spop : online_solver -> unit
 
 val spush : online_solver -> unit
+
+module Asyncs : sig
+  open Lwt
+
+  type response = solver_response t
+
+  type solver = {
+    s_name : string;
+    s_pid : int;
+    s_inputc : Lwt_io.output_channel;
+    s_outputc : Lwt_io.input_channel;
+    mutable s_scope_level : int;
+    s_declared : (string, int) Hashtbl.t;
+    s_log_file : string;
+    s_log_outc : OC.t;
+  }
+
+  val make_cvc4_solver : unit -> solver t
+
+  val make_z3_solver : unit -> solver t
+
+  val close_solver : solver -> unit t
+
+  val exec_command : solver -> SmtLib.command -> response
+
+  val solver_read : solver -> response
+
+  val check_sat : solver -> response
+
+  val declare_all : solver -> SmtLib.command list -> unit t
+
+  val get_model : solver -> response
+
+  val load_min_max_defs : solver -> unit t
+
+  val set_logic : solver -> string -> unit t
+
+  val set_option : solver -> string -> string -> unit t
+
+  val smt_assert : solver -> SmtLib.smtTerm -> unit t
+
+  val spop : solver -> unit t
+
+  val spush : solver -> unit t
+end
