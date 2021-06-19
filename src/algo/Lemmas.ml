@@ -90,7 +90,8 @@ let handle_lemma_synth_response (resp : solver_response option) =
       Some soln
   | Some RInfeasible | Some RFail | Some RUnknown | None -> None
 
-let smt_of_lemma_validity ~(p : psi_def) _lemma (ctex : ctex option) =
+let smt_of_lemma_validity ~(p : psi_def) (lemma_name, lemma_args, _lemma_body) (ctex : ctex option)
+    =
   match ctex with
   | None -> []
   | Some ctex ->
@@ -114,11 +115,24 @@ let smt_of_lemma_validity ~(p : psi_def) _lemma (ctex : ctex option) =
         | None -> failwith "No TInv has been specified. Cannot check lemma validity."
         | Some pmrs -> S.mk_simple_app pmrs.pvar.vname [ Smt.smt_of_term ctex.ctex_eqn.eterm ]
       in
-      let rec_elim_eqns = S.mk_true in
-      (* TODO: fill in rec_elim_eqns *)
+      let rec_elim_eqns =
+        List.fold ~init:S.mk_true
+          ~f:(fun acc (t1, t2) ->
+            let applic =
+              S.mk_simple_app p.psi_reference.pvar.vname
+                [
+                  (if p.psi_repr_is_identity then Smt.smt_of_term t1
+                  else S.mk_simple_app p.psi_repr.pvar.vname [ Smt.smt_of_term t1 ]);
+                ]
+            in
+            let eqn = S.mk_eq applic (Smt.smt_of_term t2) in
+            S.mk_and acc eqn)
+          ctex.ctex_eqn.eelim
+      in
       let if_condition = S.mk_and tinv_app rec_elim_eqns in
-      let if_then = S.mk_true in
-      (* TODO: fill in if_then *)
+      let if_then =
+        S.mk_simple_app lemma_name (List.map ~f:(fun var -> S.mk_var var.vname) lemma_args)
+      in
       [ S.mk_assert (S.mk_not (S.mk_forall quants (S.mk_or (S.mk_not if_condition) if_then))) ]
 
 let verify_lemma_candidate ~(p : psi_def) (lemma_candidates : (symbol * variable list * term) list)
@@ -155,12 +169,17 @@ let verify_lemma_candidate ~(p : psi_def) (lemma_candidates : (symbol * variable
     match Solvers.check_sat solver with
     (* TODO: If not unsat, lemma isn't valid. So, get counterexamples *)
     (* TODO: Check lemmas separately instead of all at once. *)
-    | Sat -> (
+    (* | Sat -> (
         match Solvers.get_model solver with
         | SExps s ->
             let _model = Smt.model_to_constmap (SExps s) in
             ()
-        | _ -> ())
+        | _ -> ()) *)
+    | Unsat -> Log.info (fun f () -> Fmt.(pf f "This lemma is correct."))
+    | Sat | Unknown ->
+        Log.info (fun f () ->
+            Fmt.(pf f "This lemma has not been proved correct. Refining lemma..."))
+        (* TODO: refine lemma *)
     | _ -> ()
   in
   Solvers.close_solver solver
