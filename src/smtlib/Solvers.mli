@@ -66,6 +66,7 @@ module Asyncs : sig
 
   type solver = {
     s_name : string;
+    s_pinfo : Lwt_process.process;
     s_pid : int;
     s_inputc : Lwt_io.output_channel;
     s_outputc : Lwt_io.input_channel;
@@ -75,11 +76,13 @@ module Asyncs : sig
     s_log_outc : OC.t;
   }
 
-  val make_cvc4_solver : unit -> solver t
+  val make_cvc4_solver : unit -> solver * int t * int u
 
-  val make_z3_solver : unit -> solver t
+  val make_z3_solver : unit -> solver * int t * int u
 
   val close_solver : solver -> unit t
+
+  val solver_make_cancellable : solver -> 'a t -> unit
 
   val exec_command : solver -> SmtLib.command -> response
 
@@ -102,4 +105,6 @@ module Asyncs : sig
   val spop : solver -> unit t
 
   val spush : solver -> unit t
+
+  val cancellable_task : solver * int t * int u -> (solver * int t -> response) -> response * int u
 end

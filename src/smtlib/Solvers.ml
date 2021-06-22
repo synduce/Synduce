@@ -261,6 +261,7 @@ module Asyncs = struct
 
   type solver = {
     s_name : string;
+    s_pinfo : Lwt_process.process;
     s_pid : int;
     s_inputc : Lwt_io.output_channel;
     s_outputc : Lwt_io.input_channel;
@@ -281,8 +282,23 @@ module Asyncs = struct
 
   let solver_read (solver : solver) : response =
     try
-      let%lwt s = Lwt_io.read_line solver.s_outputc in
-      return (parse_response [ Sexp.of_string s ])
+      (* Read lines until concatenation of lines can be parsed as a S-Expression. *)
+      let rec read_until_sexp buf =
+        let%lwt s = Lwt_io.read_line solver.s_outputc in
+        Buffer.add_string buf s;
+        try return (Sexp.of_string (String.strip (Buffer.contents buf)))
+        with Failure _ -> read_until_sexp buf
+      in
+      let%lwt s = read_until_sexp (Buffer.create 10) in
+      (* For verbose debugging, print non-sucess messages.
+         Declarations errors are ignored in Z3, it might be useful to see them.
+      *)
+      (match s with
+      | Sexp.Atom "success" -> ()
+      | _ ->
+          Log.verbose (fun frmt () ->
+              Fmt.pf frmt "%6s [%6i] 📢@; @[%a@]" solver.s_name solver.s_pid Sexp.pp_hum s));
+      return (parse_response [ s ])
     with _ -> return (Error "Error reading solver response.")
 
   let solver_write (solver : solver) (c : command) : unit t =
@@ -348,44 +364,55 @@ module Asyncs = struct
       solver_read solver)
     else return (Error (Fmt.str "Variable already declared"))
 
-  let make_solver ~(name : string) (path : string) (options : string list) : solver t =
-    let open Unix in
-    let pinfo = create_process ~prog:path ~args:options in
+  let make_solver ~(name : string) (path : string) (options : string list) : solver * int t * int u
+      =
+    let pinfo = Lwt_process.open_process (path, Array.of_list options) in
     (* If the ocaml ends of the pipes aren't marked close-on-exec, they
        will remain open in the fork/exec'd solver process, and the solver won't exit
        when our main ocaml process ends. *)
-    set_close_on_exec pinfo.stdout;
-    set_close_on_exec pinfo.stderr;
-    (* The stdout of the solver is our input channel. *)
-    let in_chan = Lwt_io.of_unix_fd ~mode:Lwt_io.input pinfo.stdout in
-    (* The stdin of the solver is our output channel.  *)
-    let out_chan = Lwt_io.of_unix_fd ~mode:Lwt_io.output pinfo.stdin in
+    (* set_close_on_exec pinfo#stdout; *)
+    (* set_close_on_exec pinfo.stderr; *)
     let log_file = Caml.Filename.temp_file (name ^ "_") ".smt2" in
     let solver =
       {
         s_name = name;
-        s_pid = Pid.to_int pinfo.pid;
-        s_inputc = out_chan;
-        s_outputc = in_chan;
+        s_pinfo = pinfo;
+        s_pid = pinfo#pid;
+        s_inputc = pinfo#stdin;
+        s_outputc = pinfo#stdout;
         s_declared = Hashtbl.create (module String);
         s_scope_level = 0;
         s_log_file = log_file;
         s_log_outc = OC.create log_file;
       }
     in
-    online_solvers := (Pid.to_int pinfo.pid, solver) :: !online_solvers;
+    online_solvers := (pinfo#pid, solver) :: !online_solvers;
+    (* The solver returned is bound to a task that can be cancelled. *)
     try
-      let%lwt r = exec_command solver mk_print_success in
-      match r with
-      | Success -> return solver
-      | _ -> failwith "could not configure solver to :print-success"
+      let (m, task_r) : int t * int u = Lwt.task () in
+      ( solver,
+        Lwt.bind m (fun i ->
+            let%lwt r = exec_command solver mk_print_success in
+            match r with
+            | Success -> return i
+            | _ -> failwith "could not configure solver to :print-success"),
+        task_r )
     with Sys_error s -> failwith ("couldn't talk to solver, double-check path. Sys_error " ^ s)
 
-  let make_z3_solver () = make_solver ~name:"Z3" Utils.Config.z3_binary_path [ "-in"; "-smt2" ]
+  let make_z3_solver () = make_solver ~name:"Z3" Config.z3_binary_path [ "z3"; "-in"; "-smt2" ]
 
   (** Create a process with a CVC4 solver. *)
   let make_cvc4_solver () =
-    make_solver ~name:"CVC4" Utils.Config.cvc4_binary_path [ "--lang=smt2.6"; "--incremental" ]
+    make_solver ~name:"CVC4" Config.cvc4_binary_path [ "cvc4"; "--lang=smt2.6"; "--incremental" ]
+
+  let solver_make_cancellable (s : solver) (p : 'a t) : unit =
+    (* IF task is cancelled, kill the solver.  *)
+    Lwt.on_cancel p (fun () ->
+        match s.s_pinfo#state with
+        | Lwt_process.Exited _ -> ()
+        | Running ->
+            Log.debug_msg Fmt.(str "Terminating solver %s (PID : %i)" s.s_name s.s_pid);
+            s.s_pinfo#terminate)
 
   let close_solver (solver : solver) : unit t =
     Log.debug
@@ -431,4 +458,10 @@ module Asyncs = struct
   let spush (solver : solver) : unit Lwt.t =
     let%lwt _ = exec_command solver (mk_push 1) in
     return ()
+
+  let cancellable_task ((s, starter, resolver) : solver * int t * int u) task_func :
+      response * int u =
+    let task = task_func (s, starter) in
+    solver_make_cancellable s task;
+    (task, resolver)
 end
