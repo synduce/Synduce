@@ -98,17 +98,13 @@ let smt_of_lemma_validity ~(p : psi_def) (lemma_name, lemma_args, _lemma_body) (
       (* TODO: complete this function *)
       (* General form: assert not forall (scalar vars in ctex + rec type vars in term) (if (TInv(term) and (recursion elim equations) and (relevant conditions)) then lemma (scalar vars in ctex)) *)
       let mk_sort maybe_rtype =
-        match maybe_rtype with
-        | None -> S.mk_int_sort
-        | Some rtype -> (
-            match RType.base_name rtype with
-            | None -> S.mk_int_sort
-            | Some name -> S.mk_simple_sort name)
+        match maybe_rtype with None -> S.mk_int_sort | Some rtype -> Smt.sort_of_rtype rtype
       in
       let quants =
         List.map
           ~f:(fun var -> (S.SSimple var.vname, mk_sort (Variable.vtype var)))
-          (Set.elements (Set.union ctex.ctex_vars (Analysis.free_variables ctex.ctex_eqn.eterm)))
+          (Set.elements (Set.union ctex.ctex_vars (Analysis.free_variables ctex.ctex_eqn.eterm))
+          @ p.psi_reference.pargs)
       in
       let tinv_app =
         match p.psi_tinv with
@@ -118,14 +114,14 @@ let smt_of_lemma_validity ~(p : psi_def) (lemma_name, lemma_args, _lemma_body) (
       let rec_elim_eqns =
         List.fold ~init:S.mk_true
           ~f:(fun acc (t1, t2) ->
-            let applic =
-              S.mk_simple_app p.psi_reference.pvar.vname
-                [
-                  (if p.psi_repr_is_identity then Smt.smt_of_term t1
-                  else S.mk_simple_app p.psi_repr.pvar.vname [ Smt.smt_of_term t1 ]);
-                ]
+            let f_compose_r t =
+              let repr_of_v =
+                if p.psi_repr_is_identity then t else mk_app_v p.psi_repr.pvar [ t ]
+              in
+              mk_app_v p.psi_reference.pvar
+                (List.map ~f:mk_var p.psi_reference.pargs @ [ repr_of_v ])
             in
-            let eqn = S.mk_eq applic (Smt.smt_of_term t2) in
+            let eqn = S.mk_eq (Smt.smt_of_term (f_compose_r t1)) (Smt.smt_of_term t2) in
             S.mk_and acc eqn)
           ctex.ctex_eqn.eelim
       in
@@ -150,8 +146,8 @@ let verify_lemma_candidate ~(p : psi_def) (lemma_candidates : (symbol * variable
   List.iter
     ~f:(fun x -> ignore (Solvers.exec_command solver x))
     ((match p.psi_tinv with None -> [] | Some tinv -> Smt.smt_of_pmrs tinv)
-    @ (if p.psi_repr_is_identity then [] else Smt.smt_of_pmrs p.psi_repr)
-    @ Smt.smt_of_pmrs p.psi_reference
+    @ (if p.psi_repr_is_identity then Smt.smt_of_pmrs p.psi_reference
+      else Smt.smt_of_pmrs p.psi_repr @ Smt.smt_of_pmrs p.psi_reference)
     (* Declare lemmas. *)
     @ List.map
         ~f:(fun (name, vars, body) ->
@@ -159,12 +155,10 @@ let verify_lemma_candidate ~(p : psi_def) (lemma_candidates : (symbol * variable
             (List.map ~f:(fun v -> (v.vname, RType.TInt)) vars)
             RType.TBool body)
         lemma_candidates
-    (* Check if lemmas are valid. *)
     @ List.concat_mapi
         ~f:(fun i lem -> smt_of_lemma_validity ~p lem (List.nth negative_ctexs i))
         (* TODO: associate lemma with term instead of ctex *)
         lemma_candidates);
-
   let _ =
     match Solvers.check_sat solver with
     (* TODO: If not unsat, lemma isn't valid. So, get counterexamples *)
