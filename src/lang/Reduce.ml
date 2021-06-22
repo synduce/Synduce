@@ -135,7 +135,7 @@ and pmrs_until_irreducible (prog : PMRS.t) (input : term) =
 
 and reduce_pmrs (prog : PMRS.t) (input : term) =
   let f_input = mk_app (mk_var prog.pmain_symb) [ input ] in
-  pmrs_until_irreducible prog f_input
+  reduce_term (pmrs_until_irreducible prog f_input)
 
 (* ============================================================================================= *)
 (*                                  DERIVED FROM REDUCTION                                       *)

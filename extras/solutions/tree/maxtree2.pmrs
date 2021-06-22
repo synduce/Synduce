@@ -1,7 +1,7 @@
 
-let f0 x = x
+let f0 x3 = x3
 
-let join x0 x1 x2 = max x2 (max x1 x0)
+let join x4 x5 x6 = max x6 (max x5 x4)
 
 target⟨join, f0⟩(): int tree -> int  = 
 {

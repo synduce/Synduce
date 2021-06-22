@@ -239,17 +239,57 @@ let check_tinv_sat ~(p : psi_def) (tinv : PMRS.t) (ctex : ctex) :
     let repr_of_v = if p.psi_repr_is_identity then t else Reduce.reduce_pmrs p.psi_repr t in
     Reduce.reduce_pmrs p.psi_reference repr_of_v
   in
+  let initial_t = ctex.ctex_eqn.eterm in
   let task (solver, starter) =
+    let steps = ref 0 in
     let rec check_bounded_sol accum terms =
       let f accum t =
-        let vars = Analysis.free_variables t in
         let tinv_t = Reduce.reduce_pmrs tinv t in
+        let rec_instantation =
+          Option.value ~default:VarMap.empty (Analysis.matches t ~pattern:initial_t)
+        in
+        let preconds =
+          let subs =
+            List.map
+              ~f:(fun (orig_rec_var, elimv) ->
+                match orig_rec_var.tkind with
+                | TVar rec_var when Map.mem rec_instantation rec_var ->
+                    (elimv, f_compose_r (Map.find_exn rec_instantation rec_var))
+                | _ -> failwith "all elimination variables should be substituted.")
+              ctex.ctex_eqn.eelim
+          in
+          Option.to_list
+            (Option.map ~f:(fun t -> smt_of_term (substitution subs t)) ctex.ctex_eqn.eprecond)
+        in
+        (* Assert that the variables have the values assigned by the model. *)
+        let model_sat =
+          let f v =
+            let v_val = Map.find_exn ctex.ctex_model v.vid in
+            match
+              List.find
+                ~f:(fun (_, elimv) ->
+                  match elimv.tkind with TVar v' -> v.vid = v'.vid | _ -> false)
+                ctex.ctex_eqn.eelim
+            with
+            | Some (original_recursion_var, _) -> (
+                match original_recursion_var.tkind with
+                | TVar ov when Map.mem rec_instantation ov ->
+                    let instantiation = Map.find_exn rec_instantation ov in
+                    smt_of_term (mk_bin Binop.Eq (f_compose_r instantiation) v_val)
+                | _ -> SmtLib.mk_true)
+            | None -> smt_of_term (mk_bin Binop.Eq (mk_var v) v_val)
+          in
+          List.map ~f (Set.elements ctex.ctex_vars)
+        in
+        let vars = Analysis.free_variables (f_compose_r t) in
         (* Start sequence of solver commands, bind on accum. *)
         let%lwt _ = accum in
         let%lwt () = Asyncs.spush solver in
         let%lwt () = Asyncs.declare_all solver (SmtInterface.decls_of_vars vars) in
         (* Assert that Tinv(t) *)
         let%lwt () = Asyncs.smt_assert solver (smt_of_term tinv_t) in
+        (* Assert that term satisfies model. *)
+        let%lwt () = Asyncs.smt_assert solver (SmtLib.mk_assoc_and (preconds @ model_sat)) in
         (* Assert that preconditions hold. *)
         let%lwt resp = Asyncs.check_sat solver in
         let%lwt () = Asyncs.spop solver in
@@ -263,14 +303,15 @@ let check_tinv_sat ~(p : psi_def) (tinv : PMRS.t) (ctex : ctex) :
     in
     let rec expand_loop u =
       let%lwt u = u in
-      match Set.min_elt u with
-      | Some t0 -> (
+      match (Set.min_elt u, !steps < !Config.num_expansions_check) with
+      | Some t0, true -> (
           let tset, u' = Expand.simple t0 in
           let%lwt check_result = check_bounded_sol (return SmtLib.Unknown) (Set.elements tset) in
+          steps := !steps + Set.length tset;
           match check_result with
           | Sat -> return SmtLib.Sat
           | _ -> expand_loop (return (Set.union (Set.remove u t0) u')))
-      | None -> return SmtLib.Unknown
+      | _, false | None, _ -> return SmtLib.Unknown
     in
     let%lwt _ = starter in
     let%lwt () = Asyncs.set_logic solver "LIA" in
@@ -279,15 +320,14 @@ let check_tinv_sat ~(p : psi_def) (tinv : PMRS.t) (ctex : ctex) :
     let%lwt () = Asyncs.close_solver solver in
     return res
   in
-  let _ = (p, tinv, ctex) in
   Asyncs.(cancellable_task (make_z3_solver ()) task)
 
 let satisfies_tinv ~(p : psi_def) (tinv : PMRS.t) (ctex : ctex) : bool =
   let resp =
     Lwt_main.run
-      ((* This call is expected to respond "unsat" when possible. *)
+      ((* This call is expected to respond "unsat" when terminating. *)
        let pr1, resolver1 = check_tinv_unsat ~p tinv ctex in
-       (* This call is expected to respond "sat" when possible. *)
+       (* This call is expected to respond "sat" when terminating. *)
        let pr2, resolver2 = check_tinv_sat ~p tinv ctex in
        Lwt.wakeup resolver1 1;
        Lwt.wakeup resolver2 1;
@@ -300,7 +340,8 @@ let satisfies_tinv ~(p : psi_def) (tinv : PMRS.t) (ctex : ctex) : bool =
       else if Solvers.is_sat resp then
         Fmt.(pf frmt "(%a) satisfies %s." (box pp_ctex) ctex tinv.pvar.vname)
       else Fmt.(pf frmt "%s-satisfiability of (%a) is unknown." tinv.pvar.vname (box pp_ctex) ctex));
-  not (Solvers.is_unsat resp)
+  match resp with Sat -> true | Unsat -> false | _ -> true
+(* TODO: return more information. *)
 
 (** Classify counterexamples into positive or negative counterexamples with respect
     to the Tinv predicate in the problem.
