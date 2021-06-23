@@ -86,6 +86,16 @@ let declare_datatype_of_rtype (t0 : RType.t) : (smtSymbol list * command) list =
       match RType.get_type tname with Some orig_t -> declare_orig tname orig_t | None -> [])
   | None -> []
 
+let smtPattern_of_pattern (p : pattern) =
+  match p with
+  | PatAny -> Pat (mk_symb "_")
+  | PatConstant c -> Pat (mk_symb (Fmt.str "%a" Constant.pp c))
+  | PatVar v -> Pat (mk_symb v.vname)
+  | PatConstr (c, pats) ->
+      PatComp (mk_symb c, List.map ~f:(fun p -> mk_symb Fmt.(str "%a" pp_pattern p)) pats)
+  | PatTuple _ ->
+      failwith "Tuple pattern in smt not supported. Need to implement tuple-type declarations."
+
 let term_of_const (c : Constant.t) : smtTerm =
   match c with
   | Constant.CInt i -> SmtTSpecConst (SCNumeral i)
@@ -106,10 +116,13 @@ let rec smt_of_term (t : term) : smtTerm =
   | TSel (t, i) -> SmtTApp (QI (IdC (SSimple "tupleSel", [ INum i ])), [ smt_of_term t ])
   | TApp ({ tkind = TVar v; _ }, args) -> mk_simple_app v.vname (List.map ~f:smt_of_term args)
   | TData (cstr, args) -> mk_simple_app cstr (List.map ~f:smt_of_term args)
+  | TMatch (tm, cases) -> SmtTMatch (smt_of_term tm, List.map ~f:smt_of_case cases)
   | TApp (_, _) ->
       Log.error_msg Fmt.(str "Smt of term %a impossible." pp_term t);
       failwith "Smt: application function can only be variable."
   | TFun (_, _) -> failwith "Smt: functions in terms not supported."
+
+and smt_of_case ((p, t) : Term.match_case) : match_case = (smtPattern_of_pattern p, smt_of_term t)
 
 let constant_of_smtConst (l : smtSpecConstant) : Constant.t =
   match l with

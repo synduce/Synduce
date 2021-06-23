@@ -1,3 +1,4 @@
+open Lwt
 open AState
 open Base
 open Lang
@@ -159,67 +160,188 @@ let check_unrealizable (unknowns : VarSet.t) (eqns : equation_system) : unrealiz
               ctexs));
   ctexs
 
-let satisfies_tinv ~(p : psi_def) (tinv : PMRS.t) (ctex : ctex) : bool =
-  let cvc4_instance = Solvers.make_cvc4_solver () in
-  Solvers.set_logic cvc4_instance "ALL";
-  Solvers.set_option cvc4_instance "quant-ind" "true";
-  if !Config.induction_proof_tlimit >= 0 then
-    Solvers.set_option cvc4_instance "tlimit" (Int.to_string !Config.induction_proof_tlimit);
-  Solvers.load_min_max_defs cvc4_instance;
-  (* Declare Tinv, repr and reference functions. *)
-  List.iter
-    ~f:(fun x -> ignore (Solvers.exec_command cvc4_instance x))
-    (smt_of_pmrs tinv
-    @ (if p.psi_repr_is_identity then [] else smt_of_pmrs p.psi_repr)
-    @ smt_of_pmrs p.psi_reference);
-
-  let fv =
-    Set.union (Analysis.free_variables ctex.ctex_eqn.eterm) (VarSet.of_list p.psi_reference.pargs)
-  in
-  let f_compose_r t =
-    let repr_of_v = if p.psi_repr_is_identity then t else mk_app_v p.psi_repr.pvar [ t ] in
-    mk_app_v p.psi_reference.pvar (List.map ~f:mk_var p.psi_reference.pargs @ [ repr_of_v ])
-  in
-  (* Create the formula. *)
-  let formula =
-    (* Assert that Tinv(t) is true. *)
-    let term_sat_tinv = mk_app_v tinv.pvar [ ctex.ctex_eqn.eterm ] in
-    (* Assert that the preconditions hold. *)
-    let preconds =
-      let subs =
-        List.map
-          ~f:(fun (orig_rec_var, elimv) -> (elimv, f_compose_r orig_rec_var))
-          ctex.ctex_eqn.eelim
-      in
-      Option.to_list (Option.map ~f:(substitution subs) ctex.ctex_eqn.eprecond)
+let check_tinv_unsat ~(p : psi_def) (tinv : PMRS.t) (ctex : ctex) :
+    Solvers.Asyncs.response * int Lwt.u =
+  let open Solvers in
+  let build_task (cvc4_instance, task_start) =
+    let%lwt _ = task_start in
+    let%lwt () = Asyncs.set_logic cvc4_instance "ALL" in
+    let%lwt () = Asyncs.set_option cvc4_instance "quant-ind" "true" in
+    let%lwt () =
+      if !Config.induction_proof_tlimit >= 0 then
+        Asyncs.set_option cvc4_instance "tlimit" (Int.to_string !Config.induction_proof_tlimit)
+      else return ()
     in
-    (* Assert that the variables have the values assigned by the model. *)
-    let model_sat =
-      let f v =
-        let v_val = Map.find_exn ctex.ctex_model v.vid in
-        match
-          List.find
-            ~f:(fun (_, elimv) -> match elimv.tkind with TVar v' -> v.vid = v'.vid | _ -> false)
+    let%lwt () = Asyncs.load_min_max_defs cvc4_instance in
+    (* Declare Tinv, repr and reference functions. *)
+    let%lwt () =
+      Lwt_list.iter_p
+        (fun x ->
+          let%lwt _ = Asyncs.exec_command cvc4_instance x in
+          return ())
+        (smt_of_pmrs tinv
+        @ (if p.psi_repr_is_identity then [] else smt_of_pmrs p.psi_repr)
+        @ smt_of_pmrs p.psi_reference)
+    in
+    let fv =
+      Set.union (Analysis.free_variables ctex.ctex_eqn.eterm) (VarSet.of_list p.psi_reference.pargs)
+    in
+    let f_compose_r t =
+      let repr_of_v = if p.psi_repr_is_identity then t else mk_app_v p.psi_repr.pvar [ t ] in
+      mk_app_v p.psi_reference.pvar (List.map ~f:mk_var p.psi_reference.pargs @ [ repr_of_v ])
+    in
+    (* Create the formula. *)
+    let formula =
+      (* Assert that Tinv(t) is true. *)
+      let term_sat_tinv = mk_app_v tinv.pvar [ ctex.ctex_eqn.eterm ] in
+      (* Assert that the preconditions hold. *)
+      let preconds =
+        let subs =
+          List.map
+            ~f:(fun (orig_rec_var, elimv) -> (elimv, f_compose_r orig_rec_var))
             ctex.ctex_eqn.eelim
-        with
-        | Some (original_recursion_var, _) ->
-            mk_bin Binop.Eq (f_compose_r original_recursion_var) v_val
-        | None -> mk_bin Binop.Eq (mk_var v) v_val
+        in
+        Option.to_list (Option.map ~f:(substitution subs) ctex.ctex_eqn.eprecond)
       in
-      List.map ~f (Set.elements ctex.ctex_vars)
+      (* Assert that the variables have the values assigned by the model. *)
+      let model_sat =
+        let f v =
+          let v_val = Map.find_exn ctex.ctex_model v.vid in
+          match
+            List.find
+              ~f:(fun (_, elimv) -> match elimv.tkind with TVar v' -> v.vid = v'.vid | _ -> false)
+              ctex.ctex_eqn.eelim
+          with
+          | Some (original_recursion_var, _) ->
+              mk_bin Binop.Eq (f_compose_r original_recursion_var) v_val
+          | None -> mk_bin Binop.Eq (mk_var v) v_val
+        in
+        List.map ~f (Set.elements ctex.ctex_vars)
+      in
+      SmtLib.mk_assoc_and (List.map ~f:smt_of_term (term_sat_tinv :: preconds @ model_sat))
     in
-    SmtLib.mk_assoc_and (List.map ~f:smt_of_term (term_sat_tinv :: preconds @ model_sat))
+    let%lwt _ =
+      Asyncs.smt_assert cvc4_instance (SmtLib.mk_exists (sorted_vars_of_vars fv) formula)
+    in
+    let%lwt resp = Asyncs.check_sat cvc4_instance in
+    let%lwt () = Asyncs.close_solver cvc4_instance in
+    return resp
   in
-  SmtLib.(Solvers.smt_assert cvc4_instance (mk_exists (sorted_vars_of_vars fv) formula));
-  let resp = Solvers.check_sat cvc4_instance in
+  Asyncs.(cancellable_task (Asyncs.make_cvc4_solver ()) build_task)
+
+(** `check_tinv_sat ~p tinv ctex` checks whether the counterexample `ctex` satisfies
+    the invariant `tinv` (a PMRS).
+ *)
+let check_tinv_sat ~(p : psi_def) (tinv : PMRS.t) (ctex : ctex) :
+    Solvers.Asyncs.response * int Lwt.u =
+  let open Solvers in
+  let f_compose_r t =
+    let repr_of_v = if p.psi_repr_is_identity then t else Reduce.reduce_pmrs p.psi_repr t in
+    Reduce.reduce_pmrs p.psi_reference repr_of_v
+  in
+  let initial_t = ctex.ctex_eqn.eterm in
+  let task (solver, starter) =
+    let steps = ref 0 in
+    let rec check_bounded_sol accum terms =
+      let f accum t =
+        let tinv_t = Reduce.reduce_pmrs tinv t in
+        let rec_instantation =
+          Option.value ~default:VarMap.empty (Analysis.matches t ~pattern:initial_t)
+        in
+        let preconds =
+          let subs =
+            List.map
+              ~f:(fun (orig_rec_var, elimv) ->
+                match orig_rec_var.tkind with
+                | TVar rec_var when Map.mem rec_instantation rec_var ->
+                    (elimv, f_compose_r (Map.find_exn rec_instantation rec_var))
+                | _ -> failwith "all elimination variables should be substituted.")
+              ctex.ctex_eqn.eelim
+          in
+          Option.to_list
+            (Option.map ~f:(fun t -> smt_of_term (substitution subs t)) ctex.ctex_eqn.eprecond)
+        in
+        (* Assert that the variables have the values assigned by the model. *)
+        let model_sat =
+          let f v =
+            let v_val = Map.find_exn ctex.ctex_model v.vid in
+            match
+              List.find
+                ~f:(fun (_, elimv) ->
+                  match elimv.tkind with TVar v' -> v.vid = v'.vid | _ -> false)
+                ctex.ctex_eqn.eelim
+            with
+            | Some (original_recursion_var, _) -> (
+                match original_recursion_var.tkind with
+                | TVar ov when Map.mem rec_instantation ov ->
+                    let instantiation = Map.find_exn rec_instantation ov in
+                    smt_of_term (mk_bin Binop.Eq (f_compose_r instantiation) v_val)
+                | _ -> SmtLib.mk_true)
+            | None -> smt_of_term (mk_bin Binop.Eq (mk_var v) v_val)
+          in
+          List.map ~f (Set.elements ctex.ctex_vars)
+        in
+        let vars = Analysis.free_variables (f_compose_r t) in
+        (* Start sequence of solver commands, bind on accum. *)
+        let%lwt _ = accum in
+        let%lwt () = Asyncs.spush solver in
+        let%lwt () = Asyncs.declare_all solver (SmtInterface.decls_of_vars vars) in
+        (* Assert that Tinv(t) *)
+        let%lwt () = Asyncs.smt_assert solver (smt_of_term tinv_t) in
+        (* Assert that term satisfies model. *)
+        let%lwt () = Asyncs.smt_assert solver (SmtLib.mk_assoc_and (preconds @ model_sat)) in
+        (* Assert that preconditions hold. *)
+        let%lwt resp = Asyncs.check_sat solver in
+        let%lwt () = Asyncs.spop solver in
+        return resp
+      in
+      match terms with
+      | [] -> accum
+      | t0 :: tl -> (
+          let%lwt accum' = f accum t0 in
+          match accum' with Sat -> return SmtLib.Sat | _ -> check_bounded_sol (return accum') tl)
+    in
+    let rec expand_loop u =
+      let%lwt u = u in
+      match (Set.min_elt u, !steps < !Config.num_expansions_check) with
+      | Some t0, true -> (
+          let tset, u' = Expand.simple t0 in
+          let%lwt check_result = check_bounded_sol (return SmtLib.Unknown) (Set.elements tset) in
+          steps := !steps + Set.length tset;
+          match check_result with
+          | Sat -> return SmtLib.Sat
+          | _ -> expand_loop (return (Set.union (Set.remove u t0) u')))
+      | _, false | None, _ -> return SmtLib.Unknown
+    in
+    let%lwt _ = starter in
+    let%lwt () = Asyncs.set_logic solver "LIA" in
+    let%lwt () = Asyncs.load_min_max_defs solver in
+    let%lwt res = expand_loop (return (TermSet.singleton ctex.ctex_eqn.eterm)) in
+    let%lwt () = Asyncs.close_solver solver in
+    return res
+  in
+  Asyncs.(cancellable_task (make_z3_solver ()) task)
+
+let satisfies_tinv ~(p : psi_def) (tinv : PMRS.t) (ctex : ctex) : bool =
+  let resp =
+    Lwt_main.run
+      ((* This call is expected to respond "unsat" when terminating. *)
+       let pr1, resolver1 = check_tinv_unsat ~p tinv ctex in
+       (* This call is expected to respond "sat" when terminating. *)
+       let pr2, resolver2 = check_tinv_sat ~p tinv ctex in
+       Lwt.wakeup resolver1 1;
+       Lwt.wakeup resolver2 1;
+       (* The first call to return is kept, the other one is ignored. *)
+       Lwt.pick [ pr1; pr2 ])
+  in
   Log.verbose (fun frmt () ->
       if Solvers.is_unsat resp then
         Fmt.(pf frmt "(%a) does not satisfy %s." (box pp_ctex) ctex tinv.pvar.vname)
-      else if Solvers.is_unsat resp then
+      else if Solvers.is_sat resp then
         Fmt.(pf frmt "(%a) satisfies %s." (box pp_ctex) ctex tinv.pvar.vname)
       else Fmt.(pf frmt "%s-satisfiability of (%a) is unknown." tinv.pvar.vname (box pp_ctex) ctex));
-  Solvers.close_solver cvc4_instance;
-  not (Solvers.is_unsat resp)
+  match resp with Sat -> true | Unsat -> false | _ -> true
+(* TODO: return more information. *)
 
 (** Classify counterexamples into positive or negative counterexamples with respect
     to the Tinv predicate in the problem.

@@ -112,8 +112,9 @@ let main () =
               (box (Algo.AState.pp_soln ~use_ocaml_syntax:is_ocaml_syntax)) frmt target)
       | None -> ());
       (* If no info required, output timing information. *)
-      if not !Config.info then
-        Fmt.(pf stdout "%i,%.4f,%.4f@." !Algo.AState.refinement_steps !Config.verif_time elapsed)
+      if not !Config.info then (
+        Fmt.(pf stdout "%i,%.4f,%.4f@." !Algo.AState.refinement_steps !Config.verif_time elapsed);
+        Fmt.(pf stdout "success@."))
   | Error _ -> Utils.Log.error_msg "No solution found.");
   if !Config.show_vars then Term.Variable.print_summary stdout ()
 
