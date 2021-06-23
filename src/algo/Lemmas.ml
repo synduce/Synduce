@@ -95,13 +95,28 @@ let handle_lemma_synth_response (resp : solver_response option) =
       Some soln
   | Some RInfeasible | Some RFail | Some RUnknown | None -> None
 
-let smt_of_lemma_validity ~(p : psi_def) (lemma_name, lemma_args, _lemma_body) (ctex : ctex option)
-    =
+let smt_of_recurs_elim_eqns (elim : (term * term) list) ~(p : psi_def) : S.smtTerm =
+  let f_compose_r t =
+    let repr_of_v = if p.psi_repr_is_identity then t else mk_app_v p.psi_repr.pvar [ t ] in
+    mk_app_v p.psi_reference.pvar (List.map ~f:mk_var p.psi_reference.pargs @ [ repr_of_v ])
+  in
+  S.mk_assoc_and
+    (List.map
+       ~f:(fun (t1, t2) -> S.mk_eq (Smt.smt_of_term (f_compose_r t1)) (Smt.smt_of_term t2))
+       elim)
+
+let smt_of_tinv_app ~(p : psi_def) (ctex : ctex) =
+  match p.psi_tinv with
+  | None -> failwith "No TInv has been specified. Cannot make smt of tinv app."
+  | Some pmrs -> S.mk_simple_app pmrs.pvar.vname [ Smt.smt_of_term ctex.ctex_eqn.eterm ]
+
+let smt_of_lemma_app (lemma_name, lemma_args, _lemma_body) =
+  S.mk_simple_app lemma_name (List.map ~f:(fun var -> S.mk_var var.vname) lemma_args)
+
+let smt_of_lemma_validity ~(p : psi_def) lemma (ctex : ctex option) =
   match ctex with
   | None -> []
   | Some ctex ->
-      (* TODO: complete this function *)
-      (* General form: assert not forall (scalar vars in ctex + rec type vars in term) (if (TInv(term) and (recursion elim equations) and (relevant conditions)) then lemma (scalar vars in ctex)) *)
       let mk_sort maybe_rtype =
         match maybe_rtype with None -> S.mk_int_sort | Some rtype -> Smt.sort_of_rtype rtype
       in
@@ -111,29 +126,11 @@ let smt_of_lemma_validity ~(p : psi_def) (lemma_name, lemma_args, _lemma_body) (
           (Set.elements (Set.union ctex.ctex_vars (Analysis.free_variables ctex.ctex_eqn.eterm))
           @ p.psi_reference.pargs)
       in
-      let tinv_app =
-        match p.psi_tinv with
-        | None -> failwith "No TInv has been specified. Cannot check lemma validity."
-        | Some pmrs -> S.mk_simple_app pmrs.pvar.vname [ Smt.smt_of_term ctex.ctex_eqn.eterm ]
+      (* TODO: if condition should account for other preconditions *)
+      let if_condition =
+        S.mk_and (smt_of_tinv_app ~p ctex) (smt_of_recurs_elim_eqns ctex.ctex_eqn.eelim ~p)
       in
-      let rec_elim_eqns =
-        List.fold ~init:S.mk_true
-          ~f:(fun acc (t1, t2) ->
-            let f_compose_r t =
-              let repr_of_v =
-                if p.psi_repr_is_identity then t else mk_app_v p.psi_repr.pvar [ t ]
-              in
-              mk_app_v p.psi_reference.pvar
-                (List.map ~f:mk_var p.psi_reference.pargs @ [ repr_of_v ])
-            in
-            let eqn = S.mk_eq (Smt.smt_of_term (f_compose_r t1)) (Smt.smt_of_term t2) in
-            S.mk_and acc eqn)
-          ctex.ctex_eqn.eelim
-      in
-      let if_condition = S.mk_and tinv_app rec_elim_eqns in
-      let if_then =
-        S.mk_simple_app lemma_name (List.map ~f:(fun var -> S.mk_var var.vname) lemma_args)
-      in
+      let if_then = smt_of_lemma_app lemma in
       [ S.mk_assert (S.mk_not (S.mk_forall quants (S.mk_or (S.mk_not if_condition) if_then))) ]
 
 let verify_lemma_candidate ~(p : psi_def) (lemma_candidates : (symbol * variable list * term) list)
@@ -146,6 +143,7 @@ let verify_lemma_candidate ~(p : psi_def) (lemma_candidates : (symbol * variable
   Solvers.set_logic solver "ALL";
   Solvers.set_option solver "quant-ind" "true";
   Solvers.set_option solver "produce-models" "true";
+  Solvers.set_option solver "incremental" "true";
   if !Config.induction_proof_tlimit >= 0 then
     Solvers.set_option solver "tlimit" (Int.to_string !Config.induction_proof_tlimit);
   Solvers.load_min_max_defs solver;
@@ -182,8 +180,51 @@ let classify_ctexs_opt ~(p : psi_def) ctexs =
     List.fold ~f ~init:([], []) ctexs
   else classify_ctexs ~p ctexs
 
-let get_positive_examples (_solver : Solvers.online_solver) = []
-(* TODO: fill in get_positive_examples *)
+let get_positive_examples (solver : Solvers.online_solver) (term : term) (ctex : ctex)
+    ~(p : psi_def) lemma : ctex list =
+  (* TODO: make fresh variables, since this may in the future be called for multiple terms, for multiple lemma candidates, or to generate multiple pos examples, in one solver instance *)
+  Log.info (fun f () -> Fmt.(pf f "Searching for a positive example."));
+  let vset = Set.union (Analysis.free_variables term) ctex.ctex_vars in
+  let _ = Solvers.declare_all solver (Smt.decls_of_vars vset) in
+  let rec_elim_eqns = smt_of_recurs_elim_eqns ctex.ctex_eqn.eelim ~p in
+  let _ =
+    List.iter
+      ~f:(fun command -> ignore (Solvers.exec_command solver command))
+      [
+        S.mk_assert rec_elim_eqns;
+        S.mk_assert (smt_of_tinv_app ~p ctex);
+        S.mk_assert (S.mk_not (smt_of_lemma_app lemma));
+      ]
+  in
+  match Solvers.check_sat solver with
+  | Sat | Unknown -> (
+      match Solvers.get_model solver with
+      | SExps s ->
+          let model = Smt.model_to_constmap (SExps s) in
+          let m, _ =
+            Map.partitioni_tf
+              ~f:(fun ~key ~data:_ -> Option.is_some (VarSet.find_by_name ctex.ctex_vars key))
+              model
+          in
+          (* Remap the names to ids of the original variables in m' *)
+          [
+            ({
+               ctex_eqn = ctex.ctex_eqn;
+               ctex_vars = ctex.ctex_vars;
+               ctex_model =
+                 Map.fold
+                   ~init:(Map.empty (module Int))
+                   ~f:(fun ~key ~data acc ->
+                     match VarSet.find_by_name ctex.ctex_vars key with
+                     | None -> acc
+                     | Some var -> Map.set ~data acc ~key:var.vid)
+                   m;
+             }
+              : ctex);
+          ]
+      | _ -> failwith "Get model failure: Positive example cannot be found during lemma refinement."
+      )
+  | _ -> failwith "Check sat failure: Positive example cannot be found during lemma refinement."
 
 let synthesize_new_lemma (positive_ctexs : ctex list) (negative_ctexs : ctex list) =
   let set_logic = CSetLogic "DTLIA" in
@@ -198,20 +239,14 @@ let synthesize_new_lemma (positive_ctexs : ctex list) (negative_ctexs : ctex lis
   in
   handle_lemma_synth_response (Syguslib.Solvers.SygusSolver.solve_commands commands)
 
-let lemma_refinement_loop (positive_ctexs : ctex list) (negative_ctexs : ctex list) ~(p : psi_def) :
-    (string * variable list * term) list =
+let rec lemma_refinement_loop (positive_ctexs : ctex list) (negative_ctexs : ctex list)
+    ~(p : psi_def) : (string * variable list * term) list =
   match synthesize_new_lemma positive_ctexs negative_ctexs with
   | None -> failwith "Failure synthesizing new lemma."
   | Some lemma_candidates -> (
       match verify_lemma_candidate ~p lemma_candidates negative_ctexs with
       (* TODO: If not unsat, lemma isn't valid. So, get counterexamples *)
       (* TODO: Check lemmas separately instead of all at once. *)
-      (* | Sat -> (
-          match Solvers.get_model solver with
-          | SExps s ->
-              let _model = Smt.model_to_constmap (SExps s) in
-              ()
-          | _ -> ()) *)
       | _, Unsat ->
           Log.info (fun f () -> Fmt.(pf f "This lemma is correct."));
           lemma_candidates
@@ -219,9 +254,21 @@ let lemma_refinement_loop (positive_ctexs : ctex list) (negative_ctexs : ctex li
           Log.info (fun f () ->
               Fmt.(pf f "This lemma has not been proved correct. Refining lemma..."));
           (* lemma_refinement_loop positive_ctexs negative_ctexs ~p *)
-          let _positive_ctexs = get_positive_examples solver in
+          let new_positive_ctexs =
+            (* TODO: should only be iterating over terms, not lemma * ctex, since each lemma and ctex are assoc with one term *)
+            List.concat_map
+              ~f:(fun lemma ->
+                List.concat_map
+                  ~f:(fun ctex -> get_positive_examples solver ctex.ctex_eqn.eterm ctex ~p lemma)
+                  negative_ctexs)
+              lemma_candidates
+          in
+          List.iter
+            ~f:(fun ctex ->
+              Log.info (fun f () -> Fmt.(pf f "Found a positive example: %a" (box pp_ctex) ctex)))
+            new_positive_ctexs;
           Solvers.close_solver solver;
-          lemma_candidates
+          lemma_refinement_loop (positive_ctexs @ new_positive_ctexs) negative_ctexs ~p
       | _ -> failwith "Lemma verification returned something other than Unsat, Sat, or Unknown.")
 
 let synthesize_lemmas ~(p : psi_def) synt_failure_info (lstate : refinement_loop_state) :

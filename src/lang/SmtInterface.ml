@@ -194,17 +194,22 @@ let constmap_of_s_exprs (starting_map : (string, term, String.comparator_witness
     (s_exprs : Sexp.t list) =
   let add_sexp map sexp =
     Sexp.(
-      match sexp with
-      | List [ Atom "define-fun"; Atom s; args; _; value ] -> (
-          match args with
-          | List [] -> (
-              let t_val_o =
-                let%map smt_value = smtTerm_of_sexp value in
-                term_of_smt (Map.empty (module String)) smt_value
-              in
-              match t_val_o with Some t_val -> Map.set map ~key:s ~data:t_val | None -> map)
-          | _ -> map)
-      | _ -> map)
+      try
+        match sexp with
+        | List [ Atom "define-fun"; Atom s; args; _; value ] -> (
+            match args with
+            | List [] -> (
+                let t_val_o =
+                  let%map smt_value = smtTerm_of_sexp value in
+                  term_of_smt (Map.empty (module String)) smt_value
+                in
+                match t_val_o with Some t_val -> Map.set map ~key:s ~data:t_val | None -> map)
+            | _ -> map)
+        | _ -> map
+      with Failure _ ->
+        Log.debug_msg
+          Fmt.(str "Failed at converting Sexpr \"%a\" to smtTerm. Skipping." Sexplib.Sexp.pp sexp);
+        map)
   in
   match s_exprs with
   | [ Sexp.List l ] -> List.fold ~f:add_sexp ~init:starting_map l
