@@ -22,7 +22,7 @@ let rec refinement_loop (p : psi_def) (lstate : refinement_loop_state) =
     if !Config.interactive_lemmas then Lemmas.add_lemmas_interactively ~p lstate else lstate
   in
   (* First, generate the set of constraints corresponding to the set of terms t_set. *)
-  let eqns = Equations.make ~p ~lemmas:lstate.lemma lstate.t_set in
+  let eqns = Equations.make ~p ~term_state:lstate.term_state lstate.t_set in
   (* The solve the set of constraints. *)
   let s_resp, solution = Equations.solve ~p eqns in
   match (s_resp, solution) with
@@ -74,7 +74,7 @@ let psi (p : psi_def) =
     failwith "Cannot solve problem.")
   else (
     refinement_steps := 0;
-    refinement_loop p { t_set; u_set; lemma = Lemmas.empty_lemma })
+    refinement_loop p { t_set; u_set; term_state = Lemmas.empty_term_state })
 
 (* ============================================================================================= *)
 (*                                                 MAIN ENTRY POINTS                             *)

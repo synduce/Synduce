@@ -87,7 +87,7 @@ let compute_rhs ?(force_replace_off = false) p t =
     in
     res
 
-let make ?(force_replace_off = false) ~(p : psi_def) ~(lemmas : lemma) (tset : TermSet.t) :
+let make ?(force_replace_off = false) ~(p : psi_def) ~(term_state : term_state) (tset : TermSet.t) :
     equation list =
   let eqns =
     let fold_f eqns t =
@@ -129,8 +129,8 @@ let make ?(force_replace_off = false) ~(p : psi_def) ~(lemmas : lemma) (tset : T
                | [] -> None
                | x :: _ -> Some (mk_var x, t_scalar)))
       in
-      let precond_from_lemmas =
-        match Map.find lemmas.lem_map eterm with
+      let precond_from_term_state =
+        match Lemmas.get_lemma term_state ~key:eterm with
         | Some lemma_for_eterm ->
             let t = Reduce.reduce_term (applic lemma_for_eterm) in
             Some t
@@ -144,10 +144,10 @@ let make ?(force_replace_off = false) ~(p : psi_def) ~(lemmas : lemma) (tset : T
           let eprecond =
             match invar invariants elhs erhs with
             | Some im_f -> (
-                match precond_from_lemmas with
+                match precond_from_term_state with
                 | Some pl -> Some (mk_bin And im_f pl)
                 | None -> Some im_f)
-            | None -> precond_from_lemmas
+            | None -> precond_from_term_state
           in
           { eterm; eprecond; elhs; erhs; eelim })
         projs
