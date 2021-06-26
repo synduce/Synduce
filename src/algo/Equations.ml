@@ -130,7 +130,7 @@ let make ?(force_replace_off = false) ~(p : psi_def) ~(term_state : term_state) 
                | x :: _ -> Some (mk_var x, t_scalar)))
       in
       let precond_from_term_state =
-        match Lemmas.get_lemma term_state ~key:eterm with
+        match Lemmas.get_lemma ~p term_state ~key:eterm with
         | Some lemma_for_eterm ->
             let t = Reduce.reduce_term (applic lemma_for_eterm) in
             Some t
