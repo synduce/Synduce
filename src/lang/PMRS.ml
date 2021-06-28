@@ -2,6 +2,7 @@ open Analysis
 open Base
 open Term
 open Utils
+open Specifications
 
 (* ============================================================================================= *)
 (*                      TYPE DEFINITIONS AND UTILS                                               *)
@@ -14,18 +15,22 @@ type rewrite_rule = variable * variable list * pattern option * term
 type top_function = variable * variable list * term
 
 type t = {
-  (* The main function symbol *)
-  pvar : Variable.t;
-  (* The input type. *)
+  pvar : Variable.t;  (** The main function symbol *)
   pinput_typ : RType.t list;
-  (* Output type and optional invariant on output of function. *)
-  poutput_typ : RType.t * term option;
-  pargs : variable list;
-  psyntobjs : VarSet.t;
-  prules : rewrite_rule IntMap.t;
-  pnon_terminals : VarSet.t;
-  pmain_symb : variable;
-  porder : int;
+      (**
+    The input type(s). For now, it should be a singleton list.
+    The input type is only the type of the recursively-typed argument of the PMRS, not the parameters.
+  *)
+  pspec : spec;
+  (* A specification for the PMRS, in the form of optional requires and ensures clauses.
+   *)
+  poutput_typ : RType.t;  (** Output type and optional invariant on output of function. *)
+  pargs : variable list;  (** Parameter arguments.  *)
+  psyntobjs : VarSet.t;  (** The unknowns to synthesize.*)
+  prules : rewrite_rule IntMap.t;  (** The rules of the PMRS. *)
+  pnon_terminals : VarSet.t;  (** Non-terminals of the PMRS. *)
+  pmain_symb : variable;  (** The main symbol of the PMRS. *)
+  porder : int;  (** The order of the PMRS (mostly useless for now). *)
 }
 
 (* Type shortcuts *)
@@ -39,6 +44,10 @@ type variables = variable Map.M(String).t
     variable id.
 *)
 let _globals : (int, t) Hashtbl.t = Hashtbl.create (module Int)
+
+let find_by_name (pmrs_name : string) =
+  let matches = Hashtbl.filter ~f:(fun p -> String.(p.pvar.vname = pmrs_name)) _globals in
+  Option.map ~f:(fun (_, p) -> p.pvar) (Hashtbl.choose matches)
 
 (** Mapping nonterminals to the PMRS they belong to, index by the nonterminal
     variable id.
@@ -62,7 +71,7 @@ let pp_pattern (frmt : Formatter.t) ((t, args) : pattern) : unit =
 
 let pp_rewrite_rule (frmt : Formatter.t) ((nt, vargs, pat, t) : rewrite_rule) : unit =
   Fmt.(
-    pf frmt "@[<hov 2>@[<hov 2>%s %a %a  ⟹@] @;%a@]" nt.vname (list ~sep:comma Variable.pp) vargs
+    pf frmt "@[<hov 2>@[<hov 2>%s %a %a  ⟹@] @;%a@]" nt.vname (list ~sep:sp Variable.pp) vargs
       (option pp_pattern) pat (box pp_term) t)
 
 let pp (frmt : Formatter.t) (pmrs : t) : unit =
@@ -75,11 +84,9 @@ let pp (frmt : Formatter.t) (pmrs : t) : unit =
       pmrs.prules
   in
   Fmt.(
-    pf frmt "%s⟨%a⟩(%a): %a -> %a%a = @;@[<v 2>{@;%a@;}@]" pmrs.pvar.vname VarSet.pp_var_names
-      pmrs.psyntobjs (list Variable.pp) pmrs.pargs (list ~sep:comma RType.pp) pmrs.pinput_typ
-      RType.pp (first pmrs.poutput_typ)
-      (option (braces pp_term))
-      (second pmrs.poutput_typ) pp_rules ())
+    pf frmt "%s⟨%a⟩(%a): %a -> %a@;%a@;= @;@[<v 2>{@;%a@;}@]" pmrs.pvar.vname
+      VarSet.pp_var_names pmrs.psyntobjs (list Variable.pp) pmrs.pargs (list ~sep:comma RType.pp)
+      pmrs.pinput_typ RType.pp pmrs.poutput_typ (box pp_spec) pmrs.pspec pp_rules ())
 
 let pp_ocaml (frmt : Formatter.t) (pmrs : t) : unit =
   let print_caml_def (frmt : Formatter.t) (nt, args, cases) =
@@ -188,9 +195,14 @@ let infer_pmrs_types (prog : t) =
       let typ_in, typ_out = RType.fun_typ_unpack (Variable.vtype_or_new prog.pmain_symb) in
       Variable.update_var_types
         [ (Variable.vtype_or_new prog.pvar, Variable.vtype_or_new prog.pmain_symb) ];
-      let invariant = Option.map ~f:(fun x -> first (infer_type x)) (second prog.poutput_typ) in
-      let output_type = (typ_out, invariant) in
-      { prog with prules = new_rules; pinput_typ = typ_in; poutput_typ = output_type }
+      let invariant = Option.map ~f:(fun x -> first (infer_type x)) prog.pspec.ensures in
+      {
+        prog with
+        prules = new_rules;
+        pinput_typ = typ_in;
+        poutput_typ = typ_out;
+        pspec = { prog.pspec with ensures = invariant };
+      }
   | None -> failwith "Failed infering types for pmrs."
 
 (* ============================================================================================= *)
@@ -205,15 +217,16 @@ let func_to_pmrs (f : Variable.t) (args : fpattern list) (body : Term.term) =
   in
   let pmain_symb, prules, pnon_terminals =
     match (args, body) with
-    | [ PatVar x ], { tkind = TVar x_v; _ } when Variable.(x = x_v) ->
+    | [ FPatVar x ], { tkind = TVar x_v; _ } when Variable.(x = x_v) ->
         (f, Map.singleton (module Int) 0 (f, [ x ], None, body), VarSet.singleton x)
     | _ -> failwith "TODO: only identity supported by func_to_pmrs"
   in
   {
     pvar = f;
     pinput_typ = [ tin ];
-    poutput_typ = (tout, None);
-    pargs = Set.elements (fpat_vars (PatTup args));
+    poutput_typ = tout;
+    pspec = empty_spec;
+    pargs = Set.elements (fpat_vars (FPatTup args));
     psyntobjs = VarSet.empty;
     (* PMRS from a function cannot have unkowns. *)
     porder = 0;
@@ -265,6 +278,7 @@ let inverted_rule_lookup ?(boundvars = VarSet.empty) rules (func : term) (args :
   in
   Map.filter_map ~f:filter rules
 
+(** Apply a substitution to all the right hand side of the PMRS rules. *)
 let subst_rule_rhs ~(p : t) (substs : (term * term) list) =
   let rules' =
     let f (nt, args, pat, body) =
@@ -275,3 +289,15 @@ let subst_rule_rhs ~(p : t) (substs : (term * term) list) =
     Map.map ~f p.prules
   in
   { p with prules = rules' }
+
+(**
+  Given an input PMRS, returns a list of PMRS that this PMRS depends on.
+  *)
+let depends (p : t) : t list =
+  let f (_, _, _, rule_body) =
+    let vars = Analysis.free_variables rule_body in
+    List.filter_map ~f:(fun v -> Hashtbl.find _globals v.vid) (Set.elements vars)
+  in
+  List.dedup_and_sort
+    ~compare:(fun p1 p2 -> String.compare p1.pvar.vname p2.pvar.vname)
+    (List.concat_map ~f (Map.data p.prules))

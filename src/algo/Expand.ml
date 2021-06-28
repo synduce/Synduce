@@ -14,14 +14,14 @@ let identify_rcalls (p : psi_def) (lam : variable) (t : term) : VarSet.t =
         match single_arg.tkind with
         | TVar x -> Some (VarSet.singleton x)
         | TApp ({ tkind = TVar repr; _ }, [ { tkind = TVar x; _ } ]) ->
-            if Variable.equal repr p.repr.pmain_symb then Some (VarSet.singleton x) else None
+            if Variable.equal repr p.psi_repr.pmain_symb then Some (VarSet.singleton x) else None
         | _ -> None)
     | _ -> None
   in
   reduce ~init:VarSet.empty ~case ~join t
 
 let subst_recursive_calls (p : psi_def) (tl : term list) : (term * term) list * TermSet.t =
-  let fsymb = p.orig.pmain_symb and gsymb = p.target.pmain_symb in
+  let fsymb = p.psi_reference.pmain_symb and gsymb = p.psi_target.pmain_symb in
   let rcalls =
     let fold_f rcalled_vars t =
       let f_x = identify_rcalls p fsymb t in
@@ -40,14 +40,15 @@ let subst_recursive_calls (p : psi_def) (tl : term list) : (term * term) list * 
       @ [
           (mk_app (mk_var fsymb) [ mk_var var ], scalar_term);
           (mk_app (mk_var gsymb) [ mk_var var ], scalar_term);
-          (mk_app (mk_var fsymb) [ mk_app (mk_var p.repr.pmain_symb) [ mk_var var ] ], scalar_term);
+          ( mk_app (mk_var fsymb) [ mk_app (mk_var p.psi_repr.pmain_symb) [ mk_var var ] ],
+            scalar_term );
         ],
       match invariant with Some inv -> Set.add invariants inv | None -> invariants )
   in
   List.fold ~f ~init:([], TermSet.empty) (Set.elements rcalls)
 
-let subst_repr_calls (p : psi_def) (tl : term list) : (term * term) list =
-  let fsymb = p.repr.pmain_symb in
+let _subst_repr_calls (p : psi_def) (tl : term list) : (term * term) list =
+  let fsymb = p.psi_repr.pmain_symb in
   let rcalls =
     let fold_f rcalled_vars t = Set.union rcalled_vars (identify_rcalls p fsymb t) in
     List.fold ~init:VarSet.empty ~f:fold_f tl
@@ -61,10 +62,11 @@ let subst_repr_calls (p : psi_def) (tl : term list) : (term * term) list =
 let maximally_reduced_app (p : psi_def) (func : term) (args : term list) : bool =
   match (func.tkind, args) with
   | TVar f, [ { tkind = TApp ({ tkind = TVar r; _ }, [ x ]); _ } ] -> (
-      Variable.(f = p.orig.pmain_symb && r = p.repr.pmain_symb)
+      Variable.(f = p.psi_reference.pmain_symb && r = p.psi_repr.pmain_symb)
       && match x.tkind with TVar _ -> true | _ -> false)
   | TVar x, args ->
-      Variable.(x = p.orig.pmain_symb || x = p.target.pmain_symb || x = p.repr.pmain_symb)
+      Variable.(
+        x = p.psi_reference.pmain_symb || x = p.psi_target.pmain_symb || x = p.psi_repr.pmain_symb)
       && List.for_all args ~f:(fun x -> match x.tkind with TVar _ -> true | _ -> false)
   | _ -> false
 
@@ -86,14 +88,18 @@ let nonreduced_terms (p : psi_def) (non_terms : VarSet.t) (t : term) : (variable
 
 let nonreduced_terms_all (p : psi_def) (t : term) =
   let all_nont =
-    VarSet.union_list [ p.orig.pnon_terminals; p.target.pnon_terminals; p.orig.pnon_terminals ]
+    VarSet.union_list
+      [
+        p.psi_reference.pnon_terminals; p.psi_target.pnon_terminals; p.psi_reference.pnon_terminals;
+      ]
   in
   nonreduced_terms p all_nont t
 
 (* Replace subterms that correspond to the right-hand side of the main rule to avoid
   capturing f(v) when v is a variable. *)
-let replace_rhs_of_main ?(for_mr = false) (p : psi_def) (f : PMRS.t) (t0 : term) : term =
-  Log.verbose_msg Fmt.(str "t0 = %a" pp_term t0);
+let replace_rhs_of_main ?(verbose = false) ?(for_mr = false) (p : psi_def) (f : PMRS.t) (t0 : term)
+    : term =
+  if verbose then Log.verbose_msg Fmt.(str "t0 = %a" pp_term t0);
   let nr = nonreduced_terms p f.pnon_terminals t0 in
   let rule_set = Map.filter f.prules ~f:(fun (nt, _, _, _) -> Variable.(nt = f.pmain_symb)) in
   let bound_params = Set.union f.psyntobjs (VarSet.of_list f.pargs) in
@@ -108,15 +114,19 @@ let replace_rhs_of_main ?(for_mr = false) (p : psi_def) (f : PMRS.t) (t0 : term)
             | TApp (_, lhs_args) -> (
                 match List.last lhs_args with
                 | Some { tkind = TVar _; _ } ->
-                    Log.verbose_msg
-                      Fmt.(
-                        str "Replacement of %a by %a." pp_term (mk_app (mk_var nt) args) pp_term lhs);
+                    if verbose then
+                      Log.verbose_msg
+                        Fmt.(
+                          str "Replacement of %a by %a." pp_term
+                            (mk_app (mk_var nt) args)
+                            pp_term lhs);
                     Some (mk_app (mk_var nt) args, lhs)
                 | _ -> None)
             | _ -> None
           else (
-            Log.verbose_msg
-              Fmt.(str "Replacement of %a by %a." pp_term (mk_app (mk_var nt) args) pp_term lhs);
+            if verbose then
+              Log.verbose_msg
+                Fmt.(str "Replacement of %a by %a." pp_term (mk_app (mk_var nt) args) pp_term lhs);
             Some (mk_app (mk_var nt) args, lhs))
       | None -> None
     in
@@ -126,9 +136,9 @@ let replace_rhs_of_main ?(for_mr = false) (p : psi_def) (f : PMRS.t) (t0 : term)
   t_out
 
 let replace_rhs_of_mains (p : psi_def) (t0 : term) : term =
-  let _t0 = replace_rhs_of_main p p.repr t0 in
-  let __t0 = replace_rhs_of_main p p.orig _t0 in
-  replace_rhs_of_main p p.target __t0
+  let _t0 = replace_rhs_of_main p p.psi_repr t0 in
+  let __t0 = replace_rhs_of_main p p.psi_reference _t0 in
+  replace_rhs_of_main p p.psi_target __t0
 
 (* ============================================================================================= *)
 (*                                   acegis TERM EXPANSION                                        *)
@@ -136,8 +146,8 @@ let replace_rhs_of_mains (p : psi_def) (t0 : term) : term =
 
 let is_max_expanded (t : term) = Term.is_novariant t
 
-let simple ?(max_height = !Config.expand_cut) (t0 : term) =
-  Log.verbose_msg Fmt.(str "Simple expansion of %a." pp_term t0);
+let simple ?(verbose = false) ?(max_height = !Config.expand_cut) (t0 : term) =
+  if verbose then Log.verbose_msg Fmt.(str "@[Simple expansion of %a.@]" pp_term t0);
   let rec aux d (t, u) =
     if d >= max_height then (t, u)
     else
@@ -154,8 +164,9 @@ let simple ?(max_height = !Config.expand_cut) (t0 : term) =
   if is_novariant t0 then (TermSet.singleton t0, TermSet.empty)
   else
     let t, u = aux 0 ([], [ t0 ]) in
-    Log.verbose Fmt.(fun f () -> pf f "t = @[<hov 2>%a@]" (list ~sep:comma pp_term) t);
-    Log.verbose Fmt.(fun f () -> pf f "u = @[<hov 2>%a@]" (list ~sep:comma pp_term) u);
+    if verbose then (
+      Log.verbose Fmt.(fun f () -> pf f "t = @[<hov 2>%a@]" (list ~sep:comma pp_term) t);
+      Log.verbose Fmt.(fun f () -> pf f "u = @[<hov 2>%a@]" (list ~sep:comma pp_term) u));
     (TermSet.of_list t, TermSet.of_list u)
 
 (* ============================================================================================= *)
@@ -163,16 +174,12 @@ let simple ?(max_height = !Config.expand_cut) (t0 : term) =
 (* ============================================================================================= *)
 let expand_max (p : psi_def) (f : PMRS.t) (t0 : term) : (term * term) list * term list =
   let nonterminals =
-    VarSet.union_list [ f.pnon_terminals; p.repr.pnon_terminals; p.orig.pnon_terminals ]
+    VarSet.union_list
+      [ f.pnon_terminals; p.psi_repr.pnon_terminals; p.psi_reference.pnon_terminals ]
   in
   let f_of_t0 = Reduce.reduce_pmrs f t0 in
   let simpl_f_of_t0 = replace_rhs_of_main p f f_of_t0 in
-  Log.verbose_msg Fmt.(str "@[<hov 2>Expand > f(t0) = %a@]" pp_term simpl_f_of_t0);
   let nr = nonreduced_terms p nonterminals simpl_f_of_t0 in
-  Log.verbose_msg
-    Fmt.(
-      str "@[<hov 2>Expand > Non reduced terms = %a@]" (list pp_term)
-        (List.map ~f:(fun (a, b) -> mk_app (mk_var a) b) nr));
   (* Collect all the variables that need to be expanded. *)
   let expand_reqs =
     let collect c (_, args) =
@@ -180,7 +187,6 @@ let expand_max (p : psi_def) (f : PMRS.t) (t0 : term) : (term * term) list * ter
     in
     List.fold ~f:collect ~init:VarSet.empty nr
   in
-  Log.verbose_msg Fmt.(str "@[Expand > Reqs: %a@]" VarSet.pp expand_reqs);
   let substs =
     let expansions =
       List.map
@@ -189,8 +195,6 @@ let expand_max (p : psi_def) (f : PMRS.t) (t0 : term) : (term * term) list * ter
     in
     cartesian_nary_product (List.filter ~f:(not <| List.is_empty) expansions)
   in
-  List.iteri substs ~f:(fun i sub ->
-      Log.verbose_msg Fmt.(str "@[Expand > Substs %i: %a@]" i Term.pp_subs sub));
   let all_ts = List.map substs ~f:(fun s -> substitution s t0) in
   let check_max_exp t =
     let tr = replace_rhs_of_main p f (Reduce.reduce_pmrs f t) in
@@ -222,12 +226,7 @@ let expand_max_main (p : psi_def) (f : PMRS.t) (g : PMRS.t) (t0 : term) :
     (term * term) list * term list =
   let non_terminals = Set.union f.pnon_terminals g.pnon_terminals in
   let t3 = composed_reduction_sequence p f g t0 in
-  Log.verbose_msg Fmt.(str "@[<hov 2>Expand > f(%a) = %a@]" pp_term t0 pp_term t3);
   let nr = nonreduced_terms p non_terminals t3 in
-  Log.verbose_msg
-    Fmt.(
-      str "@[<hov 2>Expand > Non reduced terms = %a@]" (list pp_term)
-        (List.map ~f:(fun (a, b) -> mk_app (mk_var a) b) nr));
   (* Collect all the variables that need to be expanded. *)
   let expand_reqs =
     let collect c (_, args) =
@@ -276,7 +275,7 @@ let expand_max2 (p : psi_def) (f : PMRS.t) (g : PMRS.t) (t0 : term) : (term * te
   match check_max_exp p f g t0 with First x -> ([ x ], []) | _ -> expand_driver p f g t0
 
 let is_mr (p : psi_def) (f : PMRS.t) (t0 : term) nt : bool =
-  Log.verbose_msg Fmt.(str "Is %a maximally reducible by %s?" pp_term t0 f.PMRS.pvar.vname);
+  Log.verbose_msg Fmt.(str "@[Is %a maximally reducible by %s?@]" pp_term t0 f.PMRS.pvar.vname);
   let f_t0 = Reduce.reduce_pmrs f t0 in
   let f_t0 = replace_rhs_of_main p f f_t0 in
   let nr = nonreduced_terms p nt f_t0 in
@@ -290,29 +289,28 @@ let is_mr (p : psi_def) (f : PMRS.t) (t0 : term) nt : bool =
 
 let is_mr_all (p : psi_def) (t0 : term) =
   let nonterminals =
-    VarSet.union_list [ p.target.pnon_terminals; p.repr.pnon_terminals; p.orig.pnon_terminals ]
+    VarSet.union_list
+      [ p.psi_target.pnon_terminals; p.psi_repr.pnon_terminals; p.psi_reference.pnon_terminals ]
   in
-  is_mr p p.target t0 nonterminals && Either.is_first (check_max_exp p p.orig p.repr t0)
+  is_mr p p.psi_target t0 nonterminals
+  && Either.is_first (check_max_exp p p.psi_reference p.psi_repr t0)
 
 (** `maximal p t0 ` expands the term `t0 ` into T, U such that all terms in T are MR-terms
-  for (p.orig (p.repr)) and p.target and T,U is a boundary.
+  for (p.psi_reference (p.psi_repr)) and p.psi_target and T,U is a boundary.
 *)
 let to_maximally_reducible (p : psi_def) (t0 : term) : TermSet.t * TermSet.t =
-  Log.verbose_msg Fmt.(str "@[Expand > t0 = %a@]" pp_term t0);
   let nonterminals =
-    VarSet.union_list [ p.target.pnon_terminals; p.repr.pnon_terminals; p.orig.pnon_terminals ]
+    VarSet.union_list
+      [ p.psi_target.pnon_terminals; p.psi_repr.pnon_terminals; p.psi_reference.pnon_terminals ]
   in
   let tset0, uset0 =
-    let g = p.target in
+    let g = p.psi_target in
     (* Expand only if there are non-reduced terms *)
     if is_mr p g t0 nonterminals then ([ (t0, t0) ], []) else expand_max p g t0
   in
-  Log.verbose_msg
-    Fmt.(str "@[Expand > tset_target = %a@]" (list ~sep:comma pp_term) (List.map ~f:first tset0));
   (* Expand with orig (f) *)
   let f (tset, uset) (t_theta, _) =
-    Log.verbose_msg Fmt.(str "===== Expand step: orig =====");
-    let new_ts, new_us = expand_max2 p p.orig p.repr t_theta in
+    let new_ts, new_us = expand_max2 p p.psi_reference p.psi_repr t_theta in
     (tset @ List.map ~f:first new_ts, uset @ new_us)
   in
   let l1, l2 = List.fold tset0 ~f ~init:([], uset0) in

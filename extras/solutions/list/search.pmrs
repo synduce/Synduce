@@ -1,0 +1,15 @@
+
+let s_0  = false
+
+let f_0 x x0 = x = x0
+
+let odot x1 x2 = x2 || x1
+
+target⟨odot, f_0, s_0⟩(x): int clist -> bool  = 
+{
+  ‣ target t   ⟹  h t
+    h  CNil  ⟹  s_0
+    h  Single(a)  ⟹  f_0 x a
+    h  Concat(x, y)  ⟹  odot (h x) (h y)
+  
+  }

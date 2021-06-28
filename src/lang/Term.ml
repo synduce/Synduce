@@ -408,36 +408,53 @@ module Constant = struct
     | CFalse -> Fmt.bool frmt false
 end
 
-type fpattern = PatVar of variable | PatTup of fpattern list
+(** Simple patterns for function arguments: a fpattern is either a variable or a tuple of patterns.  *)
+type fpattern = FPatVar of variable | FPatTup of fpattern list
+
+(** More complex patterns are used in match-cases.
+  In the current implementation, this is only used as a way to translate a PMRS back to
+  a set of mutually recursive functions.
+*)
+type pattern =
+  | PatAny
+  | PatVar of variable
+  | PatConstant of Constant.t
+  | PatTuple of pattern list
+  | PatConstr of string * pattern list
 
 type termkind =
-  | TBin of Binop.t * term * term
-  | TUn of Unop.t * term
-  | TConst of Constant.t
-  | TVar of variable
-  | TIte of term * term * term
-  | TTup of term list
-  | TSel of term * int
-  | TFun of fpattern list * term
-  | TApp of term * term list
-  | TData of string * term list
+  | TConst of Constant.t  (** A constant. *)
+  | TVar of variable  (** A variable. *)
+  | TData of string * term list  (** A datatype constructor. *)
+  | TUn of Unop.t * term  (** A unary operation. *)
+  | TBin of Binop.t * term * term  (** A binary operation. *)
+  | TIte of term * term * term  (** A conditional. *)
+  | TTup of term list  (** A tuple. *)
+  | TSel of term * int  (** A tuple projection. TSet(TTup tl, i) is List.nth tl i. *)
+  | TFun of fpattern list * term  (** A function, where each argument capture by a f-pattern. *)
+  | TApp of term * term list  (** A function application. *)
+  | TMatch of term * match_case list
+
+and match_case = pattern * term
 
 and term = { tpos : position * position; tkind : termkind; ttyp : RType.t }
 
-let _globals : (int, Variable.t * fpattern list * term option * term) Hashtbl.t =
-  Hashtbl.create (module Int)
+let _globals : (string, Variable.t * fpattern list * term option * term) Hashtbl.t =
+  Hashtbl.create (module String)
 
+let find_global (s : string) : variable option =
+  match Hashtbl.find _globals s with Some (v, _, _, _) -> Some v | None -> None
 (* F-Patterns helpers *)
 
-let rec fpat_ty fp =
+let rec fpat_ty (fp : fpattern) : RType.t =
   match fp with
-  | PatVar v -> Variable.vtype_or_new v
-  | PatTup tl -> RType.(TTup (List.map ~f:fpat_ty tl))
+  | FPatVar v -> Variable.vtype_or_new v
+  | FPatTup tl -> RType.(TTup (List.map ~f:fpat_ty tl))
 
-let rec fpat_vars fp =
+let rec fpat_vars (fp : fpattern) : VarSet.t =
   match fp with
-  | PatVar v -> VarSet.singleton v
-  | PatTup tl -> VarSet.union_list (List.map ~f:fpat_vars tl)
+  | FPatVar v -> VarSet.singleton v
+  | FPatTup tl -> VarSet.union_list (List.map ~f:fpat_vars tl)
 
 (* ============================================================================================= *)
 (*                        CONSTRUCTION FUNCTIONS                                                 *)
@@ -512,18 +529,18 @@ let mk_un ?(pos = dummy_loc) ?(typ = None) (op : Unop.t) (t : term) =
   { tpos = pos; tkind = TUn (op, t); ttyp = typ }
 
 let rec fpat_to_term fp =
-  match fp with PatVar v -> mk_var v | PatTup tl -> mk_tup (List.map ~f:fpat_to_term tl)
+  match fp with FPatVar v -> mk_var v | FPatTup tl -> mk_tup (List.map ~f:fpat_to_term tl)
 
-let fpat_sub fp1 fp2 =
+let fpat_sub (fp1 : fpattern) (fp2 : fpattern) =
   let rec aux (fp1, fp2) =
     match (fp1, fp2) with
-    | PatVar v1, PatVar v2 -> [ (mk_var v1, mk_var v2) ]
-    | PatTup tl1, PatTup tl2 -> (
+    | FPatVar v1, FPatVar v2 -> [ (mk_var v1, mk_var v2) ]
+    | FPatTup tl1, FPatTup tl2 -> (
         match List.zip tl1 tl2 with
         | Ok l -> List.concat (List.map ~f:aux l)
         | _ -> failwith "no sub")
-    | PatVar v1, _ -> [ (mk_var v1, fpat_to_term fp2) ]
-    | _, PatVar v2 -> [ (fpat_to_term fp1, mk_var v2) ]
+    | FPatVar v1, _ -> [ (mk_var v1, fpat_to_term fp2) ]
+    | _, FPatVar v2 -> [ (fpat_to_term fp1, mk_var v2) ]
   in
   try Some (aux (fp1, fp2)) with _ -> None
 
@@ -600,6 +617,7 @@ and substitution (substs : (term * term) list) (term : term) : term =
           | TFun (args, body) -> TFun (args, aux body)
           | TApp (f, args) -> TApp (aux f, List.map ~f:aux args)
           | TData (cstr, args) -> TData (cstr, List.map ~f:aux args)
+          | TMatch (tm, cases) -> TMatch (aux tm, List.map ~f:(fun (c, t) -> (c, aux t)) cases)
           | TVar _ | TConst _ -> _t.tkind
         in
         { _t with tkind = new_kind }
@@ -620,6 +638,23 @@ let mk_with_fresh_vars (vs : VarSet.t) (t : term) : VarSet.t * term =
     List.map ~f (Set.elements vs)
   in
   (VarSet.of_list (List.map ~f:first substs), substitution (List.map ~f:second substs) t)
+
+module VarMap = struct
+  module M = Map.M (Variable)
+  include M
+
+  type 'value t = 'value M.t
+
+  let empty = Map.empty (module Variable)
+
+  let singleton (v : variable) (elt : 'a) = Map.singleton (module Variable) v elt
+
+  let of_alist (al : (variable * 'a) list) = Map.of_alist (module Variable) al
+
+  let of_alist_exn (al : (variable * 'a) list) = Map.of_alist_exn (module Variable) al
+
+  let to_subst (map : term t) = List.map ~f:(fun (v, t) -> (mk_var v, t)) (Map.to_alist map)
+end
 
 (* ============================================================================================= *)
 (*                              TRANFORMATION / REDUCTION  UTILS                                 *)
@@ -643,6 +678,7 @@ let rewrite_with (f : term -> term) (t : term) =
       | TFun (fargs, body) -> TFun (fargs, aux body)
       | TApp (func, args) -> TApp (aux func, List.map ~f:aux args)
       | TData (cstr, args) -> TData (cstr, List.map ~f:aux args)
+      | TMatch (tm, cases) -> TMatch (aux tm, list_map_snd ~f:aux cases)
     in
     f { t0 with tkind = tk' }
   in
@@ -668,6 +704,7 @@ let rewrite_top_down (f : term -> term option) (t : term) =
           | TFun (fargs, body) -> TFun (fargs, aux body)
           | TApp (func, args) -> TApp (aux func, List.map ~f:aux args)
           | TData (cstr, args) -> TData (cstr, List.map ~f:aux args)
+          | TMatch (tm, cases) -> TMatch (aux tm, list_map_snd ~f:aux cases)
         in
         { t0 with tkind = tk' }
   in
@@ -695,6 +732,7 @@ let rewrite_accum ~(init : 'a) ~(f : 'a -> term -> (term, 'a) Either.t) (t : ter
           | TFun (fargs, body) -> TFun (fargs, aux a' body)
           | TApp (func, args) -> TApp (aux a' func, List.map ~f:(aux a') args)
           | TData (cstr, args) -> TData (cstr, List.map ~f:(aux a') args)
+          | TMatch (tm, cases) -> TMatch (aux a' tm, list_map_snd ~f:(aux a') cases)
         in
         { t0 with tkind = tk' }
   in
@@ -725,7 +763,8 @@ let reduce ~(init : 'a) ~(case : (term -> 'a) -> term -> 'a option) ~(join : 'a 
         | TSel (t, _) -> aux t
         | TFun (_, body) -> aux body
         | TApp (func, args) -> join (aux func) (aux_l args)
-        | TData (_, args) -> aux_l args)
+        | TData (_, args) -> aux_l args
+        | TMatch (tm, cases) -> join (aux tm) (aux_l (snd (List.unzip cases))))
   and aux_l l = List.fold ~init ~f:join (List.map ~f:aux l) in
   aux t
 
@@ -747,7 +786,8 @@ let transform ~(case : (term -> term) -> term -> term option) (t : term) : term 
             | TSel (t, i) -> TSel (aux t, i)
             | TFun (args, body) -> TFun (args, aux body)
             | TApp (func, args) -> TApp (aux func, aux_l args)
-            | TData (cstr, args) -> TData (cstr, aux_l args));
+            | TData (cstr, args) -> TData (cstr, aux_l args)
+            | TMatch (tm, cases) -> TMatch (aux tm, list_map_snd ~f:aux cases));
         }
   and aux_l l = List.map ~f:aux l in
   aux t
@@ -797,8 +837,19 @@ open Fmt
 
 let rec pp_fpattern (frmt : Formatter.t) (fp : fpattern) =
   match fp with
-  | PatVar x -> Variable.pp frmt x
-  | PatTup tl -> pf frmt "%a" (box (parens (list ~sep:comma pp_fpattern))) tl
+  | FPatVar x -> Variable.pp frmt x
+  | FPatTup tl -> pf frmt "%a" (box (parens (list ~sep:comma pp_fpattern))) tl
+
+let rec pp_pattern (frmt : Formatter.t) (p : pattern) =
+  match p with
+  | PatAny -> pf frmt "_"
+  | PatVar v -> Variable.pp frmt v
+  | PatConstant c -> Constant.pp frmt c
+  | PatConstr (c, args) -> (
+      match args with
+      | [] -> string frmt c
+      | _ -> pf frmt "%s(%a)" c (list ~sep:comma pp_pattern) args)
+  | PatTuple tl -> (parens (list ~sep:comma pp_pattern)) frmt tl
 
 let pp_term (frmt : Formatter.t) (x : term) =
   let rec aux (paren : bool) (frmt : Formatter.t) (t : term) =
@@ -832,6 +883,10 @@ let pp_term (frmt : Formatter.t) (x : term) =
     | TData (cstr, args) ->
         if List.length args = 0 then pf frmt "%a" (styled (`Fg `Green) string) cstr
         else pf frmt "%a(%a)" (styled (`Fg `Green) string) cstr (list ~sep:comma (aux false)) args
+    | TMatch (tm, cases) ->
+        pf frmt "@[<hov 2>@[match %a with@]@;[@%a@@]" (aux false) tm
+          (list ~sep:vbar (pair ~sep:rightarrow pp_pattern (aux false)))
+          cases
   in
   aux false frmt x
 
@@ -963,6 +1018,7 @@ let infer_type (t : term) : term * RType.substitution =
         | None ->
             Log.loc_fatal_errmsg eloc
               Fmt.(str "Type inference failure: could not find type of %s." cstr))
+    | TMatch _ -> Log.loc_fatal_errmsg eloc Fmt.(str "Type inference failure: match not supported.")
   in
   let t', subs = aux t in
   match RType.unify (RType.mkv subs) with

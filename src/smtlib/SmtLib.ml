@@ -51,7 +51,7 @@ and match_case = smtPattern * smtTerm
 
 and var_binding = smtSymbol * smtTerm
 
-type smdSortDec = smtSymbol * numeral
+type smtSortDec = smtSymbol * numeral
 
 type smtSelectorDec = smtSymbol * smtSort
 
@@ -59,7 +59,7 @@ type smtConstructorDec = smtSymbol * smtSelectorDec list
 
 type datatype_dec =
   | DDConstr of smtConstructorDec list
-  | DDPar of smtSymbol list * smtConstructorDec list
+  | DDParametric of smtSymbol list * smtConstructorDec list
 
 type func_dec = smtSymbol * smtSortedVar list * smtSort
 
@@ -77,7 +77,7 @@ type command =
   | CheckSatAssuming of prop_literal list
   | DeclareConst of smtSymbol * smtSort
   | DeclareDatatype of smtSymbol * datatype_dec
-  | DeclareDatatypes of smdSortDec list * datatype_dec list
+  | DeclareDatatypes of smtSortDec list * datatype_dec list
   | DeclareFun of smtSymbol * smtSort list * smtSort
   | DeclareSmtSort of smtSymbol * numeral
   | DefineFun of func_def
@@ -166,9 +166,7 @@ let smtSpecConstant_of_sexp (sexp : t) : smtSpecConstant option =
       else if String.is_prefix ~prefix:"#b" s then Some (SCHexaDecimal (String.drop_prefix s 2))
       else if String.is_prefix ~prefix:"\"" s then
         Some (SCString (String.drop_prefix (String.drop_prefix s 1) 1))
-      else
-        try Some (SCNumeral (Int.of_string s))
-        with _ -> None)
+      else try Some (SCNumeral (Int.of_string s)) with _ -> None)
   | _ -> None
 
 let sexp_of_smtSymbol (s : smtSymbol) : t =
@@ -365,7 +363,7 @@ let sexp_of_smtConstructorDec ((s, sdecs) : smtConstructorDec) : t =
 let sexp_of_datatype_dec (dtdec : datatype_dec) : t =
   match dtdec with
   | DDConstr cd_list -> List (List.map ~f:sexp_of_smtConstructorDec cd_list)
-  | DDPar (symbs, cd_list) ->
+  | DDParametric (symbs, cd_list) ->
       List
         [
           Atom "par";
@@ -387,7 +385,7 @@ let sexp_of_func_def ((s, svs, srt, t) : func_def) : t list =
 let sexp_of_prop_literal (pl : prop_literal) : t =
   match pl with PL x -> sexp_of_smtSymbol x | PLNot x -> List [ Atom "not"; sexp_of_smtSymbol x ]
 
-let sexp_of_smtSortDec ((s, n) : smdSortDec) : t = List [ sexp_of_smtSymbol s; sexp_of_numeral n ]
+let sexp_of_smtSortDec ((s, n) : smtSortDec) : t = List [ sexp_of_smtSymbol s; sexp_of_numeral n ]
 
 let sexp_of_command (c : command) =
   match c with
@@ -457,7 +455,7 @@ let sexp_of_command (c : command) =
         List (Atom "simplify" :: sexp_of_smtTerm t :: List.concat (List.map ~f:sexps_of_option ol))
 
 let write_command (out : OC.t) (c : command) : unit =
-  let comm_s = Sexp.to_string (sexp_of_command c) in
+  let comm_s = Sexp.to_string_hum (sexp_of_command c) in
   OC.output_lines out [ comm_s ];
   OC.flush out
 
@@ -519,6 +517,8 @@ let mk_le t1 t2 = mk_simple_app "<=" [ t1; t2 ]
 let mk_ge t1 t2 = mk_simple_app ">=" [ t1; t2 ]
 
 let mk_not t1 = mk_simple_app "not" [ t1 ]
+
+let mk_exists (sorted_vars : smtSortedVar list) (term : smtTerm) = SmtTExists (sorted_vars, term)
 
 (* Commands *)
 let mk_assert (t : smtTerm) = Assert t
@@ -596,28 +596,29 @@ let remove_duplicate_decls (s : String.t Hash_set.t) (decls : command list) =
   List.map ~f:snd uniq_decls @ List.map ~f:snd nondecls
 
 (* Reading solver responses *)
-type solver_response = Error of string | Sat | Unsat | Unknown | SExps of Sexp.t list [@sexp.list]
+type solver_response =
+  | Error of string
+  | Sat
+  | Unsat
+  | Unknown
+  | Success
+  | SExps of Sexp.t list [@sexp.list]
 [@@deriving_sexp]
-
-type solver_kind =
-  | Z3_SMT2 of int (* Z3 smt2 solver with timeout *)
-  | Z3_SMT2_Timeout_Fast (* Z3 smt2 soler with fast timeout (1 sec) *)
-  | CVC4_Default
-
-(* CVC4 solver *)
 
 (* Parse solver reponses *)
 let parse_response (r : Sexp.t list) : solver_response =
   match r with
   | [ Sexp.Atom "sat" ] -> Sat
   | [ Sexp.Atom "unsat" ] -> Unsat
-  | [ Sexp.Atom "unkown" ] -> Unknown
+  | [ Sexp.Atom "unknown" ] -> Unknown
+  | [ Sexp.Atom "success" ] -> Success
   | _ -> SExps r
 
 let pp_solver_response f r =
   match r with
   | Sat -> Fmt.pf f "sat"
   | Unsat -> Fmt.pf f "unsat"
-  | Unknown -> Fmt.pf f "unkown"
+  | Unknown -> Fmt.pf f "unknown"
+  | Success -> Fmt.pf f "success"
   | SExps sl -> Fmt.(pf f "%a" (list ~sep:sp Sexp.pp) sl)
   | Error s -> Fmt.(pf f "(error %s)" s)

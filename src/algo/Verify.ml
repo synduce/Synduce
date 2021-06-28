@@ -1,10 +1,14 @@
 open AState
 open Base
+open Lang
 open Lang.SmtInterface
 open Lang.Term
-open Equations
 open Smtlib
 open Utils
+
+(* ============================================================================================= *)
+(*                               Checking correctness of solutions                               *)
+(* ============================================================================================= *)
 
 let constr_eqn (eqn : equation) =
   let rec mk_equality (lhs, rhs) =
@@ -23,14 +27,14 @@ let constr_eqn (eqn : equation) =
   | Some inv -> SmtLib.mk_or (SmtLib.mk_not (smt_of_term inv)) equality
   | None -> equality
 
-let check_solution ?(use_acegis = false) ~(p : psi_def) ((t, u) : TermSet.t * TermSet.t)
+let check_solution ?(use_acegis = false) ~(p : psi_def) (lstate : refinement_loop_state)
     (soln : (string * variable list * term) list) =
   if use_acegis then Log.info (fun f () -> Fmt.(pf f "Check solution."))
   else Log.info (fun f () -> Fmt.(pf f "Checking solution..."));
   let verb = !Config.verbose in
   Config.verbose := false;
   let start_time = Unix.gettimeofday () in
-  let target_inst = Lang.Reduce.instantiate_with_solution p.target soln in
+  let target_inst = Lang.Reduce.instantiate_with_solution p.psi_target soln in
   let free_vars = VarSet.empty in
   let init_vardecls = decls_of_vars free_vars in
   let solver = Solvers.make_z3_solver () in
@@ -52,7 +56,9 @@ let check_solution ?(use_acegis = false) ~(p : psi_def) ((t, u) : TermSet.t * Te
     let num_terms = Set.length t_set in
     if num_terms > 0 then (
       let sys_eqns =
-        Equations.make ~force_replace_off:true ~p:{ p with target = target_inst } t_set
+        Equations.make ~force_replace_off:true
+          ~p:{ p with psi_target = target_inst }
+          ~lemmas:lstate.lemma t_set
       in
       let smt_eqns = List.map sys_eqns ~f:constr_eqn in
       let new_free_vars =
@@ -91,17 +97,17 @@ let check_solution ?(use_acegis = false) ~(p : psi_def) ((t, u) : TermSet.t * Te
       | [] -> None
       | hd :: tl ->
           let has_ctex, t_set, u_set, num_checks = expand_and_check num_checks hd in
-          if has_ctex then Some (Set.union t t_set, terms_to_expand)
+          if has_ctex then Some (Set.union lstate.t_set t_set, terms_to_expand)
           else
             let elts = Set.union u_set (TermSet.of_list tl) in
             find_ctex num_checks elts
   in
   (* Declare all variables *)
   Solvers.declare_all solver init_vardecls;
-  (match find_ctex 0 t with
+  (match find_ctex 0 lstate.t_set with
   | Some _ -> failwith "Synthesizer and solver disagree on solution. That's unexpected!"
   | None -> ());
-  let ctex_or_none = find_ctex 0 u in
+  let ctex_or_none = find_ctex 0 lstate.u_set in
   Solvers.close_solver solver;
   let elapsed = Unix.gettimeofday () -. start_time in
   Config.verif_time := !Config.verif_time +. elapsed;
@@ -114,7 +120,7 @@ let bounded_check ?(concrete_ctex = false) ~(p : psi_def)
     (soln : (string * variable list * term) list) =
   Log.info (fun f () -> Fmt.(pf f "Checking solution (bounded check)..."));
   let start_time = Unix.gettimeofday () in
-  let target_inst = Lang.Reduce.instantiate_with_solution p.target soln in
+  let target_inst = Lang.Reduce.instantiate_with_solution p.psi_target soln in
   let free_vars = VarSet.empty in
   let init_vardecls = decls_of_vars free_vars in
   let solver = Solvers.make_z3_solver () in
@@ -133,12 +139,13 @@ let bounded_check ?(concrete_ctex = false) ~(p : psi_def)
   in
   let check term =
     let sys_eqns =
-      Equations.make ~force_replace_off:true ~p:{ p with target = target_inst }
-        (TermSet.singleton term)
+      Equations.make ~force_replace_off:true
+        ~p:{ p with psi_target = target_inst }
+        ~lemmas:Lemmas.empty_lemma (TermSet.singleton term)
     in
     let smt_eqns = List.map sys_eqns ~f:(fun t -> (t, constr_eqn t)) in
     let new_free_vars =
-      let f fv (eqn : Equations.equation) =
+      let f fv (eqn : equation) =
         Set.union fv
           (Set.union
              (Lang.Analysis.free_variables eqn.elhs)
@@ -172,7 +179,9 @@ let bounded_check ?(concrete_ctex = false) ~(p : psi_def)
           | SExps _, _ | Unsat, _ -> search_ctex tl
           | Unknown, _ ->
               Log.error_msg Fmt.(str "SMT solver returned unkown. The solution might be incorrect.");
-              search_ctex tl)
+              search_ctex tl
+          | Success, _ ->
+              (* Should not be a valid answer, but keep searching anyway. *) search_ctex tl)
     in
     let ctex_or_none = search_ctex smt_eqns in
     (match ctex_or_none with
@@ -203,3 +212,48 @@ let bounded_check ?(concrete_ctex = false) ~(p : psi_def)
   Config.verif_time := !Config.verif_time +. elapsed;
   Log.info (fun f () -> Fmt.(pf f "... finished in %3.4fs" elapsed));
   ctex_or_none
+
+(* ============================================================================================= *)
+(*                                 Other verification/checking functions                         *)
+(* ============================================================================================= *)
+
+let invert (recf : PMRS.t) (c : Constant.t) : term list option =
+  let check_bounded_sol solver terms =
+    let f accum t =
+      let vars = Analysis.free_variables t in
+      let f_t = Reduce.reduce_pmrs recf t in
+      let f_t_eq_c = mk_bin Eq f_t (mk_const c) in
+      Solvers.spush solver;
+      Solvers.declare_all solver (SmtInterface.decls_of_vars vars);
+      Solvers.smt_assert solver (smt_of_term f_t_eq_c);
+      let sol =
+        match Solvers.check_sat solver with
+        | Sat ->
+            let model_as_subst = model_to_subst vars (Solvers.get_model solver) in
+            Continue_or_stop.Stop (Some (Reduce.reduce_term (substitution model_as_subst t)))
+        | _ -> Continue_or_stop.Continue accum
+      in
+      Solvers.spop solver;
+      sol
+    in
+    Set.fold_until ~init:None ~finish:(fun x -> x) ~f terms
+  in
+  match recf.pinput_typ with
+  | [ typ1 ] ->
+      let x1 = Variable.mk ~t:(Some typ1) (Alpha.fresh ()) in
+      let solver = Solvers.make_z3_solver () in
+      let rec expand_loop u =
+        match Set.min_elt u with
+        | Some t0 -> (
+            let tset, u' = Expand.simple t0 in
+            match check_bounded_sol solver tset with
+            | Some s -> Some s
+            | None -> expand_loop (Set.union (Set.remove u t0) u'))
+        | None -> None
+      in
+      let res = expand_loop (TermSet.singleton (mk_var x1)) in
+      Solvers.close_solver solver;
+      Option.map ~f:(fun x -> [ x ]) res
+  | _ ->
+      Log.error_msg "rec_inverse: only PMRS with a single input argument supported for now.";
+      None

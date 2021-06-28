@@ -60,19 +60,50 @@ let pair a b = (a, b)
 (* ============================================================================================= *)
 let ast frmt () = Fmt.(pf frmt "@;*@;")
 
-let rightarrow frmt () = Fmt.(pf frmt " ->@;")
+let colon frmt () = Fmt.(pf frmt "@;:@;")
+
+let vbar frmt () = Fmt.(pf frmt "@;|@;")
+
+let dot frmt () = Fmt.(pf frmt ".")
+
+let rightarrow frmt () = Fmt.(pf frmt " ⟶ @;")
 
 let leftarrow frmt () = Fmt.(pf frmt " <-@;")
+
+let sep_and : Formatter.t -> unit -> unit = Fmt.any "@;and@;"
+
+(** list_or_space prints the list using f for each element, and sep for the separator.
+  If the list is empty, prints a space.
+  If the list is not empty, the printed list is surrounded by two spaces.
+*)
+let list_or_space ~sep ~f frmt li =
+  match li with [] -> Fmt.pf frmt " " | _ as l -> Fmt.(pf frmt " %a " (list ~sep f) l)
+
+(** option_or_space prints the option using f for the data, and sep for the separator.
+  If the option is None, prints a space.
+  If the option is not None, the printed data is surrounded by two spaces.
+*)
+let option_or_space ~f frmt o =
+  match o with Some x -> Fmt.(pf frmt "%a" f x) | None -> Fmt.(pf frmt " ")
 
 (* ============================================================================================= *)
 (*                  LISTS HELPERS                                                                *)
 (* ============================================================================================= *)
+let list_map_snd (l : ('a * 'b) list) ~(f : 'b -> 'c) : ('a * 'c) list =
+  List.map ~f:(fun (a, b) -> (a, f b)) l
 
 let cartesian_nary_product (elts : 'a list list) : 'a list list =
   let f acc l =
     List.concat (List.map l ~f:(fun elt -> List.map acc ~f:(fun acc_l -> elt :: acc_l)))
   in
   match elts with hd :: tl -> List.fold ~f ~init:(List.map ~f:(fun x -> [ x ]) hd) tl | [] -> []
+
+let combinations (l : 'a list) : ('a * 'a) list =
+  let rec aux acc = function
+    | [] -> acc
+    | hd :: tl -> aux (acc @ List.map ~f:(fun x -> (hd, x)) (hd :: tl)) tl
+  in
+  aux [] l
 
 let all_or_none (l : 'a option list) : 'a list option =
   let l' = Option.all l in
