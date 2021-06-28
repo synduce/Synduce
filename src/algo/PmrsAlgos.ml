@@ -117,7 +117,7 @@ let solve_problem (psi_comps : (string * string * string) option)
             let x = Variable.mk "x" in
             let xt = Variable.vtype_or_new x in
             let repr_fun = Variable.mk ~t:(Some (TFun (xt, xt))) repr_fname in
-            (Either.Second (repr_fun, [ PatVar x ], mk_var x), RType.TFun (xt, xt)))
+            (Either.Second (repr_fun, [ FPatVar x ], mk_var x), RType.TFun (xt, xt)))
   in
   (* Reference function. *)
   let reference_f, tau =

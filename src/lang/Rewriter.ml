@@ -156,7 +156,8 @@ module Expression = struct
             | Neg -> mk_e_un Neg (f t)
             | Not -> mk_e_un Not (f t)
             | Abs -> mk_e_un Abs (f t)))
-      | TApp _ | TFun _ | TSel _ -> raise_s (Sexp.Atom "Expressions only for fully reduced terms.")
+      | TMatch _ | TApp _ | TFun _ | TSel _ ->
+          raise_s (Sexp.Atom "Expressions only for fully reduced terms.")
     in
     try Some (f t0) with _ -> None
 

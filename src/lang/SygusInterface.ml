@@ -75,6 +75,7 @@ let rec sygus_of_term (t : term) : sygus_term =
   | TApp ({ tkind = TVar v; _ }, args) -> SyApp (IdSimple v.vname, List.map ~f:sygus_of_term args)
   | TApp (_, _) ->
       failwith "Sygus: application function can only be variable. TODO: add let-conversion."
+  | TMatch (_, _) -> failwith "Sygus: match cases not supported."
   | TFun (_, _) -> failwith "Sygus: functions in terms not supported."
 
 let constant_of_literal (l : literal) : Constant.t =

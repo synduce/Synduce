@@ -285,7 +285,7 @@ let solve_syntactic_definitions (unknowns : VarSet.t) (eqns : equation list) =
   let new_eqns =
     let substs =
       List.map full_defs ~f:(fun (x, (lhs_args, lhs_body)) ->
-          let t, _ = infer_type (mk_fun (List.map ~f:(fun x -> PatVar x) lhs_args) lhs_body) in
+          let t, _ = infer_type (mk_fun (List.map ~f:(fun x -> FPatVar x) lhs_args) lhs_body) in
           (mk_var x, t))
     in
     List.map other_eqns ~f:(fun eqn ->

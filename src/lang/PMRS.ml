@@ -217,7 +217,7 @@ let func_to_pmrs (f : Variable.t) (args : fpattern list) (body : Term.term) =
   in
   let pmain_symb, prules, pnon_terminals =
     match (args, body) with
-    | [ PatVar x ], { tkind = TVar x_v; _ } when Variable.(x = x_v) ->
+    | [ FPatVar x ], { tkind = TVar x_v; _ } when Variable.(x = x_v) ->
         (f, Map.singleton (module Int) 0 (f, [ x ], None, body), VarSet.singleton x)
     | _ -> failwith "TODO: only identity supported by func_to_pmrs"
   in
@@ -226,7 +226,7 @@ let func_to_pmrs (f : Variable.t) (args : fpattern list) (body : Term.term) =
     pinput_typ = [ tin ];
     poutput_typ = tout;
     pspec = empty_spec;
-    pargs = Set.elements (fpat_vars (PatTup args));
+    pargs = Set.elements (fpat_vars (FPatTup args));
     psyntobjs = VarSet.empty;
     (* PMRS from a function cannot have unkowns. *)
     porder = 0;

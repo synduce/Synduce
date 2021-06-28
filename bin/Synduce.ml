@@ -26,7 +26,8 @@ let print_usage () =
     \       --no-simplify               Don't simplify equations with partial evaluation.\n\
     \       --no-gropt                  Don't optimize grammars.\n\
     \       --no-lifting                Don't attempt lifting.\n\
-    \    -C --check-unrealizable        Check if synthesis problems are functionally realizable.\n\
+    \    -u --no-check-unrealizable     Do not check if synthesis problems are functionally \
+     realizable.\n\
     \  Bounded checking:\n\
     \       --use-bmc                   Use acegis bounded model checking (bmc mode).\n\
     \    -b --bmc=MAX_DEPTH             Maximum depth of terms for bounded model checking, in bmc \
@@ -49,7 +50,7 @@ let options =
   [
     ('b', "bmc", None, Some Config.set_check_depth);
     ('c', "simple-init", set Config.simple_init true, None);
-    ('C', "check-unrealizable", set Config.check_unrealizable true, None);
+    ('u', "no-check-unrealizable", set Config.check_unrealizable false, None);
     ('d', "debug", set Config.debug true, None);
     ('h', "help", Some print_usage, None);
     ('i', "info-off", set Config.info false, None);
@@ -114,8 +115,9 @@ let main () =
               (box (Algo.AState.pp_soln ~use_ocaml_syntax:is_ocaml_syntax)) frmt target)
       | None -> ());
       (* If no info required, output timing information. *)
-      if not !Config.info then
-        Fmt.(pf stdout "%i,%.4f,%.4f@." !Algo.AState.refinement_steps !Config.verif_time elapsed)
+      if not !Config.info then (
+        Fmt.(pf stdout "%i,%.4f,%.4f@." !Algo.AState.refinement_steps !Config.verif_time elapsed);
+        Fmt.(pf stdout "success@."))
   | Error _ -> Utils.Log.error_msg "No solution found.");
   if !Config.show_vars then Term.Variable.print_summary stdout ()
 

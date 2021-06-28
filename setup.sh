@@ -106,5 +106,6 @@ fi
 
 sep "Calling the tool, should print help message..."
 ./Synduce -h
-
+sep "Running tests: should take about 10mins..."
+./test/runtests.sh
 sep "Please update your environment (source $HOME/.profile) before running the tool."

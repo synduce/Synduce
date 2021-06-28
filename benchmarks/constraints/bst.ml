@@ -7,7 +7,7 @@ let rec tree_max = function Leaf x -> x | Node (a, l, r) -> max a (min (tree_max
 let rec is_bst t = aux (tree_max t) (tree_min t) t
 
 and aux hi lo = function
-  | Leaf a -> true
+  | Leaf a -> lo <= a && a <= hi
   | Node (a, l, r) -> lo <= a && a <= hi && aux lo a l && aux a hi r
 
 let repr x = x

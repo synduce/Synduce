@@ -11,7 +11,8 @@ val nonreduced_terms :
 
 val nonreduced_terms_all : AState.psi_def -> Term.term -> (Term.variable * Term.term list) list
 
-val replace_rhs_of_main : ?for_mr:bool -> AState.psi_def -> PMRS.t -> Term.term -> Term.term
+val replace_rhs_of_main :
+  ?verbose:bool -> ?for_mr:bool -> AState.psi_def -> PMRS.t -> Term.term -> Term.term
 (** Replace subterms that correspond to the right-hand side of the main rule to avoid capturing f(v)
     when v is a variable. *)
 
@@ -20,6 +21,7 @@ val replace_rhs_of_mains : AState.psi_def -> Term.term -> Term.term
 *)
 
 val simple :
+  ?verbose:bool ->
   ?max_height:int ->
   Term.term ->
   (Term.term, Term.Terms.comparator_witness) Set.t
