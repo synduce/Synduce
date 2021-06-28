@@ -46,7 +46,7 @@ let interactive_lemmas_loop = ref false
   Check whether a system of equations defines a "functionally realizable" synthesis problem.
   OFF by default.
 *)
-let check_unrealizable = ref false
+let check_unrealizable = ref true
 
 (* ============================================================================================= *)
 (*                                GLOBAL TIMING INFO                                             *)

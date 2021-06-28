@@ -271,7 +271,44 @@ module Asyncs = struct
     s_log_outc : OC.t;
   }
 
-  let online_solvers : (int * solver) list ref = ref []
+  let async_online_solvers : (int * solver) list ref = ref []
+
+  let _last_resp : (int, int * Sexp.t) Hashtbl.t = Hashtbl.create (module Int)
+
+  let solver_verbose_response_summary solver s =
+    (* For verbose debugging, print non-sucess messages.
+         Declarations errors are ignored in Z3, it might be useful to see them.
+    *)
+    match s with
+    | Sexp.Atom "success" -> ()
+    | _ ->
+        let resp_ind, prev_resp =
+          Option.value ~default:(0, Sexp.Atom "none") (Hashtbl.find _last_resp solver.s_pid)
+        in
+        let changed =
+          if Sexp.equal prev_resp s then (
+            Hashtbl.set _last_resp ~key:solver.s_pid ~data:(resp_ind + 1, s);
+            false)
+          else (
+            Hashtbl.set _last_resp ~key:solver.s_pid ~data:(0, s);
+            true)
+        in
+        if changed then (
+          if resp_ind > 0 then
+            Log.verbose (fun frmt () ->
+                Fmt.pf frmt "%6s [%6i] ... %i more." solver.s_name solver.s_pid resp_ind);
+          Log.verbose (fun frmt () ->
+              Fmt.pf frmt "%6s [%6i] 📢@; @[%a@]" solver.s_name solver.s_pid Sexp.pp_hum s))
+        else ()
+
+  let solver_verbose_pp_last_resp_count solver =
+    let resp_ind, s =
+      Option.value ~default:(0, Sexp.Atom "none") (Hashtbl.find _last_resp solver.s_pid)
+    in
+    if resp_ind > 0 then
+      Log.verbose (fun frmt () ->
+          Fmt.pf frmt "%6s [%6i] ... %i more \"%a\" answers." solver.s_name solver.s_pid resp_ind
+            Sexp.pp_hum s)
 
   let already_declared (solver : solver) (s : smtSymbol) : bool =
     match Hashtbl.find solver.s_declared (str_of_symb s) with
@@ -290,14 +327,7 @@ module Asyncs = struct
         with Failure _ -> read_until_sexp buf
       in
       let%lwt s = read_until_sexp (Buffer.create 10) in
-      (* For verbose debugging, print non-sucess messages.
-         Declarations errors are ignored in Z3, it might be useful to see them.
-      *)
-      (match s with
-      | Sexp.Atom "success" -> ()
-      | _ ->
-          Log.verbose (fun frmt () ->
-              Fmt.pf frmt "%6s [%6i] 📢@; @[%a@]" solver.s_name solver.s_pid Sexp.pp_hum s));
+      solver_verbose_response_summary solver s;
       return (parse_response [ s ])
     with _ -> return (Error "Error reading solver response.")
 
@@ -386,7 +416,7 @@ module Asyncs = struct
         s_log_outc = OC.create log_file;
       }
     in
-    online_solvers := (pinfo#pid, solver) :: !online_solvers;
+    async_online_solvers := (pinfo#pid, solver) :: !async_online_solvers;
     (* The solver returned is bound to a task that can be cancelled. *)
     try
       let (m, task_r) : int t * int u = Lwt.task () in
@@ -415,6 +445,7 @@ module Asyncs = struct
             s.s_pinfo#terminate)
 
   let close_solver (solver : solver) : unit t =
+    solver_verbose_pp_last_resp_count solver;
     Log.debug
       Fmt.(
         fun fmt () ->

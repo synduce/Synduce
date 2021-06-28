@@ -160,6 +160,13 @@ let check_unrealizable (unknowns : VarSet.t) (eqns : equation_system) : unrealiz
               ctexs));
   ctexs
 
+(** [check_tinv_unsat ~p tinv c] checks whether the counterexample [c] satisfies the predicate
+  [tinv] in the synthesis problem [p]. The function returns a promise of a solver response and
+  the resolver associated to that promise (the promise is cancellable).
+  If the solver response is unsat, then there is a proof that the counterexample [c] does not
+  satisfy the predicate [tinv]. In general, if the reponse is not unsat, the solver either
+  stalls or returns unknown.
+*)
 let check_tinv_unsat ~(p : psi_def) (tinv : PMRS.t) (ctex : ctex) :
     Solvers.Asyncs.response * int Lwt.u =
   let open Solvers in
@@ -229,8 +236,9 @@ let check_tinv_unsat ~(p : psi_def) (tinv : PMRS.t) (ctex : ctex) :
   in
   Asyncs.(cancellable_task (Asyncs.make_cvc4_solver ()) build_task)
 
-(** `check_tinv_sat ~p tinv ctex` checks whether the counterexample `ctex` satisfies
-    the invariant `tinv` (a PMRS).
+(** [check_tinv_sat ~p tinv ctex] checks whether the counterexample [ctex] satisfies
+    the invariant [tinv] (a PMRS). The function returns a pair of a promise of a solver
+    response and a resolver for that promise. The promise is cancellable.
  *)
 let check_tinv_sat ~(p : psi_def) (tinv : PMRS.t) (ctex : ctex) :
     Solvers.Asyncs.response * int Lwt.u =
@@ -314,6 +322,7 @@ let check_tinv_sat ~(p : psi_def) (tinv : PMRS.t) (ctex : ctex) :
       | _, false | None, _ -> return SmtLib.Unknown
     in
     let%lwt _ = starter in
+    (* TODO : logic *)
     let%lwt () = Asyncs.set_logic solver "LIA" in
     let%lwt () = Asyncs.load_min_max_defs solver in
     let%lwt res = expand_loop (return (TermSet.singleton ctex.ctex_eqn.eterm)) in
