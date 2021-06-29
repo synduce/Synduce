@@ -12,4 +12,4 @@ open Syguslib
 val solve_problem :
   (string * string * string) option ->
   (string, PMRS.t, String.comparator_witness) Map.t ->
-  (AState.soln, Sygus.solver_response) Result.t
+  AState.psi_def * (AState.soln, Sygus.solver_response) Result.t

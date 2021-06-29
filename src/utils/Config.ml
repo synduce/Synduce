@@ -9,6 +9,9 @@ let debug_msg_max_chars = ref 400
 (* Toggle info messages. Set to true by default. *)
 let info = ref true
 
+(* Toggle printing timing info when info is off. Set to true by default. *)
+let timings = ref true
+
 (** Maximum steps of rewrites to apply during PMRS reduction (symbolic evaluation). *)
 let reduction_limit = ref 100
 
@@ -18,12 +21,25 @@ let show_vars = ref false
 (** Toggle verbose messages. *)
 let verbose = ref false
 
+(** Optional output folder for solution.
+    If None, the solution is only printed on the standard output.
+    If Some path, the solution is written in path/inputfilename
+*)
+let output_folder : string option ref = ref None
+
+let set_output_folder s = output_folder := Some s
+
+let get_output_file s =
+  Option.map !output_folder ~f:(fun o_f ->
+      let base = Caml.Filename.basename s in
+      Caml.Filename.concat o_f base)
+
 (* ============================================================================================= *)
 (*                                TEMPORARY OPTIONS                                              *)
 (* ============================================================================================= *)
 
 (**
-  Prompt user to input a precondition (lemma) for each equation, while the equations are being generated from a set of terms in Equations.make. 
+  Prompt user to input a precondition (lemma) for each equation, while the equations are being generated from a set of terms in Equations.make.
 *)
 let interactive_lemmas = ref false
 
@@ -33,7 +49,7 @@ let interactive_lemmas_loop = ref false
   Check whether a system of equations defines a "functionally realizable" synthesis problem.
   OFF by default.
 *)
-let check_unrealizable = ref false
+let check_unrealizable = ref true
 
 (* ============================================================================================= *)
 (*                                GLOBAL TIMING INFO                                             *)
@@ -63,6 +79,14 @@ let z3_binary_path = try FileUtil.which "z3" with _ -> failwith "Z3 not found."
 let dryadsynth_binary_path = try FileUtil.which "DryadSynth" with _ -> ""
 
 let eusolver_binary_path = try FileUtil.which "eusolver" with _ -> ""
+
+(* Smt solver logging. *)
+
+let smt_solver_log_file = ref "/tmp/solver.smt2"
+
+let smt_log_queries = ref true
+
+let smt_solve_verbose = ref true
 
 (* ============================================================================================= *)
 (*                  SYSTEM OF EQUATIONS OPTIMIZATION FLAGS                                       *)
@@ -148,3 +172,12 @@ let check_depth = ref 5
 let set_check_depth (s : string) =
   let i = Int.of_string s in
   if i > 0 && i < 1024 then check_depth := i
+
+(** A time limit for induction proofs.
+  Infinity if set to negative.
+*)
+let induction_proof_tlimit = ref (-1)
+
+let set_induction_proof_tlimit (s : string) =
+  let i = Int.of_string s in
+  induction_proof_tlimit := i

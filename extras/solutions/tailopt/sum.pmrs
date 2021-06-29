@@ -1,0 +1,12 @@
+
+let s0  = 0
+
+let oplus x1 x2 = x1 + x2
+
+target⟨oplus, s0⟩(l): int list -> int  = 
+{
+  ‣ main l   ⟹  f s0 l
+    f s Nil  ⟹  s
+    f s Cons(hd, tl)  ⟹  f (oplus s hd) tl
+  
+  }

@@ -1,0 +1,12 @@
+
+let odot (j, j0) (j1, j2) = (min j j1, min j0 (max j1 (min j j2)))
+
+let f_0 x x0 = (min x x0, max x x0)
+
+target⟨odot, f_0⟩(l): int clist -> (int * int)  = 
+{
+  ‣ target t   ⟹  h t
+    h  CTwo(a, b)  ⟹  f_0 a b
+    h  Concat(x, y)  ⟹  odot (h x) (h y)
+  
+  }

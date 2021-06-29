@@ -1,0 +1,10 @@
+
+let odot (j, j0, j1) (j2, j3, j4) = (j, j3, j1 && (j4 && (j2 > j0)))
+
+target⟨odot⟩(): int clist -> (int * int * bool)  = 
+{
+  ‣ main t   ⟹  h t
+    h  Single(a)  ⟹  (a, a, true)
+    h  Concat(y, z)  ⟹  odot (h y) (h z)
+  
+  }

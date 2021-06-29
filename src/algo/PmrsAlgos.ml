@@ -10,7 +10,7 @@ let rec refinement_loop (p : psi_def) (lstate : refinement_loop_state) =
   (* Output status information before entering process. *)
   let elapsed = Unix.gettimeofday () -. !Config.glob_start in
   Log.info (fun frmt () -> Fmt.pf frmt "Refinement step %i." !refinement_steps);
-  (if not !Config.info then
+  (if (not !Config.info) && !Config.timings then
    Fmt.(
      pf stdout "%i,%3.3f,%3.3f,%i,%i@." !refinement_steps !Config.verif_time elapsed
        (Set.length lstate.t_set) (Set.length lstate.u_set)));
@@ -94,7 +94,7 @@ let sync_args p : psi_def =
 
 let solve_problem (psi_comps : (string * string * string) option)
     (pmrs : (string, PMRS.t, Base.String.comparator_witness) Map.t) :
-    (soln, solver_response) Result.t =
+    psi_def * (soln, solver_response) Result.t =
   let target_fname, spec_fname, repr_fname =
     match psi_comps with
     | Some names -> names
@@ -117,7 +117,7 @@ let solve_problem (psi_comps : (string * string * string) option)
             let x = Variable.mk "x" in
             let xt = Variable.vtype_or_new x in
             let repr_fun = Variable.mk ~t:(Some (TFun (xt, xt))) repr_fname in
-            (Either.Second (repr_fun, [ PatVar x ], mk_var x), RType.TFun (xt, xt)))
+            (Either.Second (repr_fun, [ FPatVar x ], mk_var x), RType.TFun (xt, xt)))
   in
   (* Reference function. *)
   let reference_f, tau =
@@ -197,7 +197,7 @@ let solve_problem (psi_comps : (string * string * string) option)
     match repr with Either.First p -> p | Either.Second (f, a, b) -> PMRS.func_to_pmrs f a b
   in
   let tinv_pmrs =
-    match reference_f.pspec.requires with
+    match target_f.pspec.requires with
     | Some t -> (
         match t.tkind with TVar func_var -> Hashtbl.find PMRS._globals func_var.vid | _ -> None)
     | None -> None
@@ -242,6 +242,7 @@ let solve_problem (psi_comps : (string * string * string) option)
   AState._span := List.length (Analysis.terms_of_max_depth 1 theta);
   AState.refinement_steps := 0;
   (* Solve the problem. *)
-  if !Config.use_acegis then Baselines.algo_acegis problem
-  else if !Config.use_ccegis then Baselines.algo_ccegis problem
-  else psi problem
+  ( problem,
+    if !Config.use_acegis then Baselines.algo_acegis problem
+    else if !Config.use_ccegis then Baselines.algo_ccegis problem
+    else psi problem )

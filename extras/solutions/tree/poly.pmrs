@@ -1,0 +1,13 @@
+
+let s0  = (0, 1)
+
+let join x7 x8 (j, j0) (j1, j2) =
+  (j + (j0 × (x8 + (x7 × j1))), x7 × (j0 × j2))
+
+target⟨join, s0⟩(poly_in): int tree -> (int * int)  = 
+{
+  ‣ main t1   ⟹  h t1
+    h  Nil  ⟹  s0
+    h  Node(a, l, r)  ⟹  join poly_in a (h l) (h r)
+  
+  }

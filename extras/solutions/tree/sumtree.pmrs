@@ -1,0 +1,12 @@
+
+let s0  = 0
+
+let join x2 x3 x4 = (x3 + x2) + x4
+
+target⟨join, s0⟩(): int tree -> int  = 
+{
+  ‣ main t1   ⟹  h t1
+    h  Nil  ⟹  s0
+    h  Node(a, l, r)  ⟹  join a (h l) (h r)
+  
+  }

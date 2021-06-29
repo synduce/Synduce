@@ -68,16 +68,16 @@ let seek_types (prog : program) =
    ```fterm_to_term loc v g l t``` transforms fterm t at location loc into a term,
     using the variables in v, the global variables in g and the local variables in l.
 *)
-let fterm_to_term _ allv globs locs rterm =
+let fterm_to_term _ (allv : Term.VarSet.t) globs (locals : Term.VarSet.t) rterm =
   let fterm_function_args args =
     let rec f x =
       match x.kind with
-      | FTTup tl -> Term.(PatTup (List.map ~f tl))
-      | FTVar id -> Term.(PatVar (Variable.mk id))
+      | FTTup tl -> Term.(FPatTup (List.map ~f tl))
+      | FTVar id -> Term.(FPatVar (Variable.mk id))
       | _ -> loc_fatal_errmsg x.pos "Function arguments can only be variables or tuples."
     in
     let t_args = List.map ~f args in
-    (Term.(fpat_vars (PatTup t_args)), t_args)
+    (Term.(fpat_vars (FPatTup t_args)), t_args)
   in
   let findv loc env k =
     match Map.find env k with
@@ -88,7 +88,7 @@ let fterm_to_term _ allv globs locs rterm =
         | Some x -> x)
     | Some x -> x
   in
-  let _env = Term.VarSet.to_env locs in
+  let _env = Term.VarSet.to_env locals in
   let rec f env t =
     match t.kind with
     | FTConst c -> Term.mk_const ~pos:t.pos c
@@ -246,7 +246,7 @@ let translate_function loc globs (f : Term.Variable.t) (args : Term.Variable.t l
         first (Term.infer_type x))
   in
   Term.Variable.update_var_types [ (Term.Variable.vtype_or_new f, f_type) ];
-  (f, List.map ~f:(fun v -> Term.PatVar v) args, t_invar, typed_body)
+  (f, List.map ~f:(fun v -> Term.FPatVar v) args, t_invar, typed_body)
 
 let translate (prog : program) =
   let globals : (string, Term.variable) Hashtbl.t = Hashtbl.create (module String) in

@@ -4,8 +4,12 @@ let rec spec t = f (0, 0) t
 
 and f s = function
   | Nil -> s
-  | Single a -> (fun (sum1, m1) -> (sum1 + a, max m1 (sum1 + a))) s
-  | Node (a, l, r) -> f ((fun (sum1, m1) -> f (sum1 + a, max m1 (sum1 + a)) l) s) r
+  | Single a ->
+      let sum1, m1 = s in
+      (sum1 + a, max m1 (sum1 + a))
+  | Node (a, l, r) ->
+      let sum1, m1 = s in
+      f (f (sum1 + a, max m1 (sum1 + a)) l) r
   [@@ensures fun (x, y) -> y >= 0 && y >= x]
 
 let rec mpps = function

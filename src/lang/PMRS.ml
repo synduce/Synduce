@@ -206,7 +206,7 @@ let infer_pmrs_types (prog : t) =
   | None -> failwith "Failed infering types for pmrs."
 
 (* ============================================================================================= *)
-(*                             TRANSLATION FROM FUNCTION to PMRS                                 *)
+(*                             TRANSLATION FROM FUNCTION to PMRS and back                        *)
 (* ============================================================================================= *)
 
 let func_to_pmrs (f : Variable.t) (args : fpattern list) (body : Term.term) =
@@ -217,7 +217,7 @@ let func_to_pmrs (f : Variable.t) (args : fpattern list) (body : Term.term) =
   in
   let pmain_symb, prules, pnon_terminals =
     match (args, body) with
-    | [ PatVar x ], { tkind = TVar x_v; _ } when Variable.(x = x_v) ->
+    | [ FPatVar x ], { tkind = TVar x_v; _ } when Variable.(x = x_v) ->
         (f, Map.singleton (module Int) 0 (f, [ x ], None, body), VarSet.singleton x)
     | _ -> failwith "TODO: only identity supported by func_to_pmrs"
   in
@@ -226,7 +226,7 @@ let func_to_pmrs (f : Variable.t) (args : fpattern list) (body : Term.term) =
     pinput_typ = [ tin ];
     poutput_typ = tout;
     pspec = empty_spec;
-    pargs = Set.elements (fpat_vars (PatTup args));
+    pargs = Set.elements (fpat_vars (FPatTup args));
     psyntobjs = VarSet.empty;
     (* PMRS from a function cannot have unkowns. *)
     porder = 0;
@@ -234,6 +234,95 @@ let func_to_pmrs (f : Variable.t) (args : fpattern list) (body : Term.term) =
     prules;
     pnon_terminals;
   }
+
+let build_match_cases pmrs _nont vars (relevant_rules : rewrite_rule list) :
+    (term * match_case list) option =
+  let build_with matched_var rest_args =
+    let rule_to_match_case (_, var_args, pat, body) =
+      let pattern =
+        match pat with Some (d, l) -> Some (pattern_of_term (mk_data d l)) | None -> None
+      in
+      let non_pattern_matched_args = pmrs.pargs @ var_args in
+      let case_body =
+        let extra_param_args = List.map ~f:Term.mk_var pmrs.pargs in
+        let body' =
+          let case f t =
+            match t.tkind with
+            | TApp ({ tkind = TVar fv; _ }, args) ->
+                if Set.mem pmrs.pnon_terminals fv then
+                  let args' = List.map ~f args in
+                  Some (mk_app (Term.mk_var fv) (extra_param_args @ args'))
+                else None
+            | _ -> None
+          in
+          Term.transform ~case body
+        in
+        let sub =
+          match
+            List.map2
+              ~f:(fun v x -> (Term.mk_var v, Term.mk_var x))
+              non_pattern_matched_args rest_args
+          with
+          | Ok zipped -> zipped
+          | Unequal_lengths -> failwith "Unexpected."
+        in
+        substitution sub body'
+      in
+      Option.map ~f:(fun x -> (x, case_body)) pattern
+    in
+    Option.map
+      ~f:(fun l -> (mk_var matched_var, l))
+      (all_or_none (List.map ~f:rule_to_match_case relevant_rules))
+  in
+  match (List.last vars, List.drop_last vars) with
+  | Some x, Some rest -> build_with x rest
+  | _ -> None
+
+let single_rule_case vars (args, body) : term =
+  let sub =
+    match List.map2 ~f:(fun v x -> (Term.mk_var v, Term.mk_var x)) args vars with
+    | Ok zipped -> zipped
+    | Unequal_lengths -> failwith "Unexpected."
+  in
+  substitution sub body
+
+let vars_and_formals (pmrs : t) (fvar : variable) =
+  let args_t, _ = RType.fun_typ_unpack (Variable.vtype_or_new fvar) in
+  List.map
+    ~f:(fun rt ->
+      let v =
+        Variable.mk ~t:(Some rt) (Alpha.fresh ~s:("x" ^ String.drop_suffix fvar.vname 2) ())
+      in
+      v)
+    (List.map ~f:(fun v -> Variable.vtype_or_new v) pmrs.pargs @ args_t)
+
+let func_of_pmrs (pmrs : t) : function_descr list =
+  (* Define recursive functions. *)
+  let fun_of_nont (nont : variable) : function_descr option =
+    let vars = vars_and_formals pmrs nont in
+    let maybe_body =
+      let relevant_rules =
+        Map.data (Map.filter ~f:(fun (k, _, _, _) -> k.vid = nont.vid) pmrs.prules)
+      in
+      let all_pattern_matching =
+        List.for_all relevant_rules ~f:(fun (_, _, pat, _) -> Option.is_some pat)
+      in
+      if all_pattern_matching then
+        match build_match_cases pmrs nont vars relevant_rules with
+        | Some (x, match_cases) -> Some (mk_match x match_cases)
+        | None -> (
+            match relevant_rules with
+            | [ (_, args, _, body) ] -> Some (single_rule_case vars (args, body))
+            | _ -> None)
+      else
+        match relevant_rules with
+        | [ (_, args, _, body) ] -> Some (single_rule_case vars (args, body))
+        | _ -> None
+    in
+    Option.map maybe_body ~f:(fun body ->
+        { f_var = nont; f_args = List.map ~f:mk_pat_var vars; f_body = body })
+  in
+  List.filter_map ~f:fun_of_nont (Set.elements pmrs.pnon_terminals)
 
 (* ============================================================================================= *)
 (*                                           UTILS FOR PMRS                                      *)
@@ -289,3 +378,15 @@ let subst_rule_rhs ~(p : t) (substs : (term * term) list) =
     Map.map ~f p.prules
   in
   { p with prules = rules' }
+
+(**
+  Given an input PMRS, returns a list of PMRS that this PMRS depends on.
+  *)
+let depends (p : t) : t list =
+  let f (_, _, _, rule_body) =
+    let vars = Analysis.free_variables rule_body in
+    List.filter_map ~f:(fun v -> Hashtbl.find _globals v.vid) (Set.elements vars)
+  in
+  List.dedup_and_sort
+    ~compare:(fun p1 p2 -> String.compare p1.pvar.vname p2.pvar.vname)
+    (List.concat_map ~f (Map.data p.prules))

@@ -1,0 +1,3 @@
+(tests
+ (names DafnyProofGeneration TestLib)
+ (libraries Lib fmt))
