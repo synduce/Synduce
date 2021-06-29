@@ -286,21 +286,75 @@ let pp_d_datatype_constr_decl (frmt : Formatter.t) (dc : d_datatype_constr_decl)
 let pp_d_ident_type (fmt : Formatter.t) ((id, ty) : d_ident_type) : unit =
   pf fmt "%s : %a" id pp_d_domain_type ty
 
-let pp_clause (clause_name : string) (fmt : Formatter.t) (c : d_clause) : unit =
-  pf fmt "@[%s %a@]" clause_name Term.pp_term c
+let newl frmt () = Fmt.(pf frmt "\n")
 
+let rec pp_d_term (frmt : Formatter.t) (x : Term.term) =
+  match x.tkind with
+  | TConst c -> pf frmt "%a" Term.Constant.pp c
+  | TVar v -> pf frmt "%a" Term.Variable.pp v
+  | TBin (op, t1, t2) -> (
+      match op with
+      | Term.Binop.Max | Term.Binop.Min ->
+          pf frmt "@[<hov 2>%a@;%a@;%a@]" Term.Binop.pp op pp_d_term t1 pp_d_term t2
+      | Term.Binop.Eq ->
+          pf frmt "@[<hov 2>(%a@;%a@;%a)@]" pp_d_term t1
+            (fun f _ -> Fmt.string f "==")
+            op pp_d_term t2
+      | _ -> pf frmt "@[<hov 2>%a@;%a@;%a@]" pp_d_term t1 Term.Binop.pp op pp_d_term t2)
+  | TUn (op, t1) -> pf frmt "@[<hov 2>%a@;%a@]" Term.Unop.pp op pp_d_term t1
+  | TIte (c, t1, t2) -> pf frmt "@[<hov 2>%a@;?@;%a@;:@;%a@]" pp_d_term c pp_d_term t1 pp_d_term t2
+  | TTup tl -> pf frmt "@[<hov 2>(%a)@]" (list ~sep:comma pp_d_term) tl
+  | TSel (t, i) -> pf frmt "@[<hov 2>%a.%i@]" pp_d_term t i
+  | TFun (args, body) ->
+      pf frmt "@[<hov 2>fun %a -> %a@]" (list ~sep:sp Term.pp_fpattern) args pp_d_term body
+      (* Todo: check if a separate pp_fpattern function needs to be written *)
+      (* Also todo: This needs to be rewritten to support Dafny lambda expressions*)
+  | TApp (func, args) -> pf frmt "@[<hov 2>%a(%a)@]" pp_d_term func (list ~sep:comma pp_d_term) args
+  | TData (cstr, args) ->
+      if List.length args = 0 then pf frmt "%a" (styled (`Fg `Green) string) cstr
+      else pf frmt "%a(%a)" (styled (`Fg `Green) string) cstr (list ~sep:comma pp_d_term) args
+  | _ -> Term.pp_term frmt x
+
+let pp_clause (clause_name : string) (fmt : Formatter.t) (c : d_clause) : unit =
+  pf fmt "@[%s %a@]" clause_name pp_d_term c
+
+(* Todo: Clean this up*)
 let pp_d_spec (fmt : Formatter.t) (spec : d_spec) : unit =
   match spec.dspec_kind with
   | DSpecMethod ->
-      list ~sep:sp (pp_clause "modifies") fmt spec.dspec_modifies;
-      list ~sep:sp (pp_clause "requires") fmt spec.dspec_requires;
-      list ~sep:sp (pp_clause "ensures") fmt spec.dspec_ensures;
-      list ~sep:sp (pp_clause "decreases") fmt spec.dspec_decreases
+      list ~sep:newl (pp_clause "modifies") fmt spec.dspec_modifies;
+      (match spec.dspec_requires @ spec.dspec_ensures @ spec.dspec_decreases with
+      | [] -> ()
+      | _ -> ( match spec.dspec_modifies with [] -> () | _ -> newl fmt ()));
+      list ~sep:newl (pp_clause "requires") fmt spec.dspec_requires;
+      (match spec.dspec_ensures @ spec.dspec_decreases with
+      | [] -> ()
+      | _ -> ( match spec.dspec_modifies @ spec.dspec_requires with [] -> () | _ -> newl fmt ()));
+      list ~sep:newl (pp_clause "ensures") fmt spec.dspec_ensures;
+      (match spec.dspec_decreases with
+      | [] -> ()
+      | _ -> (
+          match spec.dspec_modifies @ spec.dspec_requires @ spec.dspec_ensures with
+          | [] -> ()
+          | _ -> newl fmt ()));
+      list ~sep:newl (pp_clause "decreases") fmt spec.dspec_decreases
   | DSpecFunction ->
-      list ~sep:sp (pp_clause "reads") fmt spec.dspec_reads;
-      list ~sep:sp (pp_clause "requires") fmt spec.dspec_requires;
-      list ~sep:sp (pp_clause "ensures") fmt spec.dspec_ensures;
-      list ~sep:sp (pp_clause "decreases") fmt spec.dspec_decreases
+      list ~sep:newl (pp_clause "reads") fmt spec.dspec_reads;
+      (match spec.dspec_requires @ spec.dspec_ensures @ spec.dspec_decreases with
+      | [] -> ()
+      | _ -> ( match spec.dspec_reads with [] -> () | _ -> newl fmt ()));
+      list ~sep:newl (pp_clause "requires") fmt spec.dspec_requires;
+      (match spec.dspec_ensures @ spec.dspec_decreases with
+      | [] -> ()
+      | _ -> ( match spec.dspec_reads @ spec.dspec_requires with [] -> () | _ -> newl fmt ()));
+      list ~sep:newl (pp_clause "ensures") fmt spec.dspec_ensures;
+      (match spec.dspec_decreases with
+      | [] -> ()
+      | _ -> (
+          match spec.dspec_reads @ spec.dspec_requires @ spec.dspec_ensures with
+          | [] -> ()
+          | _ -> newl fmt ()));
+      list ~sep:newl (pp_clause "decreases") fmt spec.dspec_decreases
   | DSpecLambda ->
       list ~sep:sp (pp_clause "reads") fmt spec.dspec_reads;
       list ~sep:sp (pp_clause "requires") fmt spec.dspec_requires
@@ -425,6 +479,9 @@ let mk_bool_type = DTyBool
 
 let mk_char_type = DTyChar
 
+let mk_string_type = DTyString
+
+let mk_tuple_type (el: d_domain_type list) = DTyTuple el
 let mk_named_type ?(params = []) name : d_domain_type = DTyNamed (name, params)
 
 let mk_datatype_constr ?(attr = None) (name : string) (args : (string option * d_domain_type) list)
@@ -464,3 +521,12 @@ let mk_lemma ?(attrs = []) (method_name : string) (signature : d_method_signatur
 
 let mk_toplevel ?(modifiers = []) (dt_kind : d_decl_kind) : d_toplevel =
   { dt_modifiers = modifiers; dt_kind }
+
+let mk_func ?(attrs = []) (func_name : string) (signature : d_function_signature) (spec : d_spec)
+    (body : d_body) : d_decl_kind =
+  let func_decl = DClassFunction (func_name, DFkFunction false, attrs, signature, spec, body) in
+  DClassMemberDecl (DDmNone, func_decl)
+
+let mk_func_sig ?(params = None) ?(ktype = None) ?(returns = []) (formals : d_ident_type list) :
+    d_function_signature =
+  { dfsig_params = params; dfsig_ktype = ktype; dfsig_formals = formals; dfsig_return = returns }

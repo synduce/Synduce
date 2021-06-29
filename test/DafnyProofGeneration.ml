@@ -21,8 +21,18 @@ let example_lemma : d_toplevel =
   let body = Body "x + y;" in
   mk_toplevel (mk_lemma "example" signature spec body)
 
+let example_lemma2 : d_toplevel = 
+  let sign = mk_method_sig [ ("a", mk_int_type)] in
+  let spec = 
+    mk_simple_spec
+      ~ensures: [] 
+      ~requires: [] DSpecMethod
+  in
+  let body = Body "a" in
+  mk_toplevel (mk_lemma "example2" sign spec body)
+
 let example_program : d_program =
-  { dp_includes = [ "list" ]; dp_topdecls = [ list_datatype_decl; example_lemma ] }
+  { dp_includes = [ "list" ]; dp_topdecls = [ list_datatype_decl; example_lemma; example_lemma2 ] }
 
 ;;
 Fmt.(pf stdout "Dafny program starts next line:@.%a@." pp_d_program example_program)
