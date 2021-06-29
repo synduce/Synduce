@@ -142,7 +142,7 @@ type d_method_kind =
       (** DMkLemmaExtreme(true) is "greatest lemma", if false "least lemma" *)
 
 type d_method_signature = {
-  dmsig_params : d_generic_param option;  (** The optional signature parameters. *)
+  dmsig_params : d_generic_param list;  (** The optional signature parameters. *)
   dmsig_ktype : d_domain_type option;  (** Optional, for "least" and "greatest" lemmas. *)
   dmsig_formals : d_ident_type list;  (** The formal arguments of the method. *)
   dmsig_returns : d_ident_type list;  (** The return of the method. *)
@@ -159,7 +159,7 @@ type d_function_kind =
       (** DMkPredicateExtreme(true) is "greatest predicate", if false "least predicate" *)
 
 type d_function_signature = {
-  dfsig_params : d_generic_param option;  (** The optional signature parameters. *)
+  dfsig_params : d_generic_param list;  (** The optional signature parameters. *)
   dfsig_ktype : d_domain_type option;  (** Optional, for "least" and "greatest" lemmas. *)
   dfsig_formals : d_ident_type list;  (** The formal arguments of the method. *)
   dfsig_return : d_domain_type list;  (** The return type of the function. *)
@@ -379,7 +379,9 @@ let pp_params (fmt : Formatter.t) (params : d_generic_param list) : unit =
   match params with [] -> () | _ -> pf fmt "<%a>" (list ~sep:comma pp_d_generic_param) params
 
 let pp_d_method_signature (fmt : Formatter.t) (dsig : d_method_signature) : unit =
-  (match dsig.dmsig_params with Some p -> pf fmt "<%a>" pp_d_generic_param p | None -> ());
+  (match dsig.dmsig_params with
+  | [] -> ()
+  | _ -> pf fmt "<%a>" (list ~sep:comma pp_d_generic_param) dsig.dmsig_params);
   match dsig.dmsig_returns with
   | [] -> pf fmt "(%a)@;" (list ~sep:comma pp_d_ident_type) dsig.dmsig_formals
   | _ ->
@@ -387,7 +389,9 @@ let pp_d_method_signature (fmt : Formatter.t) (dsig : d_method_signature) : unit
         (list ~sep:comma pp_d_ident_type) dsig.dmsig_returns
 
 let pp_d_function_signature (fmt : Formatter.t) (dsig : d_function_signature) : unit =
-  (match dsig.dfsig_params with Some p -> pf fmt "<%a>" pp_d_generic_param p | None -> ());
+  (match dsig.dfsig_params with
+  | [] -> ()
+  | _ -> pf fmt "<%a>" (list ~sep:comma pp_d_generic_param) dsig.dfsig_params);
   pf fmt "(%a)@;: %a" (list ~sep:comma pp_d_ident_type) dsig.dfsig_formals
     (list ~sep:comma pp_d_domain_type)
     dsig.dfsig_return
@@ -481,7 +485,8 @@ let mk_char_type = DTyChar
 
 let mk_string_type = DTyString
 
-let mk_tuple_type (el: d_domain_type list) = DTyTuple el
+let mk_tuple_type (el : d_domain_type list) = DTyTuple el
+
 let mk_named_type ?(params = []) name : d_domain_type = DTyNamed (name, params)
 
 let mk_datatype_constr ?(attr = None) (name : string) (args : (string option * d_domain_type) list)
@@ -509,7 +514,7 @@ let mk_simple_spec ?(decreases = []) ~(requires : d_clause list) ~(ensures : d_c
 (** Create a method signature. By default, there are not parameters, no ktype
     and no returns.
 *)
-let mk_method_sig ?(params = None) ?(ktype = None) ?(returns = []) (formals : d_ident_type list) :
+let mk_method_sig ?(params = []) ?(ktype = None) ?(returns = []) (formals : d_ident_type list) :
     d_method_signature =
   { dmsig_params = params; dmsig_ktype = ktype; dmsig_formals = formals; dmsig_returns = returns }
 
@@ -527,6 +532,6 @@ let mk_func ?(attrs = []) (func_name : string) (signature : d_function_signature
   let func_decl = DClassFunction (func_name, DFkFunction false, attrs, signature, spec, body) in
   DClassMemberDecl (DDmNone, func_decl)
 
-let mk_func_sig ?(params = None) ?(ktype = None) ?(returns = []) (formals : d_ident_type list) :
+let mk_func_sig ?(params = []) ?(ktype = None) ?(returns = []) (formals : d_ident_type list) :
     d_function_signature =
   { dfsig_params = params; dfsig_ktype = ktype; dfsig_formals = formals; dfsig_return = returns }

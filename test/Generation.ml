@@ -22,12 +22,48 @@ let gen_variant (variant : type_term) =
       mk_datatype_constr name (List.map (fun term -> (None, convert_tkind term)) terms)
   | _ -> failwith "Unexpected variant form."
 
+module SS = Set.Make (String)
+
+let rec get_params_from_type_term (tterm : type_term) =
+  match tterm.tkind with
+  | TyFun (t1, t2) -> SS.union (get_params_from_type_term t1) (get_params_from_type_term t2)
+  | TyParam name -> SS.singleton name
+  | TyConstr (params, _) ->
+      List.fold_left SS.union SS.empty (List.map get_params_from_type_term params)
+  | TySum variants -> List.fold_left SS.union SS.empty (List.map get_params_from_type_term variants)
+  | TyVariant (_, terms) ->
+      List.fold_left SS.union SS.empty (List.map get_params_from_type_term terms)
+  | _ -> SS.empty
+
 let gen_type_decl (typename : string) (tterm : type_term) =
   match tterm.tkind with
   | TySum variants ->
       let constructors : d_datatype_constr_decl list = List.map gen_variant variants in
-      mk_toplevel (mk_datatype_decl typename constructors)
+      let params = SS.elements (get_params_from_type_term tterm) in
+      mk_toplevel
+        (mk_datatype_decl
+           ~params:(List.map (fun name -> (None, name)) params)
+           typename constructors)
   | _ -> failwith "Unsupported type declaration."
+
+let rec get_params_from_type = function
+  | TTup el -> List.fold_left SS.union SS.empty (List.map get_params_from_type el)
+  | TFun (t1, t2) -> SS.union (get_params_from_type t1) (get_params_from_type t2)
+  | TParam (params, _) ->
+      List.fold_left SS.union SS.empty
+        (List.map
+           (fun param ->
+             match param with
+             | TNamed name -> SS.singleton name
+             | _ -> failwith "Unsupported param type.")
+           params)
+  | _ -> SS.empty
+
+let rec get_params_from_arg = function
+  | FPatVar var -> (
+      let typ = Variable.vtype var in
+      match typ with Some t -> get_params_from_type t | None -> SS.empty)
+  | FPatTup vars -> List.fold_left SS.union SS.empty (List.map get_params_from_arg vars)
 
 let rec convert_otyp_to_dfy (typ : t) : d_domain_type =
   match typ with
@@ -71,7 +107,16 @@ let gen_func_arg (arg : fpattern) : string * d_domain_type =
 let gen_func_decl (func : term) =
   match func.tkind with
   | TFun (args, body) ->
-      let signature = mk_func_sig ~returns:[] (List.map gen_func_arg args) in
+      let return_type = match infer_type body with t, _ -> convert_otyp_to_dfy t.ttyp in
+      let arguments = List.map gen_func_arg args in
+      let params: string list =
+        SS.elements (List.fold_left SS.union SS.empty (List.map get_params_from_arg args))
+      in
+      let signature =
+        mk_func_sig
+          ~params:(List.map (fun name -> (None, name)) params)
+          ~returns:[ return_type ] arguments
+      in
       let spec = mk_simple_spec ~ensures:[] ~requires:[] DSpecFunction in
       let body = Body (Fmt.str "%a" pp_term body) in
       mk_toplevel (mk_func "target" signature spec body)
@@ -90,17 +135,15 @@ let ex_tree_decl =
     ]
 
 let ex_repr_decl =
-  let x = ... in
-  mk_fun
-    [ FPatVar (Variable.mk ~t:(Some (TParam ([ TNamed "a" ], TNamed "Tree"))) "x") ]
-    (mk_var (Variable.mk "x"))
-  
-let f = infer_type (mk_var (Variable.mk "x"))
+  let x = Variable.mk ~t:(Some (TParam ([ TNamed "a" ], TNamed "Tree"))) "x" in
+  mk_fun [ FPatVar x ] (mk_var x)
 
 let tree_datatype_decl = gen_type_decl "Tree" ex_tree_decl
 
 let repr_decl = gen_func_decl ex_repr_decl
-let example_program : d_program = { dp_includes = []; dp_topdecls = [ tree_datatype_decl; repr_decl] }
+
+let example_program : d_program =
+  { dp_includes = []; dp_topdecls = [ tree_datatype_decl; repr_decl ] }
 
 ;;
 Fmt.(pf stdout "%a" pp_d_program example_program)
