@@ -6,13 +6,14 @@ let _tid = ref 0
 
 type ident = string
 
+(** Used for type declarations*)
 type typekind =
-  | TyInt
-  | TyBool
-  | TyString
-  | TyChar
-  | TyFun of type_term * type_term
-  | TyTyp of ident
+  | TyInt  (** The int type.*)
+  | TyBool  (** The bool type. *)
+  | TyString  (** The string type. *)
+  | TyChar  (** The char type. *)
+  | TyFun of type_term * type_term  (** The function type. *)
+  | TyTyp of ident 
   | TyParam of ident
   | TyConstr of type_term list * type_term
   | TySum of type_term list
