@@ -37,14 +37,27 @@ let compute_lhs p t =
   Expand.replace_rhs_of_mains p (Reduce.reduce_term final)
 
 let remap_rec_calls p t =
+  let proj_func = Lifting.proj_to_lifting p in
+  let lift_func = Lifting.compose_parts p in
   let g = p.psi_target in
+  let lift_wrapper tx =
+    match (proj_func, lift_func) with
+    | Some pf, Some lf ->
+        let t1 = mk_app (mk_var g.pmain_symb) [ tx ] in
+        let t2 = mk_app pf [ t1 ] in
+        mk_app lf [ compute_lhs p tx; t2 ]
+    | _ -> compute_lhs p tx
+  in
   let t' = Expand.replace_rhs_of_main p g t in
-  let f a _t =
-    match _t.tkind with
-    | TApp ({ tkind = TVar x; _ }, args) ->
-        if a && Variable.equal x g.pmain_symb then
-          match args with [ arg ] -> Either.First (compute_lhs p arg) | _ -> Either.Second a
-        else if Set.mem g.psyntobjs x then Second true
+  let f a t0 =
+    match t0.tkind with
+    | TApp ({ tkind = TVar g'; _ }, args) ->
+        if a && Variable.equal g' g.pmain_symb then
+          match args with
+          | [ { tkind = TVar _; _ } ] -> Either.Second a
+          | [ arg ] -> Either.First (lift_wrapper arg)
+          | _ -> Either.Second a
+        else if Set.mem g.psyntobjs g' then Second true
         else Second a
     | _ -> Second a
   in
@@ -80,15 +93,19 @@ let compute_rhs_with_replacing p t =
   _res
 
 let compute_rhs ?(force_replace_off = false) p t =
-  if not force_replace_off then compute_rhs_with_replacing p t
+  if not force_replace_off then
+    let res = compute_rhs_with_replacing p t in
+    res
   else
     let res =
       Expand.replace_rhs_of_mains p (Reduce.reduce_term (Reduce.reduce_pmrs p.psi_target t))
     in
     res
 
-let make ?(force_replace_off = false) ~(p : psi_def) ~(lemmas : lemma) (tset : TermSet.t) :
-    equation list =
+let make ?(force_replace_off = false) ~(p : psi_def) ~(lemmas : lemma) ~(lifting : lifting)
+    (tset : TermSet.t) : equation list =
+  let _ = lifting in
+  let proj_to_non_lifting = Lifting.proj_to_non_lifting p in
   let eqns =
     let fold_f eqns t =
       let lhs = compute_lhs p t in
@@ -112,6 +129,11 @@ let make ?(force_replace_off = false) ~(p : psi_def) ~(lemmas : lemma) (tset : T
       let applic x = substitution all_subs (Reduce.reduce_term (substitution all_subs x)) in
       (* Compute the lhs and rhs of the equations. *)
       let lhs' = Reduce.reduce_term (applic lhs) and rhs' = Reduce.reduce_term (applic rhs) in
+      let rhs' =
+        match proj_to_non_lifting with
+        | Some func_term -> Reduce.reduce_term (mk_app func_term [ rhs' ])
+        | None -> rhs'
+      in
       let lhs'', rhs'' =
         if !Config.simplify_eqns then (Eval.simplify lhs', Eval.simplify rhs') else (lhs', rhs')
       in

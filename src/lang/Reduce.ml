@@ -111,7 +111,7 @@ let rec reduce_term (t : term) : term =
         with
         | [] -> None
         | (subst_map, rhs_t) :: _ -> Some (substitution (VarMap.to_subst subst_map) rhs_t))
-    | _ -> None
+    | TVar _ | TFun _ | TTup _ | TBin _ | TUn _ | TConst _ | TData _ -> None
   in
   transform ~case t
 

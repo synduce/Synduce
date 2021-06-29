@@ -60,20 +60,36 @@ let get_fresh_tvar () =
   TVar !_tvar_idx
 
 let rec pp (frmt : Formatter.t) (typ : t) =
-  match typ with
-  | TInt -> Fmt.(pf frmt "int")
-  | TBool -> Fmt.(pf frmt "bool")
-  | TString -> Fmt.(pf frmt "string")
-  | TChar -> Fmt.(pf frmt "char")
-  | TNamed s -> Fmt.(pf frmt "%s" s)
-  | TTup tl -> Fmt.(pf frmt "%a" (parens (list ~sep:Utils.ast pp)) tl)
-  | TFun (tin, tout) -> Fmt.(pf frmt "(%a -> %a)" pp tin pp tout)
-  | TParam (alpha, t') -> (
-      match alpha with
-      | [] -> Fmt.(pf frmt "ɑ? %a" pp t')
-      | [ a ] -> Fmt.(pf frmt "%a %a" pp a pp t')
-      | _ -> Fmt.(pf frmt "(%a) %a" (list ~sep:comma pp) alpha pp t'))
-  | TVar i -> Fmt.(pf frmt "α%i" i)
+  if !Config.math_display then
+    match typ with
+    | TInt -> Fmt.(pf frmt "ℤ")
+    | TBool -> Fmt.(pf frmt "𝐁")
+    | TString -> Fmt.(pf frmt "String")
+    | TChar -> Fmt.(pf frmt "𝐂")
+    | TNamed s -> Fmt.(pf frmt "%s" s)
+    | TTup tl -> Fmt.(pf frmt "%a" (parens (list ~sep:Utils.ast pp)) tl)
+    | TFun (tin, tout) -> Fmt.(pf frmt "(%a ⟶  %a)" pp tin pp tout)
+    | TParam (alpha, t') -> (
+        match alpha with
+        | [] -> Fmt.(pf frmt "ɑ? %a" pp t')
+        | [ a ] -> Fmt.(pf frmt "%a %a" pp a pp t')
+        | _ -> Fmt.(pf frmt "(%a) %a" (list ~sep:comma pp) alpha pp t'))
+    | TVar i -> Fmt.(pf frmt "α%s" (to_subscript_unicode i))
+  else
+    match typ with
+    | TInt -> Fmt.(pf frmt "int")
+    | TBool -> Fmt.(pf frmt "bool")
+    | TString -> Fmt.(pf frmt "string")
+    | TChar -> Fmt.(pf frmt "char")
+    | TNamed s -> Fmt.(pf frmt "%s" s)
+    | TTup tl -> Fmt.(pf frmt "%a" (parens (list ~sep:Utils.ast pp)) tl)
+    | TFun (tin, tout) -> Fmt.(pf frmt "(%a -> %a)" pp tin pp tout)
+    | TParam (alpha, t') -> (
+        match alpha with
+        | [] -> Fmt.(pf frmt "param? %a" pp t')
+        | [ a ] -> Fmt.(pf frmt "%a %a" pp a pp t')
+        | _ -> Fmt.(pf frmt "(%a) %a" (list ~sep:comma pp) alpha pp t'))
+    | TVar i -> Fmt.(pf frmt "param%i" i)
 
 let fun_typ_unpack (t : t) : t list * t =
   let rec aux pre = function TFun (a, b) -> aux (pre @ [ a ]) b | _ as _t -> (pre, _t) in
@@ -174,7 +190,7 @@ type substitution = (int * t) list
  *)
 
 (* unify one pair *)
-let rec unify_one (s : t) (t : t) : substitution option =
+let rec unify_one ?(verb = true) (s : t) (t : t) : substitution option =
   match (s, t) with
   | TVar x, TVar y -> if x = y then Some [] else Some [ (x, t) ]
   | TFun (f, sc), TFun (g, tc) -> (
@@ -183,22 +199,25 @@ let rec unify_one (s : t) (t : t) : substitution option =
         match unify_one sc tc with
         | Some u2 -> unify (mkv u1 @ mkv u2)
         | None ->
-            Log.verbose (fun frmt () ->
-                Fmt.(pf frmt "Type unification: cannot unify %a and %a.") pp s pp t);
+            if verb then
+              Log.verbose (fun frmt () ->
+                  Fmt.(pf frmt "Type unification: cannot unify %a and %a.") pp s pp t);
             None))
   | TParam (params1, t1), TParam (params2, t2) -> (
       match List.zip (params1 @ [ t1 ]) (params2 @ [ t2 ]) with
       | Ok pairs -> unify pairs
       | Unequal_lengths ->
-          Log.verbose (fun frmt () ->
-              Fmt.(pf frmt "Type unification: cannot unify %a and %a.") pp s pp t);
+          if verb then
+            Log.verbose (fun frmt () ->
+                Fmt.(pf frmt "Type unification: cannot unify %a and %a.") pp s pp t);
           None)
   | TTup tl1, TTup tl2 -> (
       match List.zip tl1 tl2 with
       | Ok tls -> unify tls
       | Unequal_lengths ->
-          Log.error (fun frmt () ->
-              Fmt.(pf frmt "Type unification: Tuples %a and %a have different sizes") pp s pp t);
+          if verb then
+            Log.error (fun frmt () ->
+                Fmt.(pf frmt "Type unification: Tuples %a and %a have different sizes") pp s pp t);
           None)
   | TVar x, t' | t', TVar x ->
       if occurs x t' then (

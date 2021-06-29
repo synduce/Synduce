@@ -19,7 +19,10 @@ let rec acegis_loop (p : psi_def) (t_set : TermSet.t) =
        (Set.length t_set)));
   Log.debug_msg Fmt.(str "<ACEGIS> Start refinement loop with %i terms in T." (Set.length t_set));
   (* Start of the algorithm. *)
-  let eqns = Equations.make ~force_replace_off:true ~p ~lemmas:Lemmas.empty_lemma t_set in
+  let eqns =
+    Equations.make ~force_replace_off:true ~p ~lemmas:Lemmas.empty_lemma
+      ~lifting:Lifting.empty_lifting t_set
+  in
   let s_resp, solution = Equations.solve ~p eqns in
   match (s_resp, solution) with
   | RSuccess _, First sol -> (
@@ -67,7 +70,10 @@ let rec ccegis_loop (p : psi_def) (t_set : TermSet.t) =
        (Set.length t_set)));
   Log.debug_msg Fmt.(str "<CCEGIS> Start refinement loop with %i terms in T." (Set.length t_set));
   (* Start of the algorithm. *)
-  let eqns = Equations.make ~force_replace_off:true ~p ~lemmas:Lemmas.empty_lemma t_set in
+  let eqns =
+    Equations.make ~force_replace_off:true ~p ~lemmas:Lemmas.empty_lemma
+      ~lifting:Lifting.empty_lifting t_set
+  in
   let s_resp, solution = Equations.solve ~p eqns in
   match (s_resp, solution) with
   | RSuccess _, First sol -> (

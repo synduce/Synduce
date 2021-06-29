@@ -18,6 +18,8 @@ let show_vars = ref false
 (** Toggle verbose messages. *)
 let verbose = ref false
 
+let math_display = ref false
+
 (** Optional output folder for solution.
     If None, the solution is only printed on the standard output.
     If Some path, the solution is written in path/inputfilename

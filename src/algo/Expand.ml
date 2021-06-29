@@ -20,6 +20,25 @@ let identify_rcalls (p : psi_def) (lam : variable) (t : term) : VarSet.t =
   in
   reduce ~init:VarSet.empty ~case ~join t
 
+let mk_recursion_elimination_term (p : psi_def) : (term * term) option =
+  let _, g_out = RType.fun_typ_unpack (Variable.vtype_or_new p.psi_target.pvar)
+  and f_out = fst !AState._alpha in
+  if Option.is_some (RType.unify_one g_out f_out) then
+    let term = mk_composite_base_type f_out in
+    Some (term, term)
+  else
+    match (g_out, f_out) with
+    | TTup tl_lift, TTup tl' ->
+        let args = List.map ~f:mk_composite_base_type tl_lift in
+        let tuple_g = mk_tup args in
+        let tuple_f = mk_tup (List.take args (List.length tl')) in
+        Some (tuple_f, tuple_g)
+    | TTup (_ :: _ as tl_lift), _ ->
+        let args = List.map ~f:mk_composite_base_type tl_lift in
+        let tuple_g = mk_tup args in
+        Some (List.hd_exn args, tuple_g)
+    | _ -> None
+
 let subst_recursive_calls (p : psi_def) (tl : term list) : (term * term) list * TermSet.t =
   let fsymb = p.psi_reference.pmain_symb and gsymb = p.psi_target.pmain_symb in
   let rcalls =
@@ -31,17 +50,21 @@ let subst_recursive_calls (p : psi_def) (tl : term list) : (term * term) list * 
     List.fold ~init:VarSet.empty ~f:fold_f tl
   in
   let f (substs, invariants) var =
-    let scalar_term = mk_composite_base_type (first !AState._alpha) in
+    let scalar_term_f, scalar_term_g =
+      match mk_recursion_elimination_term p with
+      | Some (a, b) -> (a, b)
+      | None -> failwith "Cannot make recursion elimination for this problem."
+    in
     let invariant =
       Option.map (second !AState._alpha) ~f:(fun inv ->
-          first (infer_type (Reduce.reduce_term (mk_app inv [ scalar_term ]))))
+          first (infer_type (Reduce.reduce_term (mk_app inv [ scalar_term_f ]))))
     in
     ( substs
       @ [
-          (mk_app (mk_var fsymb) [ mk_var var ], scalar_term);
-          (mk_app (mk_var gsymb) [ mk_var var ], scalar_term);
+          (mk_app (mk_var fsymb) [ mk_var var ], scalar_term_f);
+          (mk_app (mk_var gsymb) [ mk_var var ], scalar_term_g);
           ( mk_app (mk_var fsymb) [ mk_app (mk_var p.psi_repr.pmain_symb) [ mk_var var ] ],
-            scalar_term );
+            scalar_term_f );
         ],
       match invariant with Some inv -> Set.add invariants inv | None -> invariants )
   in

@@ -66,9 +66,15 @@ module Variable = struct
 
   let _types : (int, RType.t) Hashtbl.t = Hashtbl.create (module Int)
 
+  let _print_info = ref false
+
   let vtype_assign (v : t) (t : RType.t) = Hashtbl.set _types ~key:v.vid ~data:t
 
   let vtype (v : t) = Hashtbl.find _types v.vid
+
+  let clear_type (v : t) =
+    let new_t = RType.get_fresh_tvar () in
+    vtype_assign v new_t
 
   (* `vtype_or_new v` returns the type of variable v, or assigns a fresh type variable
       as its type if it doesn't have one.
@@ -105,7 +111,15 @@ module Variable = struct
 
   let same_name (v : t) (v2 : t) : bool = String.equal v.vname v2.vname
 
-  let pp (frmt : Formatter.t) (v : t) = Fmt.(pf frmt "%s" v.vname)
+  let pp (frmt : Formatter.t) (v : t) =
+    if !_print_info then
+      Fmt.(
+        pf frmt "(%s%a: %a)" v.vname
+          (styled `Faint (fun fmt i -> pf fmt "@%i" i))
+          v.vid
+          (styled `Italic RType.pp)
+          (vtype_or_new v))
+    else Fmt.(pf frmt "%s" v.vname)
 
   let pp_id (frmt : Formatter.t) (v : t) = Fmt.(pf frmt "%s{%i}" v.vname v.vid)
 
@@ -789,6 +803,27 @@ let transform ~(case : (term -> term) -> term -> term option) (t : term) : term 
   and aux_l l = List.map ~f:aux l in
   aux t
 
+let transform_info ~(f : term -> term) (t : term) : term =
+  let rec aux (t : term) : 'a =
+    {
+      (f t) with
+      tkind =
+        (match t.tkind with
+        | TBin (bo, t1, t2) -> TBin (bo, aux t1, aux t2)
+        | TUn (uo, t1) -> TUn (uo, aux t1)
+        | TConst _ -> t.tkind
+        | TVar _ -> t.tkind
+        | TIte (c, a, b) -> TIte (aux c, aux a, aux b)
+        | TTup tl -> TTup (aux_l tl)
+        | TSel (t, i) -> TSel (aux t, i)
+        | TFun (args, body) -> TFun (args, aux body)
+        | TApp (func, args) -> TApp (aux func, aux_l args)
+        | TData (cstr, args) -> TData (cstr, aux_l args)
+        | TMatch (tm, cases) -> TMatch (aux tm, list_map_snd ~f:aux cases));
+    }
+  and aux_l l = List.map ~f:aux l in
+  aux t
+
 let var_count (typ : RType.t) (t : term) =
   let case _ t =
     match t.tkind with
@@ -1007,6 +1042,10 @@ let infer_type (t : term) : term * RType.substitution =
       let tsubs = RType.mkv merge_subs in
       (rewrite_types tsubs t', merge_subs)
   | None -> Log.loc_fatal_errmsg t'.tpos "Could not infer type."
+
+let erase_term_type (t : term) =
+  let f t = { t with ttyp = RType.get_fresh_tvar () } in
+  transform_info ~f t
 
 (* ============================================================================================= *)
 (*                                  SETS OF TERMS                                                *)

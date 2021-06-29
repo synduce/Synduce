@@ -14,6 +14,7 @@ let print_usage () =
     \    -h --help                      Print this message.\n\
     \    -d --debug                     Print debugging info.\n\
     \    -v --verbose                   Print verbose.\n\
+    \    -m --style-math                Print math-style.\n\
     \    -i --info-off                  Print timing information only.\n\
     \    -o --output=PATH               Output solution in folder PATH.\n\
     \  Otimizations off/on:\n\
@@ -56,6 +57,7 @@ let options =
     ('i', "info-off", set Config.info false, None);
     ('I', "interactive", set Config.interactive_lemmas true, None);
     ('L', "interactive-loop", set Config.interactive_lemmas_loop true, None);
+    ('m', "style-math", set Config.math_display true, None);
     ('n', "verification", None, Some Config.set_num_expansions_check);
     ('o', "output", None, Some Config.set_output_folder);
     ('s', "no-splitting", set Config.split_solve_on false, None);

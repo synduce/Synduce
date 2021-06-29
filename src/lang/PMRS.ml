@@ -166,6 +166,26 @@ let update_order (p : t) : t =
   in
   { p with porder = order }
 
+let clear_pmrs_types (prog : t) : t =
+  let f_rule ~key:_ ~data:(nt, args, pat, body) : _ =
+    List.iter ~f:Variable.clear_type args;
+    (match pat with
+    | Some (_, args) ->
+        List.iter ~f:(fun t -> Set.iter ~f:Variable.clear_type (Analysis.free_variables t)) args
+    | None -> ());
+    (nt, args, pat, erase_term_type body)
+  in
+  let prules = Map.mapi ~f:f_rule prog.prules in
+  Set.iter ~f:Variable.clear_type (Set.union prog.pnon_terminals prog.psyntobjs);
+  Variable.clear_type prog.pvar;
+  Variable.clear_type prog.pmain_symb;
+  {
+    prog with
+    prules;
+    pinput_typ = [ RType.get_fresh_tvar () ];
+    poutput_typ = RType.get_fresh_tvar ();
+  }
+
 let infer_pmrs_types (prog : t) =
   Log.verbose Fmt.(fun fmt () -> pf fmt "@[<hov 2>Untyped PMRS input:@;@[%a@]@]" pp prog);
   let infer_aux ~key ~data:(nt, args, pat, body) (map, substs) =
@@ -204,6 +224,43 @@ let infer_pmrs_types (prog : t) =
         pspec = { prog.pspec with ensures = invariant };
       }
   | None -> failwith "Failed infering types for pmrs."
+
+let unify_two_with_update ((theta, theta') : RType.t * RType.t) ((tau, tau') : RType.t * RType.t) :
+    unit =
+  let sb1 = RType.unify_one theta theta' in
+  let sb2 = RType.unify_one tau tau' in
+  match (sb1, sb2) with
+  | Some sb1, Some sb2 -> (
+      match RType.unify (RType.mkv (sb1 @ sb2)) with
+      | Some sb' -> Term.Variable.update_var_types (RType.mkv sb')
+      | None ->
+          Log.error_msg "Could not unify θ and τ in problem definition.";
+          Log.fatal ())
+  | _ ->
+      Log.error_msg
+        (Fmt.str "repr has type %a, expected %a." RType.pp
+           RType.(TFun (theta', tau'))
+           RType.pp
+           RType.(TFun (theta, tau)));
+      Log.fatal ()
+
+let unify_one_with_update (t, t') =
+  let sb1 = RType.unify_one t t' in
+  match sb1 with
+  | Some sb1 -> (
+      match RType.unify (RType.mkv sb1) with
+      | Some sb' -> Term.Variable.update_var_types (RType.mkv sb')
+      | None ->
+          Log.error_msg "Could not unify θ and τ in problem definition.";
+          Log.fatal ())
+  | _ ->
+      Log.error_msg (Fmt.str "Match PMRS on type %a with %a impossible." RType.pp t' RType.pp t);
+      Log.fatal ()
+
+let extract_rec_input_typ (prog : t) =
+  match List.last prog.pinput_typ with
+  | Some t -> t
+  | None -> failwith "PMRS should have at least one input for recursion."
 
 (* ============================================================================================= *)
 (*                             TRANSLATION FROM FUNCTION to PMRS                                 *)

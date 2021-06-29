@@ -86,6 +86,23 @@ let list_or_space ~sep ~f frmt li =
 let option_or_space ~f frmt o =
   match o with Some x -> Fmt.(pf frmt "%a" f x) | None -> Fmt.(pf frmt " ")
 
+let to_subscript_unicode (i : int) =
+  let f c =
+    match c with
+    | '1' -> "₁"
+    | '2' -> "₂"
+    | '3' -> "₃"
+    | '4' -> "₄"
+    | '5' -> "₅"
+    | '6' -> "₆"
+    | '7' -> "₇"
+    | '8' -> "₈"
+    | '9' -> "₉"
+    | '0' -> "₀"
+    | _ -> String.of_char c
+  in
+  String.concat_map ~f (Int.to_string i)
+
 (* ============================================================================================= *)
 (*                  LISTS HELPERS                                                                *)
 (* ============================================================================================= *)

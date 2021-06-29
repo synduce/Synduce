@@ -22,7 +22,7 @@ let rec refinement_loop (p : psi_def) (lstate : refinement_loop_state) =
     if !Config.interactive_lemmas then Lemmas.add_lemmas_interactively ~p lstate else lstate
   in
   (* First, generate the set of constraints corresponding to the set of terms t_set. *)
-  let eqns = Equations.make ~p ~lemmas:lstate.lemma lstate.t_set in
+  let eqns = Equations.make ~p ~lemmas:lstate.lemma ~lifting:lstate.lifting lstate.t_set in
   (* The solve the set of constraints. *)
   let s_resp, solution = Equations.solve ~p eqns in
   match (s_resp, solution) with
@@ -52,7 +52,12 @@ let rec refinement_loop (p : psi_def) (lstate : refinement_loop_state) =
   | _ as synt_failure_info -> (
       match Lemmas.synthesize_lemmas ~p synt_failure_info lstate with
       | Ok new_lstate -> refinement_loop p new_lstate
-      | Error synt_failure -> Error synt_failure)
+      | Error synt_failure -> (
+          match Lifting.scalar ~p lstate synt_failure with
+          | Ok p' ->
+              Int.decr refinement_steps;
+              refinement_loop p' lstate
+          | Error r' -> Error r'))
 
 let psi (p : psi_def) =
   (* Initialize sets with the most general terms. *)
@@ -74,7 +79,8 @@ let psi (p : psi_def) =
     failwith "Cannot solve problem.")
   else (
     refinement_steps := 0;
-    refinement_loop p { t_set; u_set; lemma = Lemmas.empty_lemma })
+    refinement_loop p
+      { t_set; u_set; lemma = Lemmas.empty_lemma; lifting = { tmap = Map.empty (module Terms) } })
 
 (* ============================================================================================= *)
 (*                                                 MAIN ENTRY POINTS                             *)
@@ -92,6 +98,14 @@ let sync_args p : psi_def =
   let target' = PMRS.subst_rule_rhs ~p:{ p.psi_target with pargs = p.psi_reference.pargs } subs in
   { p with psi_target = target' }
 
+(**
+  [solve_problem (Some (target, reference, representation))] solves the synthesis problem
+  associated with the target function named [target], the reference function named
+  [reference] and the representation function named [representation] that have
+  been parsed in the file.
+  If None is passed as argument, the default values are ("target", "spec", "repr").
+  If the functions cannot be found, it will exit the program.
+*)
 let solve_problem (psi_comps : (string * string * string) option)
     (pmrs : (string, PMRS.t, Base.String.comparator_witness) Map.t) :
     (soln, solver_response) Result.t =
@@ -123,17 +137,16 @@ let solve_problem (psi_comps : (string * string * string) option)
   let reference_f, tau =
     match Map.find pmrs spec_fname with
     | Some pmrs -> (
-        match List.last pmrs.pinput_typ with
-        | Some tau -> (pmrs, tau)
-        | None ->
-            Log.error_msg Fmt.(str "Reference function should have at least one input argument.");
-            no_synth ())
+        try (pmrs, PMRS.extract_rec_input_typ pmrs)
+        with _ ->
+          Log.error_msg Fmt.(str "Reference function should have at least one input argument.");
+          no_synth ())
     | None ->
         Log.error_msg Fmt.(str "No spec named %s found." spec_fname);
         no_synth ()
   in
   (* Target recursion scheme. *)
-  let target_f, xi, theta =
+  let target_f, theta =
     let target_f =
       match Map.find pmrs target_fname with
       | Some pmrs -> pmrs
@@ -141,29 +154,14 @@ let solve_problem (psi_comps : (string * string * string) option)
           Log.error_msg Fmt.(str "No recursion skeleton named %s found." target_fname);
           no_synth ()
     in
-    match List.last target_f.pinput_typ with
-    | Some theta -> (target_f, target_f.psyntobjs, theta)
-    | None ->
-        Log.error_msg Fmt.(str "Recursion skeleton should have at least one input.");
-        no_synth ()
+    try (target_f, PMRS.extract_rec_input_typ target_f)
+    with _ ->
+      Log.error_msg Fmt.(str "Recursion skeleton should have at least one input.");
+      no_synth ()
   in
   (* Match origin and target recursion scheme types. *)
   (match RType.fun_typ_unpack theta_to_tau with
-  | [ theta' ], tau' -> (
-      let sb1 = RType.unify_one theta theta' in
-      let sb2 = RType.unify_one tau tau' in
-      match (sb1, sb2) with
-      | Some sb1, Some sb2 -> (
-          match RType.unify (RType.mkv (sb1 @ sb2)) with
-          | Some sb' -> Term.Variable.update_var_types (RType.mkv sb')
-          | None ->
-              Log.error_msg "Could not unify θ and τ in problem definition.";
-              Log.fatal ())
-      | _ ->
-          Log.error_msg
-            (Fmt.str "repr has type %a, expected %a." RType.pp theta_to_tau RType.pp
-               RType.(TFun (theta, tau)));
-          Log.fatal ())
+  | [ theta' ], tau' -> PMRS.unify_two_with_update (theta, theta') (tau, tau')
   | _ ->
       Log.error_msg "Representation function should be a function.";
       Log.fatal ());
@@ -210,6 +208,7 @@ let solve_problem (psi_comps : (string * string * string) option)
         psi_repr = repr_pmrs;
         psi_tinv = tinv_pmrs;
         psi_repr_is_identity = Reduce.is_identity repr_pmrs;
+        psi_lifting = [];
       }
   in
   (* Print summary information about the problem, before solving.*)
@@ -218,7 +217,8 @@ let solve_problem (psi_comps : (string * string * string) option)
       fun fmt () ->
         pf fmt " Ψ (%a) := ∀ x : %a. (%s o %s)(x) = %s(x)"
           (list ~sep:comma Term.Variable.pp)
-          (Set.elements xi) (list ~sep:sp RType.pp) args_t spec_fname repr_fname target_fname);
+          (Set.elements target_f.psyntobjs) (list ~sep:sp RType.pp) args_t spec_fname repr_fname
+          target_fname);
   (* Print reference function. *)
   Log.info Fmt.(fun fmt () -> pf fmt "%a" PMRS.pp problem.psi_reference);
   (* Print target recursion skeleton. *)

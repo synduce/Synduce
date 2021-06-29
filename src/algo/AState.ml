@@ -10,11 +10,24 @@ open Utils
  *)
 
 type psi_def = {
-  psi_target : PMRS.t;
-  psi_reference : PMRS.t;
-  psi_repr : PMRS.t;
-  psi_tinv : PMRS.t option;
-  psi_repr_is_identity : bool;
+  psi_target : PMRS.t;  (**
+  The target recursion skeleton in the problem.
+  *)
+  psi_reference : PMRS.t;  (**
+   The reference function in the problem.
+  *)
+  psi_repr : PMRS.t;  (**
+    The representation function in the problem.
+  *)
+  psi_tinv : PMRS.t option;  (**
+  The requires predicate of the target recursion skeleton.
+  *)
+  psi_repr_is_identity : bool;  (**
+  A boolean that is true iff psi_repr is identity.
+  *)
+  psi_lifting : RType.t list;
+      (** The current lifting: the output type of psi_target
+  should be !_alpha extended with the tuple of types psi_lifting. *)
 }
 
 (**
@@ -91,7 +104,18 @@ type lemma = { lem_map : (term, term, Terms.comparator_witness) Map.t }
   during the constraint generation).
  *)
 
-type refinement_loop_state = { t_set : TermSet.t; u_set : TermSet.t; lemma : lemma }
+type lifting = { tmap : (term, term, Terms.comparator_witness) Map.t }
+(**
+  The type to describe liftings.
+  tmap is a map from terms to the expression of the lifting.
+*)
+
+type refinement_loop_state = {
+  t_set : TermSet.t;
+  u_set : TermSet.t;
+  lemma : lemma;
+  lifting : lifting;
+}
 (** The state of the main refinement loop. Currently, it is entirely determined by the sets T and U,
   accompanied with a set of lemmas that can be used during the generation of constraints.
  *)
