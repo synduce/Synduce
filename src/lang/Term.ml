@@ -458,6 +458,17 @@ let rec fpat_vars (fp : fpattern) : VarSet.t =
   | FPatVar v -> VarSet.singleton v
   | FPatTup tl -> VarSet.union_list (List.map ~f:fpat_vars tl)
 
+let pattern_of_term (t : term) =
+  let rec aux t =
+    match t.tkind with
+    | TVar x -> PatVar x
+    | TTup tl -> PatTuple (List.map ~f:aux tl)
+    | TData (c, args) -> PatConstr (c, List.map ~f:aux args)
+    | TConst c -> PatConstant c
+    | _ -> PatAny
+  in
+  aux t
+
 (* ============================================================================================= *)
 (*                        CONSTRUCTION FUNCTIONS                                                 *)
 (* ============================================================================================= *)
@@ -543,6 +554,17 @@ let mk_un ?(pos = dummy_loc) ?(typ = None) (op : Unop.t) (t : term) =
 let mk_match ?(pos = dummy_loc) (x : term) (cases : match_case list) =
   let typ = match cases with (_, t) :: _ -> t.ttyp | _ -> RType.get_fresh_tvar () in
   { tpos = pos; tkind = TMatch (x, cases); ttyp = typ }
+
+let term_of_pattern (p : pattern) : term =
+  let rec aux p =
+    match p with
+    | PatVar v -> mk_var v
+    | PatTuple tl -> mk_tup (List.map ~f:aux tl)
+    | PatConstant c -> mk_const c
+    | PatConstr (c, args) -> mk_data c (List.map ~f:aux args)
+    | PatAny -> mk_var (Variable.mk "_")
+  in
+  aux p
 
 (* ============================================================================================= *)
 (*                              TRANFORMATION / REDUCTION  UTILS                                 *)
@@ -867,13 +889,13 @@ let infer_type (t : term) : term * RType.substitution =
     | TApp (func, fargs) -> (
         let t_func, c_func = aux func and t_args, c_args = List.unzip (List.map ~f:aux fargs) in
         let argst = List.map ~f:(fun t -> t.ttyp) t_args in
-        let _c = RType.(mkv c_func @ mkv (List.concat c_args)) in
+        let csub = RType.(mkv c_func @ mkv (List.concat c_args)) in
         match t_func.ttyp with
         | RType.TFun (_, _) -> (
             let func_targs, func_tout = RType.fun_typ_unpack t_func.ttyp in
             match List.zip func_targs argst with
             | Ok typ_pairs -> (
-                match RType.(unify (_c @ typ_pairs)) with
+                match RType.(unify (csub @ typ_pairs)) with
                 | Some subs -> (mk_app ~pos:t0.tpos ~typ:(Some func_tout) t_func t_args, subs)
                 | None ->
                     Log.loc_fatal_errmsg eloc
@@ -891,7 +913,7 @@ let infer_type (t : term) : term * RType.substitution =
             (* |- f_tvar : (_ -> _ -> _ .. -> _) -> 'b *)
             let t_out = RType.get_fresh_tvar () in
             let tf = RType.fun_typ_pack argst t_out in
-            match RType.(unify (_c @ [ (tf, RType.TVar f_tvar) ])) with
+            match RType.(unify (csub @ [ (tf, RType.TVar f_tvar) ])) with
             | Some subs -> (mk_app ~pos:t0.tpos ~typ:(Some t_out) t_func t_args, subs)
             | None -> failwith "Type inference failure.")
         | _ as tf ->
@@ -916,8 +938,32 @@ let infer_type (t : term) : term * RType.substitution =
         | None ->
             Log.loc_fatal_errmsg eloc
               Fmt.(str "Type inference failure: could not find type of %s." cstr))
-    | TMatch _ -> Log.loc_fatal_errmsg eloc Fmt.(str "Type inference failure: match not supported.")
+    | TMatch (t, cases) -> (
+        let t_t, c_t = aux t in
+        let per_case (pat, rhs) =
+          let pat_term, pat_c = aux (term_of_pattern pat) in
+          match RType.(unify [ (pat_term.ttyp, t_t.ttyp) ]) with
+          | Some subs ->
+              let t_branch, c_branch = aux rhs in
+              ((pat, t_branch), merge_subs (merge_subs c_t pat_c) (merge_subs c_branch subs))
+          | None ->
+              Log.loc_fatal_errmsg eloc Fmt.(str "Type inference failure: could unify match case")
+        in
+        let f (cases, subs, t) ((pat, rhs), sub) =
+          match RType.unify ([ (t, rhs.ttyp) ] @ RType.mkv subs) with
+          | Some s -> (cases @ [ (pat, rhs) ], merge_subs s sub, rhs.ttyp)
+          | None ->
+              Log.loc_fatal_errmsg eloc Fmt.(str "Type inference failure: could unify match case")
+        in
+        match List.map ~f:per_case cases with
+        | [] -> failwith "Empty match case?"
+        | ((hd_pat, hd_rhs), sub1) :: tl ->
+            let cases, subs, typ =
+              List.fold ~f ~init:([ (hd_pat, hd_rhs) ], sub1, hd_rhs.ttyp) tl
+            in
+            ({ t0 with ttyp = typ; tkind = TMatch (t_t, cases) }, subs))
   in
+
   let t', subs = aux t in
   match RType.unify (RType.mkv subs) with
   | Some merge_subs ->
@@ -965,19 +1011,6 @@ let rec mk_composite_base_type (t : RType.t) : term =
   | RType.TNamed _ -> mk_var (Variable.mk ~t:(Some t) (Alpha.fresh ~s:"l" ()))
   | RType.TFun (_, _) | RType.TParam (_, _) | RType.TVar _ ->
       failwith "mk_composite_base_type: %a is not a base type." RType.pp t
-
-let pattern_of_term (t : term) =
-  let rec aux t =
-    match t.tkind with
-    | TVar x -> PatVar x
-    | TTup tl -> PatTuple (List.map ~f:aux tl)
-    | TData (c, args) -> PatConstr (c, List.map ~f:aux args)
-    | TConst c -> PatConstant c
-    | _ ->
-        Log.error (fun fmt () -> pf fmt "Pattern of %a ignored, replaced by _." pp_term t);
-        PatAny
-  in
-  aux t
 
 (* ============================================================================================= *)
 (*                             EQUALITY                                                          *)
