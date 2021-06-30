@@ -306,14 +306,18 @@ let rec pp_d_term (frmt : Formatter.t) (x : Term.term) =
   | TTup tl -> pf frmt "@[<hov 2>(%a)@]" (list ~sep:comma pp_d_term) tl
   | TSel (t, i) -> pf frmt "@[<hov 2>%a.%i@]" pp_d_term t i
   | TFun (args, body) ->
-      pf frmt "@[<hov 2>fun %a -> %a@]" (list ~sep:sp Term.pp_fpattern) args pp_d_term body
+      pf frmt "@[<hov 2>((%a) => %a)@]" (list ~sep:comma Term.pp_fpattern) args pp_d_term body
       (* Todo: check if a separate pp_fpattern function needs to be written *)
       (* Also todo: This needs to be rewritten to support Dafny lambda expressions*)
   | TApp (func, args) -> pf frmt "@[<hov 2>%a(%a)@]" pp_d_term func (list ~sep:comma pp_d_term) args
   | TData (cstr, args) ->
       if List.length args = 0 then pf frmt "%a" (styled (`Fg `Green) string) cstr
       else pf frmt "%a(%a)" (styled (`Fg `Green) string) cstr (list ~sep:comma pp_d_term) args
-  | _ -> Term.pp_term frmt x
+  | TMatch (tm, cases) ->
+      let pp_d_match_case (frmt: Formatter.t) ((pat, term): Term.match_case) = 
+        pf frmt "@[<hov 2>case %a =>@;@] %a" Term.pp_pattern pat pp_d_term term
+      in
+      pf frmt "@[<hov 2>match %a@]\n%a" pp_d_term tm (list ~sep:newl pp_d_match_case) cases
 
 let pp_clause (clause_name : string) (fmt : Formatter.t) (c : d_clause) : unit =
   pf fmt "@[%s %a@]" clause_name pp_d_term c

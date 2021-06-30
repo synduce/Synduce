@@ -1,6 +1,6 @@
 open Fmt
 
-let sum, _ = Lib.solve_file "benchmarks/list/mss.ml"
+let sum, _ = Lib.solve_file "benchmarks/tree/sum.ml"
 
 (*
   Don't execute both for now, solve_file should be only caleld once per executable.

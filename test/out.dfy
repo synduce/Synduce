@@ -15,7 +15,6 @@ function target(t : tree) : int
   case node(a, l, r)=> a + target(l) + target(r)}
 lemma sumLemma(s : int, t : tree) 
   ensures (f(s, t) == s + target(t))
-ensures (t == t)
 decreases t
   {match t
   case nil => {}
