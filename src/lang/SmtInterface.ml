@@ -105,6 +105,7 @@ let term_of_const (c : Constant.t) : smtTerm =
 let rec smt_of_term (t : term) : smtTerm =
   let tk = t.tkind in
   match tk with
+  | TBox t -> smt_of_term t
   | TBin (op, t1, t2) -> mk_simple_app (Binop.to_string op) (List.map ~f:smt_of_term [ t1; t2 ])
   | TUn (op, t1) -> mk_simple_app (Unop.to_string op) [ smt_of_term t1 ]
   | TConst c -> term_of_const c

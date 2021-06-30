@@ -434,17 +434,18 @@ type pattern =
   | PatConstr of string * pattern list
 
 type termkind =
-  | TConst of Constant.t  (** A constant. *)
-  | TVar of variable  (** A variable. *)
-  | TData of string * term list  (** A datatype constructor. *)
-  | TUn of Unop.t * term  (** A unary operation. *)
-  | TBin of Binop.t * term * term  (** A binary operation. *)
-  | TIte of term * term * term  (** A conditional. *)
-  | TTup of term list  (** A tuple. *)
-  | TSel of term * int  (** A tuple projection. TSet(TTup tl, i) is List.nth tl i. *)
-  | TFun of fpattern list * term  (** A function, where each argument capture by a f-pattern. *)
   | TApp of term * term list  (** A function application. *)
-  | TMatch of term * match_case list
+  | TBin of Binop.t * term * term  (** A binary operation. *)
+  | TBox of term  (** A boxed term, used in transformation to "protect" its contents.*)
+  | TConst of Constant.t  (** A constant. *)
+  | TData of string * term list  (** A datatype constructor. *)
+  | TFun of fpattern list * term  (** A function, where each argument capture by a f-pattern. *)
+  | TIte of term * term * term  (** A conditional. *)
+  | TMatch of term * match_case list  (** A pattern matching construct. *)
+  | TSel of term * int  (** A tuple projection. TSet(TTup tl, i) is List.nth tl i. *)
+  | TTup of term list  (** A tuple. *)
+  | TUn of Unop.t * term  (** A unary operation. *)
+  | TVar of variable  (** A variable. *)
 
 and match_case = pattern * term
 
@@ -489,6 +490,8 @@ let mk_const ?(pos = dummy_loc) (c : Constant.t) =
     match c with Constant.CInt _ -> RType.TInt | Constant.CTrue | Constant.CFalse -> RType.TBool
   in
   { tpos = pos; tkind = TConst c; ttyp = ctyp }
+
+let mk_box ?(pos = dummy_loc) (t : term) : term = { tpos = pos; tkind = TBox t; ttyp = t.ttyp }
 
 let mk_app ?(pos = dummy_loc) ?(typ = None) (f : term) (x : term list) =
   let typ = match typ with Some t -> t | None -> RType.get_fresh_tvar () in
@@ -621,6 +624,7 @@ and substitution (substs : (term * term) list) (term : term) : term =
         let new_kind =
           match _t.tkind with
           | TBin (b1, t1, t2) -> TBin (b1, aux t1, aux t2)
+          | TBox t -> TBox (aux t)
           | TUn (u, t1) -> TUn (u, aux t1)
           | TIte (c, tt, tf) -> TIte (aux c, aux tt, aux tf)
           | TTup tl -> TTup (List.map ~f:aux tl)
@@ -679,15 +683,16 @@ let rewrite_with (f : term -> term) (t : term) =
     let tk = t0.tkind in
     let tk' =
       match tk with
+      | TApp (func, args) -> TApp (aux func, List.map ~f:aux args)
       | TBin (op, t1, t2) -> TBin (op, aux t1, aux t2)
-      | TUn (op, t1) -> TUn (op, aux t1)
+      | TBox _ -> tk (* Do not rewrite Tbox *)
       | TConst _ -> tk
+      | TUn (op, t1) -> TUn (op, aux t1)
       | TVar _ -> tk
       | TIte (c, t1, t2) -> TIte (aux c, aux t1, aux t2)
       | TTup tl -> TTup (List.map ~f:aux tl)
       | TSel (t, i) -> TSel (aux t, i)
       | TFun (fargs, body) -> TFun (fargs, aux body)
-      | TApp (func, args) -> TApp (aux func, List.map ~f:aux args)
       | TData (cstr, args) -> TData (cstr, List.map ~f:aux args)
       | TMatch (tm, cases) -> TMatch (aux tm, list_map_snd ~f:aux cases)
     in
@@ -709,6 +714,7 @@ let rewrite_top_down (f : term -> term option) (t : term) =
           | TUn (op, t1) -> TUn (op, aux t1)
           | TConst _ -> t0.tkind
           | TVar _ -> t0.tkind
+          | TBox _ -> t0.tkind
           | TIte (c, t1, t2) -> TIte (aux c, aux t1, aux t2)
           | TTup tl -> TTup (List.map ~f:aux tl)
           | TSel (t, i) -> TSel (aux t, i)
@@ -737,6 +743,7 @@ let rewrite_accum ~(init : 'a) ~(f : 'a -> term -> (term, 'a) Either.t) (t : ter
           | TUn (op, t1) -> TUn (op, aux a' t1)
           | TConst _ -> t0.tkind
           | TVar _ -> t0.tkind
+          | TBox _ -> t0.tkind
           | TIte (c, t1, t2) -> TIte (aux a' c, aux a' t1, aux a' t2)
           | TTup tl -> TTup (List.map ~f:(aux a') tl)
           | TSel (t, i) -> TSel (aux a' t, i)
@@ -769,6 +776,7 @@ let reduce ~(init : 'a) ~(case : (term -> 'a) -> term -> 'a option) ~(join : 'a 
         | TUn (_, t1) -> aux t1
         | TConst _ -> init
         | TVar _ -> init
+        | TBox t -> aux t
         | TIte (c, a, b) -> join (aux c) (join (aux a) (aux b))
         | TTup tl -> aux_l tl
         | TSel (t, _) -> aux t
@@ -792,6 +800,7 @@ let transform ~(case : (term -> term) -> term -> term option) (t : term) : term 
             | TUn (uo, t1) -> TUn (uo, aux t1)
             | TConst _ -> t.tkind
             | TVar _ -> t.tkind
+            | TBox _ -> t.tkind
             | TIte (c, a, b) -> TIte (aux c, aux a, aux b)
             | TTup tl -> TTup (aux_l tl)
             | TSel (t, i) -> TSel (aux t, i)
@@ -813,6 +822,7 @@ let transform_info ~(f : term -> term) (t : term) : term =
         | TUn (uo, t1) -> TUn (uo, aux t1)
         | TConst _ -> t.tkind
         | TVar _ -> t.tkind
+        | TBox _ -> t.tkind
         | TIte (c, a, b) -> TIte (aux c, aux a, aux b)
         | TTup tl -> TTup (aux_l tl)
         | TSel (t, i) -> TSel (aux t, i)
@@ -823,6 +833,9 @@ let transform_info ~(f : term -> term) (t : term) : term =
     }
   and aux_l l = List.map ~f:aux l in
   aux t
+
+let remove_boxes (t : term) =
+  transform ~case:(fun f t -> match t.tkind with TBox t -> Some (f t) | _ -> None) t
 
 let var_count (typ : RType.t) (t : term) =
   let case _ t =
@@ -872,6 +885,7 @@ let pp_term (frmt : Formatter.t) (x : term) =
     match t.tkind with
     | TConst c -> pf frmt "%a" Constant.pp c
     | TVar v -> pf frmt "%a" Variable.pp v
+    | TBox t -> (aux paren) frmt t
     | TBin (op, t1, t2) -> (
         match op with
         | Binop.Max | Binop.Min ->
@@ -921,6 +935,7 @@ let infer_type (t : term) : term * RType.substitution =
     let eloc = t0.tpos in
     let merge_subs = RType.merge_subs eloc in
     match t0.tkind with
+    | TBox t -> aux t
     | TBin (op, t1, t2) -> (
         let t_t1, c_t1 = aux t1 and t_t2, c_t2 = aux t2 in
         let ta, tb = Binop.operand_types op in

@@ -1,10 +1,10 @@
 
-let s0  = (0, 0, 0, 0)
-
 let odot (j, j0, j1, j2) (j3, j4, j5, j6) =
   (j + j3, max j4 (j0 + j3), max j1 (j + j5), max j2 (max j6 (j0 + j5)))
 
 let f0 x23 = (x23, max 0 x23, max x23 0, max 0 (max x23 0))
+
+let s0  = (0, 0, 0, 0)
 
 target⟨odot, f0, s0⟩(): int clist -> (int * int * int * int)  = 
 {

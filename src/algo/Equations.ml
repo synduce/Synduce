@@ -44,7 +44,7 @@ let remap_rec_calls p t =
     match (proj_func, lift_func) with
     | Some pf, Some lf ->
         let t1 = mk_app (mk_var g.pmain_symb) [ tx ] in
-        let t2 = mk_app pf [ t1 ] in
+        let t2 = mk_box (pf t1) in
         mk_app lf [ compute_lhs p tx; t2 ]
     | _ -> compute_lhs p tx
   in
@@ -103,7 +103,7 @@ let compute_rhs ?(force_replace_off = false) p t =
     res
 
 let make ?(force_replace_off = false) ~(p : psi_def) ~(lemmas : lemma) ~(lifting : lifting)
-    (tset : TermSet.t) : equation list =
+    (tset : TermSet.t) : equation list * lifting =
   let _ = lifting in
   let proj_to_non_lifting = Lifting.proj_to_non_lifting p in
   let eqns =
@@ -122,10 +122,12 @@ let make ?(force_replace_off = false) ~(p : psi_def) ~(lemmas : lemma) ~(lifting
     Log.verbose
       Fmt.(
         fun frmt () ->
-          pf frmt "Invariants:@[<hov 2>%a@]" (list ~sep:comma pp_term) (Set.elements invariants))
+          pf frmt "Invariants: @[<hov 2>%a@]"
+            (styled `Italic (list ~sep:comma pp_term))
+            (Set.elements invariants))
   else Log.verbose_msg "No invariants.";
-  let pure_eqns =
-    let f (eterm, lhs, rhs) =
+  let pure_eqns, lifting =
+    let f (eqns_accum, lifting) (eterm, lhs, rhs) =
       let applic x = substitution all_subs (Reduce.reduce_term (substitution all_subs x)) in
       (* Compute the lhs and rhs of the equations. *)
       let lhs' = Reduce.reduce_term (applic lhs) and rhs' = Reduce.reduce_term (applic rhs) in
@@ -158,35 +160,42 @@ let make ?(force_replace_off = false) ~(p : psi_def) ~(lemmas : lemma) ~(lifting
             Some t
         | None -> None
       in
+      (* Replace the boxed expressions of the lifting. *)
+      let lifting' =
+        Lifting.deduce_lifting_expressions ~p lifting precond_from_lemmas lhs'' rhs''
+      in
+      let rhs'' = Lifting.replace_boxed_expressions ~p lifting' rhs' in
       (* If possible project equation of tuples into tuple of equations. *)
       let projs = projection_eqns lhs'' rhs'' in
-      List.map
-        ~f:(fun (elhs, erhs) ->
-          (* Select the relevant preconditions. *)
-          let eprecond =
-            match invar invariants elhs erhs with
-            | Some im_f -> (
-                match precond_from_lemmas with
-                | Some pl -> Some (mk_bin And im_f pl)
-                | None -> Some im_f)
-            | None -> precond_from_lemmas
-          in
-          { eterm; eprecond; elhs; erhs; eelim })
-        projs
+      ( eqns_accum
+        @ List.map
+            ~f:(fun (elhs, erhs) ->
+              (* Select the relevant preconditions. *)
+              let eprecond =
+                match invar invariants elhs erhs with
+                | Some im_f -> (
+                    match precond_from_lemmas with
+                    | Some pl -> Some (mk_bin And im_f pl)
+                    | None -> Some im_f)
+                | None -> precond_from_lemmas
+              in
+              { eterm; eprecond; elhs; erhs; eelim })
+            projs,
+        lifting' )
     in
-    List.concat (List.map ~f eqns)
+    List.fold ~init:([], lifting) ~f eqns
   in
   Log.verbose (fun f () ->
       let print_less = List.take pure_eqns !Config.pp_eqn_count in
       Fmt.(
-        pf f "Equations > make (%i) @." (Set.length tset);
+        pf f "Equations (%i) @." (Set.length tset);
         List.iter ~f:(fun eqn -> Fmt.pf f "@[%a@]@." pp_equation eqn) print_less));
 
   match List.find ~f:(fun eq -> not (check_equation ~p eq)) pure_eqns with
   | Some not_pure ->
       Log.error_msg Fmt.(str "Not pure: %a" pp_equation not_pure);
       failwith "Equation not pure."
-  | None -> pure_eqns
+  | None -> (pure_eqns, lifting)
 
 let revert_projs (orig_xi : VarSet.t)
     (projections : (int, variable list, Int.comparator_witness) Map.t)
@@ -430,6 +439,7 @@ let solve_eqns (unknowns : VarSet.t) (eqns : equation list) :
   else aux_solve ()
 
 let solve_eqns_proxy (unknowns : VarSet.t) (eqns : equation list) =
+  (* Fmt.(pf stdout "Solve %a:@.%a@." VarSet.pp unknowns (list ~sep:sp pp_equation) eqns); *)
   if !Config.use_syntactic_definitions then
     let partial_soln, new_unknowns, new_eqns = solve_syntactic_definitions unknowns eqns in
     if Set.length new_unknowns > 0 then

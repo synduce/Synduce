@@ -5,16 +5,83 @@ open Lang.Term
 open Syguslib.Sygus
 open Utils
 
+let msg_lifting () =
+  Log.info
+    Fmt.(
+      fun frmt () ->
+        (styled (`Fg `Black) (styled (`Bg (`Hi `Red)) (fun frmt () -> pf frmt "Lifting ... ")))
+          frmt ())
+
 let empty_lifting = { tmap = Map.empty (module Terms) }
 
-let has_real_lifting p =
+let alpha_component_count () = match fst !_alpha with RType.TTup tl -> List.length tl | _ -> 1
+
+let decompose_t (p : psi_def) (t : term) : (int * term) option =
+  let g = p.psi_target.pmain_symb in
+  match t.tkind with
+  | TSel (t', i) ->
+      let n = alpha_component_count () in
+      if i >= n then
+        match t'.tkind with
+        | TApp ({ tkind = TVar f; _ }, [ targ ]) when Variable.(equal f g) -> Some (i, targ)
+        | _ -> None
+      else None
+  | _ -> None
+
+let add_lifting_expression ~p (l : lifting) (a : term) (i : int) : lifting * term option =
+  let env = VarSet.to_env (Analysis.free_variables a) in
+  let g = p.psi_target.pmain_symb in
+  let n = alpha_component_count () in
+  (* Prompt the user to add lemmas. *)
+  Log.info (fun frmt () ->
+      Fmt.(pf frmt "Please provide a value for %s(%a).%i:" g.vname pp_term a i));
+  match Stdio.In_channel.input_line Stdio.stdin with
+  | None | Some "" ->
+      Log.info (fun frmt () -> Fmt.pf frmt "No lifting provided.");
+      (l, None)
+  | Some x -> (
+      let smtterm =
+        try
+          let sexpr = Sexplib.Sexp.of_string x in
+          Smtlib.SmtLib.smtTerm_of_sexp sexpr
+        with Failure _ -> None
+      in
+      let l_term = Option.map ~f:(SmtInterface.term_of_smt env) smtterm in
+      match l_term with
+      | None -> (l, None)
+      | Some x ->
+          let vals =
+            match Map.find l.tmap a with
+            | None | Some [] -> List.init (i - n + 1) ~f:(fun _ -> x) (* TODO fix this. *)
+            | Some vals -> List.mapi ~f:(fun j y -> if j = i - n then x else y) vals
+          in
+          ({ tmap = Map.set l.tmap ~key:a ~data:vals }, Some x))
+
+(**
+  Find the expression of the lifting for an input term.
+*)
+let get_mapped_value ~(p : psi_def) (l : lifting) (t : term) =
+  let n = alpha_component_count () in
+  Option.(
+    decompose_t p t >>= fun (i, targ) ->
+    Map.find l.tmap targ >>= fun l -> List.nth l (i - n))
+
+let replace_boxed_expressions ~(p : psi_def) (l : lifting) =
+  let case _ t = match t.tkind with TBox t' -> get_mapped_value ~p l t' | _ -> None in
+  transform ~case
+
+let has_real_lifting (p : psi_def) : bool =
   let _, tout = RType.fun_typ_unpack (Variable.vtype_or_new p.psi_target.pvar) in
   not (Option.is_some (RType.unify_one ~verb:false tout (fst !_alpha)))
+
+(* ============================================================================================= *)
+(*                       PROJECTIONS TO AND FROM LIFTING                                         *)
+(* ============================================================================================= *)
 
 (**
   Return a projection function that can be symbolically evaluated.
 *)
-let proj_to_non_lifting p =
+let proj_to_non_lifting (p : psi_def) : term option =
   if not (has_real_lifting p) then None
   else
     let _, tout = RType.fun_typ_unpack (Variable.vtype_or_new p.psi_target.pvar) in
@@ -33,29 +100,33 @@ let proj_to_non_lifting p =
         None
 
 (**
-  Return a projection function that can be symbolically evaluated.
+    Return function f such that f(a) = a.i, .. a.i + n if i, .. i+n where
+    i, ..., i+n are the components of the lifting.
 *)
-let proj_to_lifting p =
+let proj_to_lifting (p : psi_def) : (term -> term) option =
   if not (has_real_lifting p) then None
   else
     let _, tout = RType.fun_typ_unpack (Variable.vtype_or_new p.psi_target.pvar) in
     match (tout, fst !_alpha) with
     | TTup tl_lift, TTup tl' ->
-        let args = List.map ~f:(fun t -> Variable.mk (Alpha.fresh ~s:"x" ()) ~t:(Some t)) tl_lift in
-        let tuple_pattern = FPatTup (List.map ~f:(fun v -> FPatVar v) args) in
-        let tup_lifting =
-          match List.map ~f:mk_var (List.drop args (List.length tl')) with
-          | [ x ] -> x
-          | _ as l -> mk_tup l
-        in
-        Some (mk_fun [ tuple_pattern ] tup_lifting)
+        let n = List.length tl' in
+        Some
+          (fun a ->
+            match
+              List.mapi ~f:(fun i t -> mk_sel ~typ:(Some t) a (n + i)) (List.drop tl_lift n)
+            with
+            | [] -> mk_tup []
+            | [ x ] -> x
+            | hd :: tl -> mk_tup (hd :: tl))
     | TTup tl_lift, _ ->
-        let args = List.map ~f:(fun t -> Variable.mk (Alpha.fresh ~s:"x" ()) ~t:(Some t)) tl_lift in
-        let tuple_pattern = FPatTup (List.map ~f:(fun v -> FPatVar v) args) in
-        let tup_lifting =
-          match List.map ~f:mk_var (List.drop args 1) with [ x ] -> x | _ as l -> mk_tup l
-        in
-        Some (mk_fun [ tuple_pattern ] tup_lifting)
+        Some
+          (fun a ->
+            match
+              List.mapi ~f:(fun i t -> mk_sel ~typ:(Some t) a (1 + i)) (List.drop tl_lift 1)
+            with
+            | [] -> mk_tup []
+            | [ x ] -> x
+            | hd :: tl -> mk_tup (hd :: tl))
     | _ ->
         Log.error_msg "Ignoring type difference between ɑ and output of target.";
         None
@@ -65,7 +136,7 @@ let proj_to_lifting p =
   computes the tuple that corresponds to the lifted function from the original components
   of the function in [oringal_part] and the components of the lifting only in [lifting_part]
 *)
-let compose_parts p =
+let compose_parts (p : psi_def) : term option =
   if not (has_real_lifting p) then None
   else
     let _, tout = RType.fun_typ_unpack (Variable.vtype_or_new p.psi_target.pvar) in
@@ -91,6 +162,10 @@ let compose_parts p =
     | _ ->
         Log.error_msg "Ignoring type difference between ɑ and output of target.";
         None
+
+(* ============================================================================================= *)
+(*                      LIFTING FUNCTIONS                                                        *)
+(* ============================================================================================= *)
 
 let apply_lifting ~(p : psi_def) (l : RType.t list) : psi_def =
   (* Type inference on p.target to update types *)
@@ -119,12 +194,28 @@ let apply_lifting ~(p : psi_def) (l : RType.t list) : psi_def =
   Log.debug (fun ft () -> Fmt.(pf ft "@[After lifting:@;%a@]" (box PMRS.pp) target'));
   { p with psi_target = target'; psi_lifting = p.psi_lifting @ l }
 
-let scalar ~(p : psi_def) (_l : refinement_loop_state) _synt_failure_info :
-    (psi_def, solver_response) Result.t =
+let deduce_lifting_expressions ~p (lif : lifting) (_pre : term option) (_lhs : term) (rhs : term) :
+    lifting =
+  let boxes =
+    reduce ~init:[]
+      ~case:(fun _ t -> match decompose_t p t with Some (i, a) -> Some [ (i, a) ] | _ -> None)
+      ~join:( @ ) rhs
+  in
+  List.fold ~init:lif ~f:(fun l (i, t) -> fst (add_lifting_expression ~p l t i)) boxes
+
+(* ============================================================================================= *)
+(*                       MAIN ENTRY POINT                                                        *)
+(* ============================================================================================= *)
+
+(**
+  Perform a scalar lifting.
+*)
+let scalar ~(p : psi_def) (l : refinement_loop_state) _synt_failure_info :
+    (psi_def * refinement_loop_state, solver_response) Result.t =
   Log.error_msg "Lifting is only a stub.";
   (*
     This function will perform the scalar lifting and call the loop continuation
     with the lifted problem.
   *)
   let p' = apply_lifting ~p [ RType.TInt ] in
-  Ok p'
+  Ok (p', l)

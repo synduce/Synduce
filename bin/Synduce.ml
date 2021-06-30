@@ -40,6 +40,7 @@ let print_usage () =
      induction proof.\n\
     \  Debugging:\n\
     \  -I   --interactive               Request additional lemmas interactively.\n\
+    \  -J   --interactive-lifting       Request expressions for lifting.\n\
     \  -L   --interactive-loop          Request lemmas interactively in a loop.\n\
     \       --parse-only                Just parse the input.\n\
     \       --show-vars                 Print variables and their types at the end.\n\
@@ -56,6 +57,7 @@ let options =
     ('h', "help", Some print_usage, None);
     ('i', "info-off", set Config.info false, None);
     ('I', "interactive", set Config.interactive_lemmas true, None);
+    ('J', "interactive-lifting", set Config.interactive_lifting true, None);
     ('L', "interactive-loop", set Config.interactive_lemmas_loop true, None);
     ('m', "style-math", set Config.math_display true, None);
     ('n', "verification", None, Some Config.set_num_expansions_check);

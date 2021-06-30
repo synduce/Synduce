@@ -44,6 +44,9 @@ let interactive_lemmas = ref false
 
 let interactive_lemmas_loop = ref false
 
+(** Prompt for lifting expressions. *)
+let interactive_lifting = ref false
+
 (**
   Check whether a system of equations defines a "functionally realizable" synthesis problem.
   OFF by default.

@@ -9,7 +9,13 @@ let rec refinement_loop (p : psi_def) (lstate : refinement_loop_state) =
   Int.incr refinement_steps;
   (* Output status information before entering process. *)
   let elapsed = Unix.gettimeofday () -. !Config.glob_start in
-  Log.info (fun frmt () -> Fmt.pf frmt "Refinement step %i." !refinement_steps);
+  Log.info
+    Fmt.(
+      fun frmt () ->
+        (styled
+           (`Fg `Black)
+           (styled (`Bg (`Hi `Green)) (fun frmt i -> pf frmt "\t\t Refinement step %i. " i)))
+          frmt !refinement_steps);
   (if not !Config.info then
    Fmt.(
      pf stdout "%i,%3.3f,%3.3f,%i,%i@." !refinement_steps !Config.verif_time elapsed
@@ -22,7 +28,7 @@ let rec refinement_loop (p : psi_def) (lstate : refinement_loop_state) =
     if !Config.interactive_lemmas then Lemmas.add_lemmas_interactively ~p lstate else lstate
   in
   (* First, generate the set of constraints corresponding to the set of terms t_set. *)
-  let eqns = Equations.make ~p ~lemmas:lstate.lemma ~lifting:lstate.lifting lstate.t_set in
+  let eqns, lifting = Equations.make ~p ~lemmas:lstate.lemma ~lifting:lstate.lifting lstate.t_set in
   (* The solve the set of constraints. *)
   let s_resp, solution = Equations.solve ~p eqns in
   match (s_resp, solution) with
@@ -42,7 +48,7 @@ let rec refinement_loop (p : psi_def) (lstate : refinement_loop_state) =
                   pf frmt "@[<hov 2>Counterexample terms:@;@[<hov 2>%a@]" (list ~sep:comma pp_term)
                     (Set.elements (Set.diff t_set lstate.t_set))));
             (* Continue looping with the new sets. *)
-            refinement_loop p { lstate with t_set; u_set }
+            refinement_loop p { lstate with t_set; u_set; lifting }
         | None ->
             (* This case happens when verification succeeded. Return the solution. *)
             Log.print_ok ();
@@ -54,9 +60,10 @@ let rec refinement_loop (p : psi_def) (lstate : refinement_loop_state) =
       | Ok new_lstate -> refinement_loop p new_lstate
       | Error synt_failure -> (
           match Lifting.scalar ~p lstate synt_failure with
-          | Ok p' ->
+          | Ok (p', lstate') ->
               Int.decr refinement_steps;
-              refinement_loop p' lstate
+              Lifting.msg_lifting ();
+              refinement_loop p' lstate'
           | Error r' -> Error r'))
 
 let psi (p : psi_def) =

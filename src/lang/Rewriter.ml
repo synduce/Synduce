@@ -124,6 +124,7 @@ module Expression = struct
   let of_term t0 : t option =
     let rec f t =
       match t.tkind with
+      | TBox t -> f t
       | TConst c -> (
           Constant.(match c with CInt i -> mk_e_int i | CTrue -> mk_e_true | CFalse -> mk_e_false))
       | TVar v ->

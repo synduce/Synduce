@@ -14,6 +14,7 @@ let rec vars_of_pattern (p : pattern) : VarSet.t =
 let free_variables (t : term) : VarSet.t =
   let rec f t =
     match t.tkind with
+    | TBox t -> f t
     | TBin (_, t1, t2) -> Set.union (f t1) (f t2)
     | TUn (_, t1) -> f t1
     | TConst _ -> VarSet.empty
