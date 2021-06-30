@@ -222,7 +222,7 @@ let verify_lemma_candidate ~(p : psi_def) (det : term_state_detail) :
   match det.lemma_candidate with
   | None -> failwith "Cannot verify lemma candidate; there is none."
   | Some lemma_candidate ->
-      Log.info (fun f () -> Fmt.(pf f "Checking lemma candidate..."));
+      Log.verbose (fun f () -> Fmt.(pf f "Checking lemma candidate..."));
       let _start_time = Unix.gettimeofday () in
       (* This solver is later closed in lemma_refinement_loop *)
       (* TODO: don't redo all the setup work in every iteration of the lemma refinement loop. Use push/pop instead. *)
@@ -268,7 +268,7 @@ let classify_ctexs_opt ~(p : psi_def) ctexs =
 let get_positive_examples (solver : Solvers.online_solver) (det : term_state_detail) ~(p : psi_def)
     lemma : ctex list =
   (* TODO: make fresh variables, since this may in the future be called for multiple terms, for multiple lemma candidates, or to generate multiple pos examples, in one solver instance *)
-  Log.info (fun f () -> Fmt.(pf f "Searching for a positive example."));
+  Log.verbose (fun f () -> Fmt.(pf f "Searching for a positive example."));
   let vset = det.vars in
   let _ = Solvers.declare_all solver (Smt.decls_of_vars vset) in
   let rec_elim_eqns = smt_of_recurs_elim_eqns det.recurs_elim ~p in
@@ -336,15 +336,19 @@ let rec lemma_refinement_loop (det : term_state_detail) ~(p : psi_def) : term_st
         verify_lemma_candidate ~p { det with lemma_candidate = Some (name, vars, lemma_term) }
       with
       | _, Unsat ->
-          Log.info (fun f () -> Fmt.(pf f "This lemma is correct."));
+          Log.verbose (fun f () -> Fmt.(pf f "This lemma has been proven correct."));
+          Log.info (fun frmt () ->
+              Fmt.pf frmt "Lemma: \"%s %s = @[%a@]\"." name
+                (String.concat ~sep:" " (List.map ~f:(fun v -> v.vname) vars))
+                pp_term lemma_term);
           Some { det with lemma_candidate = None; lemmas = lemma_term :: det.lemmas }
       | solver, Sat | solver, Unknown ->
-          Log.info (fun f () ->
+          Log.verbose (fun f () ->
               Fmt.(pf f "This lemma has not been proved correct. Refining lemma..."));
           let new_positive_ctexs = get_positive_examples solver det ~p (name, vars, lemma_term) in
           List.iter
             ~f:(fun ctex ->
-              Log.info (fun f () -> Fmt.(pf f "Found a positive example: %a" (box pp_ctex) ctex)))
+              Log.verbose (fun f () -> Fmt.(pf f "Found a positive example: %a" (box pp_ctex) ctex)))
             new_positive_ctexs;
           Solvers.close_solver solver;
           lemma_refinement_loop
