@@ -97,6 +97,10 @@ let apply_projections (projs : (int, variable list, Int.comparator_witness) Map.
             let projected = pack xlist args' in
             Some (mk_tup projected)
         | None -> None)
+    | TVar x -> (
+        match Map.find projs x.vid with
+        | Some components -> Some (mk_tup (List.map ~f:mk_var components))
+        | None -> None)
     | _ -> None
   in
   transform ~case t
