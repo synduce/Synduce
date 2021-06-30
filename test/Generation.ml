@@ -53,7 +53,6 @@ let rec get_params_from_type = function
       List.fold_left SS.union SS.empty
         (List.map
            (fun param -> match param with TNamed name -> SS.singleton name | _ -> SS.empty)
-           (* | _ -> failwith (Fmt.str "Unsupported param type. %a" pp param)) *)
            params)
   | _ -> SS.empty
 
