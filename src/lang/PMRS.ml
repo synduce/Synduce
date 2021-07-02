@@ -202,15 +202,16 @@ let infer_pmrs_types (prog : t) =
     let cur_loc = body.tpos in
     let c_rule = RType.merge_subs cur_loc c_body c_head in
     match RType.unify (RType.mkv (substs @ c_rule) @ [ (t_head.ttyp, t_body.ttyp) ]) with
-    | Some res -> (Map.set map ~key ~data:(nt, args, pat, rewrite_types (RType.mkv res) t_body), res)
-    | None ->
+    | Ok res -> (Map.set map ~key ~data:(nt, args, pat, rewrite_types (RType.mkv res) t_body), res)
+    | Error e ->
+        Log.error_msg Fmt.(str "Error: %a" Sexp.pp_hum e);
         Log.loc_fatal_errmsg cur_loc
           (Fmt.str "(%a) has type %a, expected type %a." pp_term body RType.pp t_body.ttyp RType.pp
              t_head.ttyp)
   in
   let new_rules, new_subs = Map.fold prog.prules ~f:infer_aux ~init:(Map.empty (module Int), []) in
   match RType.unify (RType.mkv new_subs) with
-  | Some usubs ->
+  | Ok usubs ->
       Variable.update_var_types (RType.mkv usubs);
       let typ_in, typ_out = RType.fun_typ_unpack (Variable.vtype_or_new prog.pmain_symb) in
       Variable.update_var_types
@@ -223,17 +224,20 @@ let infer_pmrs_types (prog : t) =
         poutput_typ = typ_out;
         pspec = { prog.pspec with ensures = invariant };
       }
-  | None -> failwith "Failed infering types for pmrs."
+  | Error e ->
+      Log.error_msg Fmt.(str "Error: %a" Sexp.pp_hum e);
+      failwith "Type inference failed for pmrs."
 
 let unify_two_with_update ((theta, theta') : RType.t * RType.t) ((tau, tau') : RType.t * RType.t) :
     unit =
   let sb1 = RType.unify_one theta theta' in
   let sb2 = RType.unify_one tau tau' in
   match (sb1, sb2) with
-  | Some sb1, Some sb2 -> (
+  | Ok sb1, Ok sb2 -> (
       match RType.unify (RType.mkv (sb1 @ sb2)) with
-      | Some sb' -> Term.Variable.update_var_types (RType.mkv sb')
-      | None ->
+      | Ok sb' -> Term.Variable.update_var_types (RType.mkv sb')
+      | Error e ->
+          Log.error_msg Fmt.(str "Error: %a" Sexp.pp_hum e);
           Log.error_msg "Could not unify θ and τ in problem definition.";
           Log.fatal ())
   | _ ->
@@ -247,10 +251,11 @@ let unify_two_with_update ((theta, theta') : RType.t * RType.t) ((tau, tau') : R
 let unify_one_with_update (t, t') =
   let sb1 = RType.unify_one t t' in
   match sb1 with
-  | Some sb1 -> (
+  | Ok sb1 -> (
       match RType.unify (RType.mkv sb1) with
-      | Some sb' -> Term.Variable.update_var_types (RType.mkv sb')
-      | None ->
+      | Ok sb' -> Term.Variable.update_var_types (RType.mkv sb')
+      | Error e ->
+          Log.error_msg Fmt.(str "Error: %a" Sexp.pp_hum e);
           Log.error_msg "Could not unify θ and τ in problem definition.";
           Log.fatal ())
   | _ ->

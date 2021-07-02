@@ -23,7 +23,7 @@ let identify_rcalls (p : psi_def) (lam : variable) (t : term) : VarSet.t =
 let mk_recursion_elimination_term (p : psi_def) : (term * term) option =
   let _, g_out = RType.fun_typ_unpack (Variable.vtype_or_new p.psi_target.pvar)
   and f_out = fst !AState._alpha in
-  if Option.is_some (RType.unify_one g_out f_out) then
+  if Result.is_ok (RType.unify_one g_out f_out) then
     let term = mk_composite_base_type f_out in
     Some (term, term)
   else

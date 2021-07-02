@@ -104,7 +104,7 @@ type lemma = { lem_map : (term, term, Terms.comparator_witness) Map.t }
   during the constraint generation).
  *)
 
-type lifting = { tmap : (term, term list, Terms.comparator_witness) Map.t }
+type lifting = { tmap : ((int * term) * term) list }
 (**
   The type to describe liftings.
   tmap is a map from terms to the expression of the lifting.

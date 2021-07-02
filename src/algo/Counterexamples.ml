@@ -51,7 +51,7 @@ let reinterpret_model (m0i, m0j') var_subst =
   If the returned list is not empty, the problem is not solvable / unrealizable.
 *)
 let check_unrealizable (unknowns : VarSet.t) (eqns : equation_system) : unrealizability_ctex list =
-  Log.info (fun f () -> Fmt.(pf f "Checking unrealizability..."));
+  Log.debug (fun f () -> Fmt.(pf f "Checking unrealizability..."));
   let start_time = Unix.gettimeofday () in
   let solver = Solvers.make_z3_solver () in
   Solvers.load_min_max_defs solver;
@@ -142,8 +142,8 @@ let check_unrealizable (unknowns : VarSet.t) (eqns : equation_system) : unrealiz
   let ctexs = List.fold ~f:check_eqn_accum ~init:[] (combinations eqns_indexed) in
   Solvers.close_solver solver;
   let elapsed = Unix.gettimeofday () -. start_time in
-  Log.info (fun f () -> Fmt.(pf f "... finished in %3.4fs" elapsed));
-  Log.info (fun f () ->
+  Log.debug (fun f () -> Fmt.(pf f "... finished in %3.4fs" elapsed));
+  Log.debug (fun f () ->
       match ctexs with
       | [] -> Fmt.pf f "No counterexample to realizability found."
       | _ :: _ ->

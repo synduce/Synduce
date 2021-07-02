@@ -86,8 +86,7 @@ let psi (p : psi_def) =
     failwith "Cannot solve problem.")
   else (
     refinement_steps := 0;
-    refinement_loop p
-      { t_set; u_set; lemma = Lemmas.empty_lemma; lifting = { tmap = Map.empty (module Terms) } })
+    refinement_loop p { t_set; u_set; lemma = Lemmas.empty_lemma; lifting = Lifting.empty_lifting })
 
 (* ============================================================================================= *)
 (*                                                 MAIN ENTRY POINTS                             *)
@@ -179,8 +178,9 @@ let solve_problem (psi_comps : (string * string * string) option)
     match (reference_out, target_out) with
     | TFun (_, tout), TFun (_, tout') -> (
         match RType.unify_one tout tout' with
-        | Some subs -> Variable.update_var_types (RType.mkv subs)
-        | None ->
+        | Ok subs -> Variable.update_var_types (RType.mkv subs)
+        | Error e ->
+            Log.error_msg Fmt.(str "Error: %a" Sexp.pp_hum e);
             Log.error_msg "Failed to unify output types.";
             no_synth ())
     | _ ->

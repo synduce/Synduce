@@ -102,6 +102,23 @@ let compute_rhs ?(force_replace_off = false) p t =
     in
     res
 
+let precond_from_lemmas ~lemmas subst eterm =
+  match Map.find lemmas.lem_map eterm with
+  | Some lemma_for_eterm ->
+      let t = Reduce.reduce_term (subst lemma_for_eterm) in
+      Some t
+  | None -> None
+
+let filter_elims all_subs t =
+  List.remove_consecutive_duplicates
+    ~equal:(fun (x1, _) (x2, _) -> Terms.equal x1 x2)
+    (List.filter_map all_subs ~f:(fun (t_rec, t_scalar) ->
+         match
+           Set.to_list (Set.inter (Analysis.free_variables t_rec) (Analysis.free_variables t))
+         with
+         | [] -> None
+         | x :: _ -> Some (mk_var x, t_scalar)))
+
 let make ?(force_replace_off = false) ~(p : psi_def) ~(lemmas : lemma) ~(lifting : lifting)
     (tset : TermSet.t) : equation list * lifting =
   let _ = lifting in
@@ -118,6 +135,7 @@ let make ?(force_replace_off = false) ~(p : psi_def) ~(lemmas : lemma) ~(lifting
     Expand.subst_recursive_calls p
       (List.concat (List.map ~f:(fun (_, lhs, rhs) -> [ lhs; rhs ]) eqns))
   in
+  let applic x = substitution all_subs (Reduce.reduce_term (substitution all_subs x)) in
   if Set.length invariants > 0 then
     Log.verbose
       Fmt.(
@@ -128,7 +146,6 @@ let make ?(force_replace_off = false) ~(p : psi_def) ~(lemmas : lemma) ~(lifting
   else Log.verbose_msg "No invariants.";
   let pure_eqns, lifting =
     let f (eqns_accum, lifting) (eterm, lhs, rhs) =
-      let applic x = substitution all_subs (Reduce.reduce_term (substitution all_subs x)) in
       (* Compute the lhs and rhs of the equations. *)
       let lhs' = Reduce.reduce_term (applic lhs) and rhs' = Reduce.reduce_term (applic rhs) in
       let rhs' =
@@ -142,28 +159,11 @@ let make ?(force_replace_off = false) ~(p : psi_def) ~(lemmas : lemma) ~(lifting
       (* Filter the relevant part of the recursion elimination substitution, and only retain a map
              from recursive-typed variable to scalar variables replacing calls.
       *)
-      let eelim =
-        List.remove_consecutive_duplicates
-          ~equal:(fun (x1, _) (x2, _) -> Terms.equal x1 x2)
-          (List.filter_map all_subs ~f:(fun (t_rec, t_scalar) ->
-               match
-                 Set.to_list
-                   (Set.inter (Analysis.free_variables t_rec) (Analysis.free_variables eterm))
-               with
-               | [] -> None
-               | x :: _ -> Some (mk_var x, t_scalar)))
-      in
-      let precond_from_lemmas =
-        match Map.find lemmas.lem_map eterm with
-        | Some lemma_for_eterm ->
-            let t = Reduce.reduce_term (applic lemma_for_eterm) in
-            Some t
-        | None -> None
-      in
+      let eelim = filter_elims all_subs eterm in
+
+      let precond = precond_from_lemmas ~lemmas applic eterm in
       (* Replace the boxed expressions of the lifting. *)
-      let lifting' =
-        Lifting.deduce_lifting_expressions ~p lifting precond_from_lemmas lhs'' rhs''
-      in
+      let lifting' = Lifting.deduce_lifting_expressions ~p lifting precond lhs'' rhs'' in
       let rhs'' = Lifting.replace_boxed_expressions ~p lifting' rhs' in
       (* If possible project equation of tuples into tuple of equations. *)
       let projs = projection_eqns lhs'' rhs'' in
@@ -174,10 +174,8 @@ let make ?(force_replace_off = false) ~(p : psi_def) ~(lemmas : lemma) ~(lifting
               let eprecond =
                 match invar invariants elhs erhs with
                 | Some im_f -> (
-                    match precond_from_lemmas with
-                    | Some pl -> Some (mk_bin And im_f pl)
-                    | None -> Some im_f)
-                | None -> precond_from_lemmas
+                    match precond with Some pl -> Some (mk_bin And im_f pl) | None -> Some im_f)
+                | None -> precond
               in
               { eterm; eprecond; elhs; erhs; eelim })
             projs,
@@ -190,12 +188,37 @@ let make ?(force_replace_off = false) ~(p : psi_def) ~(lemmas : lemma) ~(lifting
       Fmt.(
         pf f "Equations (%i) @." (Set.length tset);
         List.iter ~f:(fun eqn -> Fmt.pf f "@[%a@]@." pp_equation eqn) print_less));
+  (* Generate the equations corresponding to the lifting constraints. *)
+  let lifting_eqns =
+    let constraint_of_lift_expr ((i, t0), lft) =
+      let t0_rhs = compute_rhs p t0 in
+      let erhs =
+        Lifting.replace_boxed_expressions ~p lifting (Reduce.reduce_term (mk_sel t0_rhs i))
+      in
+      let elhs = lft in
+      let precond = precond_from_lemmas ~lemmas (fun x -> x) t0 in
+      let eprecond =
+        match invar invariants elhs erhs with
+        | Some im_f -> (
+            match precond with Some pl -> Some (mk_bin And im_f pl) | None -> Some im_f)
+        | None -> precond
+      in
+      let eelim = filter_elims all_subs t0 in
+      { eterm = t0; elhs; erhs; eprecond; eelim }
+    in
+    List.map ~f:constraint_of_lift_expr lifting.tmap
+  in
+  Log.verbose (fun f () ->
+      let print_less = List.take lifting_eqns !Config.pp_eqn_count in
+      Fmt.(
+        pf f "Lifting constraints (%i) @." (List.length lifting_eqns);
+        List.iter ~f:(fun eqn -> Fmt.pf f "@[%a@]@." pp_equation eqn) print_less));
 
-  match List.find ~f:(fun eq -> not (check_equation ~p eq)) pure_eqns with
+  match List.find ~f:(fun eq -> not (check_equation ~p eq)) (pure_eqns @ lifting_eqns) with
   | Some not_pure ->
       Log.error_msg Fmt.(str "Not pure: %a" pp_equation not_pure);
       failwith "Equation not pure."
-  | None -> (pure_eqns, lifting)
+  | None -> (pure_eqns @ lifting_eqns, lifting)
 
 let revert_projs (orig_xi : VarSet.t)
     (projections : (int, variable list, Int.comparator_witness) Map.t)
@@ -259,7 +282,9 @@ let combine ?(verb = false) prev_sol new_response =
     match (prev_sol, new_response) with
     | First soln, (resp, First soln') ->
         if verb then
-          Log.debug_msg Fmt.(str "Partial solution:@;@[<hov 2>%a@]" pp_partial_soln soln');
+          Log.debug
+            Fmt.(
+              fun frmt () -> pf frmt "@[Partial solution:@;@[<hov 2>%a@]@]" pp_partial_soln soln');
         (resp, First (soln @ soln'))
     | Second ctexs, (resp, Second ctexs') -> (resp, Second (ctexs @ ctexs'))
     | Second ctexs, (resp, First _) | First _, (resp, Second ctexs) -> (resp, Second ctexs))
@@ -439,7 +464,6 @@ let solve_eqns (unknowns : VarSet.t) (eqns : equation list) :
   else aux_solve ()
 
 let solve_eqns_proxy (unknowns : VarSet.t) (eqns : equation list) =
-  (* Fmt.(pf stdout "Solve %a:@.%a@." VarSet.pp unknowns (list ~sep:sp pp_equation) eqns); *)
   if !Config.use_syntactic_definitions then
     let partial_soln, new_unknowns, new_eqns = solve_syntactic_definitions unknowns eqns in
     if Set.length new_unknowns > 0 then
@@ -620,6 +644,7 @@ let solve ~(p : psi_def) (eqns : equation list) :
   Either.(
     match soln_final with
     | _, First soln ->
-        Utils.Log.debug_msg Fmt.(str "@[<hov 2>Solution found: @;%a" pp_partial_soln soln)
+        Utils.Log.debug
+          Fmt.(fun fmt () -> pf fmt "@[<hov 2>Solution found: @;%a@]" (box pp_partial_soln) soln)
     | _ -> ());
   soln_final

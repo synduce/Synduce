@@ -128,8 +128,8 @@ let matches ?(boundvars = VarSet.empty) (t : term) ~(pattern : term) : term VarM
         else
           let pat_ty = Variable.vtype_or_new vpat in
           match RType.unify_one pat_ty t.ttyp with
-          | Some _ -> Ok [ (vpat, t) ]
-          | _ -> Error [ (pat, t) ])
+          | Ok _ -> Ok [ (vpat, t) ]
+          | Error _ -> Error [ (pat, t) ])
     | TData (cstr, mems), TData (cstr', mems') ->
         if String.equal cstr cstr' && List.length mems = List.length mems' then
           match List.map2 ~f:aux mems mems' with

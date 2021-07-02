@@ -12,7 +12,27 @@ let msg_lifting () =
         (styled (`Fg `Black) (styled (`Bg (`Hi `Red)) (fun frmt () -> pf frmt "Lifting ... ")))
           frmt ())
 
-let empty_lifting = { tmap = Map.empty (module Terms) }
+module LiftingMap = struct
+  type t = ((int * term) * term) list
+
+  let empty : t = []
+
+  let key_match ~key:(i1, t1) i2 t2 = if i1 = i2 then Analysis.matches ~pattern:t1 t2 else None
+
+  let get (map : t) ((i, t0) : int * term) =
+    List.find_map map ~f:(fun ((i1, t1), tr) ->
+        match key_match ~key:(i1, t1) i t0 with
+        | Some sub -> Some (substitution (VarMap.to_subst sub) tr)
+        | None -> None)
+
+  let is_empty (a : t) = List.is_empty a
+
+  let set (map : t) ((i, t0) : int * term) (tr : term) = ((i, t0), tr) :: map
+end
+
+let empty_lifting = { tmap = LiftingMap.empty }
+
+let is_empty_lifting lifting = LiftingMap.is_empty lifting.tmap
 
 let alpha_component_count () = match fst !_alpha with RType.TTup tl -> List.length tl | _ -> 1
 
@@ -28,10 +48,15 @@ let decompose_t (p : psi_def) (t : term) : (int * term) option =
       else None
   | _ -> None
 
+(**
+  Find the expression of the lifting for an input term.
+*)
+let get_mapped_value ~(p : psi_def) (l : lifting) (t : term) =
+  Option.(decompose_t p t >>= LiftingMap.get l.tmap)
+
 let add_lifting_expression ~p (l : lifting) (a : term) (i : int) : lifting * term option =
   let env = VarSet.to_env (Analysis.free_variables a) in
   let g = p.psi_target.pmain_symb in
-  let n = alpha_component_count () in
   (* Prompt the user to add lemmas. *)
   Log.info (fun frmt () ->
       Fmt.(pf frmt "Please provide a value for %s(%a).%i:" g.vname pp_term a i));
@@ -49,22 +74,10 @@ let add_lifting_expression ~p (l : lifting) (a : term) (i : int) : lifting * ter
       let l_term = Option.map ~f:(SmtInterface.term_of_smt env) smtterm in
       match l_term with
       | None -> (l, None)
-      | Some x ->
-          let vals =
-            match Map.find l.tmap a with
-            | None | Some [] -> List.init (i - n + 1) ~f:(fun _ -> x) (* TODO fix this. *)
-            | Some vals -> List.mapi ~f:(fun j y -> if j = i - n then x else y) vals
-          in
-          ({ tmap = Map.set l.tmap ~key:a ~data:vals }, Some x))
-
-(**
-  Find the expression of the lifting for an input term.
-*)
-let get_mapped_value ~(p : psi_def) (l : lifting) (t : term) =
-  let n = alpha_component_count () in
-  Option.(
-    decompose_t p t >>= fun (i, targ) ->
-    Map.find l.tmap targ >>= fun l -> List.nth l (i - n))
+      | Some x -> (
+          match LiftingMap.get l.tmap (i, a) with
+          | Some _ -> (l, Some x)
+          | None -> ({ tmap = LiftingMap.set l.tmap (i, a) x }, Some x)))
 
 let replace_boxed_expressions ~(p : psi_def) (l : lifting) =
   let case _ t = match t.tkind with TBox t' -> get_mapped_value ~p l t' | _ -> None in
@@ -72,7 +85,7 @@ let replace_boxed_expressions ~(p : psi_def) (l : lifting) =
 
 let has_real_lifting (p : psi_def) : bool =
   let _, tout = RType.fun_typ_unpack (Variable.vtype_or_new p.psi_target.pvar) in
-  not (Option.is_some (RType.unify_one ~verb:false tout (fst !_alpha)))
+  not (Result.is_ok (RType.unify_one tout (fst !_alpha)))
 
 (* ============================================================================================= *)
 (*                       PROJECTIONS TO AND FROM LIFTING                                         *)
@@ -187,8 +200,10 @@ let apply_lifting ~(p : psi_def) (l : RType.t list) : psi_def =
     PMRS.unify_one_with_update (free_theta, !_theta);
     (* Update the output type. *)
     (match RType.unify_one (Variable.vtype_or_new target'.pmain_symb) new_out_type with
-    | Some subs -> Variable.update_var_types (RType.mkv subs)
-    | None -> Log.error_msg "Failed to unify output types in lifting.");
+    | Ok subs -> Variable.update_var_types (RType.mkv subs)
+    | Error e ->
+        Log.error_msg Fmt.(str "Error: %a" Sexp.pp_hum e);
+        Log.error_msg "Failed to unify output types in lifting.");
     PMRS.infer_pmrs_types target'
   in
   Log.debug (fun ft () -> Fmt.(pf ft "@[After lifting:@;%a@]" (box PMRS.pp) target'));
@@ -201,7 +216,12 @@ let deduce_lifting_expressions ~p (lif : lifting) (_pre : term option) (_lhs : t
       ~case:(fun _ t -> match decompose_t p t with Some (i, a) -> Some [ (i, a) ] | _ -> None)
       ~join:( @ ) rhs
   in
-  List.fold ~init:lif ~f:(fun l (i, t) -> fst (add_lifting_expression ~p l t i)) boxes
+  List.fold ~init:lif
+    ~f:(fun l (i, t) ->
+      match LiftingMap.get l.tmap (i, t) with
+      | Some _ -> l
+      | None -> fst (add_lifting_expression ~p l t i))
+    boxes
 
 (* ============================================================================================= *)
 (*                       MAIN ENTRY POINT                                                        *)

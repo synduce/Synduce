@@ -190,64 +190,59 @@ type substitution = (int * t) list
  *)
 
 (* unify one pair *)
-let rec unify_one ?(verb = true) (s : t) (t : t) : substitution option =
+let rec unify_one (s : t) (t : t) : (substitution, Sexp.t) Result.t =
   match (s, t) with
-  | TVar x, TVar y -> if x = y then Some [] else Some [ (x, t) ]
+  | TVar x, TVar y -> if x = y then Ok [] else Ok [ (x, t) ]
   | TFun (f, sc), TFun (g, tc) -> (
-      Option.(
+      Result.(
         unify_one f g >>= fun u1 ->
         match unify_one sc tc with
-        | Some u2 -> unify (mkv u1 @ mkv u2)
-        | None ->
-            if verb then
-              Log.verbose (fun frmt () ->
-                  Fmt.(pf frmt "Type unification: cannot unify %a and %a.") pp s pp t);
-            None))
+        | Ok u2 -> unify (mkv u1 @ mkv u2)
+        | Error e ->
+            Error
+              (Sexp.List [ e; Atom Fmt.(str "Type unification: cannot unify %a and %a." pp s pp t) ]))
+      )
   | TParam (params1, t1), TParam (params2, t2) -> (
       match List.zip (params1 @ [ t1 ]) (params2 @ [ t2 ]) with
       | Ok pairs -> unify pairs
       | Unequal_lengths ->
-          if verb then
-            Log.verbose (fun frmt () ->
-                Fmt.(pf frmt "Type unification: cannot unify %a and %a.") pp s pp t);
-          None)
+          Error (Sexp.Atom (Fmt.str "Type unification: cannot unify %a and %a." pp s pp t)))
   | TTup tl1, TTup tl2 -> (
       match List.zip tl1 tl2 with
       | Ok tls -> unify tls
       | Unequal_lengths ->
-          if verb then
-            Log.error (fun frmt () ->
-                Fmt.(pf frmt "Type unification: Tuples %a and %a have different sizes") pp s pp t);
-          None)
+          let emsg =
+            Fmt.(str "Type unification: Tuples %a and %a have different sizes" pp s pp t)
+          in
+          Error (Sexp.Atom emsg))
   | TVar x, t' | t', TVar x ->
-      if occurs x t' then (
-        Log.verbose (fun frmt () -> Fmt.(pf frmt "Type unification: circularity %a - %a") pp s pp t);
-        None)
-      else Some [ (x, t') ]
+      if occurs x t' then
+        let emsg = Fmt.(str "Type unification: circularity %a - %a" pp s pp t) in
+        Error (Sexp.Atom emsg)
+      else Ok [ (x, t') ]
   | TParam ([], t1), _ -> unify_one t1 t
   | _, TParam ([], t2) -> unify_one s t2
   | _ ->
-      if Poly.equal s t then Some []
-      else (
-        Log.verbose (fun frmt () ->
-            Fmt.(pf frmt "Type unification: cannot unify %a and %a") pp s pp t);
-        None)
+      if Poly.equal s t then Ok []
+      else
+        let emsg = Fmt.(str "Type unification: cannot unify %a and %a" pp s pp t) in
+        Error (Sexp.Atom emsg)
 
 and mkv = List.map ~f:(fun (a, b) -> (TVar a, b))
 
 (* unify a list of pairs *)
-and unify (s : (t * t) list) : substitution option =
+and unify (s : (t * t) list) : (substitution, Sexp.t) Result.t =
   match s with
-  | [] -> Some []
+  | [] -> Ok []
   | (x, y) :: t ->
-      Option.(
+      Result.(
         unify t >>= fun t2 ->
-        unify_one (sub_all (mkv t2) x) (sub_all (mkv t2) y) >>= fun t1 -> Some (t1 @ t2))
+        unify_one (sub_all (mkv t2) x) (sub_all (mkv t2) y) >>= fun t1 -> Ok (t1 @ t2))
 
 let merge_subs loc (s : substitution) (t : substitution) : substitution =
   match unify (List.map ~f:(fun (a, b) -> (TVar a, b)) (s @ t)) with
-  | Some subs -> subs
-  | None -> Log.loc_fatal_errmsg loc "Error merging constraints."
+  | Ok subs -> subs
+  | Error _ -> Log.loc_fatal_errmsg loc "Error merging constraints."
 
 (* ============================================================================================= *)
 (*                      VARIANT TYPES                                                            *)
@@ -306,8 +301,8 @@ let get_variants (typ : t) : (string * t list) list =
             match typ' with
             | TParam (params', _) when List.length params' > 0 -> (
                 match unify (List.zip_exn in_params params') with
-                | Some subs -> List.map ~f:(sub_all (mkv subs)) tl'
-                | None ->
+                | Ok subs -> List.map ~f:(sub_all (mkv subs)) tl'
+                | Error _ ->
                     Log.error_msg
                       Fmt.(
                         str

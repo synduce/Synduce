@@ -940,10 +940,11 @@ let infer_type (t : term) : term * RType.substitution =
         let t_t1, c_t1 = aux t1 and t_t2, c_t2 = aux t2 in
         let ta, tb = Binop.operand_types op in
         match RType.unify [ (t_t1.ttyp, ta); (t_t2.ttyp, tb) ] with
-        | Some subs ->
+        | Ok subs ->
             ( mk_bin ~pos:t0.tpos ~typ:(Some (Binop.result_type op)) op t_t1 t_t2,
               merge_subs subs (merge_subs c_t1 c_t2) )
-        | None ->
+        | Error e ->
+            Log.error_msg Fmt.(str "Error: %a" Sexp.pp_hum e);
             Log.error_msg Fmt.(str "Cannot infer type of binary expression %a." pp_term t0);
             Log.error_msg
               Fmt.(
@@ -953,9 +954,10 @@ let infer_type (t : term) : term * RType.substitution =
     | TUn (op, t1) -> (
         let t_t1, c_t1 = aux t1 in
         match RType.unify [ (t_t1.ttyp, Unop.operand_type op) ] with
-        | Some subs ->
+        | Ok subs ->
             (mk_un ~pos:t0.tpos ~typ:(Some (Unop.result_type op)) op t_t1, merge_subs subs c_t1)
-        | None ->
+        | Error e ->
+            Log.error_msg Fmt.(str "Error: %a" Sexp.pp_hum e);
             Log.error_msg Fmt.(str "Cannot infer type of unary expression %a." pp_term t0);
             Log.error_msg
               Fmt.(
@@ -966,15 +968,18 @@ let infer_type (t : term) : term * RType.substitution =
     | TVar v -> (
         let tv = Variable.vtype_or_new v in
         match RType.unify [ (tv, t0.ttyp) ] with
-        | Some res -> ({ t0 with ttyp = tv }, res)
-        | None -> failwith "Type inference failure")
+        | Ok res -> ({ t0 with ttyp = tv }, res)
+        | Error e ->
+            Log.error_msg Fmt.(str "Error: %a" Sexp.pp_hum e);
+            failwith "Type inference failure")
     | TIte (c, t1, t2) -> (
         let t_c, c_c = aux c and t_t1, c_t1 = aux t1 and t_t2, c_t2 = aux t2 in
         match RType.unify [ (t_c.ttyp, RType.TBool); (t_t1.ttyp, t_t2.ttyp) ] with
-        | Some subs ->
+        | Ok subs ->
             ( mk_ite ~pos:t0.tpos ~typ:(Some t_t1.ttyp) t_c t_t1 t_t2,
               merge_subs subs (merge_subs c_c (merge_subs c_t1 c_t2)) )
-        | None ->
+        | Error e ->
+            Log.error_msg Fmt.(str "Error: %a" Sexp.pp_hum e);
             Log.error_msg
               Fmt.(str "ite(%a, %a, %a)." RType.pp c.ttyp RType.pp t1.ttyp RType.pp t2.ttyp);
             failwith "Type inference failure.")
@@ -1007,8 +1012,9 @@ let infer_type (t : term) : term * RType.substitution =
             match List.zip func_targs argst with
             | Ok typ_pairs -> (
                 match RType.(unify (_c @ typ_pairs)) with
-                | Some subs -> (mk_app ~pos:t0.tpos ~typ:(Some func_tout) t_func t_args, subs)
-                | None ->
+                | Ok subs -> (mk_app ~pos:t0.tpos ~typ:(Some func_tout) t_func t_args, subs)
+                | Error e ->
+                    Log.error_msg Fmt.(str "Error: %a" Sexp.pp_hum e);
                     Log.loc_fatal_errmsg eloc
                       (Fmt.str "Type inference failure: could not unify types in application %a(%a)"
                          pp_term func
@@ -1025,8 +1031,10 @@ let infer_type (t : term) : term * RType.substitution =
             let t_out = RType.get_fresh_tvar () in
             let tf = RType.fun_typ_pack argst t_out in
             match RType.(unify (_c @ [ (tf, RType.TVar f_tvar) ])) with
-            | Some subs -> (mk_app ~pos:t0.tpos ~typ:(Some t_out) t_func t_args, subs)
-            | None -> failwith "Type inference failure.")
+            | Ok subs -> (mk_app ~pos:t0.tpos ~typ:(Some t_out) t_func t_args, subs)
+            | Error e ->
+                Log.error_msg Fmt.(str "Error: %a" Sexp.pp_hum e);
+                failwith "Type inference failure.")
         | _ as tf ->
             Log.loc_fatal_errmsg eloc
               (Fmt.str "Type inference failure: could not type %a as function." RType.pp tf))
@@ -1037,8 +1045,9 @@ let infer_type (t : term) : term * RType.substitution =
             match List.zip targs (List.map ~f:(fun term -> term.ttyp) t_args) with
             | Ok pairs -> (
                 match RType.unify (pairs @ RType.mkv (List.concat c_args)) with
-                | Some subs -> ({ t0 with ttyp = tout; tkind = TData (cstr, t_args) }, subs)
-                | None ->
+                | Ok subs -> ({ t0 with ttyp = tout; tkind = TData (cstr, t_args) }, subs)
+                | Error e ->
+                    Log.error_msg Fmt.(str "Error: %a" Sexp.pp_hum e);
                     Log.loc_fatal_errmsg eloc
                       (Fmt.str "Type inference failure: could not unify %s arguments %a." cstr
                          (list ~sep:comma pp_term) t_args))
@@ -1053,10 +1062,12 @@ let infer_type (t : term) : term * RType.substitution =
   in
   let t', subs = aux t in
   match RType.unify (RType.mkv subs) with
-  | Some merge_subs ->
+  | Ok merge_subs ->
       let tsubs = RType.mkv merge_subs in
       (rewrite_types tsubs t', merge_subs)
-  | None -> Log.loc_fatal_errmsg t'.tpos "Could not infer type."
+  | Error e ->
+      Log.error_msg Fmt.(str "Error: %a" Sexp.pp_hum e);
+      Log.loc_fatal_errmsg t'.tpos "Could not infer type."
 
 let erase_term_type (t : term) =
   let f t = { t with ttyp = RType.get_fresh_tvar () } in
