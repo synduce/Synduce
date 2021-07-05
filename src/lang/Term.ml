@@ -591,6 +591,9 @@ let rec term_compare (t1 : term) (t2 : term) : int =
   match (t1.tkind, t2.tkind) with
   | TConst c1, TConst c2 -> Constant.compare c1 c2
   | TVar v1, TVar v2 -> Variable.compare v1 v2
+  | TBox t1', TBox t2' -> term_compare t1' t2'
+  | TBox t1', _ -> term_compare t1' t2
+  | _, TBox t2' -> term_compare t1 t2'
   | TData (c1, args1), TData (c2, args2) ->
       let c = String.compare c1 c2 in
       if c = 0 then List.compare term_compare args1 args2 else c
@@ -614,6 +617,13 @@ let rec term_compare (t1 : term) (t2 : term) : int =
         | None -> -1
       else c
   | TTup tl1, TTup tl2 -> List.compare term_compare tl1 tl2
+  | TSel (t1', i1), TSel (t2', i2) ->
+      let c = compare i1 i2 in
+      if c = 0 then term_compare t1' t2' else c
+  | TMatch (t1', cases1), TMatch (t2', cases2) ->
+      let c = term_compare t1' t2' in
+      if c = 0 then List.compare term_compare (snd (List.unzip cases1)) (snd (List.unzip cases2))
+      else c
   | _, _ -> Poly.compare t1 t2
 
 and substitution (substs : (term * term) list) (term : term) : term =
@@ -908,8 +918,8 @@ let pp_term (frmt : Formatter.t) (x : term) =
           pf frmt "@[<hov 2>(fun %a -> @;%a)@]" (list ~sep:sp pp_fpattern) args (aux false) body
         else pf frmt "@[<hov 2>fun %a -> %a@]" (list ~sep:sp pp_fpattern) args (aux false) body
     | TApp (func, args) ->
-        if paren then pf frmt "@[<hov 2>(%a@;%a)@]" (aux true) func (list ~sep:sp (aux true)) args
-        else pf frmt "@[<hov 2>%a@;%a@]" (aux true) func (list ~sep:sp (aux true)) args
+        if paren then pf frmt "@[<hov 2>(%a@ %a)@]" (aux true) func (list ~sep:sp (aux true)) args
+        else pf frmt "@[<hov 2>%a@ %a@]" (aux true) func (list ~sep:sp (aux true)) args
     | TData (cstr, args) ->
         if List.length args = 0 then pf frmt "%a" (styled (`Fg `Green) string) cstr
         else pf frmt "%a(%a)" (styled (`Fg `Green) string) cstr (list ~sep:comma (aux false)) args

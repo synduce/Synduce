@@ -84,6 +84,7 @@ module Expression = struct
     | EFalse
     | EInt of int
     | EVar of int
+    | EBox of int
     | ETup of t list
     | EIte of t * t * t
     | EData of string * t list
@@ -171,6 +172,9 @@ module Expression = struct
       | EVar i ->
           let%map v = get_var i in
           mk_var v
+      | EBox i ->
+          let%map v = get_var i in
+          mk_var v
       | ETup tl -> Option.map ~f:mk_tup (Option.all (List.map ~f tl))
       | EIte (c, tt, tf) ->
           let%map c' = f c and tt' = f tt and tf' = f tf in
@@ -194,4 +198,11 @@ module Expression = struct
           mk_bin op a' b'
     in
     f e
+end
+
+module Solver = struct
+  let functional_equation ~(func_side : term) (res_side : term) (boxes : variable list) :
+      (variable * term) list =
+    let _ = (func_side, res_side, boxes) in
+    []
 end

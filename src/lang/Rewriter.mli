@@ -32,6 +32,7 @@ module Expression : sig
     | EInt of int  (** The ineger constants. *)
     | EVar of int
         (** A variable, identified by its id. The id should be registered in _VARS through register_var. *)
+    | EBox of int  (** A box with an id.*)
     | ETup of t list  (** A tuple of expressions. *)
     | EIte of t * t * t  (** A conditional expression (if .. then .. else) *)
     | EData of string * t list  (** A data constructor. *)
@@ -87,4 +88,8 @@ module Expression : sig
   (** Convert an expression to a term. Returns [None] if some variable id in the expression is not
   registered.
    *)
+end
+
+module Solver : sig
+  val functional_equation : func_side:term -> term -> variable list -> (variable * term) list
 end

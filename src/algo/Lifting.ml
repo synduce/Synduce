@@ -48,18 +48,23 @@ let decompose_t (p : psi_def) (t : term) : (int * term) option =
       else None
   | _ -> None
 
+let recompose_t (p : psi_def) (t : term) (i : int) : term =
+  let g = p.psi_target.pmain_symb in
+  mk_sel (mk_app (mk_var g) [ t ]) i
+
 (**
   Find the expression of the lifting for an input term.
 *)
 let get_mapped_value ~(p : psi_def) (l : lifting) (t : term) =
   Option.(decompose_t p t >>= LiftingMap.get l.tmap)
 
-let add_lifting_expression ~p (l : lifting) (a : term) (i : int) : lifting * term option =
+let interactive_add_lifting_expression ~p (l : lifting) (a : term) (i : int) : lifting * term option
+    =
   let env = VarSet.to_env (Analysis.free_variables a) in
   let g = p.psi_target.pmain_symb in
   (* Prompt the user to add lemmas. *)
   Log.info (fun frmt () ->
-      Fmt.(pf frmt "Please provide a value for %s(%a).%i:" g.vname pp_term a i));
+      Fmt.(pf frmt "Please provide a value for (%s %a).%i:" g.vname pp_term a i));
   match Stdio.In_channel.input_line Stdio.stdin with
   | None | Some "" ->
       Log.info (fun frmt () -> Fmt.pf frmt "No lifting provided.");
@@ -176,6 +181,10 @@ let compose_parts (p : psi_def) : term option =
         Log.error_msg "Ignoring type difference between ɑ and output of target.";
         None
 
+let ith_type (p : psi_def) (i : int) : RType.t option =
+  let _, tout = RType.fun_typ_unpack (Variable.vtype_or_new p.psi_target.pvar) in
+  match tout with RType.TTup tl -> List.nth tl i | _ -> if i = 0 then Some tout else None
+
 (* ============================================================================================= *)
 (*                      LIFTING FUNCTIONS                                                        *)
 (* ============================================================================================= *)
@@ -209,19 +218,36 @@ let apply_lifting ~(p : psi_def) (l : RType.t list) : psi_def =
   Log.debug (fun ft () -> Fmt.(pf ft "@[After lifting:@;%a@]" (box PMRS.pp) target'));
   { p with psi_target = target'; psi_lifting = p.psi_lifting @ l }
 
-let deduce_lifting_expressions ~p (lif : lifting) (_pre : term option) (_lhs : term) (rhs : term) :
+let deduce_lifting_expressions ~p (lif : lifting) (_ : term option) (lhs : term) (rhs : term) :
     lifting =
   let boxes =
     reduce ~init:[]
       ~case:(fun _ t -> match decompose_t p t with Some (i, a) -> Some [ (i, a) ] | _ -> None)
       ~join:( @ ) rhs
   in
-  List.fold ~init:lif
-    ~f:(fun l (i, t) ->
-      match LiftingMap.get l.tmap (i, t) with
-      | Some _ -> l
-      | None -> fst (add_lifting_expression ~p l t i))
-    boxes
+  if !Config.interactive_lifting then
+    List.fold ~init:lif
+      ~f:(fun l (i, t) ->
+        match LiftingMap.get l.tmap (i, t) with
+        | Some _ -> l
+        | None -> fst (interactive_add_lifting_expression ~p l t i))
+      boxes
+  else
+    let subs, var_to_linput =
+      List.unzip
+        (List.map boxes ~f:(fun (i, t) ->
+             let typ_i = Option.value_exn (ith_type p i) in
+             let x = Variable.mk (Alpha.fresh ~s:(Fmt.str "_L_%i" i) ()) ~t:(Some typ_i) in
+             ((recompose_t p t i, mk_var x), (x, (i, t)))))
+    in
+    let rhs' = substitution subs rhs in
+    Fmt.(pf stdout "Equation: %a = %a@." pp_term rhs' pp_term lhs);
+    let var_to_lexpr =
+      Rewriter.Solver.functional_equation ~func_side:rhs' lhs (fst (List.unzip var_to_linput))
+    in
+    List.fold var_to_lexpr ~init:lif ~f:(fun l (v, t) ->
+        let i, t0 = List.Assoc.find_exn ~equal:Variable.equal var_to_linput v in
+        { tmap = LiftingMap.set l.tmap (i, t0) t })
 
 (* ============================================================================================= *)
 (*                       MAIN ENTRY POINT                                                        *)
