@@ -148,12 +148,12 @@ let get_t_name = function
   | _ -> "Can't get name of type"
 
 let get_typ_decl (typ : t) =
-  let theta_vars =
+  let type_vars =
     List.map
       (fun (name, variant) -> mk_t_variant dummy_loc name (List.map convert_t_tkind variant))
       (get_variants typ)
   in
-  gen_type_decl (get_t_name typ) (mk_t_sum dummy_loc theta_vars)
+  gen_type_decl (get_t_name typ) (mk_t_sum dummy_loc type_vars)
 
 let gen_func_descr (desc : function_descr) =
   let name = desc.f_var.vname in
@@ -203,7 +203,18 @@ let correctness_lemma : d_toplevel =
   let body = Body "" in
   mk_toplevel (mk_lemma "correctness_lemma" signature spec body)
 
-let proof_skeleton = tau_decl :: theta_decl :: toplevel @ gen_target soln @ [ correctness_lemma ]
+let get_num_params = function
+  | DDatatypeDecl (_, _, params, _) -> List.length params
+  | _ -> failwith "Can't get params from a non-datatype declaration."
+
+let incl_decl =
+  (*If tau and theta are the same type, prioritize one based on the number of parameters*)
+  if get_t_name !Algo.AState._tau = get_t_name !Algo.AState._theta then
+    if get_num_params tau_decl.dt_kind >= get_num_params theta_decl.dt_kind then [ tau_decl ]
+    else [ theta_decl ]
+  else [ tau_decl; theta_decl ]
+
+let proof_skeleton = incl_decl @ toplevel @ gen_target soln @ [ correctness_lemma ]
 
 let ref_program : d_program = { dp_includes = []; dp_topdecls = proof_skeleton }
 

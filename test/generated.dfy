@@ -1,6 +1,5 @@
 
 
-datatype tree =  Node(int, tree<int>, tree<int>) |  Nil
 datatype tree<a1> =  Node(a1, tree<a1>, tree<a1>) |  Nil
 function repr(xre : tree<int>) : tree<int>  {xre}
 function spec(xsp : tree<int>) : int  {f(0, xsp)}
