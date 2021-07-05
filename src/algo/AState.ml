@@ -93,7 +93,18 @@ type ctex = {
 
 type equation_system = equation list
 
-type lemma = { lem_map : (term, term, Terms.comparator_witness) Map.t }
+type term_state_detail = {
+  term : term;
+  lemmas : term list;
+  lemma_candidate : (string * variable list * term) option;
+  negative_ctexs : ctex list;
+  positive_ctexs : ctex list;
+  recurs_elim : (term * term) list;
+  vars : VarSet.t;
+  ctex : ctex;
+}
+
+type term_state = (term, term_state_detail, Terms.comparator_witness) Map.t
 (*
   A type for lemmas.
   For now, it only contains a map from terms to terms.
@@ -113,7 +124,7 @@ type lifting = { tmap : ((int * term) * term) list }
 type refinement_loop_state = {
   t_set : TermSet.t;
   u_set : TermSet.t;
-  lemma : lemma;
+  term_state : term_state;
   lifting : lifting;
 }
 (** The state of the main refinement loop. Currently, it is entirely determined by the sets T and U,

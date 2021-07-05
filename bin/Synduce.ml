@@ -42,6 +42,7 @@ let print_usage () =
     \  -I   --interactive               Request additional lemmas interactively.\n\
     \  -J   --interactive-lifting       Request expressions for lifting.\n\
     \  -L   --interactive-loop          Request lemmas interactively in a loop.\n\
+    \  -X   --classify-ctex             Manually classify ctex as pos or neg.\n\
     \       --parse-only                Just parse the input.\n\
     \       --show-vars                 Print variables and their types at the end.\n\
      -> Try:\n\
@@ -65,6 +66,7 @@ let options =
     ('s', "no-splitting", set Config.split_solve_on false, None);
     ('t', "no-detupling", set Config.detupling_on false, None);
     ('v', "verbose", set Config.verbose true, None);
+    ('X', "classify-ctex", set Config.classify_ctex true, None);
     ('\000', "acegis", set Config.use_acegis true, None);
     ('\000', "ccegis", set Config.use_ccegis true, None);
     ('\000', "parse-only", set parse_only true, None);

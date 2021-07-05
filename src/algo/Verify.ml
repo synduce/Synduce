@@ -58,7 +58,7 @@ let check_solution ?(use_acegis = false) ~(p : psi_def) (lstate : refinement_loo
       let sys_eqns, _ =
         Equations.make ~force_replace_off:true
           ~p:{ p with psi_target = target_inst }
-          ~lemmas:lstate.lemma ~lifting:lstate.lifting t_set
+          ~term_state:lstate.term_state ~lifting:lstate.lifting t_set
       in
       let smt_eqns = List.map sys_eqns ~f:constr_eqn in
       let new_free_vars =
@@ -141,7 +141,7 @@ let bounded_check ?(concrete_ctex = false) ~(p : psi_def)
     let sys_eqns, _ =
       Equations.make ~force_replace_off:true
         ~p:{ p with psi_target = target_inst }
-        ~lemmas:Lemmas.empty_lemma ~lifting:Lifting.empty_lifting (TermSet.singleton term)
+        ~term_state:Lemmas.empty_term_state ~lifting:Lifting.empty_lifting (TermSet.singleton term)
     in
     let smt_eqns = List.map sys_eqns ~f:(fun t -> (t, constr_eqn t)) in
     let new_free_vars =

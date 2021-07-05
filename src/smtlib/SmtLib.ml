@@ -475,6 +475,8 @@ let mk_seq_sort t = Comp (Id (SSimple "Seq"), [ t ])
 
 let mk_tuple_sort lt = Comp (Id (SSimple "Tuple"), lt)
 
+let mk_simple_sort name = SmtSort (Id (SSimple name))
+
 (* Terms *)
 let mk_qi s = QI (Id (SSimple s))
 
@@ -519,6 +521,8 @@ let mk_ge t1 t2 = mk_simple_app ">=" [ t1; t2 ]
 let mk_not t1 = mk_simple_app "not" [ t1 ]
 
 let mk_exists (sorted_vars : smtSortedVar list) (term : smtTerm) = SmtTExists (sorted_vars, term)
+
+let mk_forall (sorted_vars : smtSortedVar list) (term : smtTerm) = SmtTForall (sorted_vars, term)
 
 (* Commands *)
 let mk_assert (t : smtTerm) = Assert t

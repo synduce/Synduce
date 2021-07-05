@@ -4,11 +4,17 @@ let rec tree_min = function Leaf x -> x | Node (a, l, r) -> min a (min (tree_min
 
 let rec tree_max = function Leaf x -> x | Node (a, l, r) -> max a (min (tree_max l) (tree_max r))
 
+<<<<<<< HEAD
 let rec is_bst t = aux (tree_max t) (tree_min t) t
 
 and aux hi lo = function
   | Leaf a -> lo <= a && a <= hi
   | Node (a, l, r) -> lo <= a && a <= hi && aux lo a l && aux a hi r
+=======
+let rec is_bst = function
+  | Leaf x -> true
+  | Node (a, l, r) -> a >= tree_max l && a <= tree_min r && is_bst l && is_bst r
+>>>>>>> dcc4d9f6a03650de86522d7cef5611ac6c068786
 
 let repr x = x
 

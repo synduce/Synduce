@@ -208,17 +208,22 @@ let constmap_of_s_exprs (starting_map : (string, term, String.comparator_witness
     (s_exprs : Sexp.t list) =
   let add_sexp map sexp =
     Sexp.(
-      match sexp with
-      | List [ Atom "define-fun"; Atom s; args; _; value ] -> (
-          match args with
-          | List [] -> (
-              let t_val_o =
-                let%map smt_value = smtTerm_of_sexp value in
-                term_of_smt (Map.empty (module String)) smt_value
-              in
-              match t_val_o with Some t_val -> Map.set map ~key:s ~data:t_val | None -> map)
-          | _ -> map)
-      | _ -> map)
+      try
+        match sexp with
+        | List [ Atom "define-fun"; Atom s; args; _; value ] -> (
+            match args with
+            | List [] -> (
+                let t_val_o =
+                  let%map smt_value = smtTerm_of_sexp value in
+                  term_of_smt (Map.empty (module String)) smt_value
+                in
+                match t_val_o with Some t_val -> Map.set map ~key:s ~data:t_val | None -> map)
+            | _ -> map)
+        | _ -> map
+      with Failure _ ->
+        Log.debug_msg
+          Fmt.(str "Failed at converting Sexpr \"%a\" to smtTerm. Skipping." Sexplib.Sexp.pp sexp);
+        map)
   in
   match s_exprs with
   | [ Sexp.List l ] -> List.fold ~f:add_sexp ~init:starting_map l
@@ -371,6 +376,13 @@ let _smt_of_pmrs (pmrs : PMRS.t) : (smtSymbol list * command) list * command lis
     DefineFunsRec (decls, bodies) :: main_f
   in
   (datatype_decls, definition_commands)
+
+let mk_def_fun_command (name : string) (args : (string * RType.t) list) (rtype : RType.t)
+    (body : term) =
+  let smt_args = List.map ~f:(fun (name, rtype) -> (mk_symb name, sort_of_rtype rtype)) args in
+  DefineFun (mk_symb name, smt_args, sort_of_rtype rtype, smt_of_term body)
+
+let mk_assert = mk_assert
 
 let smt_of_pmrs (pmrs : PMRS.t) : command list =
   (* TODO : order of declarations matters. *)

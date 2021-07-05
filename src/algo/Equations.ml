@@ -102,8 +102,8 @@ let compute_rhs ?(force_replace_off = false) p t =
     in
     res
 
-let precond_from_lemmas ~lemmas subst eterm =
-  match Map.find lemmas.lem_map eterm with
+let precond_from_term_state ~p ~term_state subst eterm =
+  match Lemmas.get_lemma ~p term_state ~key:eterm with
   | Some lemma_for_eterm ->
       let t = Reduce.reduce_term (subst lemma_for_eterm) in
       Some t
@@ -119,7 +119,7 @@ let filter_elims all_subs t =
          | [] -> None
          | x :: _ -> Some (mk_var x, t_scalar)))
 
-let make ?(force_replace_off = false) ~(p : psi_def) ~(lemmas : lemma) ~(lifting : lifting)
+let make ?(force_replace_off = false) ~(p : psi_def) ~(term_state : term_state) ~(lifting : lifting)
     (tset : TermSet.t) : equation list * lifting =
   let _ = lifting in
   let proj_to_non_lifting = Lifting.proj_to_non_lifting p in
@@ -160,8 +160,8 @@ let make ?(force_replace_off = false) ~(p : psi_def) ~(lemmas : lemma) ~(lifting
              from recursive-typed variable to scalar variables replacing calls.
       *)
       let eelim = filter_elims all_subs eterm in
-
-      let precond = precond_from_lemmas ~lemmas applic eterm in
+      (* Get the precondition, from the lemmas in the term state, *)
+      let precond = precond_from_term_state ~p ~term_state applic eterm in
       (* Replace the boxed expressions of the lifting. *)
       let lifting' = Lifting.deduce_lifting_expressions ~p lifting precond lhs'' rhs'' in
       let rhs'' = Lifting.replace_boxed_expressions ~p lifting' rhs' in
@@ -188,7 +188,8 @@ let make ?(force_replace_off = false) ~(p : psi_def) ~(lemmas : lemma) ~(lifting
       Fmt.(
         pf f "Equations (%i) @." (Set.length tset);
         List.iter ~f:(fun eqn -> Fmt.pf f "@[%a@]@." pp_equation eqn) print_less));
-  (* Generate the equations corresponding to the lifting constraints. *)
+  (* Phase 2 of the equation generation.
+     Generate the equations corresponding to the lifting constraints. *)
   let lifting_eqns =
     let constraint_of_lift_expr ((i, t0), lft) =
       let t0_rhs = compute_rhs p t0 in
@@ -196,7 +197,7 @@ let make ?(force_replace_off = false) ~(p : psi_def) ~(lemmas : lemma) ~(lifting
         Lifting.replace_boxed_expressions ~p lifting (Reduce.reduce_term (mk_sel t0_rhs i))
       in
       let elhs = lft in
-      let precond = precond_from_lemmas ~lemmas (fun x -> x) t0 in
+      let precond = precond_from_term_state ~p ~term_state (fun x -> x) t0 in
       let eprecond =
         match invar invariants elhs erhs with
         | Some im_f -> (
