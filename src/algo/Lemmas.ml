@@ -147,25 +147,37 @@ let add_lemmas_interactively ~(p : psi_def) (lstate : refinement_loop_state) : r
 
 let ith_synth_fun index = "lemma_" ^ Int.to_string index
 
-let synthfun_of_ctex (det : term_state_detail) (lem_id : int) : command =
-  let args =
+let synthfun_of_ctex (det : term_state_detail) (lem_id : int) : command * (string * sygus_sort) list
+    =
+  let params =
     List.map
       ~f:(fun scalar -> (scalar.vname, sort_of_rtype RType.TInt))
       (Set.elements det.ctex.ctex_vars)
   in
   let ret_sort = sort_of_rtype RType.TBool in
-  let grammar = Grammars.generate_grammar ~guess:None ~bools:true OpSet.empty args ret_sort in
-  CSynthFun (ith_synth_fun lem_id, args, ret_sort, grammar)
+  let grammar = Grammars.generate_grammar ~guess:None ~bools:true OpSet.empty params ret_sort in
+  (CSynthFun (ith_synth_fun lem_id, params, ret_sort, grammar), params)
 
-let constraint_of_neg_ctex index ctex =
-  let var_list = List.map ~f:(fun t -> sygus_of_term t) (Map.data ctex.ctex_model) in
-  (* TODO: check that order of terms in Map.data model is the same as order of arguments to xi *)
-  CConstraint (SyApp (IdSimple "not", [ SyApp (IdSimple (ith_synth_fun index), var_list) ]))
+let ctex_model_to_args params ctex =
+  List.map
+    ~f:(fun (name, _) ->
+      match
+        Map.find ctex.ctex_model
+          (match VarSet.find_by_name ctex.ctex_vars name with
+          | None -> failwith "Failed to extract argument list from ctex model."
+          | Some v -> v.vid)
+      with
+      | None -> failwith "Failed to extract argument list from ctex model."
+      | Some t -> sygus_of_term t)
+    params
 
-let constraint_of_pos_ctex index ctex =
-  let var_list = List.map ~f:(fun t -> sygus_of_term t) (Map.data ctex.ctex_model) in
-  (* TODO: check that order of terms in Map.data model is the same as order of arguments to xi *)
-  CConstraint (SyApp (IdSimple (ith_synth_fun index), var_list))
+let constraint_of_neg_ctex index params ctex =
+  CConstraint
+    (SyApp
+       (IdSimple "not", [ SyApp (IdSimple (ith_synth_fun index), ctex_model_to_args params ctex) ]))
+
+let constraint_of_pos_ctex index params ctex =
+  CConstraint (SyApp (IdSimple (ith_synth_fun index), ctex_model_to_args params ctex))
 
 let log_soln s vs t =
   Log.verbose (fun frmt () ->
@@ -265,22 +277,47 @@ let classify_ctexs_opt ~(p : psi_def) ctexs =
     List.fold ~f ~init:([], []) ctexs
   else classify_ctexs ~p ctexs
 
+let smt_of_disallow_ctex_values (ctexs : ctex list) : S.smtTerm =
+  S.mk_assoc_and
+    (List.map
+       ~f:(fun ctex ->
+         S.mk_not
+           (S.mk_assoc_and
+              (Map.fold
+                 ~f:(fun ~key ~data acc ->
+                   let var =
+                     match VarSet.find_by_id ctex.ctex_vars key with
+                     | None -> failwith "Something went wrong."
+                     | Some v -> v
+                   in
+                   S.mk_eq (S.mk_var var.vname) (Smt.smt_of_term data) :: acc)
+                 ~init:[] ctex.ctex_model)))
+       ctexs)
+
 let get_positive_examples (solver : Solvers.online_solver) (det : term_state_detail) ~(p : psi_def)
-    lemma : ctex list =
+    (lemma : symbol * variable list * term) : ctex list =
   (* TODO: make fresh variables, since this may in the future be called for multiple terms, for multiple lemma candidates, or to generate multiple pos examples, in one solver instance *)
   Log.verbose (fun f () -> Fmt.(pf f "Searching for a positive example."));
-  let vset = det.vars in
-  let _ = Solvers.declare_all solver (Smt.decls_of_vars vset) in
+  let _ =
+    Solvers.declare_all solver
+      (Smt.decls_of_vars (Set.union det.vars (VarSet.of_list p.psi_reference.pargs)))
+  in
   let rec_elim_eqns = smt_of_recurs_elim_eqns det.recurs_elim ~p in
   let _ =
     List.iter
-      ~f:(fun command -> ignore (Solvers.exec_command solver command))
-      [
-        S.mk_assert rec_elim_eqns;
-        S.mk_assert (smt_of_tinv_app ~p det);
-        S.mk_assert (S.mk_not (smt_of_lemma_app lemma));
-      ]
+      ~f:(fun command ->
+        ignore (Solvers.exec_command solver command);
+        ignore (Solvers.check_sat solver))
+      ((if List.length det.positive_ctexs > 0 then
+        [ S.mk_assert (smt_of_disallow_ctex_values det.positive_ctexs) ]
+       else [])
+      @ [
+          S.mk_assert rec_elim_eqns;
+          S.mk_assert (smt_of_tinv_app ~p det);
+          S.mk_assert (S.mk_not (smt_of_lemma_app lemma));
+        ])
   in
+
   match Solvers.check_sat solver with
   | Sat | Unknown -> (
       match Solvers.get_model solver with
@@ -314,9 +351,9 @@ let synthesize_new_lemma (det : term_state_detail) : (string * variable list * t
   let set_logic = CSetLogic "DTLIA" in
   (* TODO: How to choose logic? *)
   let lem_id = 0 in
-  let synth_objs = synthfun_of_ctex det lem_id in
-  let neg_constraints = List.map ~f:(constraint_of_neg_ctex lem_id) det.negative_ctexs in
-  let pos_constraints = List.map ~f:(constraint_of_pos_ctex lem_id) det.positive_ctexs in
+  let synth_objs, params = synthfun_of_ctex det lem_id in
+  let neg_constraints = List.map ~f:(constraint_of_neg_ctex lem_id params) det.negative_ctexs in
+  let pos_constraints = List.map ~f:(constraint_of_pos_ctex lem_id params) det.positive_ctexs in
   let extra_defs = [ max_definition; min_definition ] in
   let commands =
     set_logic :: (extra_defs @ [ synth_objs ] @ neg_constraints @ pos_constraints @ [ CCheckSynth ])
@@ -338,7 +375,7 @@ let rec lemma_refinement_loop (det : term_state_detail) ~(p : psi_def) : term_st
       | _, Unsat ->
           Log.verbose (fun f () -> Fmt.(pf f "This lemma has been proven correct."));
           Log.info (fun frmt () ->
-              Fmt.pf frmt "Lemma: \"%s %s = @[%a@]\"." name
+              Fmt.pf frmt "Lemma for term %a: \"%s %s = @[%a@]\"." pp_term det.term name
                 (String.concat ~sep:" " (List.map ~f:(fun v -> v.vname) vars))
                 pp_term lemma_term);
           Some { det with lemma_candidate = None; lemmas = lemma_term :: det.lemmas }
