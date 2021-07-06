@@ -1,9 +1,12 @@
+open Base
 open Term
 
 val get_id_const : Binop.t -> term option
 (** If the binary operator [op] has an identity element, then [get_id_const op] returns
   [Some term] where term is the identity of [op]
  *)
+
+val get_ty_const : RType.t -> term
 
 val is_left_distrib : Binop.t -> Binop.t -> bool
 (** For example, [is_left_distrib Plus Max] is true. *)
@@ -21,6 +24,36 @@ operator [op] to the arguments [args]. If [op] is not associative or has no iden
 
 val is_commutative : Binop.t -> bool
 (** For example [is_commutative Times] returns true. *)
+
+(** Set of ints = set of variables. Module is only meant to avoid (Set.... (module Int)) everywhere. *)
+module IS : sig
+  type t = Set.M(Int).t
+
+  type elt = int
+
+  val empty : t
+
+  val singleton : int -> t
+
+  val of_list : int list -> t
+
+  val ( + ) : t -> t -> t
+  (** Set union. *)
+
+  val ( - ) : t -> t -> t
+  (** Set difference. *)
+
+  val ( ^ ) : t -> t -> t
+  (** Set intersection. *)
+
+  val ( ?. ) : t -> bool
+  (** Is the set empty? *)
+
+  val ( ~$ ) : int -> t
+  (** Set singleton. *)
+
+  val pp : Formatter.t -> t -> unit
+end
 
 (** The module for expressions: terms without let-bindings or functions. Useful rewriting and
   expression manipulation while ignoring "functional" features of the language.
@@ -40,7 +73,11 @@ module Expression : sig
     | EBin of Binop.t * t * t  (** A binary operator application. *)
     | EUn of Unop.t * t  (** A unary operator application. *)
 
-  val equal : 'a -> 'a -> bool
+  val pp : Formatter.t -> t -> unit
+
+  val pp_ivar : Formatter.t -> int -> unit
+
+  val equal : t -> t -> bool
 
   val mk_e_true : t
   (** The boolean constant true. *)
@@ -88,8 +125,18 @@ module Expression : sig
   (** Convert an expression to a term. Returns [None] if some variable id in the expression is not
   registered.
    *)
-end
 
-module Solver : sig
-  val functional_equation : func_side:term -> term -> variable list -> (variable * term) list
+  val reduce : case:((t -> 'a) -> t -> 'a option) -> join:('a -> 'a -> 'a) -> init:'a -> t -> 'a
+  (** Reduce an expression, using special case [case]. *)
+
+  val transform : ((t -> t) -> t -> t option) -> t -> t
+  (** Transform an expression.*)
+
+  val free_variables : t -> IS.t
+
+  val match_as_subexpr : t -> of_:t -> (int * t) option
+
+  val get_id_const : Binop.t -> t option
+
+  val get_ty_const : RType.t -> t
 end

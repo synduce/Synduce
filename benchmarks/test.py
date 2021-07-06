@@ -125,6 +125,13 @@ benchmark_set = [
     ["list/sumgt.ml", ""],
     ["list/sndminhom.pmrs", ""],
     ["list/mincount.pmrs", ""],
+    ["zippers/list_sum_basic.ml", ""],
+    ["zippers/list_sum.ml", ""]
+]
+
+extra_benchmarks = [
+    ["list/bal.ml", ""],
+    ["list/lpeak.ml", ""],
 ]
 
 root = os.getcwd()

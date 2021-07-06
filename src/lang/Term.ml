@@ -280,13 +280,13 @@ module Binop = struct
     | "or" | "||" -> Some Or
     | _ -> None
 
-  let operand_types (op : t) =
+  let operand_types (op : t) : (RType.t * RType.t) list =
     RType.(
       match op with
-      | Lt | Gt | Ge | Le -> (TInt, TInt)
-      | Eq -> (TInt, TInt)
-      | Max | Min | Plus | Minus | Times | Div | Mod -> (TInt, TInt)
-      | And | Or -> (TBool, TBool))
+      | Lt | Gt | Ge | Le -> [ (TInt, TInt) ]
+      | Eq -> [ (TInt, TInt); (TBool, TBool) ]
+      | Max | Min | Plus | Minus | Times | Div | Mod -> [ (TInt, TInt) ]
+      | And | Or -> [ (TBool, TBool) ])
 
   let result_type (op : t) =
     RType.(
@@ -948,18 +948,28 @@ let infer_type (t : term) : term * RType.substitution =
     | TBox t -> aux t
     | TBin (op, t1, t2) -> (
         let t_t1, c_t1 = aux t1 and t_t2, c_t2 = aux t2 in
-        let ta, tb = Binop.operand_types op in
-        match RType.unify [ (t_t1.ttyp, ta); (t_t2.ttyp, tb) ] with
-        | Ok subs ->
-            ( mk_bin ~pos:t0.tpos ~typ:(Some (Binop.result_type op)) op t_t1 t_t2,
-              merge_subs subs (merge_subs c_t1 c_t2) )
-        | Error e ->
-            Log.error_msg Fmt.(str "Error: %a" Sexp.pp_hum e);
+        (* Collect possible operand types. *)
+        let possible_opty = Binop.operand_types op in
+        (* Find a pair of operaand types that work. *)
+        let maybe_t =
+          List.find_map possible_opty ~f:(fun (ta, tb) ->
+              match RType.unify [ (t_t1.ttyp, ta); (t_t2.ttyp, tb) ] with
+              | Ok subs ->
+                  Some
+                    ( mk_bin ~pos:t0.tpos ~typ:(Some (Binop.result_type op)) op t_t1 t_t2,
+                      merge_subs subs (merge_subs c_t1 c_t2) )
+              | Error _ -> None)
+        in
+        match maybe_t with
+        | Some x -> x
+        | None ->
             Log.error_msg Fmt.(str "Cannot infer type of binary expression %a." pp_term t0);
             Log.error_msg
               Fmt.(
-                str "%a has type %a, expected type %a. %a has type %a, expected %a." pp_term t1
-                  RType.pp t_t1.ttyp RType.pp ta pp_term t2 RType.pp t_t2.ttyp RType.pp tb);
+                str "%a has type %a, and %a has type %a, expected pair to be one  of %a." pp_term t1
+                  RType.pp t_t1.ttyp pp_term t2 RType.pp t_t2.ttyp
+                  (list ~sep:sp (parens (pair ~sep:comma RType.pp RType.pp)))
+                  possible_opty);
             failwith "Type inference failure.")
     | TUn (op, t1) -> (
         let t_t1, c_t1 = aux t1 in
@@ -1119,6 +1129,9 @@ module TermSet = struct
   let of_list = Set.of_list (module Terms)
 
   let union_list = Set.union_list (module Terms)
+
+  let pp (f : Formatter.t) (s : t) =
+    Fmt.(pf f "@[{%a}@]" (list ~sep:comma pp_term) (Set.elements s))
 end
 
 let pp_term_set (f : Formatter.t) (s : TermSet.t) =

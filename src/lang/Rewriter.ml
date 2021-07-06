@@ -5,12 +5,19 @@ open Option.Let_syntax
 let get_id_const (op : Binop.t) : term option =
   match op with
   | Plus -> Some (mk_const (Constant.CInt 0))
-  | Times -> Some (mk_const (Constant.CInt 0))
+  | Times -> Some (mk_const (Constant.CInt 1))
   | Min -> Some (mk_const (Constant.CInt Int.max_value))
   | Max -> Some (mk_const (Constant.CInt Int.min_value))
   | And -> Some (mk_const Constant.CTrue)
   | Or -> Some (mk_const Constant.CFalse)
   | _ -> None
+
+let get_ty_const (typ : RType.t) : term =
+  RType.(
+    match typ with
+    | TInt -> mk_const (Constant.of_int 0)
+    | TBool -> mk_const (Constant.of_int 1)
+    | _ -> mk_const (Constant.of_int 0))
 
 (**
   Left distributive operators: for each pair op1, op2 it means that:
@@ -77,8 +84,40 @@ let _commut =
 *)
 let is_commutative op = Set.mem _commut (Binary op)
 
+(** Set of ints = set of variables. Module is only meant to avoid (Set.... (module Int)) everywhere. *)
+module IS = struct
+  type t = Set.M(Int).t
+
+  type elt = int
+
+  let empty = Set.empty (module Int)
+
+  let singleton i = Set.singleton (module Int) i
+
+  let of_list l = Set.of_list (module Int) l
+
+  let ( + ) = Set.union
+
+  let ( - ) = Set.diff
+
+  let ( ^ ) = Set.inter
+
+  let ( ?. ) x = Set.is_empty x
+
+  let ( ~$ ) x = singleton x
+
+  let pp (f : Formatter.t) (s : t) : unit = Fmt.(braces (list ~sep:comma int)) f (Set.elements s)
+end
+
 (** An expression is a term without let-bindings or function values.  *)
 module Expression = struct
+  let box_id : int ref = ref 0
+
+  let new_box_id () =
+    let i = !box_id in
+    Int.incr box_id;
+    i
+
   type t =
     | ETrue
     | EFalse
@@ -92,8 +131,36 @@ module Expression = struct
     | EBin of Binop.t * t * t
     | EUn of Unop.t * t
 
+  let _VARS : (int, variable) Hashtbl.t = Hashtbl.create (module Int)
+
+  let register_var (v : variable) = Hashtbl.set _VARS ~key:v.vid ~data:v
+
+  let get_var (id : int) = Hashtbl.find _VARS id
+
+  let pp_ivar (f : Formatter.t) (vid : int) : unit =
+    Fmt.(
+      match get_var vid with
+      | Some v -> pf f "%a" (styled (`Fg `Green) (styled `Italic Variable.pp)) v
+      | None -> pf f "?%a" (styled (`Fg `Green) (styled `Italic int)) vid)
+
+  let rec pp (f : Formatter.t) (expr : t) : unit =
+    Fmt.(
+      match expr with
+      | ETrue -> pf f "#t"
+      | EFalse -> pf f "#f"
+      | EInt i -> pf f "%i" i
+      | EVar i -> pp_ivar f i
+      | EBox i -> pf f ":%a" (styled `Faint int) i
+      | ETup tl -> pf f "@[(%a)@]" (list ~sep:comma pp) tl
+      | EIte (a, b, c) -> pf f "@[if@;%a then@ %a@ else %a@]" pp a pp b pp c
+      | EData (c, tl) -> pf f "@[%s(%a)@]" c (list ~sep:comma pp) tl
+      | EAssoc (op, args) ->
+          pf f "@[(%a %a)@]" (styled (`Fg `Yellow) Binop.pp) op (list ~sep:sp pp) args
+      | EBin (op, a, b) -> pf f "@[(%a@ %a %a)@]" (styled (`Fg `Yellow) Binop.pp) op pp a pp b
+      | EUn (op, a) -> pf f "@[(%a %a)@]" Unop.pp op pp a)
+
   (* Simple equality *)
-  let equal = Poly.equal
+  let equal : t -> t -> bool = Poly.equal
 
   (* Expression construction. *)
   let mk_e_true = ETrue
@@ -116,11 +183,42 @@ module Expression = struct
 
   let mk_e_un u e = EUn (u, e)
 
-  let _VARS : (int, variable) Hashtbl.t = Hashtbl.create (module Int)
+  let reduce ~(case : (t -> 'a) -> t -> 'a option) ~(join : 'a -> 'a -> 'a) ~(init : 'a) (e : t) =
+    let rec aux e =
+      match case aux e with
+      | Some c -> c
+      | None -> (
+          match e with
+          | ETrue | EFalse | EInt _ | EVar _ | EBox _ -> init
+          | EIte (a, b, c) -> join (aux a) (join (aux b) (aux c))
+          | EAssoc (_, tl) | EData (_, tl) | ETup tl ->
+              List.fold ~init ~f:(fun a e' -> join (aux e') a) tl
+          | EBin (_, a, b) -> join (aux a) (aux b)
+          | EUn (_, a) -> aux a)
+    in
+    aux e
 
-  let register_var (v : variable) = Hashtbl.set _VARS ~key:v.vid ~data:v
+  let transform (case : (t -> t) -> t -> t option) (e : t) =
+    let rec aux e =
+      match case aux e with
+      | Some c -> c
+      | None -> (
+          match e with
+          | ETrue | EFalse | EInt _ | EVar _ | EBox _ -> e
+          | EIte (a, b, c) -> mk_e_ite (aux a) (aux b) (aux c)
+          | EAssoc (op, tl) -> mk_e_assoc op (List.map ~f:aux tl)
+          | EData (c, tl) -> mk_e_data c (List.map ~f:aux tl)
+          | ETup tl -> mk_e_tup (List.map ~f:aux tl)
+          | EBin (op, a, b) -> mk_e_bin op (aux a) (aux b)
+          | EUn (op, a) -> mk_e_un op (aux a))
+    in
+    aux e
 
-  let get_var (id : int) = Hashtbl.find _VARS id
+  let free_variables (e : t) =
+    IS.(
+      reduce ~join:( + ) ~init:empty
+        ~case:(fun _ e -> match e with EVar i -> Some ~$i | _ -> None)
+        e)
 
   let of_term t0 : t option =
     let rec f t =
@@ -198,11 +296,33 @@ module Expression = struct
           mk_bin op a' b'
     in
     f e
-end
 
-module Solver = struct
-  let functional_equation ~(func_side : term) (res_side : term) (boxes : variable list) :
-      (variable * term) list =
-    let _ = (func_side, res_side, boxes) in
-    []
+  (** Matching subexpressions (up to rewriting) *)
+  let match_as_subexpr (e : t) ~(of_ : t) : (int * t) option =
+    let bid = ref None in
+    let transformer _ e0 =
+      if equal e e0 then (
+        match !bid with
+        | Some i -> Some (EBox i)
+        | None ->
+            let i = new_box_id () in
+            bid := Some i;
+            Some (EBox i))
+      else None
+    in
+    let e' = transform transformer of_ in
+    match !bid with Some id -> Some (id, e') | None -> None
+
+  let get_id_const (op : Binop.t) : t option =
+    match op with
+    | Plus -> Some (mk_e_int 0)
+    | Times -> Some (mk_e_int 1)
+    | Min -> Some (mk_e_int Int.max_value)
+    | Max -> Some (mk_e_int Int.min_value)
+    | And -> Some mk_e_true
+    | Or -> Some mk_e_false
+    | _ -> None
+
+  let get_ty_const (typ : RType.t) : t =
+    RType.(match typ with TInt -> mk_e_int 0 | TBool -> mk_e_true | _ -> mk_e_int 0)
 end

@@ -92,6 +92,10 @@ let has_real_lifting (p : psi_def) : bool =
   let _, tout = RType.fun_typ_unpack (Variable.vtype_or_new p.psi_target.pvar) in
   not (Result.is_ok (RType.unify_one tout (fst !_alpha)))
 
+let lift_count (p : psi_def) : int =
+  let _, tout = RType.fun_typ_unpack (Variable.vtype_or_new p.psi_target.pvar) in
+  match tout with RType.TTup tl -> List.length tl - alpha_component_count () | _ -> 0
+
 (* ============================================================================================= *)
 (*                       PROJECTIONS TO AND FROM LIFTING                                         *)
 (* ============================================================================================= *)
@@ -116,6 +120,19 @@ let proj_to_non_lifting (p : psi_def) : term option =
     | _ ->
         Log.error_msg "Ignoring type difference between ɑ and output of target.";
         None
+
+let is_proj_function (p : psi_def) (t : term) : bool =
+  match t.tkind with
+  | TFun ([ tuple_arg_pattern ], tuple_body) -> (
+      match tuple_arg_pattern with
+      | FPatTup t ->
+          if List.length t = lift_count p + alpha_component_count () then
+            match tuple_body.tkind with
+            | TTup tl -> List.length tl = alpha_component_count ()
+            | _ -> alpha_component_count () = 1
+          else false
+      | _ -> false)
+  | _ -> false
 
 (**
     Return function f such that f(a) = a.i, .. a.i + n if i, .. i+n where
@@ -236,18 +253,32 @@ let deduce_lifting_expressions ~p (lif : lifting) (_ : term option) (lhs : term)
     let subs, var_to_linput =
       List.unzip
         (List.map boxes ~f:(fun (i, t) ->
-             let typ_i = Option.value_exn (ith_type p i) in
-             let x = Variable.mk (Alpha.fresh ~s:(Fmt.str "_L_%i" i) ()) ~t:(Some typ_i) in
-             ((recompose_t p t i, mk_var x), (x, (i, t)))))
+             match LiftingMap.get lif.tmap (i, t) with
+             | Some e -> ((recompose_t p t i, e), None)
+             | None ->
+                 let typ_i = Option.value_exn (ith_type p i) in
+                 let x = Variable.mk (Alpha.fresh ~s:(Fmt.str "_L_%i" i) ()) ~t:(Some typ_i) in
+                 ((recompose_t p t i, mk_var x), Some (x, (i, t)))))
+    in
+    let var_to_linput = List.filter_opt var_to_linput in
+    let rec as_unknown_app t =
+      match t.tkind with
+      | TApp (f, [ arg ]) when is_proj_function p f -> as_unknown_app arg
+      | TApp ({ tkind = TVar f; _ }, args) ->
+          if Set.mem p.psi_target.psyntobjs f then Some args else None
+      | _ -> None
     in
     let rhs' = substitution subs rhs in
-    Fmt.(pf stdout "Equation: %a = %a@." pp_term rhs' pp_term lhs);
-    let var_to_lexpr =
-      Rewriter.Solver.functional_equation ~func_side:rhs' lhs (fst (List.unzip var_to_linput))
-    in
-    List.fold var_to_lexpr ~init:lif ~f:(fun l (v, t) ->
-        let i, t0 = List.Assoc.find_exn ~equal:Variable.equal var_to_linput v in
-        { tmap = LiftingMap.set l.tmap (i, t0) t })
+    match as_unknown_app rhs' with
+    | Some rhs_args ->
+        let var_to_lexpr =
+          Deduction.Solver.functional_equation ~func_side:rhs_args lhs
+            (List.map ~f:(fun (x, (_, t)) -> (x, Analysis.free_variables t)) var_to_linput)
+        in
+        List.fold var_to_lexpr ~init:lif ~f:(fun l (v, t) ->
+            let i, t0 = List.Assoc.find_exn ~equal:Variable.equal var_to_linput v in
+            { tmap = LiftingMap.set l.tmap (i, t0) t })
+    | None -> lif
 
 (* ============================================================================================= *)
 (*                       MAIN ENTRY POINT                                                        *)
