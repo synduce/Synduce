@@ -25,7 +25,7 @@ let free_variables (t : term) : VarSet.t =
     | TData (_, mems) -> VarSet.union_list (List.map ~f mems)
     | TMatch (tm, cases) ->
         Set.union (f tm)
-          (VarSet.union_list (List.map ~f:(fun (p, t) -> Set.diff (vars_of_pattern p) (f t)) cases))
+          (VarSet.union_list (List.map ~f:(fun (p, t) -> Set.diff (f t) (vars_of_pattern p)) cases))
   in
   f t
 

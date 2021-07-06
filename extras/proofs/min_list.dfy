@@ -24,7 +24,6 @@ function rep(cl: clist): list
 }
 function dec(l1: clist, l2: clist): list
     decreases clen(l1) + clen(l2), l2
-    // ensures len(dec(l1, l2)) == clen(l1) + clen(l2)
 {
     match l2
     case Single(a) => Cons(a, rep(l1))
@@ -53,6 +52,16 @@ function target(cl: clist): int
     case Single(a) => f0(a)
     case Concat(x, y) => odot(target(x), target(y))
 }
+lemma minLemma(x: clist, y: clist)
+ensures spec(dec(y, x)) == min(spec(rep(x)), spec(rep(y)))
+decreases clen(x) + clen(y), x,y
+{
+    match x
+    case Single(a) => {}
+    case Concat(x1, x2) => {
+        minLemma(x1, Concat(x2, y));
+    }
+}
 
 lemma correctness(cl: clist)
 ensures target(cl) == spec(rep(cl))
@@ -61,6 +70,6 @@ ensures target(cl) == spec(rep(cl))
     case Single(a) => {}
     case Concat(x, y)=>
     {
-        
+        minLemma(x, y);
     }
 }

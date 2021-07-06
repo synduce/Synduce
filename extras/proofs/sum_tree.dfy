@@ -29,7 +29,7 @@ function target(t: tree): int
 }
 lemma sumLemma(s: int, t: tree)
     ensures f(s, t) == s + target(t)
-    decreases t
+    decreases t 
 {
     match t
     case nil => {}

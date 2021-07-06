@@ -109,12 +109,18 @@ let gen_func_decl (name : ident) (func : term) =
       let params : string list =
         SS.elements (List.fold_left SS.union SS.empty (List.map get_params_from_arg args))
       in
+      
       let signature =
         mk_func_sig
           ~params:(List.map (fun name -> (None, name)) params)
           ~returns:[ return_type ] arguments
       in
-      let spec = mk_simple_spec ~ensures:[] ~requires:[] DSpecFunction in
+      let last_arg =
+        match List.nth_opt (List.rev arguments) 0 with
+        | Some (var, _) -> [ mk_var (Variable.mk var) ]
+        | None -> []
+      in
+      let spec = mk_simple_spec ~decreases:last_arg ~ensures:[] ~requires:[] DSpecFunction in
       let body = Body (Fmt.str "%a" pp_d_term body) in
       mk_toplevel (mk_func name signature spec body)
   | _ -> failwith "Unsupported function declaration."
@@ -182,7 +188,30 @@ let tau_decl = get_typ_decl !Algo.AState._tau
 
 let theta_decl = get_typ_decl !Algo.AState._theta
 
-let toplevel = List.map gen_func_descr (sum.pd_repr @ sum.pd_reference @ sum.pd_target)
+let toplevel =
+  let new_target =
+    let aux (t : function_descr) =
+      let fv = Lang.Analysis.free_variables t.f_body in
+      let subs : (term * term) list =
+        match soln with
+        | Some soln ->
+            List.map
+              (fun (name, _, body) ->
+                match VarSet.find_by_name fv name with
+                | Some var -> (mk_var var, body)
+                | None ->
+                    failwith
+                      (Fmt.str "Free var %s not found in %a" name
+                         (Fmt.list ~sep:Fmt.comma Fmt.string)
+                         (VarSet.names fv)))
+              (List.filter (fun (_, args, _) -> List.length args = 0) soln.soln_implems)
+        | None -> []
+      in
+      { t with f_body = substitution subs t.f_body }
+    in
+    List.map aux sum.pd_target
+  in
+  List.map gen_func_descr (sum.pd_repr @ sum.pd_reference @ new_target)
 
 let correctness_lemma : d_toplevel =
   let tree_type = mk_named_type (get_t_name !Algo.AState._theta) in
@@ -214,9 +243,11 @@ let incl_decl =
     else [ theta_decl ]
   else [ tau_decl; theta_decl ]
 
+(* let sub_soln = substitution  *)
+
 let proof_skeleton = incl_decl @ toplevel @ gen_target soln @ [ correctness_lemma ]
 
 let ref_program : d_program = { dp_includes = []; dp_topdecls = proof_skeleton }
 
 ;;
-Utils.Log.to_file "test/generated.dfy" (fun fmt () -> Fmt.pf fmt "%a" pp_d_program ref_program)
+Utils.Log.to_file "test/generated2.dfy" (fun fmt () -> Fmt.pf fmt "%a" pp_d_program ref_program)

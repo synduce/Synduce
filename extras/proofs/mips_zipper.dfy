@@ -38,7 +38,9 @@ function repr(zip:zipper): btree
     case Zip(w, lbl, child, z) => h(lbl, child, z, w)
 }
 
+
 function h(lbl: int, child: btree, z: zipper, c: sel): btree
+decreases z
 {
     match c
     case Left => Node(lbl, child, repr(z))
@@ -59,7 +61,7 @@ function joinr(x23: int, j: (int, int), j1: (int, int)): (int, int)
 }
 
 function aux(a: int, child: btree, z: zipper, c: sel): (int, int)
-    // decreases child
+    decreases z
 {
     match c
     case Left => joinl(a, spec(child), target(z))
@@ -67,6 +69,7 @@ function aux(a: int, child: btree, z: zipper, c: sel): (int, int)
 }
 
 function target(zip: zipper): (int, int)
+decreases zip
 {
     match zip
     case Top => s0()
