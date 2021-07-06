@@ -222,9 +222,13 @@ let smt_of_lemma_validity ~(p : psi_def) lemma (det : term_state_detail) =
       ~f:(fun var -> (S.SSimple var.vname, mk_sort (Variable.vtype var)))
       (Set.elements det.vars @ p.psi_reference.pargs)
   in
+  let preconds =
+    match det.ctex.ctex_eqn.eprecond with None -> [] | Some pre -> [ Smt.smt_of_term pre ]
+  in
   (* TODO: if condition should account for other preconditions *)
   let if_condition =
-    S.mk_and (smt_of_tinv_app ~p det) (smt_of_recurs_elim_eqns det.recurs_elim ~p)
+    S.mk_assoc_and
+      ([ smt_of_tinv_app ~p det; smt_of_recurs_elim_eqns det.recurs_elim ~p ] @ preconds)
   in
   let if_then = smt_of_lemma_app lemma in
   [ S.mk_assert (S.mk_not (S.mk_forall quants (S.mk_or (S.mk_not if_condition) if_then))) ]
@@ -298,25 +302,31 @@ let get_positive_examples (solver : Solvers.online_solver) (det : term_state_det
     (lemma : symbol * variable list * term) : ctex list =
   (* TODO: make fresh variables, since this may in the future be called for multiple terms, for multiple lemma candidates, or to generate multiple pos examples, in one solver instance *)
   Log.verbose (fun f () -> Fmt.(pf f "Searching for a positive example."));
+
+  (* Step 1. Declare vars for term, and assert that term satisfies tinv. *)
+  let _ =
+    Solvers.declare_all solver (Smt.decls_of_vars (Analysis.free_variables det.term));
+    ignore (Solvers.exec_command solver (S.mk_assert (smt_of_tinv_app ~p det)));
+    ignore (Solvers.check_sat solver)
+  in
+  (* Step 2. Declare scalars (vars for recursion elimination & spec param) and their constraints (preconds & recurs elim eqns) *)
   let _ =
     Solvers.declare_all solver
-      (Smt.decls_of_vars (Set.union det.vars (VarSet.of_list p.psi_reference.pargs)))
+      (Smt.decls_of_vars (Set.union det.vars (VarSet.of_list p.psi_reference.pargs)));
+    ignore (Solvers.exec_command solver (S.mk_assert (smt_of_recurs_elim_eqns det.recurs_elim ~p)));
+    (match det.ctex.ctex_eqn.eprecond with
+    | None -> ()
+    | Some pre -> ignore (Solvers.exec_command solver (S.mk_assert (Smt.smt_of_term pre))));
+    ignore (Solvers.check_sat solver)
   in
-  let rec_elim_eqns = smt_of_recurs_elim_eqns det.recurs_elim ~p in
+  (* Step 3. Disallow repeated positive examples. *)
   let _ =
-    List.iter
-      ~f:(fun command ->
-        ignore (Solvers.exec_command solver command);
-        ignore (Solvers.check_sat solver))
-      ((if List.length det.positive_ctexs > 0 then
-        [ S.mk_assert (smt_of_disallow_ctex_values det.positive_ctexs) ]
-       else [])
-      @ [
-          S.mk_assert rec_elim_eqns;
-          S.mk_assert (smt_of_tinv_app ~p det);
-          S.mk_assert (S.mk_not (smt_of_lemma_app lemma));
-        ])
+    if List.length det.positive_ctexs > 0 then
+      ignore
+        (Solvers.exec_command solver (S.mk_assert (smt_of_disallow_ctex_values det.positive_ctexs)))
   in
+  (* Step 4. Assert that lemma candidate is false. *)
+  let _ = ignore (Solvers.exec_command solver (S.mk_assert (S.mk_not (smt_of_lemma_app lemma)))) in
 
   match Solvers.check_sat solver with
   | Sat | Unknown -> (
