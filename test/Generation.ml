@@ -109,7 +109,6 @@ let gen_func_decl (name : ident) (func : term) =
       let params : string list =
         SS.elements (List.fold_left SS.union SS.empty (List.map get_params_from_arg args))
       in
-      
       let signature =
         mk_func_sig
           ~params:(List.map (fun name -> (None, name)) params)
