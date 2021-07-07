@@ -43,15 +43,19 @@ let make_term_state_detail_from_ctex (is_pos_ctex : bool) (ctex : ctex) : term_s
     ctex;
   }
 
-let mk_f_compose_r ~(p : psi_def) (t : term) : term =
+let mk_f_compose_r_orig ~(p : psi_def) (t : term) : term =
   let repr_of_v = if p.psi_repr_is_identity then t else mk_app_v p.psi_repr.pvar [ t ] in
   mk_app_v p.psi_reference.pvar (List.map ~f:mk_var p.psi_reference.pargs @ [ repr_of_v ])
+
+let mk_f_compose_r_main ~(p : psi_def) (t : term) : term =
+  let repr_of_v = if p.psi_repr_is_identity then t else mk_app_v p.psi_repr.pmain_symb [ t ] in
+  mk_app_v p.psi_reference.pmain_symb [ repr_of_v ]
 
 let term_detail_to_lemma ~(p : psi_def) (det : term_state_detail) : term option =
   let subst =
     List.map
       ~f:(fun (t1, t2) ->
-        let frt1 = mk_f_compose_r ~p t1 in
+        let frt1 = mk_f_compose_r_main ~p t1 in
         (t2, frt1))
       det.recurs_elim
   in
@@ -188,8 +192,7 @@ let log_soln s vs t =
 let handle_lemma_synth_response (det : term_state_detail) (resp : solver_response option) =
   let parse_synth_fun (fname, _fargs, _, fbody) =
     let args = Set.elements det.ctex.ctex_vars in
-    let local_vars = VarSet.of_list args in
-    let body, _ = infer_type (term_of_sygus (VarSet.to_env local_vars) fbody) in
+    let body, _ = infer_type (term_of_sygus (VarSet.to_env det.ctex.ctex_vars) fbody) in
     (fname, args, body)
   in
   match resp with
@@ -202,7 +205,8 @@ let handle_lemma_synth_response (det : term_state_detail) (resp : solver_respons
 let smt_of_recurs_elim_eqns (elim : (term * term) list) ~(p : psi_def) : S.smtTerm =
   S.mk_assoc_and
     (List.map
-       ~f:(fun (t1, t2) -> S.mk_eq (Smt.smt_of_term (mk_f_compose_r ~p t1)) (Smt.smt_of_term t2))
+       ~f:(fun (t1, t2) ->
+         S.mk_eq (Smt.smt_of_term (mk_f_compose_r_orig ~p t1)) (Smt.smt_of_term t2))
        elim)
 
 let smt_of_tinv_app ~(p : psi_def) (det : term_state_detail) =
