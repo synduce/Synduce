@@ -115,12 +115,12 @@ type d_spec = {
           This changes how the specification is printed by filtering only the clauses
           allowed in the given specification.
   *)
-  dspec_requires : d_clause list;  (** The list of requires clauses. *)
-  dspec_ensures : d_clause list;  (** The list of ensures clauses. *)
   dspec_decreases : d_clause list;  (** The list of decreases clauses. *)
+  dspec_ensures : d_clause list;  (** The list of ensures clauses. *)
+  dspec_modifies : d_clause list;  (** The list of modifies clauses. *)
+  dspec_requires : d_clause list;  (** The list of requires clauses. *)
   (* For non-functional specifications. *)
   dspec_reads : d_clause list;  (** The list of reads clauses *)
-  dspec_modifies : d_clause list;  (** The list of modifies clauses. *)
   (* For loops. *)
   dspec_invariant : d_clause option;  (** The loop invariant clause. *)
 }
@@ -128,6 +128,11 @@ type d_spec = {
 This type is used for all kinds of specifications. Some fields should not appear in some
 specifications, for example if the spec if for a function, the modifies clauses will not be used.
 *)
+
+let dspec_is_empty (x : d_spec) : bool =
+  List.is_empty x.dspec_decreases && List.is_empty x.dspec_ensures && List.is_empty x.dspec_requires
+  && List.is_empty x.dspec_reads && List.is_empty x.dspec_modifies
+  && Option.is_none x.dspec_invariant
 
 (* Class member declarations. *)
 
@@ -286,7 +291,8 @@ let pp_d_datatype_constr_decl (frmt : Formatter.t) (dc : d_datatype_constr_decl)
 let pp_d_ident_type (fmt : Formatter.t) ((id, ty) : d_ident_type) : unit =
   pf fmt "%s : %a" id pp_d_domain_type ty
 
-let newl frmt () = Fmt.(pf frmt "\n")
+(** Force a newline by asking to print 100 spaces or a new line. *)
+let newl frmt () = pf frmt "@;<100 0>"
 
 let rec pp_d_term (frmt : Formatter.t) (x : Term.term) =
   match x.tkind with
@@ -314,10 +320,13 @@ let rec pp_d_term (frmt : Formatter.t) (x : Term.term) =
       if List.length args = 0 then pf frmt "%a" (styled (`Fg `Green) string) cstr
       else pf frmt "%a(%a)" (styled (`Fg `Green) string) cstr (list ~sep:comma pp_d_term) args
   | TMatch (tm, cases) ->
-      let pp_d_match_case (frmt: Formatter.t) ((pat, term): Term.match_case) = 
-        pf frmt "@[<hov 2>case %a =>@;@] %a" Term.pp_pattern pat pp_d_term term
+      let pp_d_match_case (frmt : Formatter.t) ((pat, term) : Term.match_case) =
+        pf frmt "@[<hov 2> case %a =>@;%a@]" Term.pp_pattern pat pp_d_term term
       in
-      pf frmt "@[<hov 2>match %a@]\n%a" pp_d_term tm (list ~sep:newl pp_d_match_case) cases
+      pf frmt "@[<v>match @[%a@]@;<1 1>@[<v>%a@]@]" pp_d_term tm
+        (* 30 spaces should be enough to force a new line. *)
+        (list ~sep:(fun fmt () -> pf fmt "@;<30 0>") pp_d_match_case)
+        cases
 
 let pp_clause (clause_name : string) (fmt : Formatter.t) (c : d_clause) : unit =
   pf fmt "@[%s %a@]" clause_name pp_d_term c
@@ -373,7 +382,7 @@ let pp_d_spec (fmt : Formatter.t) (spec : d_spec) : unit =
       list ~sep:sp (pp_clause "modifies") fmt spec.dspec_modifies
 
 let pp_d_body (fmt : Formatter.t) (body : d_body) : unit =
-  match body with Body content -> pf fmt "%a" (box ~indent:2 (braces string)) content
+  match body with Body content -> pf fmt "@[<v>{@;<1 2>@[<hov 2>%a@]@;}@]" (box string) content
 
 let pp_d_generic_param (fmt : Formatter.t) ((_vo, t) : d_generic_param) =
   (* Just print the type for now, we don't need the variance. *)
@@ -419,14 +428,20 @@ let pp_d_class_member_decl (fmt : Formatter.t) (decl : d_class_member_decl) : un
   match decl with
   | DClassConstantField fields -> pf fmt "var %a;" (list ~sep:comma pp_d_ident_type) fields
   | DClassFunction (fname, function_kind, attributes, signature, spec, body) ->
-      pf fmt "@[<hov 2>%a%a%s%a@;%a@;%a@]" pp_d_function_kind function_kind
+      pf fmt "@[<v>@[%a%a%s%a@]@;<4 0>%a@;<4 0>%a@]" pp_d_function_kind function_kind
         (list_or_space ~sep:sp ~f:pp_attribute)
         attributes fname (box pp_d_function_signature) signature (box pp_d_spec) spec
         (box pp_d_body) body
   | DClassMethod (fname, method_kind, attributes, signature, spec, body) ->
-      pf fmt "@[<hov 2>%a%a%s%a@;%a@;%a@]" pp_d_method_kind method_kind
+      pf fmt "@[<v>@[%a%a%s%a@]%a@;<4 0>%a@]" pp_d_method_kind method_kind
         (list_or_space ~sep:sp ~f:pp_attribute)
-        attributes fname (box pp_d_method_signature) signature (box pp_d_spec) spec (box pp_d_body)
+        attributes fname (box pp_d_method_signature) signature
+        (* Print the spec, or do nothing if spec is empty. *)
+          (fun fmt () ->
+          if dspec_is_empty spec then () else pf fmt "@;<4 0>%a" (box pp_d_spec) spec)
+        ()
+        (* Print the body *)
+        (box pp_d_body)
         body
 
 let rec pp_d_decl_kind (fmt : Formatter.t) (dk : d_decl_kind) : unit =
@@ -471,11 +486,16 @@ and pp_d_toplevel (fmt : Formatter.t) (topl : d_toplevel) : unit =
   | _ as l ->
       pf fmt "@[<hov 2>%a %a@]" (list ~sep:sp pp_d_decl_modifier) l pp_d_decl_kind topl.dt_kind
 
-let pp_d_program (fmt : Formatter.t) (p : d_program) : unit =
-  List.iter p.dp_includes ~f:(fun incl -> pf fmt "include %s@." incl);
+let pp_d_program (frmt : Formatter.t) (p : d_program) : unit =
+  List.iter p.dp_includes ~f:(fun incl -> pf frmt "include %s@." incl);
   (* Skip two lines after includes, for readability. *)
-  pf fmt "@.@.";
-  List.iter p.dp_topdecls ~f:(fun topd -> pf fmt "@[<hov 2>%a@]@." pp_d_toplevel topd)
+  if List.is_empty p.dp_includes then () else pf frmt "@.@.";
+  pf frmt "%a"
+    (list
+       ~sep:(fun fmt () -> pf fmt "@.@.")
+       (fun fmt topd -> pf fmt "@[<hov 2>%a@]" pp_d_toplevel topd))
+    p.dp_topdecls;
+  pf frmt "@."
 
 (* ============================================================================================= *)
 (*                                        BUilding     helpers                                   *)
