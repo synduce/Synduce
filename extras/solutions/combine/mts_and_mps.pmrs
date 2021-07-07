@@ -1,8 +1,8 @@
 
-let s0  = (0, 0, 0)
-
 let oplus x11 (j, j0, j1) =
   (x11 + j, max j0 (x11 + j), x11 + (max j1 (- x11)))
+
+let s0  = (0, 0, 0)
 
 target⟨oplus, s0⟩(l): int list -> (int * int * int)  = 
 {

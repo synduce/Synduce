@@ -1,7 +1,7 @@
 
-let s0  = (0, 0)
-
 let join (j, j0) (j1, j2) = (max j1 (j + j2), j0 + j2)
+
+let s0  = (0, 0)
 
 let f0 x = (max 0 x, x)
 

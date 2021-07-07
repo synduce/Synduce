@@ -1,10 +1,10 @@
 
-let s0  = (0, 0)
-
 let join1 x25 (j, j0) (j1, j2) =
   (x25 + (j + j1), x25 + (max j0 (max (- x25) (j + j2))))
 
 let f0 x23 = (x23, max 0 x23)
+
+let s0  = (0, 0)
 
 target⟨join1, f0, s0⟩(): int tree -> (int * int)  = 
 {

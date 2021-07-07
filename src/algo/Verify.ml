@@ -55,10 +55,10 @@ let check_solution ?(use_acegis = false) ~(p : psi_def) (lstate : refinement_loo
     let t_set, u_set = Expand.to_maximally_reducible p t0 in
     let num_terms = Set.length t_set in
     if num_terms > 0 then (
-      let sys_eqns =
+      let sys_eqns, _ =
         Equations.make ~force_replace_off:true
           ~p:{ p with psi_target = target_inst }
-          ~lemmas:lstate.lemma t_set
+          ~term_state:lstate.term_state ~lifting:lstate.lifting t_set
       in
       let smt_eqns = List.map sys_eqns ~f:constr_eqn in
       let new_free_vars =
@@ -138,10 +138,10 @@ let bounded_check ?(concrete_ctex = false) ~(p : psi_def)
     (x, model)
   in
   let check term =
-    let sys_eqns =
+    let sys_eqns, _ =
       Equations.make ~force_replace_off:true
         ~p:{ p with psi_target = target_inst }
-        ~lemmas:Lemmas.empty_lemma (TermSet.singleton term)
+        ~term_state:Lemmas.empty_term_state ~lifting:Lifting.empty_lifting (TermSet.singleton term)
     in
     let smt_eqns = List.map sys_eqns ~f:(fun t -> (t, constr_eqn t)) in
     let new_free_vars =

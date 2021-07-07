@@ -129,9 +129,9 @@ let int_parametric ?(guess = None) (params : grammar_parameters) =
         | GBin b -> (
             let args =
               match Binop.operand_types b with
-              | Lang.RType.TInt, Lang.RType.TInt -> Some [ ix; ix ]
-              | Lang.RType.TInt, Lang.RType.TBool -> Some [ ix; ipred ]
-              | Lang.RType.TBool, Lang.RType.TBool -> Some [ ipred; ipred ]
+              | (Lang.RType.TInt, Lang.RType.TInt) :: _ -> Some [ ix; ix ]
+              | [ (Lang.RType.TInt, Lang.RType.TBool) ] -> Some [ ix; ipred ]
+              | [ (Lang.RType.TBool, Lang.RType.TBool) ] -> Some [ ipred; ipred ]
               | _ -> None
             in
             match args with
@@ -213,9 +213,9 @@ let bool_parametric ?(guess = None) (params : grammar_parameters) =
         | GBin b -> (
             let args =
               match Binop.operand_types b with
-              | Lang.RType.TInt, Lang.RType.TInt -> Some [ ix; ix ]
-              | Lang.RType.TInt, Lang.RType.TBool -> Some [ ix; ipred ]
-              | Lang.RType.TBool, Lang.RType.TBool -> Some [ ipred; ipred ]
+              | (Lang.RType.TInt, Lang.RType.TInt) :: _ -> Some [ ix; ix ]
+              | [ (Lang.RType.TInt, Lang.RType.TBool) ] -> Some [ ix; ipred ]
+              | [ (Lang.RType.TBool, Lang.RType.TBool) ] -> Some [ ipred; ipred ]
               | _ -> None
             in
             match args with

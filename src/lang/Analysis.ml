@@ -2,6 +2,9 @@ open Base
 open Term
 open Utils
 
+(* ============================================================================================= *)
+(*                                  UTILITIES                                                    *)
+(* ============================================================================================= *)
 let rec vars_of_pattern (p : pattern) : VarSet.t =
   match p with
   | PatAny | PatConstant _ -> VarSet.empty
@@ -11,6 +14,7 @@ let rec vars_of_pattern (p : pattern) : VarSet.t =
 let free_variables (t : term) : VarSet.t =
   let rec f t =
     match t.tkind with
+    | TBox t -> f t
     | TBin (_, t1, t2) -> Set.union (f t1) (f t2)
     | TUn (_, t1) -> f t1
     | TConst _ -> VarSet.empty
@@ -32,6 +36,31 @@ let free_variables (t : term) : VarSet.t =
 let has_ite (t : term) : bool =
   reduce t ~init:false ~join:( || ) ~case:(fun _ t ->
       match t.tkind with TIte _ -> Some true | _ -> None)
+
+let operators_of (t : term) : OpSet.t =
+  let case f t =
+    match t.tkind with
+    | TBin (binop, t1, t2) -> Some (Set.add (Set.union (f t1) (f t2)) (Operator.Binary binop))
+    | TUn (unop, t1) -> Some (Set.add (f t1) (Operator.Unary unop))
+    | _ -> None
+  in
+  reduce ~init:OpSet.empty ~join:Set.union ~case t
+
+let is_norec =
+  let case _ t =
+    match t.tkind with
+    | TVar x -> Some (not (RType.is_recursive (Variable.vtype_or_new x)))
+    | _ -> None
+  in
+  reduce ~init:true ~join:( && ) ~case
+
+let is_novariant =
+  let case _ t =
+    match t.tkind with
+    | TVar x -> Some (List.is_empty (RType.get_variants (Variable.vtype_or_new x)))
+    | _ -> None
+  in
+  reduce ~init:true ~join:( && ) ~case
 
 let subst_args (fpatterns : fpattern list) (args : term list) =
   let rec f (fpat, t) =
@@ -68,6 +97,10 @@ let apply_projections (projs : (int, variable list, Int.comparator_witness) Map.
             let projected = pack xlist args' in
             Some (mk_tup projected)
         | None -> None)
+    | TVar x -> (
+        match Map.find projs x.vid with
+        | Some components -> Some (mk_tup (List.map ~f:mk_var components))
+        | None -> None)
     | _ -> None
   in
   transform ~case t
@@ -95,8 +128,8 @@ let matches ?(boundvars = VarSet.empty) (t : term) ~(pattern : term) : term VarM
         else
           let pat_ty = Variable.vtype_or_new vpat in
           match RType.unify_one pat_ty t.ttyp with
-          | Some _ -> Ok [ (vpat, t) ]
-          | _ -> Error [ (pat, t) ])
+          | Ok _ -> Ok [ (vpat, t) ]
+          | Error _ -> Error [ (pat, t) ])
     | TData (cstr, mems), TData (cstr', mems') ->
         if String.equal cstr cstr' && List.length mems = List.length mems' then
           match List.map2 ~f:aux mems mems' with

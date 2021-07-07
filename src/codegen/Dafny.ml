@@ -327,6 +327,7 @@ let rec pp_d_term (frmt : Formatter.t) (x : Term.term) =
         (* 30 spaces should be enough to force a new line. *)
         (list ~sep:(fun fmt () -> pf fmt "@;<30 0>") pp_d_match_case)
         cases
+  | TBox t -> pp_d_term frmt t
 
 let pp_clause (clause_name : string) (fmt : Formatter.t) (c : d_clause) : unit =
   pf fmt "@[%s %a@]" clause_name pp_d_term c
