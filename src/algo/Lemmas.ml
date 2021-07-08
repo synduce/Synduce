@@ -275,14 +275,15 @@ let verify_lemma_candidate ~(p : psi_def) (det : term_state_detail) :
 
 let classify_ctexs_opt ~(p : psi_def) ctexs =
   if !Config.classify_ctex then
-    let f (p, n) ctex =
+    let f (p, n, u) ctex =
       Log.info (fun frmt () ->
-          Fmt.(pf frmt "Classify this counterexample: %a (P/N)" (box pp_ctex) ctex));
+          Fmt.(pf frmt "Classify this counterexample: %a (P/N/U)" (box pp_ctex) ctex));
       match Stdio.In_channel.input_line Stdio.stdin with
-      | Some "N" -> (p, ctex :: n)
-      | _ -> (ctex :: p, n)
+      | Some "N" -> (p, ctex :: n, u)
+      | Some "P" -> (ctex :: p, n, u)
+      | _ -> (p, n, ctex :: u)
     in
-    List.fold ~f ~init:([], []) ctexs
+    List.fold ~f ~init:([], [], []) ctexs
   else classify_ctexs ~p ctexs
 
 let smt_of_disallow_ctex_values (ctexs : ctex list) : S.smtTerm =
@@ -386,8 +387,9 @@ let rec lemma_refinement_loop (det : term_state_detail) ~(p : psi_def) : term_st
       match
         verify_lemma_candidate ~p { det with lemma_candidate = Some (name, vars, lemma_term) }
       with
-      | _, Unsat ->
+      | solver, Unsat ->
           Log.verbose (fun f () -> Fmt.(pf f "This lemma has been proven correct."));
+          Solvers.close_solver solver;
           Log.info (fun frmt () ->
               Fmt.pf frmt "Lemma for term %a: \"%s %s = @[%a@]\"." pp_term det.term name
                 (String.concat ~sep:" " (List.map ~f:(fun v -> v.vname) vars))
@@ -424,9 +426,10 @@ let synthesize_lemmas ~(p : psi_def) synt_failure_info (lstate : refinement_loop
         (* Forget about the specific association in pairs. *)
         let ctexs = List.concat_map unrealizability_ctexs ~f:(fun uc -> [ uc.ci; uc.cj ]) in
         (* Classify in negative and positive cexs. *)
-        let _, negative_ctexs = classify_ctexs_opt ~p ctexs in
+        let positive_ctexs, negative_ctexs, _ = classify_ctexs_opt ~p ctexs in
         let ts : term_state =
-          update_term_state_for_ctexs lstate.term_state ~neg_ctexs:negative_ctexs ~pos_ctexs:[]
+          update_term_state_for_ctexs lstate.term_state ~neg_ctexs:negative_ctexs
+            ~pos_ctexs:positive_ctexs
         in
         if List.is_empty negative_ctexs then (ts, false)
         else
