@@ -12,16 +12,16 @@ let repr x = x
 
 let spec x t =
   let rec f = function
-    | Leaf a -> if a < x then 1 else 0
-    | Node (a, l, r) -> if a < x then 1 + f l + f r else f l + f r
+    | Leaf a -> if a = x then 1 else 0
+    | Node (a, l, r) -> if a = x then 1 else if f l = 1 then 1 else if f r = 1 then 1 else 0
   in
   f t
-  [@@ensures fun x -> x >= 0]
+  [@@ensures fun x -> x >= 0 && x <= 1]
 
 let target y t =
   let rec g = function
     | Leaf a -> [%synt xi_0] y a
-    | Node (a, l, r) -> if a < y then [%synt xi_1] (g l) (g r) else [%synt xi_2] (g l)
+    | Node (a, l, r) -> if y < a then [%synt xi_1] (g l) else [%synt xi_2] y a (g r)
   in
   g t
   [@@requires is_bst]
