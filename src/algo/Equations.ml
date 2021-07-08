@@ -163,7 +163,15 @@ let make ?(force_replace_off = false) ~(p : psi_def) ~(term_state : term_state) 
       (* Get the precondition, from the lemmas in the term state, *)
       let precond = precond_from_term_state ~p ~term_state applic eterm in
       (* Replace the boxed expressions of the lifting. *)
-      let lifting' = Lifting.deduce_lifting_expressions ~p lifting precond lhs'' rhs'' in
+      let lifting' =
+        let eprecond =
+          match invar invariants lhs'' rhs'' with
+          | Some im_f -> (
+              match precond with Some pl -> Some (mk_bin And im_f pl) | None -> Some im_f)
+          | None -> precond
+        in
+        Lifting.deduce_lifting_expressions ~p lifting eprecond lhs'' rhs''
+      in
       let rhs'' = Lifting.replace_boxed_expressions ~p lifting' rhs' in
       (* If possible project equation of tuples into tuple of equations. *)
       let projs = projection_eqns lhs'' rhs'' in

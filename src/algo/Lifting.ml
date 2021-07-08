@@ -235,7 +235,7 @@ let apply_lifting ~(p : psi_def) (l : RType.t list) : psi_def =
   Log.debug (fun ft () -> Fmt.(pf ft "@[After lifting:@;%a@]" (box PMRS.pp) target'));
   { p with psi_target = target'; psi_lifting = p.psi_lifting @ l }
 
-let deduce_lifting_expressions ~p (lif : lifting) (_ : term option) (lhs : term) (rhs : term) :
+let deduce_lifting_expressions ~p (lif : lifting) (lemma : term option) (lhs : term) (rhs : term) :
     lifting =
   let boxes =
     reduce ~init:[]
@@ -272,7 +272,7 @@ let deduce_lifting_expressions ~p (lif : lifting) (_ : term option) (lhs : term)
     match as_unknown_app rhs' with
     | Some rhs_args ->
         let var_to_lexpr =
-          Deduction.Solver.functional_equation ~func_side:rhs_args lhs
+          Deduction.Solver.functional_equation ~func_side:rhs_args ~lemma lhs
             (List.map ~f:(fun (x, (_, t)) -> (x, Analysis.free_variables t)) var_to_linput)
         in
         List.fold var_to_lexpr ~init:lif ~f:(fun l (v, t) ->

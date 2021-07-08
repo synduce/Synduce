@@ -1,3 +1,3 @@
 (tests
- (names DafnyProofGeneration)
+ (names DafnyProofGeneration TestRewriter)
  (libraries Lib fmt))
