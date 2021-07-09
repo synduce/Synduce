@@ -126,7 +126,9 @@ benchmark_set = [
     ["list/sndminhom.pmrs", ""],
     ["list/mincount.pmrs", ""],
     ["zippers/list_sum_basic.ml", ""],
-    ["zippers/list_sum.ml", ""]
+    ["zippers/list_sum.ml", ""],
+    ["lifting/mits_nosum.ml", ""],
+    ["lifting/mpsl.ml", ""]
 ]
 
 extra_benchmarks = [
@@ -183,7 +185,7 @@ if __name__ == "__main__":
             \tRun the experiments to generate data for table TABLE_NO (1, 2, or 3) or -1 for running tests.\n\
             \tIf an additional argument is provided, only a reduced set of benchmarks is run.\n\
             \t\tUSE_REDUCED_SET=0 kick-the-tire benchmarks set\n\
-            \t\tUSE_REDUCE_SET !=0 reduced set of benchmarks\n")
+            \t\tUSE_REDUCE_SET != 0 reduced set of benchmarks\n")
         exit()
 
     if len(sys.argv) > 2:

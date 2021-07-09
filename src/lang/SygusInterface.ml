@@ -54,7 +54,7 @@ and dec_parametric t args =
 let sygus_term_of_const (c : Constant.t) : sygus_term =
   match c with
   | Constant.CInt i ->
-      if i > 0 then SyLit (LitNum i) else SyApp (IdSimple "-", [ SyLit (LitNum (-i)) ])
+      if i >= 0 then SyLit (LitNum i) else SyApp (IdSimple "-", [ SyLit (LitNum (-i)) ])
   | Constant.CTrue -> SyLit (LitBool true)
   | Constant.CFalse -> SyLit (LitBool false)
 
