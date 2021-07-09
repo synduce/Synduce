@@ -1,5 +1,5 @@
 
-let oplus (j, j0) x4 = (x4 + j, (max j0 (- x4)) + x4)
+let oplus (j, j0) x4 = (x4 + j, max 0 (x4 + j0))
 
 target⟨oplus⟩(l): int list -> (int * int)  = 
 {
