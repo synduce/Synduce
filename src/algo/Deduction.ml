@@ -3,6 +3,7 @@ open Lang
 open Lang.Term
 open Lang.Rewriter
 open Utils
+open Fmt
 
 let contains_ebox (e : Expression.t) : bool =
   Expression.(
@@ -52,9 +53,10 @@ module Solver = struct
 
   let functionalize ~(args : Expression.t list) ~(lemma : Expression.t option) (res : Expression.t)
       (boxes : (int * IS.t) list) : (int * Expression.t) list option =
-    Fmt.(
-      pf stdout "@[=== Solve Func. Equation: F %a = %a@]@." (list ~sep:sp Expression.pp) args
-        Expression.pp res);
+    Log.verbose
+      Fmt.(
+        Log.wrap2 "@[=== Solve Func. Equation: F %a = %a@]@." (list ~sep:sp Expression.pp) args
+          Expression.pp res);
     let box_ids = IS.of_list (fst (List.unzip boxes)) in
     let box_args, bound_args =
       List.partition_map args ~f:(function
@@ -64,9 +66,9 @@ module Solver = struct
             | None -> Either.Second (Expression.mk_e_var vid))
         | _ as e -> Either.Second e)
     in
-    Fmt.(
-      pf stdout "\t@[Box args: %a@]@." (list ~sep:comma (parens (pair ~sep:sp int IS.pp))) box_args);
-    Fmt.(pf stdout "\t@[Bound args: %a@]@." (list ~sep:comma Expression.pp) bound_args);
+    Log.verbose
+      (Log.wrap1 "\t@[Box args: %a@]" (list ~sep:comma (parens (pair ~sep:sp int IS.pp))) box_args);
+    Log.verbose (Log.wrap1 "\t@[Bound args: %a@]" (list ~sep:comma Expression.pp) bound_args);
     let rec floop i (unassigned_bs, assigned_bs) (unassigned_bound, _q) res =
       let i' = i + 1 in
       if i' > max_deduction_attempts then None
@@ -78,38 +80,37 @@ module Solver = struct
       else
         match unassigned_bound with
         | hd :: tl -> (
-            Fmt.(
-              pf stdout "@[\t\tTry to %a %a.@]@."
-                (styled (`Bg `Magenta) string)
-                "match" Expression.pp hd);
+            Log.verbose
+              (Log.wrap2 "@[\t\tTry to %a %a.@]"
+                 (styled (`Bg `Magenta) string)
+                 "match" Expression.pp hd);
             match match_as_subexpr ~lemma hd ~of_:res with
             | Some (_, res') ->
-                Fmt.(
-                  pf stdout "@[\t\t\t✅  %a =@;%a <- (%a)@]@." Expression.pp res Expression.pp res'
-                    Expression.pp hd);
+                Log.verbose (fun fmt () ->
+                    pf fmt "@[\t\t\t✅  %a =@;%a <- (%a)@]" Expression.pp res Expression.pp res'
+                      Expression.pp hd);
                 floop i' (unassigned_bs, assigned_bs) (tl, _q) res'
             | None ->
-                Fmt.(pf stdout "\t\t\t❌@.");
+                Log.verbose_msg "\t\t\t❌";
                 floop i' (unassigned_bs, assigned_bs) (tl, _q @ [ hd ]) res)
         | [] -> (
             match unassigned_bs with
             | hd :: tl -> (
-                Fmt.(
-                  pf stdout "@[\t\tTry to %a %a.@]@."
-                    (styled (`Bg `Cyan) string)
-                    "assign"
-                    (pair ~sep:comma Expression.pp_ivar Expression.pp_ivarset)
-                    hd);
+                Log.verbose (fun fmt () ->
+                    pf fmt "@[\t\tTry to %a %a.@]@."
+                      (styled (`Bg `Cyan) string)
+                      "assign"
+                      (pair ~sep:comma Expression.pp_ivar Expression.pp_ivarset)
+                      hd);
                 match assign_match_box hd ~of_:res with
                 | Some (res', hd_assignment) ->
-                    Fmt.(
-                      pf stdout "@[\t\t\t✅ %a =@;%a <- %a@]@." Expression.pp res Expression.pp
-                        res'
-                        (parens (pair ~sep:comma int Expression.pp))
-                        hd_assignment);
+                    Log.verbose (fun fmt () ->
+                        pf fmt "@[\t\t\t✅ %a =@;%a <- %a@]" Expression.pp res Expression.pp res'
+                          (parens (pair ~sep:comma int Expression.pp))
+                          hd_assignment);
                     floop i' (tl, assigned_bs @ [ hd_assignment ]) (_q, []) res'
                 | None ->
-                    Fmt.(pf stdout "\t\t\t❌@.");
+                    Log.verbose_msg "\t\t\t❌@.";
                     floop i' (tl @ [ hd ], assigned_bs) (_q, []) res)
             | [] -> floop i' ([], assigned_bs) (_q, []) res)
     in

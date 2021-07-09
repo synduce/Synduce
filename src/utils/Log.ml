@@ -61,6 +61,8 @@ let wrap1 f s t fmt () = pf fmt f s t
 
 let wrap2 f s1 t1 s2 t2 fmt () = pf fmt f s1 t1 s2 t2
 
+let wrapn fmt () = pf fmt
+
 let error (msg : Formatter.t -> unit -> unit) : unit =
   pf Fmt.stdout "@[<hov 2>%a@;%a@]@." (styled (`Bg `Red) string) "[ERROR]" msg ()
 
@@ -92,12 +94,14 @@ let print_ok () =
     pf Fmt.stdout "%a@." (styled (`Fg `Black) (styled (`Bg `Green) string)) "  OK   "
   else ()
 
-let verbose msg =
+let verb msg =
   if !Config.verbose then
     pf Fmt.stdout "@[<hov 2>%a@;%a@]@."
       (styled (`Fg `Black) (styled (`Bg `Cyan) string))
-      " VERB <" msg ()
-  else ()
+      " VERB <" msg
+  else fun _ -> ()
+
+let verbose msg = if !Config.verbose then verb msg () else ()
 
 let verbose_msg msg =
   if !Config.verbose then

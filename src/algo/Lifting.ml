@@ -289,7 +289,6 @@ let deduce_lifting_expressions ~p (lif : lifting) (lemma : term option) (lhs : t
 *)
 let scalar ~(p : psi_def) (l : refinement_loop_state) _synt_failure_info :
     (psi_def * refinement_loop_state, solver_response) Result.t =
-  Log.error_msg "Lifting is only a stub.";
   (*
     This function will perform the scalar lifting and call the loop continuation
     with the lifted problem.
