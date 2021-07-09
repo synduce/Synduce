@@ -620,49 +620,64 @@ let expand (e : t) : t =
   rewrite_until_stable expand_rule e
 
 (** Rewrite rule out of a lemma. *)
-let rewrite_with_lemma (lemma : t) : t -> t =
+let rewrite_with_lemma (lemma : t) : t -> t list =
   let conjs = match expand lemma with EOp (Binary And, args) -> args | lemma' -> [ lemma' ] in
-  let _rules =
+  let dyn_rules =
     let r e =
       let open Operator in
       match e with
-      | EOp (Binary Gt, [ a; b ]) ->
-          [ (a, mk_e_assoc (Binary Max) [ a; b ]); (b, mk_e_assoc (Binary Min) [ a; b ]) ]
-      | EOp (Binary Lt, [ a; b ]) ->
-          [ (a, mk_e_assoc (Binary Min) [ a; b ]); (b, mk_e_assoc (Binary Max) [ a; b ]) ]
+      | EOp (Binary Ge, [ a; EInt x ]) -> [ (a, mk_e_assoc (Binary Max) [ a; EInt x ]) ]
+      | EOp (Binary Le, [ a; EInt x ]) -> [ (a, mk_e_assoc (Binary Min) [ a; EInt x ]) ]
       | _ -> []
     in
     List.concat_map ~f:r conjs
   in
-  (* TODO *)
-  fun e -> e
+  let apply_dyn_rule e =
+    List.map dyn_rules ~f:(fun (lhs, rhs) ->
+        let e' = transform (fun _ e -> if equal lhs e then Some rhs else None) e in
+        e')
+  in
+  apply_dyn_rule
 
 (** Matching subexpressions (up to rewriting) *)
 let match_as_subexpr ?(lemma = None) (sube : t) ~(of_ : t) : (int * t) option =
-  let _ = Option.map ~f:rewrite_with_lemma lemma in
-  let sube = expand sube in
-  let bid = ref None in
-  let transformer _ e0 =
+  (* Expand expressions. *)
+  let of_ = expand of_ and sube = expand sube in
+  (* Use lemmas to rewrite expressions.  *)
+  let of_choices =
+    let choices_from_lemma_r =
+      Option.value
+        (Option.map ~f:(fun l -> of_ :: List.map ~f:expand (rewrite_with_lemma l of_)) lemma)
+        ~default:[ of_ ]
+    in
+    List.remove_consecutive_duplicates ~equal choices_from_lemma_r
+  in
+  let bids = Hashtbl.create (module Int) in
+  let transformer ~i _ e0 =
     if equal sube e0 then (
-      match !bid with
-      | Some i -> Some (EBox i)
+      match Hashtbl.find bids i with
+      | Some bid -> Some (EBox bid)
       | None ->
-          let i = new_box_id () in
-          bid := Some i;
-          Some (EBox i))
+          let bid = new_box_id () in
+          Hashtbl.set bids ~key:i ~data:bid;
+          Some (EBox bid))
     else
       match (e0, sube) with
       | EOp (op, args), EOp (subop, subargs) when Operator.equal op subop ->
           let subargs', rest = List.partition_tf ~f:(List.mem ~equal subargs) args in
           if List.length subargs' = List.length subargs then (
-            match !bid with
-            | Some i -> Some (mk_e_assoc op (EBox i :: rest))
+            match Hashtbl.find bids i with
+            | Some bid -> Some (mk_e_assoc op (EBox bid :: rest))
             | None ->
-                let i = new_box_id () in
-                bid := Some i;
-                Some (mk_e_assoc op (EBox i :: rest)))
+                let bid = new_box_id () in
+                Hashtbl.set bids ~key:i ~data:bid;
+                Some (mk_e_assoc op (EBox bid :: rest)))
           else None
       | _ -> None
   in
-  let e' = transform transformer (expand of_) in
-  match !bid with Some id -> Some (id, e') | None -> None
+  let e_choices = List.mapi ~f:(fun i x -> transform (transformer ~i) x) of_choices in
+  let results =
+    List.mapi e_choices ~f:(fun i ec ->
+        match Hashtbl.find bids i with Some id -> Some (id, ec) | None -> None)
+  in
+  match List.filter_opt results with hd :: _ -> Some hd | _ -> None

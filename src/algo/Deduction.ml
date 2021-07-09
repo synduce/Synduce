@@ -16,15 +16,28 @@ let is_boxable_expr ((_, box_args) : int * IS.t) (t : Expression.t) : bool =
 
 let assign_match_box ((bid, bargs) : int * IS.t) ~(of_ : Expression.t) :
     (Expression.t * (int * Expression.t)) option =
+  let open Expression in
   let boxed = ref None in
+  let box_it (e0 : t) (bid : t) =
+    match !boxed with
+    | Some b -> if equal b e0 then Some bid else None
+    | None ->
+        boxed := Some e0;
+        Some bid
+  in
   let case _ e0 =
-    if is_boxable_expr (bid, bargs) e0 then (
-      match !boxed with
-      | Some b -> if Expression.equal b e0 then Some (Expression.EBox bid) else None
-      | None ->
-          boxed := Some e0;
-          Some (Expression.EBox bid))
-    else None
+    (* Case 1 : the expression is immediately "boxable" *)
+    if is_boxable_expr (bid, bargs) e0 then box_it e0 (EBox bid)
+    else
+      (* Case 2: some subexpression in an EOp are "boxable". *)
+      match e0 with
+      | EOp (op, args) -> (
+          match List.partition_tf ~f:(is_boxable_expr (bid, bargs)) args with
+          | b1 :: bs, u1 :: us when is_commutative op ->
+              box_it (mk_e_assoc op (b1 :: bs)) (mk_e_assoc op (EBox bid :: u1 :: us))
+          | _, [] -> None (*This case should have been detected in 1. *)
+          | _ -> None)
+      | _ -> None
   in
   let e' = Expression.transform case of_ in
   match !boxed with Some b -> Some (e', (bid, b)) | None -> None
