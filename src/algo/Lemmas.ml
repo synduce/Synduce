@@ -261,7 +261,7 @@ let verify_lemma_candidate ~(p : psi_def) (det : term_state_detail) :
         ~f:(fun x -> ignore (Solvers.exec_command solver x))
         ((match p.psi_tinv with None -> [] | Some tinv -> Smt.smt_of_pmrs tinv)
         @ (if p.psi_repr_is_identity then Smt.smt_of_pmrs p.psi_reference
-          else Smt.smt_of_pmrs p.psi_repr @ Smt.smt_of_pmrs p.psi_reference)
+          else Smt.smt_of_pmrs p.psi_reference @ Smt.smt_of_pmrs p.psi_repr)
         (* Declare lemmas. *)
         @ [
             (match lemma_candidate with
