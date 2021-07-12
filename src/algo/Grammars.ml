@@ -165,7 +165,11 @@ let bool_parametric ?(guess = None) (params : grammar_parameters) =
           ]
         @
         if has_ints then
-          [ GTerm (SyApp (IdSimple "=", [ ix; ix ])); GTerm (SyApp (IdSimple ">", [ ix; ix ])) ]
+          [
+            GTerm (SyApp (IdSimple "=", [ ix; ic ]));
+            GTerm (SyApp (IdSimple "=", [ ix; ix ]));
+            GTerm (SyApp (IdSimple ">", [ ix; ix ]));
+          ]
         else [] );
     ]
   in
@@ -177,6 +181,7 @@ let bool_parametric ?(guess = None) (params : grammar_parameters) =
               match s with SId (IdSimple "Int") -> Some (GTerm t) | _ -> None)
         @ [ GTerm (SyApp (IdSimple "-", [ ix ])) ]
         @ [ GTerm (SyApp (IdSimple "+", [ ix; ix ])) ]
+        @ [ GTerm (SyApp (IdSimple "+", [ ix; ic ])) ]
         @ (if Set.mem params.g_opset (Binary Min) then
            [ GTerm (SyApp (IdSimple "min", [ ix; ix ])) ]
           else [])
