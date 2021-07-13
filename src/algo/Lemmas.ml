@@ -364,6 +364,33 @@ let get_positive_examples (solver : Solvers.online_solver) (det : term_state_det
       )
   | _ -> failwith "Check sat failure: Positive example cannot be found during lemma refinement."
 
+let parse_positive_example (_det : term_state_detail) (s : string) =
+  List.iter ~f:(fun _s -> failwith "Not Implemented") (Str.split (Str.regexp " *, *") s);
+  None
+
+let interactive_get_positive_examples (det : term_state_detail) =
+  let vars =
+    Set.filter
+      ~f:(fun var ->
+        match Variable.vtype var with None -> false | Some t -> not (RType.is_recursive t))
+      det.vars
+  in
+  Log.info (fun f () ->
+      Fmt.(
+        pf f "Enter an example as \"%s\""
+          (String.concat ~sep:", "
+             (List.map
+                ~f:(fun var ->
+                  var.vname ^ "=<"
+                  ^ (match Variable.vtype var with
+                    | None -> ""
+                    | Some t -> ( match RType.base_name t with None -> "" | Some tname -> tname))
+                  ^ ">")
+                (Set.elements vars)))));
+  match Stdio.In_channel.input_line Stdio.stdin with
+  | None -> []
+  | Some s -> ( match parse_positive_example det s with None -> [] | Some ctex -> [ ctex ])
+
 let synthesize_new_lemma (det : term_state_detail) : (string * variable list * term) option =
   let set_logic = CSetLogic "DTLIA" in
   (* TODO: How to choose logic? *)
@@ -386,32 +413,57 @@ let rec lemma_refinement_loop (det : term_state_detail) ~(p : psi_def) : term_st
       Log.debug_msg "Lemma synthesis failure.";
       None
   | Some (name, vars, lemma_term) -> (
-      match
-        verify_lemma_candidate ~p { det with lemma_candidate = Some (name, vars, lemma_term) }
-      with
-      | solver, Unsat ->
-          Log.verbose (fun f () -> Fmt.(pf f "This lemma has been proven correct."));
-          Solvers.close_solver solver;
-          Log.info (fun frmt () ->
-              Fmt.pf frmt "Lemma for term %a: \"%s %s = @[%a@]\"." pp_term det.term name
+      if !Config.interactive_check_lemma then (
+        Log.info (fun f () ->
+            Fmt.(
+              pf f "Is the lemma \"%s %s = @[%a@]\" for term %a[%a] correct? [Y/N]" name
                 (String.concat ~sep:" " (List.map ~f:(fun v -> v.vname) vars))
-                pp_term lemma_term);
-          Some { det with lemma_candidate = None; lemmas = lemma_term :: det.lemmas }
-      | solver, Sat | solver, Unknown ->
-          Log.verbose (fun f () ->
-              Fmt.(pf f "This lemma has not been proved correct. Refining lemma..."));
-          let new_positive_ctexs = get_positive_examples solver det ~p (name, vars, lemma_term) in
-          List.iter
-            ~f:(fun ctex ->
-              Log.verbose (fun f () -> Fmt.(pf f "Found a positive example: %a" (box pp_ctex) ctex)))
-            new_positive_ctexs;
-          Solvers.close_solver solver;
-          lemma_refinement_loop
-            { det with positive_ctexs = det.positive_ctexs @ new_positive_ctexs }
-            ~p
-      | _ ->
-          Log.error_msg "Lemma verification returned something other than Unsat, Sat, or Unknown.";
-          None)
+                pp_term lemma_term pp_term det.term pp_subs det.ctex.ctex_eqn.eelim));
+        match Stdio.In_channel.input_line Stdio.stdin with
+        | Some "Y" -> Some { det with lemma_candidate = None; lemmas = lemma_term :: det.lemmas }
+        | _ -> (
+            Log.info (fun f () ->
+                Fmt.(
+                  pf f
+                    "Would you like to provide a non-spurious example in which the lemma is false? \
+                     [Y/N]"));
+            match Stdio.In_channel.input_line Stdio.stdin with
+            | Some "Y" ->
+                lemma_refinement_loop
+                  {
+                    det with
+                    positive_ctexs = det.positive_ctexs @ interactive_get_positive_examples det;
+                  }
+                  ~p
+            | _ -> None))
+      else
+        match
+          verify_lemma_candidate ~p { det with lemma_candidate = Some (name, vars, lemma_term) }
+        with
+        | solver, Unsat ->
+            Log.verbose (fun f () -> Fmt.(pf f "This lemma has been proven correct."));
+            Solvers.close_solver solver;
+            Log.info (fun frmt () ->
+                Fmt.pf frmt "Lemma for term %a: \"%s %s = @[%a@]\"." pp_term det.term name
+                  (String.concat ~sep:" " (List.map ~f:(fun v -> v.vname) vars))
+                  pp_term lemma_term);
+            Some { det with lemma_candidate = None; lemmas = lemma_term :: det.lemmas }
+        | solver, Sat | solver, Unknown ->
+            Log.verbose (fun f () ->
+                Fmt.(pf f "This lemma has not been proven correct. Refining lemma..."));
+            let new_positive_ctexs = get_positive_examples solver det ~p (name, vars, lemma_term) in
+            List.iter
+              ~f:(fun ctex ->
+                Log.verbose (fun f () ->
+                    Fmt.(pf f "Found a positive example: %a" (box pp_ctex) ctex)))
+              new_positive_ctexs;
+            Solvers.close_solver solver;
+            lemma_refinement_loop
+              { det with positive_ctexs = det.positive_ctexs @ new_positive_ctexs }
+              ~p
+        | _ ->
+            Log.error_msg "Lemma verification returned something other than Unsat, Sat, or Unknown.";
+            None)
 
 let synthesize_lemmas ~(p : psi_def) synt_failure_info (lstate : refinement_loop_state) :
     (refinement_loop_state, solver_response) Result.t =

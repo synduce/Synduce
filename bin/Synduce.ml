@@ -44,6 +44,8 @@ let print_usage () =
     \  -L   --interactive-loop          Request lemmas interactively in a loop.\n\
     \  -X   --classify-ctex             Manually classify ctex as pos or neg.\n\
     \  -N   --no-sat-as-unsat           No sat found in bounded checking is accepted as unsat.\n\
+    \  -C   --interactive-check-lemma   Manually set if a lemma is true and, if not, give \
+     counterexample.\n\
     \       --parse-only                Just parse the input.\n\
     \       --show-vars                 Print variables and their types at the end.\n\
      -> Try:\n\
@@ -69,6 +71,7 @@ let options =
     ('t', "no-detupling", set Config.detupling_on false, None);
     ('v', "verbose", set Config.verbose true, None);
     ('X', "classify-ctex", set Config.classify_ctex true, None);
+    ('C', "interactive-check-lemma", set Config.interactive_check_lemma true, None);
     ('\000', "acegis", set Config.use_acegis true, None);
     ('\000', "ccegis", set Config.use_ccegis true, None);
     ('\000', "parse-only", set parse_only true, None);

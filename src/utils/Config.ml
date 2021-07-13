@@ -52,6 +52,8 @@ let interactive_lifting = ref false
 
 let classify_ctex = ref false
 
+let interactive_check_lemma = ref false
+
 (**
   Check whether a system of equations defines a "functionally realizable" synthesis problem.
   OFF by default.
