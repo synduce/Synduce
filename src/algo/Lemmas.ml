@@ -43,15 +43,19 @@ let make_term_state_detail_from_ctex (is_pos_ctex : bool) (ctex : ctex) : term_s
     ctex;
   }
 
-let mk_f_compose_r ~(p : psi_def) (t : term) : term =
+let mk_f_compose_r_orig ~(p : psi_def) (t : term) : term =
   let repr_of_v = if p.psi_repr_is_identity then t else mk_app_v p.psi_repr.pvar [ t ] in
   mk_app_v p.psi_reference.pvar (List.map ~f:mk_var p.psi_reference.pargs @ [ repr_of_v ])
+
+let mk_f_compose_r_main ~(p : psi_def) (t : term) : term =
+  let repr_of_v = if p.psi_repr_is_identity then t else mk_app_v p.psi_repr.pmain_symb [ t ] in
+  mk_app_v p.psi_reference.pmain_symb [ repr_of_v ]
 
 let term_detail_to_lemma ~(p : psi_def) (det : term_state_detail) : term option =
   let subst =
     List.map
       ~f:(fun (t1, t2) ->
-        let frt1 = mk_f_compose_r ~p t1 in
+        let frt1 = mk_f_compose_r_main ~p t1 in
         (t2, frt1))
       det.recurs_elim
   in
@@ -188,8 +192,7 @@ let log_soln s vs t =
 let handle_lemma_synth_response (det : term_state_detail) (resp : solver_response option) =
   let parse_synth_fun (fname, _fargs, _, fbody) =
     let args = Set.elements det.ctex.ctex_vars in
-    let local_vars = VarSet.of_list args in
-    let body, _ = infer_type (term_of_sygus (VarSet.to_env local_vars) fbody) in
+    let body, _ = infer_type (term_of_sygus (VarSet.to_env det.ctex.ctex_vars) fbody) in
     (fname, args, body)
   in
   match resp with
@@ -202,7 +205,8 @@ let handle_lemma_synth_response (det : term_state_detail) (resp : solver_respons
 let smt_of_recurs_elim_eqns (elim : (term * term) list) ~(p : psi_def) : S.smtTerm =
   S.mk_assoc_and
     (List.map
-       ~f:(fun (t1, t2) -> S.mk_eq (Smt.smt_of_term (mk_f_compose_r ~p t1)) (Smt.smt_of_term t2))
+       ~f:(fun (t1, t2) ->
+         S.mk_eq (Smt.smt_of_term (mk_f_compose_r_orig ~p t1)) (Smt.smt_of_term t2))
        elim)
 
 let smt_of_tinv_app ~(p : psi_def) (det : term_state_detail) =
@@ -222,9 +226,13 @@ let smt_of_lemma_validity ~(p : psi_def) lemma (det : term_state_detail) =
       ~f:(fun var -> (S.SSimple var.vname, mk_sort (Variable.vtype var)))
       (Set.elements det.vars @ p.psi_reference.pargs)
   in
+  let preconds =
+    match det.ctex.ctex_eqn.eprecond with None -> [] | Some pre -> [ Smt.smt_of_term pre ]
+  in
   (* TODO: if condition should account for other preconditions *)
   let if_condition =
-    S.mk_and (smt_of_tinv_app ~p det) (smt_of_recurs_elim_eqns det.recurs_elim ~p)
+    S.mk_assoc_and
+      ([ smt_of_tinv_app ~p det; smt_of_recurs_elim_eqns det.recurs_elim ~p ] @ preconds)
   in
   let if_then = smt_of_lemma_app lemma in
   [ S.mk_assert (S.mk_not (S.mk_forall quants (S.mk_or (S.mk_not if_condition) if_then))) ]
@@ -267,14 +275,15 @@ let verify_lemma_candidate ~(p : psi_def) (det : term_state_detail) :
 
 let classify_ctexs_opt ~(p : psi_def) ctexs =
   if !Config.classify_ctex then
-    let f (p, n) ctex =
+    let f (p, n, u) ctex =
       Log.info (fun frmt () ->
-          Fmt.(pf frmt "Classify this counterexample: %a (P/N)" (box pp_ctex) ctex));
+          Fmt.(pf frmt "Classify this counterexample: %a (P/N/U)" (box pp_ctex) ctex));
       match Stdio.In_channel.input_line Stdio.stdin with
-      | Some "N" -> (p, ctex :: n)
-      | _ -> (ctex :: p, n)
+      | Some "N" -> (p, ctex :: n, u)
+      | Some "P" -> (ctex :: p, n, u)
+      | _ -> (p, n, ctex :: u)
     in
-    List.fold ~f ~init:([], []) ctexs
+    List.fold ~f ~init:([], [], []) ctexs
   else classify_ctexs ~p ctexs
 
 let smt_of_disallow_ctex_values (ctexs : ctex list) : S.smtTerm =
@@ -298,25 +307,31 @@ let get_positive_examples (solver : Solvers.online_solver) (det : term_state_det
     (lemma : symbol * variable list * term) : ctex list =
   (* TODO: make fresh variables, since this may in the future be called for multiple terms, for multiple lemma candidates, or to generate multiple pos examples, in one solver instance *)
   Log.verbose (fun f () -> Fmt.(pf f "Searching for a positive example."));
+
+  (* Step 1. Declare vars for term, and assert that term satisfies tinv. *)
+  let _ =
+    Solvers.declare_all solver (Smt.decls_of_vars (Analysis.free_variables det.term));
+    ignore (Solvers.exec_command solver (S.mk_assert (smt_of_tinv_app ~p det)));
+    ignore (Solvers.check_sat solver)
+  in
+  (* Step 2. Declare scalars (vars for recursion elimination & spec param) and their constraints (preconds & recurs elim eqns) *)
   let _ =
     Solvers.declare_all solver
-      (Smt.decls_of_vars (Set.union det.vars (VarSet.of_list p.psi_reference.pargs)))
+      (Smt.decls_of_vars (Set.union det.vars (VarSet.of_list p.psi_reference.pargs)));
+    ignore (Solvers.exec_command solver (S.mk_assert (smt_of_recurs_elim_eqns det.recurs_elim ~p)));
+    (match det.ctex.ctex_eqn.eprecond with
+    | None -> ()
+    | Some pre -> ignore (Solvers.exec_command solver (S.mk_assert (Smt.smt_of_term pre))));
+    ignore (Solvers.check_sat solver)
   in
-  let rec_elim_eqns = smt_of_recurs_elim_eqns det.recurs_elim ~p in
+  (* Step 3. Disallow repeated positive examples. *)
   let _ =
-    List.iter
-      ~f:(fun command ->
-        ignore (Solvers.exec_command solver command);
-        ignore (Solvers.check_sat solver))
-      ((if List.length det.positive_ctexs > 0 then
-        [ S.mk_assert (smt_of_disallow_ctex_values det.positive_ctexs) ]
-       else [])
-      @ [
-          S.mk_assert rec_elim_eqns;
-          S.mk_assert (smt_of_tinv_app ~p det);
-          S.mk_assert (S.mk_not (smt_of_lemma_app lemma));
-        ])
+    if List.length det.positive_ctexs > 0 then
+      ignore
+        (Solvers.exec_command solver (S.mk_assert (smt_of_disallow_ctex_values det.positive_ctexs)))
   in
+  (* Step 4. Assert that lemma candidate is false. *)
+  let _ = ignore (Solvers.exec_command solver (S.mk_assert (S.mk_not (smt_of_lemma_app lemma)))) in
 
   match Solvers.check_sat solver with
   | Sat | Unknown -> (
@@ -372,8 +387,9 @@ let rec lemma_refinement_loop (det : term_state_detail) ~(p : psi_def) : term_st
       match
         verify_lemma_candidate ~p { det with lemma_candidate = Some (name, vars, lemma_term) }
       with
-      | _, Unsat ->
+      | solver, Unsat ->
           Log.verbose (fun f () -> Fmt.(pf f "This lemma has been proven correct."));
+          Solvers.close_solver solver;
           Log.info (fun frmt () ->
               Fmt.pf frmt "Lemma for term %a: \"%s %s = @[%a@]\"." pp_term det.term name
                 (String.concat ~sep:" " (List.map ~f:(fun v -> v.vname) vars))
@@ -410,9 +426,10 @@ let synthesize_lemmas ~(p : psi_def) synt_failure_info (lstate : refinement_loop
         (* Forget about the specific association in pairs. *)
         let ctexs = List.concat_map unrealizability_ctexs ~f:(fun uc -> [ uc.ci; uc.cj ]) in
         (* Classify in negative and positive cexs. *)
-        let _, negative_ctexs = classify_ctexs_opt ~p ctexs in
+        let positive_ctexs, negative_ctexs, _ = classify_ctexs_opt ~p ctexs in
         let ts : term_state =
-          update_term_state_for_ctexs lstate.term_state ~neg_ctexs:negative_ctexs ~pos_ctexs:[]
+          update_term_state_for_ctexs lstate.term_state ~neg_ctexs:negative_ctexs
+            ~pos_ctexs:positive_ctexs
         in
         if List.is_empty negative_ctexs then (ts, false)
         else

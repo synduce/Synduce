@@ -355,11 +355,11 @@ let satisfies_tinv ~(p : psi_def) (tinv : PMRS.t) (ctex : ctex) : bool =
 (** Classify counterexamples into positive or negative counterexamples with respect
     to the Tinv predicate in the problem.
 *)
-let classify_ctexs ~(p : psi_def) (ctexs : ctex list) : ctex list * ctex list =
+let classify_ctexs ~(p : psi_def) (ctexs : ctex list) : ctex list * ctex list * ctex list =
   let classify_with_tinv tinv =
     (* TODO: DT_LIA for z3, DTLIA for cvc4... Should write a type to represent logics. *)
     let f (ctex : ctex) = satisfies_tinv ~p tinv ctex in
     let unknowns, negatives = List.partition_tf ~f ctexs in
-    (unknowns, negatives)
+    ([], negatives, unknowns)
   in
-  match p.psi_tinv with Some tinv -> classify_with_tinv tinv | None -> ([], [])
+  match p.psi_tinv with Some tinv -> classify_with_tinv tinv | None -> ([], [], [])
