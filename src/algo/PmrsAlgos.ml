@@ -62,13 +62,14 @@ let rec refinement_loop (p : psi_def) (lstate : refinement_loop_state) =
   | _ as synt_failure_info -> (
       match Lemmas.synthesize_lemmas ~p synt_failure_info lstate with
       | Ok new_lstate -> refinement_loop p new_lstate
-      | Error synt_failure -> (
+      | Error synt_failure when !Config.attempt_lifting -> (
           match Lifting.scalar ~p lstate synt_failure with
           | Ok (p', lstate') ->
               Int.decr refinement_steps;
               Lifting.msg_lifting ();
               refinement_loop p' lstate'
-          | Error r' -> Error r'))
+          | Error r' -> Error r')
+      | _ -> Error RFail)
 
 let psi (p : psi_def) =
   (* Initialize sets with the most general terms. *)

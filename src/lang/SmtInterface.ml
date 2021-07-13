@@ -165,14 +165,14 @@ let id_kind_of_s env s =
 let rec term_of_smt (env : (string, variable, String.comparator_witness) Map.t) (st : smtTerm) :
     term =
   match st with
-  | SmtTQualdId (QI (Id (SSimple s))) -> (
+  | SmtTQualdId (QIas (Id (SSimple s), _)) | SmtTQualdId (QI (Id (SSimple s))) -> (
       match id_kind_of_s env s with
       | IVar v -> Term.mk_var v
       | IBool true -> mk_const Constant.CTrue
       | IBool false -> mk_const Constant.CFalse
       | _ -> failwith Fmt.(str "Smt: undefined variable %s" s))
   | SmtTSpecConst l -> mk_const (constant_of_smtConst l)
-  | SmtTApp (QI (Id (SSimple s)), args) -> (
+  | SmtTApp (QIas (Id (SSimple s), _), args) | SmtTApp (QI (Id (SSimple s)), args) -> (
       let args' = List.map ~f:(term_of_smt env) args in
       match id_kind_of_s env s with
       | ICstr c -> mk_data c args'
@@ -192,7 +192,8 @@ let rec term_of_smt (env : (string, variable, String.comparator_witness) Map.t) 
   | SmtTExists (_, _) -> failwith "Smt: exists-terms not supported."
   | SmtTForall (_, _) -> failwith "Smt: forall-terms not supported."
   | SmtTLet (_, _) -> failwith "Smt: let-terms not supported."
-  | _ -> failwith "Composite identifier not supported."
+  | _ ->
+      failwith (Fmt.str "Composite identifier %a not supported." Sexp.pp_hum (sexp_of_smtTerm st))
 
 let sorted_vars_of_vars (vars : VarSet.t) : smtSortedVar list =
   List.map
@@ -220,7 +221,8 @@ let constmap_of_s_exprs (starting_map : (string, term, String.comparator_witness
                 match t_val_o with Some t_val -> Map.set map ~key:s ~data:t_val | None -> map)
             | _ -> map)
         | _ -> map
-      with Failure _ ->
+      with Failure s ->
+        Log.debug_msg s;
         Log.debug_msg
           Fmt.(str "Failed at converting Sexpr \"%a\" to smtTerm. Skipping." Sexplib.Sexp.pp sexp);
         map)

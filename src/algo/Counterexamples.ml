@@ -331,7 +331,8 @@ let check_tinv_sat ~(p : psi_def) (tinv : PMRS.t) (ctex : ctex) :
   in
   Asyncs.(cancellable_task (make_z3_solver ()) task)
 
-let satisfies_tinv ~(p : psi_def) (tinv : PMRS.t) (ctex : ctex) : bool =
+let satisfies_tinv ~(p : psi_def) (tinv : PMRS.t) (ctex : ctex) :
+    [ `Fst of ctex | `Snd of ctex | `Trd of ctex ] =
   let resp =
     Lwt_main.run
       ((* This call is expected to respond "unsat" when terminating. *)
@@ -349,8 +350,7 @@ let satisfies_tinv ~(p : psi_def) (tinv : PMRS.t) (ctex : ctex) : bool =
       else if Solvers.is_sat resp then
         Fmt.(pf frmt "(%a) satisfies %s." (box pp_ctex) ctex tinv.pvar.vname)
       else Fmt.(pf frmt "%s-satisfiability of (%a) is unknown." tinv.pvar.vname (box pp_ctex) ctex));
-  match resp with Sat -> true | Unsat -> false | _ -> true
-(* TODO: return more information. *)
+  match resp with Sat -> `Fst ctex | Unsat -> `Snd ctex | _ -> `Trd ctex
 
 (** Classify counterexamples into positive or negative counterexamples with respect
     to the Tinv predicate in the problem.
@@ -359,7 +359,7 @@ let classify_ctexs ~(p : psi_def) (ctexs : ctex list) : ctex list * ctex list * 
   let classify_with_tinv tinv =
     (* TODO: DT_LIA for z3, DTLIA for cvc4... Should write a type to represent logics. *)
     let f (ctex : ctex) = satisfies_tinv ~p tinv ctex in
-    let unknowns, negatives = List.partition_tf ~f ctexs in
-    ([], negatives, unknowns)
+    let positives, negatives, unknowns = List.partition3_map ~f ctexs in
+    (positives, negatives @ unknowns, unknowns)
   in
   match p.psi_tinv with Some tinv -> classify_with_tinv tinv | None -> ([], [], [])
