@@ -168,7 +168,9 @@ let ctex_model_to_args params ctex =
       match
         Map.find ctex.ctex_model
           (match VarSet.find_by_name ctex.ctex_vars name with
-          | None -> failwith "Failed to extract argument list from ctex model."
+          | None ->
+              failwith
+                (Fmt.str "Failed to extract argument list from ctex model (%s unknown)." name)
           | Some v -> v.vid)
       with
       | None -> failwith "Failed to extract argument list from ctex model."

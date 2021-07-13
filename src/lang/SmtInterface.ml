@@ -116,7 +116,10 @@ let rec smt_of_term (t : term) : smtTerm =
       mk_simple_app "mkTuple" (List.map ~f:smt_of_term tl)
   | TSel (t, i) -> SmtTApp (QI (IdC (SSimple "tupleSel", [ INum i ])), [ smt_of_term t ])
   | TApp ({ tkind = TVar v; _ }, args) -> mk_simple_app v.vname (List.map ~f:smt_of_term args)
-  | TData (cstr, args) -> mk_simple_app cstr (List.map ~f:smt_of_term args)
+  | TData (cstr, args) -> (
+      match args with
+      | [] -> SmtTQualdId (QI (Id (SSimple cstr)))
+      | _ -> mk_simple_app cstr (List.map ~f:smt_of_term args))
   | TMatch (tm, cases) -> SmtTMatch (smt_of_term tm, List.map ~f:smt_of_case cases)
   | TApp (_, _) ->
       Log.error_msg Fmt.(str "Smt of term %a impossible." pp_term t);
@@ -268,7 +271,9 @@ let smtPattern_of_term (t : term) : smtPattern option =
         let f t = match t.tkind with TVar x -> Some (mk_symb x.vname) | _ -> None in
         all_or_none (List.map ~f args)
       in
-      Option.map maybe_pat_args ~f:(fun pat_args -> PatComp (mk_symb constr, pat_args))
+      Option.map maybe_pat_args ~f:(function
+        | [] -> Pat (mk_symb constr)
+        | _ as pat_args -> PatComp (mk_symb constr, pat_args))
   | _ -> None
 
 (* Work in progress *)

@@ -18,7 +18,9 @@ type unrealizability_ctex = { i : int; j : int; ci : ctex; cj : ctex }
 let pp_unrealizability_ctex (frmt : Formatter.t) (uc : unrealizability_ctex) : unit =
   let pp_model frmt model =
     (* Print as comma-separated list of variable -> term *)
-    Fmt.(list ~sep:comma (pair ~sep:Utils.rightarrow (option Variable.pp) pp_term))
+    Fmt.(
+      list ~sep:comma
+        (pair ~sep:Utils.rightarrow (option ~none:(fun fmt () -> pf fmt "?") Variable.pp) pp_term))
       frmt
       (List.map
          ~f:(fun (vid, t) -> (VarSet.find_by_id uc.ci.ctex_vars vid, t))
@@ -32,15 +34,16 @@ let reinterpret_model (m0i, m0j') var_subst =
   List.fold var_subst
     ~init:(Map.empty (module Int), Map.empty (module Int))
     ~f:(fun (m, m') (v, v') ->
+      let primed_name = v'.vname in
       Variable.free v';
       match Map.find m0i v.vname with
       | Some data -> (
           let new_m = Map.set m ~key:v.vid ~data in
-          match Map.find m0j' v'.vname with
+          match Map.find m0j' primed_name with
           | Some data -> (new_m, Map.set m' ~key:v.vid ~data)
           | None -> (new_m, m'))
       | None -> (
-          match Map.find m0j' v'.vname with
+          match Map.find m0j' primed_name with
           | Some data -> (m, Map.set m' ~key:v.vid ~data)
           | None -> (m, m')))
 
@@ -129,8 +132,9 @@ let check_unrealizable (unknowns : VarSet.t) (eqns : equation_system) : unrealiz
                   in
                   (* Remap the names to ids of the original variables in m' *)
                   let m_i, m_j = reinterpret_model (m0i, m0j) var_subst in
-                  let ctex_i : ctex = { ctex_eqn = eqn_i; ctex_vars = vseti; ctex_model = m_i } in
-                  let ctex_j : ctex = { ctex_eqn = eqn_j; ctex_vars = vsetj; ctex_model = m_j } in
+                  let vset = Set.union vseti vsetj in
+                  let ctex_i : ctex = { ctex_eqn = eqn_i; ctex_vars = vset; ctex_model = m_i } in
+                  let ctex_j : ctex = { ctex_eqn = eqn_j; ctex_vars = vset; ctex_model = m_j } in
                   { i; j; ci = ctex_i; cj = ctex_j } :: ctexs
               | _ -> ctexs)
           | _ -> ctexs
@@ -289,7 +293,9 @@ let check_tinv_sat ~(p : psi_def) (tinv : PMRS.t) (ctex : ctex) :
           in
           List.map ~f (Set.elements ctex.ctex_vars)
         in
-        let vars = Analysis.free_variables (f_compose_r t) in
+        let vars =
+          Set.union (Analysis.free_variables t) (Analysis.free_variables (f_compose_r t))
+        in
         (* Start sequence of solver commands, bind on accum. *)
         let%lwt _ = accum in
         let%lwt () = Asyncs.spush solver in
@@ -319,8 +325,14 @@ let check_tinv_sat ~(p : psi_def) (tinv : PMRS.t) (ctex : ctex) :
           match check_result with
           | Sat -> return SmtLib.Sat
           | _ -> expand_loop (return (Set.union (Set.remove u t0) u')))
-      | _, false | None, _ -> return SmtLib.Unknown
+      | None, true ->
+          (* All expansions have been checked. *)
+          return SmtLib.Unsat
+      | _, false ->
+          (* Bounded check incomplete. Result is unknown. *)
+          return SmtLib.Unknown
     in
+
     let%lwt _ = starter in
     (* TODO : logic *)
     let%lwt () = Asyncs.set_logic solver "LIA" in
@@ -346,7 +358,7 @@ let satisfies_tinv ~(p : psi_def) (tinv : PMRS.t) (ctex : ctex) :
   in
   Log.verbose (fun frmt () ->
       if Solvers.is_unsat resp then
-        Fmt.(pf frmt "(%a) does not satisfy %s." (box pp_ctex) ctex tinv.pvar.vname)
+        Fmt.(pf frmt "(%a)@;<1 4>does not satisfy \"%s\"." (box pp_ctex) ctex tinv.pvar.vname)
       else if Solvers.is_sat resp then
         Fmt.(pf frmt "(%a) satisfies %s." (box pp_ctex) ctex tinv.pvar.vname)
       else Fmt.(pf frmt "%s-satisfiability of (%a) is unknown." tinv.pvar.vname (box pp_ctex) ctex));
