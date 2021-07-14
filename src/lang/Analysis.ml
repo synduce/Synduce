@@ -109,6 +109,23 @@ let apply_projections (projs : (int, variable list, Int.comparator_witness) Map.
   in
   transform ~case t
 
+let replace_id_calls ~(func : variable) (t : term) =
+  (* Collect the arguments of the calls (func x) *)
+  let args_of_calls_to_func =
+    let case _ t =
+      match t.tkind with
+      | TApp ({ tkind = TVar func'; _ }, [ x ]) when Variable.(func = func') ->
+          Some (TermSet.singleton x)
+      | _ -> None
+    in
+    reduce ~init:TermSet.empty ~join:Set.union ~case t
+  in
+  let subs =
+    (* Replace all func x by just x *)
+    List.map ~f:(fun x -> (mk_app (mk_var func) [ x ], x)) (Set.elements args_of_calls_to_func)
+  in
+  substitution subs t
+
 (* ============================================================================================= *)
 (*                                  TERM MATCHING                                                *)
 (* ============================================================================================= *)
