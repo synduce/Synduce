@@ -43,6 +43,7 @@ let print_usage () =
     \  -J   --interactive-lifting       Request expressions for lifting.\n\
     \  -L   --interactive-loop          Request lemmas interactively in a loop.\n\
     \  -X   --classify-ctex             Manually classify ctex as pos or neg.\n\
+    \  -N   --no-sat-as-unsat           No sat found in bounded checking is accepted as unsat.\n\
     \       --parse-only                Just parse the input.\n\
     \       --show-vars                 Print variables and their types at the end.\n\
      -> Try:\n\
@@ -62,6 +63,7 @@ let options =
     ('L', "interactive-loop", set Config.interactive_lemmas_loop true, None);
     ('m', "style-math", set Config.math_display true, None);
     ('n', "verification", None, Some Config.set_num_expansions_check);
+    ('N', "no-sat-as-unsat", set Config.no_bounded_sat_as_unsat true, None);
     ('o', "output", None, Some Config.set_output_folder);
     ('s', "no-splitting", set Config.split_solve_on false, None);
     ('t', "no-detupling", set Config.detupling_on false, None);

@@ -1,3 +1,5 @@
+(* Run with --no-lifting -dvN *)
+
 type 'a tree = Nil | Node of 'a * 'a tree * 'a tree
 
 let rec balanced = function

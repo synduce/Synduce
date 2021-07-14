@@ -63,6 +63,11 @@ let check_unrealizable = ref true
 *)
 let attempt_lifting = ref true
 
+(**
+  Accept no-sat in bounded checking as unsat.
+*)
+let no_bounded_sat_as_unsat = ref false
+
 (* ============================================================================================= *)
 (*                                GLOBAL TIMING INFO                                             *)
 (* ============================================================================================= *)

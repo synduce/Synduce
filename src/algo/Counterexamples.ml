@@ -329,8 +329,8 @@ let check_tinv_sat ~(p : psi_def) (tinv : PMRS.t) (ctex : ctex) :
           (* All expansions have been checked. *)
           return SmtLib.Unsat
       | _, false ->
-          (* Bounded check incomplete. Result is unknown. *)
-          return SmtLib.Unknown
+          (* Check reached limit. *)
+          if !Config.no_bounded_sat_as_unsat then return SmtLib.Unsat else return SmtLib.Unknown
     in
 
     let%lwt _ = starter in
@@ -372,6 +372,6 @@ let classify_ctexs ~(p : psi_def) (ctexs : ctex list) : ctex list * ctex list * 
     (* TODO: DT_LIA for z3, DTLIA for cvc4... Should write a type to represent logics. *)
     let f (ctex : ctex) = satisfies_tinv ~p tinv ctex in
     let positives, negatives, unknowns = List.partition3_map ~f ctexs in
-    (positives, negatives @ unknowns, unknowns)
+    (positives, negatives, unknowns)
   in
   match p.psi_tinv with Some tinv -> classify_with_tinv tinv | None -> ([], [], [])
