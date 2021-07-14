@@ -1,8 +1,8 @@
 
-let s0  = (0, 1)
-
 let join x7 x8 (j, j0) (j1, j2) =
   (j + (j0 × (x8 + (x7 × j1))), x7 × (j0 × j2))
+
+let s0  = (0, 1)
 
 target⟨join, s0⟩(poly_in): int tree -> (int * int)  = 
 {

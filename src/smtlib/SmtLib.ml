@@ -357,8 +357,24 @@ and binding_of_sexp (s : t) : var_binding option =
 let sexp_of_smtSelectorDec ((s, srt) : smtSelectorDec) : t =
   List [ sexp_of_smtSymbol s; sexp_of_smtSort srt ]
 
+let smtSelectorDec_of_sexp (s : Sexp.t) : smtSelectorDec option =
+  match s with
+  | List [ s; srt ] ->
+      let%bind s = smtSymbol_of_sexp s in
+      let%map srt = smtSort_of_sexp srt in
+      (s, srt)
+  | _ -> None
+
 let sexp_of_smtConstructorDec ((s, sdecs) : smtConstructorDec) : t =
   List (sexp_of_smtSymbol s :: List.map ~f:sexp_of_smtSelectorDec sdecs)
+
+let smtConstructorDec_of_sexp (s : Sexp.t) : smtConstructorDec option =
+  match s with
+  | List (s :: sdecs) ->
+      let%bind s = smtSymbol_of_sexp s in
+      let%map sdecs = Option.all (List.map ~f:smtSelectorDec_of_sexp sdecs) in
+      (s, sdecs)
+  | _ -> None
 
 let sexp_of_datatype_dec (dtdec : datatype_dec) : t =
   match dtdec with
@@ -371,8 +387,37 @@ let sexp_of_datatype_dec (dtdec : datatype_dec) : t =
           List (List.map ~f:sexp_of_smtConstructorDec cd_list);
         ]
 
+let datatype_dec_of_sexp (s : Sexp.t) : datatype_dec option =
+  match s with
+  | List [ Atom "par"; List symbs; List cdecs ] ->
+      let%bind symbs = Option.all (List.map ~f:smtSymbol_of_sexp symbs) in
+      let%map constrs = Option.all (List.map ~f:smtConstructorDec_of_sexp cdecs) in
+      DDParametric (symbs, constrs)
+  | List cd_list ->
+      let%map x = Option.all (List.map ~f:smtConstructorDec_of_sexp cd_list) in
+      DDConstr x
+  | _ -> None
+
 let sexp_of_func_dec ((s, svs, srt) : func_dec) : t =
   List [ sexp_of_smtSymbol s; List (List.map ~f:sexp_of_sortedVar svs); sexp_of_smtSort srt ]
+
+let func_dec_of_sexpl (s : Sexp.t list) : func_dec option =
+  match s with
+  | [ name; List args; res_sort ] ->
+      let%bind name = smtSymbol_of_sexp name in
+      let%bind args = Option.all (List.map ~f:sortedVar_of_sexp args) in
+      let%map res = smtSort_of_sexp res_sort in
+      (name, args, res)
+  | _ -> None
+
+let func_dec_of_sexp (s : Sexp.t) : func_dec option =
+  match s with
+  | List [ name; List args; res_sort ] ->
+      let%bind name = smtSymbol_of_sexp name in
+      let%bind args = Option.all (List.map ~f:sortedVar_of_sexp args) in
+      let%map res = smtSort_of_sexp res_sort in
+      (name, args, res)
+  | _ -> None
 
 let sexp_of_func_def ((s, svs, srt, t) : func_def) : t list =
   [
@@ -382,10 +427,37 @@ let sexp_of_func_def ((s, svs, srt, t) : func_def) : t list =
     sexp_of_smtTerm t;
   ]
 
+let func_def_of_sexp (s : Sexp.t list) : func_def option =
+  match s with
+  | [ name; List args; res_sort; body ] ->
+      let%bind name = smtSymbol_of_sexp name in
+      let%bind args = Option.all (List.map ~f:sortedVar_of_sexp args) in
+      let%bind res = smtSort_of_sexp res_sort in
+      let%map body = smtTerm_of_sexp body in
+      (name, args, res, body)
+  | _ -> None
+
 let sexp_of_prop_literal (pl : prop_literal) : t =
   match pl with PL x -> sexp_of_smtSymbol x | PLNot x -> List [ Atom "not"; sexp_of_smtSymbol x ]
 
+let prop_literal_of_sexp (s : Sexp.t) : prop_literal option =
+  match s with
+  | List [ Atom "not"; x ] ->
+      let%map x = smtSymbol_of_sexp x in
+      PLNot x
+  | x ->
+      let%map x = smtSymbol_of_sexp x in
+      PL x
+
 let sexp_of_smtSortDec ((s, n) : smtSortDec) : t = List [ sexp_of_smtSymbol s; sexp_of_numeral n ]
+
+let smtSortDec_of_sexp (s : Sexp.t) : smtSortDec option =
+  match s with
+  | List [ s; n ] ->
+      let%bind s = smtSymbol_of_sexp s in
+      let%map n = numeral_of_sexp n in
+      (s, n)
+  | _ -> None
 
 let sexp_of_command (c : command) =
   match c with
@@ -454,6 +526,75 @@ let sexp_of_command (c : command) =
       else
         List (Atom "simplify" :: sexp_of_smtTerm t :: List.concat (List.map ~f:sexps_of_option ol))
 
+let command_of_sexp (s : Sexp.t) : command option =
+  match s with
+  | List [ Atom "assert"; t ] -> Option.map ~f:(fun x -> Assert x) (smtTerm_of_sexp t)
+  | List [ Atom "check-sat" ] -> Some CheckSat
+  | List [ Atom "check-sat-assuming"; List pl_list ] ->
+      let%map pls = Option.all (List.map ~f:prop_literal_of_sexp pl_list) in
+      CheckSatAssuming pls
+  | List [ Atom "declare-const"; sym; smts ] ->
+      let%bind sym = smtSymbol_of_sexp sym in
+      let%map sort = smtSort_of_sexp smts in
+      DeclareConst (sym, sort)
+  | List [ Atom "declare-datatype"; sym; ddec ] ->
+      let%bind name = smtSymbol_of_sexp sym in
+      let%map ddec = datatype_dec_of_sexp ddec in
+      DeclareDatatype (name, ddec)
+  | List [ Atom "declare-datatypes"; List sdec_l; List ddec_l ] ->
+      let%bind decls = Option.all (List.map ~f:smtSortDec_of_sexp sdec_l) in
+      let%map ddecls = Option.all (List.map ~f:datatype_dec_of_sexp ddec_l) in
+      DeclareDatatypes (decls, ddecls)
+  | List [ Atom "declare-fun"; name; List args; res ] ->
+      let%bind name = smtSymbol_of_sexp name in
+      let%bind args = Option.all (List.map ~f:smtSort_of_sexp args) in
+      let%map res = smtSort_of_sexp res in
+      DeclareFun (name, args, res)
+  | List [ Atom "declare-smtSort"; s; n ] ->
+      let%bind s = smtSymbol_of_sexp s in
+      let%map n = numeral_of_sexp n in
+      DeclareSmtSort (s, n)
+  | List (Atom "define-fun" :: fd) ->
+      let%map x = func_def_of_sexp fd in
+      DefineFun x
+  | List (Atom "define-fun-rec" :: fd) ->
+      let%map x = func_def_of_sexp fd in
+      DefineFunRec x
+  | List [ Atom "define-funs-rec"; List fdl; List tl ] ->
+      let%bind decs = Option.all (List.map ~f:func_dec_of_sexp fdl) in
+      let%map bodies = Option.all (List.map ~f:smtTerm_of_sexp tl) in
+      DefineFunsRec (decs, bodies)
+  | List [ Atom "define-sort"; s; List sl; smts ] ->
+      let%bind s = smtSymbol_of_sexp s in
+      let%bind sl = Option.all (List.map ~f:smtSymbol_of_sexp sl) in
+      let%map smts = smtSort_of_sexp smts in
+      DefineSmtSort (s, sl, smts)
+  | List [ Atom "echo"; Atom s ] -> Some (Echo s)
+  | List [ Atom "exit" ] -> Some Exit
+  | List [ Atom "get-assertions" ] -> Some GetAssertions
+  | List [ Atom "get-assignment" ] -> Some GetAssignment
+  | List [ Atom "get-info"; iflag ] -> Some (GetInfo (info_flag_of_sexp iflag))
+  | List [ Atom "get-model" ] -> Some GetModel
+  | List [ Atom "get-option"; Atom kw ] -> Some (GetOption kw)
+  | List [ Atom "get-proof" ] -> Some GetProof
+  | List [ Atom "get-unsat-assumptions" ] -> Some GetUnsatAssumptions
+  | List [ Atom "get-unsat-core" ] -> Some GetUnsatCore
+  | List (Atom "get-value" :: tl) ->
+      let%map x = Option.all (List.map ~f:smtTerm_of_sexp tl) in
+      GetValue x
+  | List [ Atom "pop"; n ] ->
+      let%map x = numeral_of_sexp n in
+      Pop x
+  | List [ Atom "push"; n ] ->
+      let%map x = numeral_of_sexp n in
+      Push x
+  | List [ Atom "reset" ] -> Some Reset
+  | List [ Atom "reset-assertions" ] -> Some ResetAssertions
+  | List [ Atom "set-info"; Atom attr ] -> Some (SetInfo attr)
+  | List [ Atom "set-logic"; s ] -> Option.map ~f:(fun x -> SetLogic x) (smtSymbol_of_sexp s)
+  | List (Atom "set-option" :: o) -> Option.map ~f:(fun x -> SetOption x) (option_of_sexp (List o))
+  | _ -> None
+
 let write_command (out : OC.t) (c : command) : unit =
   let comm_s = Sexp.to_string_hum (sexp_of_command c) in
   OC.output_lines out [ comm_s ];
@@ -474,6 +615,8 @@ let mk_bool_sort = SmtSort (Id (SSimple "Bool"))
 let mk_seq_sort t = Comp (Id (SSimple "Seq"), [ t ])
 
 let mk_tuple_sort lt = Comp (Id (SSimple "Tuple"), lt)
+
+let mk_simple_sort name = SmtSort (Id (SSimple name))
 
 (* Terms *)
 let mk_qi s = QI (Id (SSimple s))
@@ -519,6 +662,8 @@ let mk_ge t1 t2 = mk_simple_app ">=" [ t1; t2 ]
 let mk_not t1 = mk_simple_app "not" [ t1 ]
 
 let mk_exists (sorted_vars : smtSortedVar list) (term : smtTerm) = SmtTExists (sorted_vars, term)
+
+let mk_forall (sorted_vars : smtSortedVar list) (term : smtTerm) = SmtTForall (sorted_vars, term)
 
 (* Commands *)
 let mk_assert (t : smtTerm) = Assert t

@@ -43,20 +43,12 @@ end
 
 type variable = { vname : string; vid : int; vattrs : Attributes.t }
 
-let sexp_of_variable v = Sexp.(List [ Atom "var"; Atom v.vname ])
-
-(*  Atom (Int.to_string v.vid); sexp_of_typ v.vtype]) *)
-
-let pp_variable f v = Fmt.((styled (`Fg `Cyan) string) f v.vname)
-
-let pp_id_var f v = Fmt.(pf f "(%i : %s)" v.vid v.vname)
-
-let dump_variable f v = Fmt.(string f v.vname)
-
 (* Module of variables *)
 module Variable = struct
   module T = struct
     type t = variable
+
+    let sexp_of_t v = Sexp.(List [ Atom "var"; Atom v.vname ])
 
     (* Variables are compared by their id, not their name. *)
     let compare x y = compare x.vid y.vid
@@ -66,8 +58,6 @@ module Variable = struct
 
     let ( = ) x y = equal x y
 
-    let sexp_of_t = sexp_of_variable
-
     let hash = Hashtbl.hash
   end
 
@@ -76,16 +66,22 @@ module Variable = struct
 
   let _types : (int, RType.t) Hashtbl.t = Hashtbl.create (module Int)
 
-  let vtype_assign (v : variable) (t : RType.t) = Hashtbl.set _types ~key:v.vid ~data:t
+  let _print_info = ref false
 
-  let vtype (v : variable) = Hashtbl.find _types v.vid
+  let vtype_assign (v : t) (t : RType.t) = Hashtbl.set _types ~key:v.vid ~data:t
+
+  let vtype (v : t) = Hashtbl.find _types v.vid
+
+  let clear_type (v : t) =
+    let new_t = RType.get_fresh_tvar () in
+    vtype_assign v new_t
 
   (* `vtype_or_new v` returns the type of variable v, or assigns a fresh type variable
       as its type if it doesn't have one.
       The type of a variable will automatically be assigned to satisfy constraints
       produced during type inference.
   *)
-  let vtype_or_new (v : variable) =
+  let vtype_or_new (v : t) =
     match vtype v with
     | Some x -> x
     | None ->
@@ -115,7 +111,17 @@ module Variable = struct
 
   let same_name (v : t) (v2 : t) : bool = String.equal v.vname v2.vname
 
-  let pp (frmt : Formatter.t) (v : t) = Fmt.(pf frmt "%s" v.vname)
+  let pp (frmt : Formatter.t) (v : t) =
+    if !_print_info then
+      Fmt.(
+        pf frmt "(%s%a: %a)" v.vname
+          (styled `Faint (fun fmt i -> pf fmt "@%i" i))
+          v.vid
+          (styled `Italic RType.pp)
+          (vtype_or_new v))
+    else Fmt.(pf frmt "%s" v.vname)
+
+  let pp_id (frmt : Formatter.t) (v : t) = Fmt.(pf frmt "%s{%i}" v.vname v.vid)
 
   let pp_typed (frmt : Formatter.t) (v : t) =
     Fmt.(pf frmt "%s : %a" v.vname RType.pp (vtype_or_new v))
@@ -153,7 +159,7 @@ module VarSet = struct
 
   let of_list = Set.of_list (module Variable)
 
-  let map f vs : t = of_list (List.map ~f (elements vs))
+  let map f vs : V.t = of_list (List.map ~f (elements vs))
 
   let max_elt = Set.max_elt
 
@@ -198,11 +204,11 @@ module VarSet = struct
   let iset vs ilist =
     of_list (List.filter ~f:(fun vi -> List.mem ilist vi.vid ~equal:( = )) (elements vs))
 
-  let pp_var_names formatter vs = Fmt.(list ~sep:comma pp_variable formatter (elements vs))
+  let pp_var_names formatter vs = Fmt.(list ~sep:comma Variable.pp formatter (elements vs))
 
   let pp formatter vs = Fmt.(list ~sep:sp (parens Variable.pp_typed) formatter (elements vs))
 
-  let dump formatter vs = Fmt.Dump.(list pp_id_var formatter (elements vs))
+  let dump formatter vs = Fmt.Dump.(list Variable.pp_id formatter (elements vs))
 
   let of_sh sh =
     Hashtbl.fold sh
@@ -274,13 +280,13 @@ module Binop = struct
     | "or" | "||" -> Some Or
     | _ -> None
 
-  let operand_types (op : t) =
+  let operand_types (op : t) : (RType.t * RType.t) list =
     RType.(
       match op with
-      | Lt | Gt | Ge | Le -> (TInt, TInt)
-      | Eq -> (TInt, TInt)
-      | Max | Min | Plus | Minus | Times | Div | Mod -> (TInt, TInt)
-      | And | Or -> (TBool, TBool))
+      | Lt | Gt | Ge | Le -> [ (TInt, TInt) ]
+      | Eq -> [ (TInt, TInt); (TBool, TBool) ]
+      | Max | Min | Plus | Minus | Times | Div | Mod -> [ (TInt, TInt) ]
+      | And | Or -> [ (TBool, TBool) ])
 
   let result_type (op : t) =
     RType.(
@@ -296,24 +302,29 @@ module Binop = struct
 end
 
 module Unop = struct
-  type t = Neg | Not | Abs
+  type t = Neg | Not | Abs | Inv
 
   let compare = Poly.compare
 
   let equal = Poly.equal
 
   let operand_type (op : t) =
-    match op with Neg -> RType.TInt | Not -> RType.TBool | Abs -> RType.TInt
+    match op with Neg -> RType.TInt | Not -> RType.TBool | Inv | Abs -> RType.TInt
 
   let result_type (op : t) =
-    match op with Neg -> RType.TInt | Not -> RType.TBool | Abs -> RType.TInt
+    match op with Neg -> RType.TInt | Not -> RType.TBool | Inv | Abs -> RType.TInt
 
-  let to_pp_string (op : t) = match op with Neg -> "-" | Not -> "¬" | Abs -> "abs"
+  let to_pp_string (op : t) = match op with Neg -> "-" | Not -> "¬" | Abs -> "abs" | Inv -> "inv"
 
-  let to_string (op : t) = match op with Neg -> "-" | Not -> "not" | Abs -> "abs"
+  let to_string (op : t) = match op with Neg -> "-" | Not -> "not" | Abs -> "abs" | Inv -> "inv"
 
   let of_string (s : string) : t option =
-    match s with "-" -> Some Neg | "not" -> Some Not | "abs " -> Some Abs | _ -> None
+    match s with
+    | "-" -> Some Neg
+    | "not" -> Some Not
+    | "abs " -> Some Abs
+    | "inv" -> Some Inv
+    | _ -> None
 
   let pp frmt op = Fmt.string frmt (to_pp_string op)
 end
@@ -423,17 +434,18 @@ type pattern =
   | PatConstr of string * pattern list
 
 type termkind =
-  | TConst of Constant.t  (** A constant. *)
-  | TVar of variable  (** A variable. *)
-  | TData of string * term list  (** A datatype constructor. *)
-  | TUn of Unop.t * term  (** A unary operation. *)
-  | TBin of Binop.t * term * term  (** A binary operation. *)
-  | TIte of term * term * term  (** A conditional. *)
-  | TTup of term list  (** A tuple. *)
-  | TSel of term * int  (** A tuple projection. TSet(TTup tl, i) is List.nth tl i. *)
-  | TFun of fpattern list * term  (** A function, where each argument capture by a f-pattern. *)
   | TApp of term * term list  (** A function application. *)
-  | TMatch of term * match_case list
+  | TBin of Binop.t * term * term  (** A binary operation. *)
+  | TBox of term  (** A boxed term, used in transformation to "protect" its contents.*)
+  | TConst of Constant.t  (** A constant. *)
+  | TData of string * term list  (** A datatype constructor. *)
+  | TFun of fpattern list * term  (** A function, where each argument capture by a f-pattern. *)
+  | TIte of term * term * term  (** A conditional. *)
+  | TMatch of term * match_case list  (** A pattern matching construct. *)
+  | TSel of term * int  (** A tuple projection. TSet(TTup tl, i) is List.nth tl i. *)
+  | TTup of term list  (** A tuple. *)
+  | TUn of Unop.t * term  (** A unary operation. *)
+  | TVar of variable  (** A variable. *)
 
 and match_case = pattern * term
 
@@ -502,6 +514,8 @@ let mk_const ?(pos = dummy_loc) (c : Constant.t) =
   in
   { tpos = pos; tkind = TConst c; ttyp = ctyp }
 
+let mk_box ?(pos = dummy_loc) (t : term) : term = { tpos = pos; tkind = TBox t; ttyp = t.ttyp }
+
 let mk_app ?(pos = dummy_loc) ?(typ = None) (f : term) (x : term list) =
   let typ = match typ with Some t -> t | None -> RType.get_fresh_tvar () in
   { tpos = pos; tkind = TApp (f, x); ttyp = typ }
@@ -566,411 +580,6 @@ let term_of_pattern (p : pattern) : term =
   in
   aux p
 
-(* ============================================================================================= *)
-(*                              TRANFORMATION / REDUCTION  UTILS                                 *)
-(* ============================================================================================= *)
-
-(**
-   `rewrite_with f t` rewrites the term t by applying the rule f bottom-up.
-*)
-let rewrite_with (f : term -> term) (t : term) =
-  let rec aux t0 =
-    let tk = t0.tkind in
-    let tk' =
-      match tk with
-      | TBin (op, t1, t2) -> TBin (op, aux t1, aux t2)
-      | TUn (op, t1) -> TUn (op, aux t1)
-      | TConst _ -> tk
-      | TVar _ -> tk
-      | TIte (c, t1, t2) -> TIte (aux c, aux t1, aux t2)
-      | TTup tl -> TTup (List.map ~f:aux tl)
-      | TSel (t, i) -> TSel (aux t, i)
-      | TFun (fargs, body) -> TFun (fargs, aux body)
-      | TApp (func, args) -> TApp (aux func, List.map ~f:aux args)
-      | TData (cstr, args) -> TData (cstr, List.map ~f:aux args)
-      | TMatch (tm, cases) -> TMatch (aux tm, list_map_snd ~f:aux cases)
-    in
-    f { t0 with tkind = tk' }
-  in
-  aux t
-
-(**
-   `rewrite_top_down f t` rewrites the term t by applying the rule f top-down.
-*)
-let rewrite_top_down (f : term -> term option) (t : term) =
-  let rec aux t0 =
-    match f t0 with
-    | Some t0' -> t0'
-    | None ->
-        let tk' =
-          match t0.tkind with
-          | TBin (op, t1, t2) -> TBin (op, aux t1, aux t2)
-          | TUn (op, t1) -> TUn (op, aux t1)
-          | TConst _ -> t0.tkind
-          | TVar _ -> t0.tkind
-          | TIte (c, t1, t2) -> TIte (aux c, aux t1, aux t2)
-          | TTup tl -> TTup (List.map ~f:aux tl)
-          | TSel (t, i) -> TSel (aux t, i)
-          | TFun (fargs, body) -> TFun (fargs, aux body)
-          | TApp (func, args) -> TApp (aux func, List.map ~f:aux args)
-          | TData (cstr, args) -> TData (cstr, List.map ~f:aux args)
-          | TMatch (tm, cases) -> TMatch (aux tm, list_map_snd ~f:aux cases)
-        in
-        { t0 with tkind = tk' }
-  in
-  aux t
-
-(**
-   `rewrite_accum ~init ~f t` rewrites the term t by applying the rule f in a top-down manner,
-   but as opposed to `rewrite_top_down` the function `f` can use an accumulator that accumulates
-   information during the traversal.
-*)
-let rewrite_accum ~(init : 'a) ~(f : 'a -> term -> (term, 'a) Either.t) (t : term) =
-  let rec aux a t0 =
-    match f a t0 with
-    | Either.First t0' -> t0'
-    | Either.Second a' ->
-        let tk' =
-          match t0.tkind with
-          | TBin (op, t1, t2) -> TBin (op, aux a' t1, aux a' t2)
-          | TUn (op, t1) -> TUn (op, aux a' t1)
-          | TConst _ -> t0.tkind
-          | TVar _ -> t0.tkind
-          | TIte (c, t1, t2) -> TIte (aux a' c, aux a' t1, aux a' t2)
-          | TTup tl -> TTup (List.map ~f:(aux a') tl)
-          | TSel (t, i) -> TSel (aux a' t, i)
-          | TFun (fargs, body) -> TFun (fargs, aux a' body)
-          | TApp (func, args) -> TApp (aux a' func, List.map ~f:(aux a') args)
-          | TData (cstr, args) -> TData (cstr, List.map ~f:(aux a') args)
-          | TMatch (tm, cases) -> TMatch (aux a' tm, list_map_snd ~f:(aux a') cases)
-        in
-        { t0 with tkind = tk' }
-  in
-  aux init t
-
-let rewrite_types t_subs =
-  Variable.update_var_types t_subs;
-  rewrite_with (fun _t -> { _t with ttyp = RType.sub_all t_subs _t.ttyp })
-
-(**
-   `reduce ~init ~case ~join t` reduces the term by reducing each leaf to `init`, and at each node
-    of the syntax tree, using `join` to merge the values. In a top-down traversal, if `case` returns
-    `Some a` then the subterm is not recrusively reduced, but the value `a` is used instead.
-*)
-let reduce ~(init : 'a) ~(case : (term -> 'a) -> term -> 'a option) ~(join : 'a -> 'a -> 'a)
-    (t : term) : 'a =
-  let rec aux (t : term) : 'a =
-    match case aux t with
-    | Some x -> x
-    | None -> (
-        match t.tkind with
-        | TBin (_, t1, t2) -> join (aux t1) (aux t2)
-        | TUn (_, t1) -> aux t1
-        | TConst _ -> init
-        | TVar _ -> init
-        | TIte (c, a, b) -> join (aux c) (join (aux a) (aux b))
-        | TTup tl -> aux_l tl
-        | TSel (t, _) -> aux t
-        | TFun (_, body) -> aux body
-        | TApp (func, args) -> join (aux func) (aux_l args)
-        | TData (_, args) -> aux_l args
-        | TMatch (tm, cases) -> join (aux tm) (aux_l (snd (List.unzip cases))))
-  and aux_l l = List.fold ~init ~f:join (List.map ~f:aux l) in
-  aux t
-
-let transform ~(case : (term -> term) -> term -> term option) (t : term) : term =
-  let rec aux (t : term) : 'a =
-    match case aux t with
-    | Some x -> x
-    | None ->
-        {
-          t with
-          tkind =
-            (match t.tkind with
-            | TBin (bo, t1, t2) -> TBin (bo, aux t1, aux t2)
-            | TUn (uo, t1) -> TUn (uo, aux t1)
-            | TConst _ -> t.tkind
-            | TVar _ -> t.tkind
-            | TIte (c, a, b) -> TIte (aux c, aux a, aux b)
-            | TTup tl -> TTup (aux_l tl)
-            | TSel (t, i) -> TSel (aux t, i)
-            | TFun (args, body) -> TFun (args, aux body)
-            | TApp (func, args) -> TApp (aux func, aux_l args)
-            | TData (cstr, args) -> TData (cstr, aux_l args)
-            | TMatch (tm, cases) -> TMatch (aux tm, list_map_snd ~f:aux cases));
-        }
-  and aux_l l = List.map ~f:aux l in
-  aux t
-
-let var_count (typ : RType.t) (t : term) =
-  let case _ t =
-    match t.tkind with
-    | TVar v -> Some (if Poly.equal (Variable.vtype_or_new v) typ then 1 else 0)
-    | _ -> None
-  in
-  reduce ~init:0 ~case ~join:(fun a b -> a + b) t
-
-let var_count_compare typ (t1 : term) (t2 : term) = compare (var_count typ t1) (var_count typ t2)
-
-let term_size (t : term) =
-  let case _ t = match t.tkind with TConst _ | TVar _ -> Some 1 | _ -> None in
-  reduce ~init:0 ~case ~join:(fun a b -> a + b + 1) t
-
-let term_size_compare (t1 : term) (t2 : term) = compare (term_size t1) (term_size t2)
-
-let term_height =
-  let case _ _ = None in
-  reduce ~init:0 ~case ~join:(fun a b -> 1 + max a b)
-
-let term_height_compare (t1 : term) (t2 : term) = compare (term_height t1) (term_height t2)
-
-let is_norec =
-  let case _ t =
-    match t.tkind with
-    | TVar x -> Some (not (RType.is_recursive (Variable.vtype_or_new x)))
-    | _ -> None
-  in
-  reduce ~init:true ~join:( && ) ~case
-
-let is_novariant =
-  let case _ t =
-    match t.tkind with
-    | TVar x -> Some (List.is_empty (RType.get_variants (Variable.vtype_or_new x)))
-    | _ -> None
-  in
-  reduce ~init:true ~join:( && ) ~case
-
-(* ============================================================================================= *)
-(*                                    PRETTY PRINTERS                                            *)
-(* ============================================================================================= *)
-open Fmt
-
-let rec pp_fpattern (frmt : Formatter.t) (fp : fpattern) =
-  match fp with
-  | FPatVar x -> Variable.pp frmt x
-  | FPatTup tl -> pf frmt "%a" (box (parens (list ~sep:comma pp_fpattern))) tl
-
-let rec pp_pattern (frmt : Formatter.t) (p : pattern) =
-  match p with
-  | PatAny -> pf frmt "_"
-  | PatVar v -> Variable.pp frmt v
-  | PatConstant c -> Constant.pp frmt c
-  | PatConstr (c, args) -> (
-      match args with
-      | [] -> string frmt c
-      | _ -> pf frmt "%s(%a)" c (list ~sep:comma pp_pattern) args)
-  | PatTuple tl -> (parens (list ~sep:comma pp_pattern)) frmt tl
-
-let pp_term (frmt : Formatter.t) (x : term) =
-  let rec aux (paren : bool) (frmt : Formatter.t) (t : term) =
-    match t.tkind with
-    | TConst c -> pf frmt "%a" Constant.pp c
-    | TVar v -> pf frmt "%a" Variable.pp v
-    | TBin (op, t1, t2) -> (
-        match op with
-        | Binop.Max | Binop.Min ->
-            if paren then pf frmt "@[<hov 2>(%a@;%a@;%a)@]" Binop.pp op (aux true) t1 (aux true) t2
-            else pf frmt "@[<hov 2>%a@;%a@;%a@]" Binop.pp op (aux true) t1 (aux true) t2
-        | _ ->
-            if paren then pf frmt "@[<hov 2>(%a@;%a@;%a)@]" (aux true) t1 Binop.pp op (aux true) t2
-            else pf frmt "@[<hov 2>%a@;%a@;%a@]" (aux true) t1 Binop.pp op (aux true) t2)
-    | TUn (op, t1) ->
-        if paren then pf frmt "@[<hov 2>(%a@;%a)@]" Unop.pp op (aux true) t1
-        else pf frmt "@[<hov 2>%a@;%a@]" Unop.pp op (aux true) t1
-    | TIte (c, t1, t2) ->
-        if paren then
-          pf frmt "@[<hov 2>(%a@;?@;%a@;:@;%a)@]" (aux false) c (aux false) t1 (aux false) t2
-        else pf frmt "@[<hov 2>%a@;?@;%a@;:@;%a@]" (aux false) c (aux false) t1 (aux false) t2
-    | TTup tl -> pf frmt "@[<hov 2>(%a)@]" (list ~sep:comma (box (aux false))) tl
-    | TSel (t, i) -> pf frmt "@[<hov 2>%a.%i@]" (aux true) t i
-    (* Some application terms can be printed like let .. = .. in .. for readability. *)
-    | TApp ({ tkind = TFun ([ arg_fpat ], body); _ }, [ app_arg ]) ->
-        pf frmt "@[<v>@[let %a@[<hov 2> =@;%a@]@;in@]@;@[<hov 2>%a@]@]" pp_fpattern arg_fpat
-          (aux false) app_arg (aux false) body
-    | TFun (args, body) ->
-        if paren then
-          pf frmt "@[<hov 2>(fun %a -> @;%a)@]" (list ~sep:sp pp_fpattern) args (aux false) body
-        else pf frmt "@[<hov 2>fun %a -> %a@]" (list ~sep:sp pp_fpattern) args (aux false) body
-    | TApp (func, args) ->
-        if paren then pf frmt "@[<hov 2>(%a@;%a)@]" (aux true) func (list ~sep:sp (aux true)) args
-        else pf frmt "@[<hov 2>%a@;%a@]" (aux true) func (list ~sep:sp (aux true)) args
-    | TData (cstr, args) ->
-        if List.length args = 0 then pf frmt "%a" (styled (`Fg `Green) string) cstr
-        else pf frmt "%a(%a)" (styled (`Fg `Green) string) cstr (list ~sep:comma (aux false)) args
-    | TMatch (tm, cases) ->
-        pf frmt "@[<hov 2>@[match %a with@]@;@[<v>%a@]@]" (aux false) tm
-          (list ~sep:sp (fun fmt (l, r) ->
-               pf fmt "@[<hov 2>| %a ->@;%a@]" (box pp_pattern) l (box (aux false)) r))
-          cases
-  in
-  aux false frmt x
-
-let pp_subs (f : Formatter.t) (subs : (term * term) list) : unit =
-  Fmt.(
-    pf f "@[<hov 2>%a@]"
-      (fun f l -> List.iter ~f:(fun (t1, t2) -> pf f "@[[%a -> %a]@]" pp_term t1 pp_term t2) l)
-      subs)
-
-let pp_function_descr (fmt : Formatter.t) (fd : function_descr) : unit =
-  let _, t_out = RType.fun_typ_unpack (Variable.vtype_or_new fd.f_var) in
-  pf fmt "@[<hov 2>@[let rec %s %a : %a@] =@;@[%a@]@]" fd.f_var.vname (list ~sep:sp pp_pattern)
-    fd.f_args RType.pp t_out pp_term fd.f_body
-
-(* ============================================================================================= *)
-(*                                  TYPE INFERENCE                                               *)
-(* ============================================================================================= *)
-
-let infer_type (t : term) : term * RType.substitution =
-  let rec aux t0 =
-    let eloc = t0.tpos in
-    let merge_subs = RType.merge_subs eloc in
-    match t0.tkind with
-    | TBin (op, t1, t2) -> (
-        let t_t1, c_t1 = aux t1 and t_t2, c_t2 = aux t2 in
-        let ta, tb = Binop.operand_types op in
-        match RType.unify [ (t_t1.ttyp, ta); (t_t2.ttyp, tb) ] with
-        | Some subs ->
-            ( mk_bin ~pos:t0.tpos ~typ:(Some (Binop.result_type op)) op t_t1 t_t2,
-              merge_subs subs (merge_subs c_t1 c_t2) )
-        | None ->
-            Log.error_msg Fmt.(str "Cannot infer type of binary expression %a." pp_term t0);
-            Log.error_msg
-              Fmt.(
-                str "%a has type %a, expected type %a. %a has type %a, expected %a." pp_term t1
-                  RType.pp t_t1.ttyp RType.pp ta pp_term t2 RType.pp t_t2.ttyp RType.pp tb);
-            failwith "Type inference failure.")
-    | TUn (op, t1) -> (
-        let t_t1, c_t1 = aux t1 in
-        match RType.unify [ (t_t1.ttyp, Unop.operand_type op) ] with
-        | Some subs ->
-            (mk_un ~pos:t0.tpos ~typ:(Some (Unop.result_type op)) op t_t1, merge_subs subs c_t1)
-        | None ->
-            Log.error_msg Fmt.(str "Cannot infer type of unary expression %a." pp_term t0);
-            Log.error_msg
-              Fmt.(
-                str "%a has type %a, expected type %a." pp_term t1 RType.pp t_t1.ttyp RType.pp
-                  (Unop.operand_type op));
-            Log.loc_fatal_errmsg eloc "Type inference failure.")
-    | TConst c -> ({ t0 with ttyp = Constant.type_of c }, [])
-    | TVar v -> (
-        let tv = Variable.vtype_or_new v in
-        match RType.unify [ (tv, t0.ttyp) ] with
-        | Some res -> ({ t0 with ttyp = tv }, res)
-        | None -> failwith "Type inference failure")
-    | TIte (c, t1, t2) -> (
-        let t_c, c_c = aux c and t_t1, c_t1 = aux t1 and t_t2, c_t2 = aux t2 in
-        match RType.unify [ (t_c.ttyp, RType.TBool); (t_t1.ttyp, t_t2.ttyp) ] with
-        | Some subs ->
-            ( mk_ite ~pos:t0.tpos ~typ:(Some t_t1.ttyp) t_c t_t1 t_t2,
-              merge_subs subs (merge_subs c_c (merge_subs c_t1 c_t2)) )
-        | None ->
-            Log.error_msg
-              Fmt.(str "ite(%a, %a, %a)." RType.pp c.ttyp RType.pp t1.ttyp RType.pp t2.ttyp);
-            failwith "Type inference failure.")
-    | TTup tl ->
-        let term_l, c_l = List.unzip (List.map ~f:aux tl) in
-        (mk_tup ~pos:t0.tpos term_l, merge_subs (List.concat c_l) [])
-    | TSel (t, i) -> (
-        let t_c, c_c = aux t in
-        match t_c.ttyp with
-        | RType.TTup tl -> (
-            match List.nth tl i with
-            | Some tout -> (mk_sel ~pos:t0.tpos ~typ:(Some tout) t_c i, c_c)
-            | None ->
-                Log.error_msg Fmt.(str "In tuple acessor %a, index out of bounds." pp_term t0);
-                failwith "Type inference: tuple acessor, accesed tuple of wrong type.")
-        | _ ->
-            Log.error_msg
-              Fmt.(str "Tuple accessor argument %a of type %a." pp_term t_c RType.pp t_c.ttyp);
-            failwith "Type inference: tuple accessor on type acessor.")
-    | TFun (args, body) ->
-        let t_body, c_body = aux body in
-        (mk_fun ~pos:t0.tpos args t_body, c_body)
-    | TApp (func, fargs) -> (
-        let t_func, c_func = aux func and t_args, c_args = List.unzip (List.map ~f:aux fargs) in
-        let argst = List.map ~f:(fun t -> t.ttyp) t_args in
-        let csub = RType.(mkv c_func @ mkv (List.concat c_args)) in
-        match t_func.ttyp with
-        | RType.TFun (_, _) -> (
-            let func_targs, func_tout = RType.fun_typ_unpack t_func.ttyp in
-            match List.zip func_targs argst with
-            | Ok typ_pairs -> (
-                match RType.(unify (csub @ typ_pairs)) with
-                | Some subs -> (mk_app ~pos:t0.tpos ~typ:(Some func_tout) t_func t_args, subs)
-                | None ->
-                    Log.loc_fatal_errmsg eloc
-                      (Fmt.str "Type inference failure: could not unify types in application %a(%a)"
-                         pp_term func
-                         (box (list ~sep:sp pp_term))
-                         fargs))
-            | Unequal_lengths ->
-                Log.loc_fatal_errmsg eloc
-                  (Fmt.str "Type inference failure: %a expects %i argument, given %i: %a." pp_term
-                     func (List.length func_targs) (List.length fargs)
-                     (box (list ~sep:sp pp_term))
-                     fargs))
-        | RType.TVar f_tvar -> (
-            (* |- f_tvar : (_ -> _ -> _ .. -> _) -> 'b *)
-            let t_out = RType.get_fresh_tvar () in
-            let tf = RType.fun_typ_pack argst t_out in
-            match RType.(unify (csub @ [ (tf, RType.TVar f_tvar) ])) with
-            | Some subs -> (mk_app ~pos:t0.tpos ~typ:(Some t_out) t_func t_args, subs)
-            | None -> failwith "Type inference failure.")
-        | _ as tf ->
-            Log.loc_fatal_errmsg eloc
-              (Fmt.str "Type inference failure: could not type %a as function." RType.pp tf))
-    | TData (cstr, args) -> (
-        match RType.type_of_variant cstr with
-        | Some (tout, targs) -> (
-            let t_args, c_args = List.unzip (List.map ~f:aux args) in
-            match List.zip targs (List.map ~f:(fun term -> term.ttyp) t_args) with
-            | Ok pairs -> (
-                match RType.unify (pairs @ RType.mkv (List.concat c_args)) with
-                | Some subs -> ({ t0 with ttyp = tout; tkind = TData (cstr, t_args) }, subs)
-                | None ->
-                    Log.loc_fatal_errmsg eloc
-                      (Fmt.str "Type inference failure: could not unify %s arguments %a." cstr
-                         (list ~sep:comma pp_term) t_args))
-            | Unequal_lengths ->
-                Log.loc_fatal_errmsg eloc
-                  (Fmt.str "Type inference failure: could not match %s arguments: %a and %a." cstr
-                     (list ~sep:comma pp_term) t_args (list ~sep:comma RType.pp) targs))
-        | None ->
-            Log.loc_fatal_errmsg eloc
-              Fmt.(str "Type inference failure: could not find type of %s." cstr))
-    | TMatch (t, cases) -> (
-        let t_t, c_t = aux t in
-        let per_case (pat, rhs) =
-          let pat_term, pat_c = aux (term_of_pattern pat) in
-          match RType.(unify [ (pat_term.ttyp, t_t.ttyp) ]) with
-          | Some subs ->
-              let t_branch, c_branch = aux rhs in
-              ((pat, t_branch), merge_subs (merge_subs c_t pat_c) (merge_subs c_branch subs))
-          | None ->
-              Log.loc_fatal_errmsg eloc Fmt.(str "Type inference failure: could unify match case")
-        in
-        let f (cases, subs, t) ((pat, rhs), sub) =
-          match RType.unify ([ (t, rhs.ttyp) ] @ RType.mkv subs) with
-          | Some s -> (cases @ [ (pat, rhs) ], merge_subs s sub, rhs.ttyp)
-          | None ->
-              Log.loc_fatal_errmsg eloc Fmt.(str "Type inference failure: could unify match case")
-        in
-        match List.map ~f:per_case cases with
-        | [] -> failwith "Empty match case?"
-        | ((hd_pat, hd_rhs), sub1) :: tl ->
-            let cases, subs, typ =
-              List.fold ~f ~init:([ (hd_pat, hd_rhs) ], sub1, hd_rhs.ttyp) tl
-            in
-            ({ t0 with ttyp = typ; tkind = TMatch (t_t, cases) }, subs))
-  in
-
-  let t', subs = aux t in
-  match RType.unify (RType.mkv subs) with
-  | Some merge_subs ->
-      let tsubs = RType.mkv merge_subs in
-      (rewrite_types tsubs t', merge_subs)
-  | None -> Log.loc_fatal_errmsg t'.tpos "Could not infer type."
-
 let rec fpat_to_term fp =
   match fp with FPatVar v -> mk_var v | FPatTup tl -> mk_tup (List.map ~f:fpat_to_term tl)
 
@@ -1010,7 +619,7 @@ let rec mk_composite_base_type (t : RType.t) : term =
   | RType.TTup tl -> mk_tup (List.map ~f:mk_composite_base_type tl)
   | RType.TNamed _ -> mk_var (Variable.mk ~t:(Some t) (Alpha.fresh ~s:"l" ()))
   | RType.TFun (_, _) | RType.TParam (_, _) | RType.TVar _ ->
-      failwith "mk_composite_base_type: %a is not a base type." RType.pp t
+      failwith Fmt.(str "mk_composite_base_type: %a is not a base type." RType.pp t)
 
 (* ============================================================================================= *)
 (*                             EQUALITY                                                          *)
@@ -1020,6 +629,9 @@ let rec term_compare (t1 : term) (t2 : term) : int =
   match (t1.tkind, t2.tkind) with
   | TConst c1, TConst c2 -> Constant.compare c1 c2
   | TVar v1, TVar v2 -> Variable.compare v1 v2
+  | TBox t1', TBox t2' -> term_compare t1' t2'
+  | TBox t1', _ -> term_compare t1' t2
+  | _, TBox t2' -> term_compare t1 t2'
   | TData (c1, args1), TData (c2, args2) ->
       let c = String.compare c1 c2 in
       if c = 0 then List.compare term_compare args1 args2 else c
@@ -1043,6 +655,13 @@ let rec term_compare (t1 : term) (t2 : term) : int =
         | None -> -1
       else c
   | TTup tl1, TTup tl2 -> List.compare term_compare tl1 tl2
+  | TSel (t1', i1), TSel (t2', i2) ->
+      let c = compare i1 i2 in
+      if c = 0 then term_compare t1' t2' else c
+  | TMatch (t1', cases1), TMatch (t2', cases2) ->
+      let c = term_compare t1' t2' in
+      if c = 0 then List.compare term_compare (snd (List.unzip cases1)) (snd (List.unzip cases2))
+      else c
   | _, _ -> Poly.compare t1 t2
 
 and substitution (substs : (term * term) list) (term : term) : term =
@@ -1053,6 +672,7 @@ and substitution (substs : (term * term) list) (term : term) : term =
         let new_kind =
           match _t.tkind with
           | TBin (b1, t1, t2) -> TBin (b1, aux t1, aux t2)
+          | TBox t -> TBox (aux t)
           | TUn (u, t1) -> TUn (u, aux t1)
           | TIte (c, tt, tf) -> TIte (aux c, aux tt, aux tf)
           | TTup tl -> TTup (List.map ~f:aux tl)
@@ -1100,6 +720,452 @@ module VarMap = struct
 end
 
 (* ============================================================================================= *)
+(*                              TRANFORMATION / REDUCTION  UTILS                                 *)
+(* ============================================================================================= *)
+
+(**
+   `rewrite_with f t` rewrites the term t by applying the rule f bottom-up.
+*)
+let rewrite_with (f : term -> term) (t : term) =
+  let rec aux t0 =
+    let tk = t0.tkind in
+    let tk' =
+      match tk with
+      | TApp (func, args) -> TApp (aux func, List.map ~f:aux args)
+      | TBin (op, t1, t2) -> TBin (op, aux t1, aux t2)
+      | TBox _ -> tk (* Do not rewrite Tbox *)
+      | TConst _ -> tk
+      | TUn (op, t1) -> TUn (op, aux t1)
+      | TVar _ -> tk
+      | TIte (c, t1, t2) -> TIte (aux c, aux t1, aux t2)
+      | TTup tl -> TTup (List.map ~f:aux tl)
+      | TSel (t, i) -> TSel (aux t, i)
+      | TFun (fargs, body) -> TFun (fargs, aux body)
+      | TData (cstr, args) -> TData (cstr, List.map ~f:aux args)
+      | TMatch (tm, cases) -> TMatch (aux tm, list_map_snd ~f:aux cases)
+    in
+    f { t0 with tkind = tk' }
+  in
+  aux t
+
+(**
+   `rewrite_top_down f t` rewrites the term t by applying the rule f top-down.
+*)
+let rewrite_top_down (f : term -> term option) (t : term) =
+  let rec aux t0 =
+    match f t0 with
+    | Some t0' -> t0'
+    | None ->
+        let tk' =
+          match t0.tkind with
+          | TBin (op, t1, t2) -> TBin (op, aux t1, aux t2)
+          | TUn (op, t1) -> TUn (op, aux t1)
+          | TConst _ -> t0.tkind
+          | TVar _ -> t0.tkind
+          | TBox _ -> t0.tkind
+          | TIte (c, t1, t2) -> TIte (aux c, aux t1, aux t2)
+          | TTup tl -> TTup (List.map ~f:aux tl)
+          | TSel (t, i) -> TSel (aux t, i)
+          | TFun (fargs, body) -> TFun (fargs, aux body)
+          | TApp (func, args) -> TApp (aux func, List.map ~f:aux args)
+          | TData (cstr, args) -> TData (cstr, List.map ~f:aux args)
+          | TMatch (tm, cases) -> TMatch (aux tm, list_map_snd ~f:aux cases)
+        in
+        { t0 with tkind = tk' }
+  in
+  aux t
+
+(**
+   `rewrite_accum ~init ~f t` rewrites the term t by applying the rule f in a top-down manner,
+   but as opposed to `rewrite_top_down` the function `f` can use an accumulator that accumulates
+   information during the traversal.
+*)
+let rewrite_accum ~(init : 'a) ~(f : 'a -> term -> (term, 'a) Either.t) (t : term) =
+  let rec aux a t0 =
+    match f a t0 with
+    | Either.First t0' -> t0'
+    | Either.Second a' ->
+        let tk' =
+          match t0.tkind with
+          | TBin (op, t1, t2) -> TBin (op, aux a' t1, aux a' t2)
+          | TUn (op, t1) -> TUn (op, aux a' t1)
+          | TConst _ -> t0.tkind
+          | TVar _ -> t0.tkind
+          | TBox _ -> t0.tkind
+          | TIte (c, t1, t2) -> TIte (aux a' c, aux a' t1, aux a' t2)
+          | TTup tl -> TTup (List.map ~f:(aux a') tl)
+          | TSel (t, i) -> TSel (aux a' t, i)
+          | TFun (fargs, body) -> TFun (fargs, aux a' body)
+          | TApp (func, args) -> TApp (aux a' func, List.map ~f:(aux a') args)
+          | TData (cstr, args) -> TData (cstr, List.map ~f:(aux a') args)
+          | TMatch (tm, cases) -> TMatch (aux a' tm, list_map_snd ~f:(aux a') cases)
+        in
+        { t0 with tkind = tk' }
+  in
+  aux init t
+
+let rewrite_types t_subs =
+  Variable.update_var_types t_subs;
+  rewrite_with (fun _t -> { _t with ttyp = RType.sub_all t_subs _t.ttyp })
+
+(**
+   `reduce ~init ~case ~join t` reduces the term by reducing each leaf to `init`, and at each node
+    of the syntax tree, using `join` to merge the values. In a top-down traversal, if `case` returns
+    `Some a` then the subterm is not recrusively reduced, but the value `a` is used instead.
+*)
+let reduce ~(init : 'a) ~(case : (term -> 'a) -> term -> 'a option) ~(join : 'a -> 'a -> 'a)
+    (t : term) : 'a =
+  let rec aux (t : term) : 'a =
+    match case aux t with
+    | Some x -> x
+    | None -> (
+        match t.tkind with
+        | TBin (_, t1, t2) -> join (aux t1) (aux t2)
+        | TUn (_, t1) -> aux t1
+        | TConst _ -> init
+        | TVar _ -> init
+        | TBox t -> aux t
+        | TIte (c, a, b) -> join (aux c) (join (aux a) (aux b))
+        | TTup tl -> aux_l tl
+        | TSel (t, _) -> aux t
+        | TFun (_, body) -> aux body
+        | TApp (func, args) -> join (aux func) (aux_l args)
+        | TData (_, args) -> aux_l args
+        | TMatch (tm, cases) -> join (aux tm) (aux_l (snd (List.unzip cases))))
+  and aux_l l = List.fold ~init ~f:join (List.map ~f:aux l) in
+  aux t
+
+let transform ~(case : (term -> term) -> term -> term option) (t : term) : term =
+  let rec aux (t : term) : 'a =
+    match case aux t with
+    | Some x -> x
+    | None ->
+        {
+          t with
+          tkind =
+            (match t.tkind with
+            | TBin (bo, t1, t2) -> TBin (bo, aux t1, aux t2)
+            | TUn (uo, t1) -> TUn (uo, aux t1)
+            | TConst _ -> t.tkind
+            | TVar _ -> t.tkind
+            | TBox _ -> t.tkind
+            | TIte (c, a, b) -> TIte (aux c, aux a, aux b)
+            | TTup tl -> TTup (aux_l tl)
+            | TSel (t, i) -> TSel (aux t, i)
+            | TFun (args, body) -> TFun (args, aux body)
+            | TApp (func, args) -> TApp (aux func, aux_l args)
+            | TData (cstr, args) -> TData (cstr, aux_l args)
+            | TMatch (tm, cases) -> TMatch (aux tm, list_map_snd ~f:aux cases));
+        }
+  and aux_l l = List.map ~f:aux l in
+  aux t
+
+let transform_info ~(f : term -> term) (t : term) : term =
+  let rec aux (t : term) : 'a =
+    {
+      (f t) with
+      tkind =
+        (match t.tkind with
+        | TBin (bo, t1, t2) -> TBin (bo, aux t1, aux t2)
+        | TUn (uo, t1) -> TUn (uo, aux t1)
+        | TConst _ -> t.tkind
+        | TVar _ -> t.tkind
+        | TBox _ -> t.tkind
+        | TIte (c, a, b) -> TIte (aux c, aux a, aux b)
+        | TTup tl -> TTup (aux_l tl)
+        | TSel (t, i) -> TSel (aux t, i)
+        | TFun (args, body) -> TFun (args, aux body)
+        | TApp (func, args) -> TApp (aux func, aux_l args)
+        | TData (cstr, args) -> TData (cstr, aux_l args)
+        | TMatch (tm, cases) -> TMatch (aux tm, list_map_snd ~f:aux cases));
+    }
+  and aux_l l = List.map ~f:aux l in
+  aux t
+
+let remove_boxes (t : term) =
+  transform ~case:(fun f t -> match t.tkind with TBox t -> Some (f t) | _ -> None) t
+
+let var_count (typ : RType.t) (t : term) =
+  let case _ t =
+    match t.tkind with
+    | TVar v -> Some (if Poly.equal (Variable.vtype_or_new v) typ then 1 else 0)
+    | _ -> None
+  in
+  reduce ~init:0 ~case ~join:(fun a b -> a + b) t
+
+let var_count_compare typ (t1 : term) (t2 : term) = compare (var_count typ t1) (var_count typ t2)
+
+let term_size (t : term) =
+  let case _ t = match t.tkind with TConst _ | TVar _ -> Some 1 | _ -> None in
+  reduce ~init:0 ~case ~join:(fun a b -> a + b + 1) t
+
+let term_size_compare (t1 : term) (t2 : term) = compare (term_size t1) (term_size t2)
+
+let term_height =
+  let case _ _ = None in
+  reduce ~init:0 ~case ~join:(fun a b -> 1 + max a b)
+
+let term_height_compare (t1 : term) (t2 : term) = compare (term_height t1) (term_height t2)
+
+(* ============================================================================================= *)
+(*                                    PRETTY PRINTERS                                            *)
+(* ============================================================================================= *)
+open Fmt
+
+let rec pp_fpattern (frmt : Formatter.t) (fp : fpattern) =
+  match fp with
+  | FPatVar x -> Variable.pp frmt x
+  | FPatTup tl -> pf frmt "%a" (box (parens (list ~sep:comma pp_fpattern))) tl
+
+let rec pp_pattern (frmt : Formatter.t) (p : pattern) =
+  match p with
+  | PatAny -> pf frmt "_"
+  | PatVar v -> Variable.pp frmt v
+  | PatConstant c -> Constant.pp frmt c
+  | PatConstr (c, args) -> (
+      match args with
+      | [] -> string frmt c
+      | _ -> pf frmt "%s(%a)" c (list ~sep:comma pp_pattern) args)
+  | PatTuple tl -> (parens (list ~sep:comma pp_pattern)) frmt tl
+
+let pp_term (frmt : Formatter.t) (x : term) =
+  let rec aux (paren : bool) (frmt : Formatter.t) (t : term) =
+    match t.tkind with
+    | TConst c -> pf frmt "%a" Constant.pp c
+    | TVar v -> pf frmt "%a" Variable.pp v
+    | TBox t -> (aux paren) frmt t
+    | TBin (op, t1, t2) -> (
+        match op with
+        | Binop.Max | Binop.Min ->
+            if paren then pf frmt "@[<hov 2>(%a@;%a@;%a)@]" Binop.pp op (aux true) t1 (aux true) t2
+            else pf frmt "@[<hov 2>%a@;%a@;%a@]" Binop.pp op (aux true) t1 (aux true) t2
+        | _ ->
+            if paren then pf frmt "@[<hov 2>(%a@;%a@;%a)@]" (aux true) t1 Binop.pp op (aux true) t2
+            else pf frmt "@[<hov 2>%a@;%a@;%a@]" (aux true) t1 Binop.pp op (aux true) t2)
+    | TUn (op, t1) ->
+        if paren then pf frmt "@[<hov 2>(%a@;%a)@]" Unop.pp op (aux true) t1
+        else pf frmt "@[<hov 2>%a@;%a@]" Unop.pp op (aux true) t1
+    | TIte (c, t1, t2) ->
+        if paren then
+          pf frmt "@[<hov 2>(%a@;?@;%a@;:@;%a)@]" (aux false) c (aux false) t1 (aux false) t2
+        else pf frmt "@[<hov 2>%a@;?@;%a@;:@;%a@]" (aux false) c (aux false) t1 (aux false) t2
+    | TTup tl -> pf frmt "@[<hov 2>(%a)@]" (list ~sep:comma (box (aux false))) tl
+    | TSel (t, i) -> pf frmt "@[<hov 2>%a.%i@]" (aux true) t i
+    (* Some application terms can be printed like let .. = .. in .. for readability. *)
+    | TApp ({ tkind = TFun ([ arg_fpat ], body); _ }, [ app_arg ]) ->
+        pf frmt "@[<v>@[let %a@[<hov 2> =@;%a@]@;in@]@;@[<hov 2>%a@]@]" pp_fpattern arg_fpat
+          (aux false) app_arg (aux false) body
+    | TFun (args, body) ->
+        if paren then
+          pf frmt "@[<hov 2>(fun %a -> @;%a)@]" (list ~sep:sp pp_fpattern) args (aux false) body
+        else pf frmt "@[<hov 2>fun %a -> %a@]" (list ~sep:sp pp_fpattern) args (aux false) body
+    | TApp (func, args) ->
+        if paren then pf frmt "@[<hov 2>(%a@ %a)@]" (aux true) func (list ~sep:sp (aux true)) args
+        else pf frmt "@[<hov 2>%a@ %a@]" (aux true) func (list ~sep:sp (aux true)) args
+    | TData (cstr, args) ->
+        if List.length args = 0 then pf frmt "%a" (styled (`Fg `Green) string) cstr
+        else pf frmt "%a(%a)" (styled (`Fg `Green) string) cstr (list ~sep:comma (aux false)) args
+    | TMatch (tm, cases) ->
+        pf frmt "@[<hov 2>@[match %a with@]@;@[<v>%a@]@]" (aux false) tm
+          (list ~sep:sp (fun fmt (l, r) ->
+               pf fmt "@[<hov 2>| %a ->@;%a@]" (box pp_pattern) l (box (aux false)) r))
+          cases
+  in
+  aux false frmt x
+
+let pp_subs (f : Formatter.t) (subs : (term * term) list) : unit =
+  Fmt.(
+    pf f "@[<hov 2>%a@]"
+      (fun f l -> List.iter ~f:(fun (t1, t2) -> pf f "@[[%a -> %a]@]" pp_term t1 pp_term t2) l)
+      subs)
+
+let pp_function_descr (fmt : Formatter.t) (fd : function_descr) : unit =
+  let _, t_out = RType.fun_typ_unpack (Variable.vtype_or_new fd.f_var) in
+  pf fmt "@[<hov 2>@[let rec %s %a : %a@] =@;@[%a@]@]" fd.f_var.vname (list ~sep:sp pp_pattern)
+    fd.f_args RType.pp t_out pp_term fd.f_body
+
+(* ============================================================================================= *)
+(*                                  TYPE INFERENCE                                               *)
+(* ============================================================================================= *)
+
+let infer_type (t : term) : term * RType.substitution =
+  let rec aux t0 =
+    let eloc = t0.tpos in
+    let merge_subs = RType.merge_subs eloc in
+    match t0.tkind with
+    | TBox t -> aux t
+    | TBin (op, t1, t2) -> (
+        let t_t1, c_t1 = aux t1 and t_t2, c_t2 = aux t2 in
+        (* Collect possible operand types. *)
+        let possible_opty = Binop.operand_types op in
+        (* Find a pair of operaand types that work. *)
+        let maybe_t =
+          List.find_map possible_opty ~f:(fun (ta, tb) ->
+              match RType.unify [ (t_t1.ttyp, ta); (t_t2.ttyp, tb) ] with
+              | Ok subs ->
+                  Some
+                    ( mk_bin ~pos:t0.tpos ~typ:(Some (Binop.result_type op)) op t_t1 t_t2,
+                      merge_subs subs (merge_subs c_t1 c_t2) )
+              | Error _ -> None)
+        in
+        match maybe_t with
+        | Some x -> x
+        | None ->
+            Log.error_msg Fmt.(str "Cannot infer type of binary expression %a." pp_term t0);
+            Log.error_msg
+              Fmt.(
+                str "%a has type %a, and %a has type %a, expected pair to be one  of %a." pp_term t1
+                  RType.pp t_t1.ttyp pp_term t2 RType.pp t_t2.ttyp
+                  (list ~sep:sp (parens (pair ~sep:comma RType.pp RType.pp)))
+                  possible_opty);
+            failwith "Type inference failure.")
+    | TUn (op, t1) -> (
+        let t_t1, c_t1 = aux t1 in
+        match RType.unify [ (t_t1.ttyp, Unop.operand_type op) ] with
+        | Ok subs ->
+            (mk_un ~pos:t0.tpos ~typ:(Some (Unop.result_type op)) op t_t1, merge_subs subs c_t1)
+        | Error e ->
+            Log.error_msg Fmt.(str "Error: %a" Sexp.pp_hum e);
+            Log.error_msg Fmt.(str "Cannot infer type of unary expression %a." pp_term t0);
+            Log.error_msg
+              Fmt.(
+                str "%a has type %a, expected type %a." pp_term t1 RType.pp t_t1.ttyp RType.pp
+                  (Unop.operand_type op));
+            Log.loc_fatal_errmsg eloc "Type inference failure.")
+    | TConst c -> ({ t0 with ttyp = Constant.type_of c }, [])
+    | TVar v -> (
+        let tv = Variable.vtype_or_new v in
+        match RType.unify [ (tv, t0.ttyp) ] with
+        | Ok res -> ({ t0 with ttyp = tv }, res)
+        | Error e ->
+            Log.error_msg Fmt.(str "Error: %a" Sexp.pp_hum e);
+            failwith "Type inference failure")
+    | TIte (c, t1, t2) -> (
+        let t_c, c_c = aux c and t_t1, c_t1 = aux t1 and t_t2, c_t2 = aux t2 in
+        match RType.unify [ (t_c.ttyp, RType.TBool); (t_t1.ttyp, t_t2.ttyp) ] with
+        | Ok subs ->
+            ( mk_ite ~pos:t0.tpos ~typ:(Some t_t1.ttyp) t_c t_t1 t_t2,
+              merge_subs subs (merge_subs c_c (merge_subs c_t1 c_t2)) )
+        | Error e ->
+            Log.error_msg Fmt.(str "Error: %a" Sexp.pp_hum e);
+            Log.error_msg
+              Fmt.(str "ite(%a, %a, %a)." RType.pp c.ttyp RType.pp t1.ttyp RType.pp t2.ttyp);
+            failwith "Type inference failure.")
+    | TTup tl ->
+        let term_l, c_l = List.unzip (List.map ~f:aux tl) in
+        (mk_tup ~pos:t0.tpos term_l, merge_subs (List.concat c_l) [])
+    | TSel (t, i) -> (
+        let t_c, c_c = aux t in
+        match t_c.ttyp with
+        | RType.TTup tl -> (
+            match List.nth tl i with
+            | Some tout -> (mk_sel ~pos:t0.tpos ~typ:(Some tout) t_c i, c_c)
+            | None ->
+                Log.error_msg Fmt.(str "In tuple acessor %a, index out of bounds." pp_term t0);
+                failwith "Type inference: tuple acessor, accesed tuple of wrong type.")
+        | _ ->
+            Log.error_msg
+              Fmt.(str "Tuple accessor argument %a of type %a." pp_term t_c RType.pp t_c.ttyp);
+            failwith "Type inference: tuple accessor on type acessor.")
+    | TFun (args, body) ->
+        let t_body, c_body = aux body in
+        (mk_fun ~pos:t0.tpos args t_body, c_body)
+    | TApp (func, fargs) -> (
+        let t_func, c_func = aux func and t_args, c_args = List.unzip (List.map ~f:aux fargs) in
+        let argst = List.map ~f:(fun t -> t.ttyp) t_args in
+        let csub = RType.(mkv c_func @ mkv (List.concat c_args)) in
+        match t_func.ttyp with
+        | RType.TFun (_, _) -> (
+            let func_targs, func_tout = RType.fun_typ_unpack t_func.ttyp in
+            match List.zip func_targs argst with
+            | Ok typ_pairs -> (
+                match RType.(unify (csub @ typ_pairs)) with
+                | Ok subs -> (mk_app ~pos:t0.tpos ~typ:(Some func_tout) t_func t_args, subs)
+                | Error e ->
+                    Log.error_msg Fmt.(str "Error: %a" Sexp.pp_hum e);
+                    Log.loc_fatal_errmsg eloc
+                      (Fmt.str "Type inference failure: could not unify types in application %a(%a)"
+                         pp_term func
+                         (box (list ~sep:sp pp_term))
+                         fargs))
+            | Unequal_lengths ->
+                Log.loc_fatal_errmsg eloc
+                  (Fmt.str "Type inference failure: %a expects %i argument, given %i: %a." pp_term
+                     func (List.length func_targs) (List.length fargs)
+                     (box (list ~sep:sp pp_term))
+                     fargs))
+        | RType.TVar f_tvar -> (
+            (* |- f_tvar : (_ -> _ -> _ .. -> _) -> 'b *)
+            let t_out = RType.get_fresh_tvar () in
+            let tf = RType.fun_typ_pack argst t_out in
+            match RType.(unify (csub @ [ (tf, RType.TVar f_tvar) ])) with
+            | Ok subs -> (mk_app ~pos:t0.tpos ~typ:(Some t_out) t_func t_args, subs)
+            | Error e ->
+                Log.error_msg Fmt.(str "Error: %a" Sexp.pp_hum e);
+                failwith "Type inference failure.")
+        | _ as tf ->
+            Log.loc_fatal_errmsg eloc
+              (Fmt.str "Type inference failure: could not type %a as function." RType.pp tf))
+    | TData (cstr, args) -> (
+        match RType.type_of_variant cstr with
+        | Some (tout, targs) -> (
+            let t_args, c_args = List.unzip (List.map ~f:aux args) in
+            match List.zip targs (List.map ~f:(fun term -> term.ttyp) t_args) with
+            | Ok pairs -> (
+                match RType.unify (pairs @ RType.mkv (List.concat c_args)) with
+                | Ok subs -> ({ t0 with ttyp = tout; tkind = TData (cstr, t_args) }, subs)
+                | Error e ->
+                    Log.error_msg Fmt.(str "Error: %a" Sexp.pp_hum e);
+                    Log.loc_fatal_errmsg eloc
+                      (Fmt.str "Type inference failure: could not unify %s arguments %a." cstr
+                         (list ~sep:comma pp_term) t_args))
+            | Unequal_lengths ->
+                Log.loc_fatal_errmsg eloc
+                  (Fmt.str "Type inference failure: could not match %s arguments: %a and %a." cstr
+                     (list ~sep:comma pp_term) t_args (list ~sep:comma RType.pp) targs))
+        | None ->
+            Log.loc_fatal_errmsg eloc
+              Fmt.(str "Type inference failure: could not find type of %s." cstr))
+    | TMatch (t, cases) -> (
+        let t_t, c_t = aux t in
+        let per_case (pat, rhs) =
+          let pat_term, pat_c = aux (term_of_pattern pat) in
+          match RType.(unify [ (pat_term.ttyp, t_t.ttyp) ]) with
+          | Ok subs ->
+              let t_branch, c_branch = aux rhs in
+              ((pat, t_branch), merge_subs (merge_subs c_t pat_c) (merge_subs c_branch subs))
+          | Error _ ->
+              Log.loc_fatal_errmsg eloc Fmt.(str "Type inference failure: could unify match case")
+        in
+        let f (cases, subs, t) ((pat, rhs), sub) =
+          match RType.unify ([ (t, rhs.ttyp) ] @ RType.mkv subs) with
+          | Ok s -> (cases @ [ (pat, rhs) ], merge_subs s sub, rhs.ttyp)
+          | Error _ ->
+              Log.loc_fatal_errmsg eloc Fmt.(str "Type inference failure: could unify match case")
+        in
+        match List.map ~f:per_case cases with
+        | [] -> failwith "Empty match case?"
+        | ((hd_pat, hd_rhs), sub1) :: tl ->
+            let cases, subs, typ =
+              List.fold ~f ~init:([ (hd_pat, hd_rhs) ], sub1, hd_rhs.ttyp) tl
+            in
+            ({ t0 with ttyp = typ; tkind = TMatch (t_t, cases) }, subs))
+  in
+
+  let t', subs = aux t in
+  match RType.unify (RType.mkv subs) with
+  | Ok merge_subs ->
+      let tsubs = RType.mkv merge_subs in
+      (rewrite_types tsubs t', merge_subs)
+  | Error e ->
+      Log.error_msg Fmt.(str "Error: %a" Sexp.pp_hum e);
+      Log.loc_fatal_errmsg t'.tpos "Could not infer type."
+
+let erase_term_type (t : term) =
+  let f t = { t with ttyp = RType.get_fresh_tvar () } in
+  transform_info ~f t
+
+(* ============================================================================================= *)
 (*                                  SETS OF TERMS                                                *)
 (* ============================================================================================= *)
 
@@ -1135,6 +1201,9 @@ module TermSet = struct
   let of_list = Set.of_list (module Terms)
 
   let union_list = Set.union_list (module Terms)
+
+  let pp (f : Formatter.t) (s : t) =
+    Fmt.(pf f "@[{%a}@]" (list ~sep:comma pp_term) (Set.elements s))
 end
 
 let pp_term_set (f : Formatter.t) (s : TermSet.t) =

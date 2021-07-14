@@ -54,13 +54,14 @@ and dec_parametric t args =
 let sygus_term_of_const (c : Constant.t) : sygus_term =
   match c with
   | Constant.CInt i ->
-      if i > 0 then SyLit (LitNum i) else SyApp (IdSimple "-", [ SyLit (LitNum (-i)) ])
+      if i >= 0 then SyLit (LitNum i) else SyApp (IdSimple "-", [ SyLit (LitNum (-i)) ])
   | Constant.CTrue -> SyLit (LitBool true)
   | Constant.CFalse -> SyLit (LitBool false)
 
 let rec sygus_of_term (t : term) : sygus_term =
   let tk = t.tkind in
   match tk with
+  | TBox t -> sygus_of_term t
   | TBin (op, t1, t2) -> SyApp (IdSimple (Binop.to_string op), List.map ~f:sygus_of_term [ t1; t2 ])
   | TUn (op, t1) -> SyApp (IdSimple (Unop.to_string op), [ sygus_of_term t1 ])
   | TConst c -> sygus_term_of_const c

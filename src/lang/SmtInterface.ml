@@ -105,6 +105,7 @@ let term_of_const (c : Constant.t) : smtTerm =
 let rec smt_of_term (t : term) : smtTerm =
   let tk = t.tkind in
   match tk with
+  | TBox t -> smt_of_term t
   | TBin (op, t1, t2) -> mk_simple_app (Binop.to_string op) (List.map ~f:smt_of_term [ t1; t2 ])
   | TUn (op, t1) -> mk_simple_app (Unop.to_string op) [ smt_of_term t1 ]
   | TConst c -> term_of_const c
@@ -115,7 +116,10 @@ let rec smt_of_term (t : term) : smtTerm =
       mk_simple_app "mkTuple" (List.map ~f:smt_of_term tl)
   | TSel (t, i) -> SmtTApp (QI (IdC (SSimple "tupleSel", [ INum i ])), [ smt_of_term t ])
   | TApp ({ tkind = TVar v; _ }, args) -> mk_simple_app v.vname (List.map ~f:smt_of_term args)
-  | TData (cstr, args) -> mk_simple_app cstr (List.map ~f:smt_of_term args)
+  | TData (cstr, args) -> (
+      match args with
+      | [] -> SmtTQualdId (QI (Id (SSimple cstr)))
+      | _ -> mk_simple_app cstr (List.map ~f:smt_of_term args))
   | TMatch (tm, cases) -> SmtTMatch (smt_of_term tm, List.map ~f:smt_of_case cases)
   | TApp (_, _) ->
       Log.error_msg Fmt.(str "Smt of term %a impossible." pp_term t);
@@ -164,14 +168,14 @@ let id_kind_of_s env s =
 let rec term_of_smt (env : (string, variable, String.comparator_witness) Map.t) (st : smtTerm) :
     term =
   match st with
-  | SmtTQualdId (QI (Id (SSimple s))) -> (
+  | SmtTQualdId (QIas (Id (SSimple s), _)) | SmtTQualdId (QI (Id (SSimple s))) -> (
       match id_kind_of_s env s with
       | IVar v -> Term.mk_var v
       | IBool true -> mk_const Constant.CTrue
       | IBool false -> mk_const Constant.CFalse
       | _ -> failwith Fmt.(str "Smt: undefined variable %s" s))
   | SmtTSpecConst l -> mk_const (constant_of_smtConst l)
-  | SmtTApp (QI (Id (SSimple s)), args) -> (
+  | SmtTApp (QIas (Id (SSimple s), _), args) | SmtTApp (QI (Id (SSimple s)), args) -> (
       let args' = List.map ~f:(term_of_smt env) args in
       match id_kind_of_s env s with
       | ICstr c -> mk_data c args'
@@ -191,7 +195,8 @@ let rec term_of_smt (env : (string, variable, String.comparator_witness) Map.t) 
   | SmtTExists (_, _) -> failwith "Smt: exists-terms not supported."
   | SmtTForall (_, _) -> failwith "Smt: forall-terms not supported."
   | SmtTLet (_, _) -> failwith "Smt: let-terms not supported."
-  | _ -> failwith "Composite identifier not supported."
+  | _ ->
+      failwith (Fmt.str "Composite identifier %a not supported." Sexp.pp_hum (sexp_of_smtTerm st))
 
 let sorted_vars_of_vars (vars : VarSet.t) : smtSortedVar list =
   List.map
@@ -207,17 +212,23 @@ let constmap_of_s_exprs (starting_map : (string, term, String.comparator_witness
     (s_exprs : Sexp.t list) =
   let add_sexp map sexp =
     Sexp.(
-      match sexp with
-      | List [ Atom "define-fun"; Atom s; args; _; value ] -> (
-          match args with
-          | List [] -> (
-              let t_val_o =
-                let%map smt_value = smtTerm_of_sexp value in
-                term_of_smt (Map.empty (module String)) smt_value
-              in
-              match t_val_o with Some t_val -> Map.set map ~key:s ~data:t_val | None -> map)
-          | _ -> map)
-      | _ -> map)
+      try
+        match sexp with
+        | List [ Atom "define-fun"; Atom s; args; _; value ] -> (
+            match args with
+            | List [] -> (
+                let t_val_o =
+                  let%map smt_value = smtTerm_of_sexp value in
+                  term_of_smt (Map.empty (module String)) smt_value
+                in
+                match t_val_o with Some t_val -> Map.set map ~key:s ~data:t_val | None -> map)
+            | _ -> map)
+        | _ -> map
+      with Failure s ->
+        Log.debug_msg s;
+        Log.debug_msg
+          Fmt.(str "Failed at converting Sexpr \"%a\" to smtTerm. Skipping." Sexplib.Sexp.pp sexp);
+        map)
   in
   match s_exprs with
   | [ Sexp.List l ] -> List.fold ~f:add_sexp ~init:starting_map l
@@ -260,7 +271,9 @@ let smtPattern_of_term (t : term) : smtPattern option =
         let f t = match t.tkind with TVar x -> Some (mk_symb x.vname) | _ -> None in
         all_or_none (List.map ~f args)
       in
-      Option.map maybe_pat_args ~f:(fun pat_args -> PatComp (mk_symb constr, pat_args))
+      Option.map maybe_pat_args ~f:(function
+        | [] -> Pat (mk_symb constr)
+        | _ as pat_args -> PatComp (mk_symb constr, pat_args))
   | _ -> None
 
 (* Work in progress *)
@@ -370,6 +383,13 @@ let _smt_of_pmrs (pmrs : PMRS.t) : (smtSymbol list * command) list * command lis
     DefineFunsRec (decls, bodies) :: main_f
   in
   (datatype_decls, definition_commands)
+
+let mk_def_fun_command (name : string) (args : (string * RType.t) list) (rtype : RType.t)
+    (body : term) =
+  let smt_args = List.map ~f:(fun (name, rtype) -> (mk_symb name, sort_of_rtype rtype)) args in
+  DefineFun (mk_symb name, smt_args, sort_of_rtype rtype, smt_of_term body)
+
+let mk_assert = mk_assert
 
 let smt_of_pmrs (pmrs : PMRS.t) : command list =
   (* TODO : order of declarations matters. *)

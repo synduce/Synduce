@@ -18,7 +18,9 @@ type unrealizability_ctex = { i : int; j : int; ci : ctex; cj : ctex }
 let pp_unrealizability_ctex (frmt : Formatter.t) (uc : unrealizability_ctex) : unit =
   let pp_model frmt model =
     (* Print as comma-separated list of variable -> term *)
-    Fmt.(list ~sep:comma (pair ~sep:Utils.rightarrow (option pp_variable) pp_term))
+    Fmt.(
+      list ~sep:comma
+        (pair ~sep:Utils.rightarrow (option ~none:(fun fmt () -> pf fmt "?") Variable.pp) pp_term))
       frmt
       (List.map
          ~f:(fun (vid, t) -> (VarSet.find_by_id uc.ci.ctex_vars vid, t))
@@ -32,15 +34,16 @@ let reinterpret_model (m0i, m0j') var_subst =
   List.fold var_subst
     ~init:(Map.empty (module Int), Map.empty (module Int))
     ~f:(fun (m, m') (v, v') ->
+      let primed_name = v'.vname in
       Variable.free v';
       match Map.find m0i v.vname with
       | Some data -> (
           let new_m = Map.set m ~key:v.vid ~data in
-          match Map.find m0j' v'.vname with
+          match Map.find m0j' primed_name with
           | Some data -> (new_m, Map.set m' ~key:v.vid ~data)
           | None -> (new_m, m'))
       | None -> (
-          match Map.find m0j' v'.vname with
+          match Map.find m0j' primed_name with
           | Some data -> (m, Map.set m' ~key:v.vid ~data)
           | None -> (m, m')))
 
@@ -51,7 +54,7 @@ let reinterpret_model (m0i, m0j') var_subst =
   If the returned list is not empty, the problem is not solvable / unrealizable.
 *)
 let check_unrealizable (unknowns : VarSet.t) (eqns : equation_system) : unrealizability_ctex list =
-  Log.info (fun f () -> Fmt.(pf f "Checking unrealizability..."));
+  Log.debug (fun f () -> Fmt.(pf f "Checking unrealizability..."));
   let start_time = Unix.gettimeofday () in
   let solver = Solvers.make_z3_solver () in
   Solvers.load_min_max_defs solver;
@@ -129,8 +132,9 @@ let check_unrealizable (unknowns : VarSet.t) (eqns : equation_system) : unrealiz
                   in
                   (* Remap the names to ids of the original variables in m' *)
                   let m_i, m_j = reinterpret_model (m0i, m0j) var_subst in
-                  let ctex_i : ctex = { ctex_eqn = eqn_i; ctex_vars = vseti; ctex_model = m_i } in
-                  let ctex_j : ctex = { ctex_eqn = eqn_j; ctex_vars = vsetj; ctex_model = m_j } in
+                  let vset = Set.union vseti vsetj in
+                  let ctex_i : ctex = { ctex_eqn = eqn_i; ctex_vars = vset; ctex_model = m_i } in
+                  let ctex_j : ctex = { ctex_eqn = eqn_j; ctex_vars = vset; ctex_model = m_j } in
                   { i; j; ci = ctex_i; cj = ctex_j } :: ctexs
               | _ -> ctexs)
           | _ -> ctexs
@@ -142,8 +146,8 @@ let check_unrealizable (unknowns : VarSet.t) (eqns : equation_system) : unrealiz
   let ctexs = List.fold ~f:check_eqn_accum ~init:[] (combinations eqns_indexed) in
   Solvers.close_solver solver;
   let elapsed = Unix.gettimeofday () -. start_time in
-  Log.info (fun f () -> Fmt.(pf f "... finished in %3.4fs" elapsed));
-  Log.info (fun f () ->
+  Log.debug (fun f () -> Fmt.(pf f "... finished in %3.4fs" elapsed));
+  Log.debug (fun f () ->
       match ctexs with
       | [] -> Fmt.pf f "No counterexample to realizability found."
       | _ :: _ ->
@@ -289,7 +293,9 @@ let check_tinv_sat ~(p : psi_def) (tinv : PMRS.t) (ctex : ctex) :
           in
           List.map ~f (Set.elements ctex.ctex_vars)
         in
-        let vars = Analysis.free_variables (f_compose_r t) in
+        let vars =
+          Set.union (Analysis.free_variables t) (Analysis.free_variables (f_compose_r t))
+        in
         (* Start sequence of solver commands, bind on accum. *)
         let%lwt _ = accum in
         let%lwt () = Asyncs.spush solver in
@@ -319,8 +325,14 @@ let check_tinv_sat ~(p : psi_def) (tinv : PMRS.t) (ctex : ctex) :
           match check_result with
           | Sat -> return SmtLib.Sat
           | _ -> expand_loop (return (Set.union (Set.remove u t0) u')))
-      | _, false | None, _ -> return SmtLib.Unknown
+      | None, true ->
+          (* All expansions have been checked. *)
+          return SmtLib.Unsat
+      | _, false ->
+          (* Bounded check incomplete. Result is unknown. *)
+          return SmtLib.Unknown
     in
+
     let%lwt _ = starter in
     (* TODO : logic *)
     let%lwt () = Asyncs.set_logic solver "LIA" in
@@ -331,7 +343,8 @@ let check_tinv_sat ~(p : psi_def) (tinv : PMRS.t) (ctex : ctex) :
   in
   Asyncs.(cancellable_task (make_z3_solver ()) task)
 
-let satisfies_tinv ~(p : psi_def) (tinv : PMRS.t) (ctex : ctex) : bool =
+let satisfies_tinv ~(p : psi_def) (tinv : PMRS.t) (ctex : ctex) :
+    [ `Fst of ctex | `Snd of ctex | `Trd of ctex ] =
   let resp =
     Lwt_main.run
       ((* This call is expected to respond "unsat" when terminating. *)
@@ -345,21 +358,20 @@ let satisfies_tinv ~(p : psi_def) (tinv : PMRS.t) (ctex : ctex) : bool =
   in
   Log.verbose (fun frmt () ->
       if Solvers.is_unsat resp then
-        Fmt.(pf frmt "(%a) does not satisfy %s." (box pp_ctex) ctex tinv.pvar.vname)
+        Fmt.(pf frmt "(%a)@;<1 4>does not satisfy \"%s\"." (box pp_ctex) ctex tinv.pvar.vname)
       else if Solvers.is_sat resp then
         Fmt.(pf frmt "(%a) satisfies %s." (box pp_ctex) ctex tinv.pvar.vname)
       else Fmt.(pf frmt "%s-satisfiability of (%a) is unknown." tinv.pvar.vname (box pp_ctex) ctex));
-  match resp with Sat -> true | Unsat -> false | _ -> true
-(* TODO: return more information. *)
+  match resp with Sat -> `Fst ctex | Unsat -> `Snd ctex | _ -> `Trd ctex
 
 (** Classify counterexamples into positive or negative counterexamples with respect
     to the Tinv predicate in the problem.
 *)
-let classify_ctexs ~(p : psi_def) (ctexs : ctex list) : ctex list * ctex list =
+let classify_ctexs ~(p : psi_def) (ctexs : ctex list) : ctex list * ctex list * ctex list =
   let classify_with_tinv tinv =
     (* TODO: DT_LIA for z3, DTLIA for cvc4... Should write a type to represent logics. *)
     let f (ctex : ctex) = satisfies_tinv ~p tinv ctex in
-    let unknowns, negatives = List.partition_tf ~f ctexs in
-    (unknowns, negatives)
+    let positives, negatives, unknowns = List.partition3_map ~f ctexs in
+    (positives, negatives @ unknowns, unknowns)
   in
-  match p.psi_tinv with Some tinv -> classify_with_tinv tinv | None -> ([], [])
+  match p.psi_tinv with Some tinv -> classify_with_tinv tinv | None -> ([], [], [])

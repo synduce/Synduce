@@ -101,7 +101,7 @@ let pp_ocaml (frmt : Formatter.t) (pmrs : t) : unit =
         match pat_opt with
         | Some pat ->
             Fmt.(
-              pf frmt "@[<hov 2>%a @[%a _x@] %a@;@[match _x with %a -> %a@]@]"
+              pf frmt "@[<hov 2>%a @[%a _x@] %a@;@[match _x with@;@[%a -> %a@]@]@]"
                 (styled (`Fg `Cyan) string)
                 nt.vname (list ~sep:sp Variable.pp) args
                 (styled (`Fg `Red) string)
@@ -115,14 +115,14 @@ let pp_ocaml (frmt : Formatter.t) (pmrs : t) : unit =
                 "=" pp_term rhs))
     | _ :: _ ->
         Fmt.(
-          pf frmt "@[<hov 2>%a @[%a@]%a@;@[<hov 2>%a@;%a@]"
+          pf frmt "@[%a %a %a@]@;<1 2>@[%a@;%a@]"
             (styled (`Fg `Cyan) string)
             nt.vname (list ~sep:sp Variable.pp) args
             (styled (`Fg `Red) string)
             "="
             (styled (`Fg `Yellow) string)
             "function"
-            (list ~sep:(fun f () -> pf f "@;%a " (styled (`Fg `Yellow) string) "|") pp_case)
+            (list ~sep:(fun f () -> pf f "@;%a" (styled (`Fg `Yellow) string) "| ") pp_case)
             cases)
   in
   let functions =
@@ -166,6 +166,26 @@ let update_order (p : t) : t =
   in
   { p with porder = order }
 
+let clear_pmrs_types (prog : t) : t =
+  let f_rule ~key:_ ~data:(nt, args, pat, body) : _ =
+    List.iter ~f:Variable.clear_type args;
+    (match pat with
+    | Some (_, args) ->
+        List.iter ~f:(fun t -> Set.iter ~f:Variable.clear_type (Analysis.free_variables t)) args
+    | None -> ());
+    (nt, args, pat, erase_term_type body)
+  in
+  let prules = Map.mapi ~f:f_rule prog.prules in
+  Set.iter ~f:Variable.clear_type (Set.union prog.pnon_terminals prog.psyntobjs);
+  Variable.clear_type prog.pvar;
+  Variable.clear_type prog.pmain_symb;
+  {
+    prog with
+    prules;
+    pinput_typ = [ RType.get_fresh_tvar () ];
+    poutput_typ = RType.get_fresh_tvar ();
+  }
+
 let infer_pmrs_types (prog : t) =
   Log.verbose Fmt.(fun fmt () -> pf fmt "@[<hov 2>Untyped PMRS input:@;@[%a@]@]" pp prog);
   let infer_aux ~key ~data:(nt, args, pat, body) (map, substs) =
@@ -182,15 +202,16 @@ let infer_pmrs_types (prog : t) =
     let cur_loc = body.tpos in
     let c_rule = RType.merge_subs cur_loc c_body c_head in
     match RType.unify (RType.mkv (substs @ c_rule) @ [ (t_head.ttyp, t_body.ttyp) ]) with
-    | Some res -> (Map.set map ~key ~data:(nt, args, pat, rewrite_types (RType.mkv res) t_body), res)
-    | None ->
+    | Ok res -> (Map.set map ~key ~data:(nt, args, pat, rewrite_types (RType.mkv res) t_body), res)
+    | Error e ->
+        Log.error_msg Fmt.(str "Error: %a" Sexp.pp_hum e);
         Log.loc_fatal_errmsg cur_loc
           (Fmt.str "(%a) has type %a, expected type %a." pp_term body RType.pp t_body.ttyp RType.pp
              t_head.ttyp)
   in
   let new_rules, new_subs = Map.fold prog.prules ~f:infer_aux ~init:(Map.empty (module Int), []) in
   match RType.unify (RType.mkv new_subs) with
-  | Some usubs ->
+  | Ok usubs ->
       Variable.update_var_types (RType.mkv usubs);
       let typ_in, typ_out = RType.fun_typ_unpack (Variable.vtype_or_new prog.pmain_symb) in
       Variable.update_var_types
@@ -203,7 +224,48 @@ let infer_pmrs_types (prog : t) =
         poutput_typ = typ_out;
         pspec = { prog.pspec with ensures = invariant };
       }
-  | None -> failwith "Failed infering types for pmrs."
+  | Error e ->
+      Log.error_msg Fmt.(str "Error: %a" Sexp.pp_hum e);
+      failwith "Type inference failed for pmrs."
+
+let unify_two_with_update ((theta, theta') : RType.t * RType.t) ((tau, tau') : RType.t * RType.t) :
+    unit =
+  let sb1 = RType.unify_one theta theta' in
+  let sb2 = RType.unify_one tau tau' in
+  match (sb1, sb2) with
+  | Ok sb1, Ok sb2 -> (
+      match RType.unify (RType.mkv (sb1 @ sb2)) with
+      | Ok sb' -> Term.Variable.update_var_types (RType.mkv sb')
+      | Error e ->
+          Log.error_msg Fmt.(str "Error: %a" Sexp.pp_hum e);
+          Log.error_msg "Could not unify θ and τ in problem definition.";
+          Log.fatal ())
+  | _ ->
+      Log.error_msg
+        (Fmt.str "repr has type %a, expected %a." RType.pp
+           RType.(TFun (theta', tau'))
+           RType.pp
+           RType.(TFun (theta, tau)));
+      Log.fatal ()
+
+let unify_one_with_update (t, t') =
+  let sb1 = RType.unify_one t t' in
+  match sb1 with
+  | Ok sb1 -> (
+      match RType.unify (RType.mkv sb1) with
+      | Ok sb' -> Term.Variable.update_var_types (RType.mkv sb')
+      | Error e ->
+          Log.error_msg Fmt.(str "Error: %a" Sexp.pp_hum e);
+          Log.error_msg "Could not unify θ and τ in problem definition.";
+          Log.fatal ())
+  | _ ->
+      Log.error_msg (Fmt.str "Match PMRS on type %a with %a impossible." RType.pp t' RType.pp t);
+      Log.fatal ()
+
+let extract_rec_input_typ (prog : t) =
+  match List.last prog.pinput_typ with
+  | Some t -> t
+  | None -> failwith "PMRS should have at least one input for recursion."
 
 (* ============================================================================================= *)
 (*                             TRANSLATION FROM FUNCTION to PMRS and back                        *)

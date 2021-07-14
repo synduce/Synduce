@@ -21,6 +21,8 @@ let show_vars = ref false
 (** Toggle verbose messages. *)
 let verbose = ref false
 
+let math_display = ref false
+
 (** Optional output folder for solution.
     If None, the solution is only printed on the standard output.
     If Some path, the solution is written in path/inputfilename
@@ -45,11 +47,21 @@ let interactive_lemmas = ref false
 
 let interactive_lemmas_loop = ref false
 
+(** Prompt for lifting expressions. *)
+let interactive_lifting = ref false
+
+let classify_ctex = ref false
+
 (**
   Check whether a system of equations defines a "functionally realizable" synthesis problem.
   OFF by default.
 *)
 let check_unrealizable = ref true
+
+(**
+  Attempt to lift the function if there is no solution.
+*)
+let attempt_lifting = ref true
 
 (* ============================================================================================= *)
 (*                                GLOBAL TIMING INFO                                             *)
@@ -143,7 +155,7 @@ let optimize_grammars = ref false
 let pp_eqn_count = ref 10
 
 (* ============================================================================================= *)
-(*                        BOUNDED EXPANSIONS / VERIFICATION PARAMETERS                           *)
+(*                  BOUNDED EXPANSIONS / VERIFICATION / REWIRTING PARAMETERS                     *)
 (* ============================================================================================= *)
 
 (** Maximum depth of pointwise expansions to perform. Careful setting this variable to high,
@@ -181,3 +193,11 @@ let induction_proof_tlimit = ref (-1)
 let set_induction_proof_tlimit (s : string) =
   let i = Int.of_string s in
   induction_proof_tlimit := i
+
+(** A limit for the number of rewriting steps applied during deduction.
+*)
+let rewrite_limit = ref 100
+
+let set_rewrite_limit (s : string) =
+  let i = Int.of_string s in
+  rewrite_limit := i

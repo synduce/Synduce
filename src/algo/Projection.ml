@@ -8,7 +8,11 @@ open Lang.Term
 (* ============================================================================================= *)
 
 let mk_projs (targs : RType.t list) (tl : RType.t list) (xi : Variable.t) =
-  let f i t = Variable.mk ~t:(Some (RType.fun_typ_pack targs t)) (xi.vname ^ Int.to_string i) in
+  let f i t =
+    match targs with
+    | [] -> Variable.mk ~t:(Some t) (xi.vname ^ Int.to_string i)
+    | _ -> Variable.mk ~t:(Some (RType.fun_typ_pack targs t)) (xi.vname ^ Int.to_string i)
+  in
   List.mapi ~f tl
 
 let projection_eqns (lhs : term) (rhs : term) =
@@ -51,6 +55,9 @@ let proj_unknowns (unknowns : VarSet.t) =
               let new_vs = mk_projs targs tl xi in
               (l @ [ (xi, Some new_vs) ], Set.union vs (VarSet.of_list new_vs))
           | _ -> (l @ [ (xi, None) ], Set.add vs xi))
+      | RType.TTup tl ->
+          let new_vs = mk_projs [] tl xi in
+          (l @ [ (xi, Some new_vs) ], Set.union vs (VarSet.of_list new_vs))
       | _ -> (l @ [ (xi, None) ], Set.add vs xi)
     in
     List.fold ~f ~init:([], VarSet.empty) (Set.elements unknowns)
