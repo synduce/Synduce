@@ -272,7 +272,7 @@ and pp_d_domain_type (fmt : Formatter.t) = function
   | DTyNat -> pf fmt "nat"
   | DTyString -> pf fmt "string"
   | DTyArray t -> pf fmt "array<%a>" pp_d_domain_type t
-  | DTyTuple tl -> (list ~sep:comma pp_d_domain_type) fmt tl
+  | DTyTuple tl -> pf fmt "(%a)" (list ~sep:comma pp_d_domain_type) tl
   | DTyNamed (tname, tparams) -> pp_d_typename_segment fmt (tname, tparams)
   | DTyComposite tsl -> (list ~sep:dot pp_d_typename_segment) fmt tsl
 
@@ -301,7 +301,7 @@ let rec pp_d_term (frmt : Formatter.t) (x : Term.term) =
   | TBin (op, t1, t2) -> (
       match op with
       | Term.Binop.Max | Term.Binop.Min ->
-          pf frmt "@[<hov 2>%a@;%a@;%a@]" Term.Binop.pp op pp_d_term t1 pp_d_term t2
+          pf frmt "@[<hov 2>%a@;(%a,@;%a)@]" Term.Binop.pp op pp_d_term t1 pp_d_term t2
       | Term.Binop.Eq ->
           pf frmt "@[<hov 2>(%a@;%a@;%a)@]" pp_d_term t1
             (fun f _ -> Fmt.string f "==")
