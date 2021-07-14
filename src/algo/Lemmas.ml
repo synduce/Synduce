@@ -364,9 +364,26 @@ let get_positive_examples (solver : Solvers.online_solver) (det : term_state_det
       )
   | _ -> failwith "Check sat failure: Positive example cannot be found during lemma refinement."
 
-let parse_positive_example (_det : term_state_detail) (s : string) =
-  List.iter ~f:(fun _s -> failwith "Not Implemented") (Str.split (Str.regexp " *, *") s);
-  None
+let trim (s : string) = Str.global_replace (Str.regexp "[\r\n\t ]") "" s
+
+let parse_interactive_positive_example (det : term_state_detail) (input : string) : ctex option =
+  Some
+    {
+      det.ctex with
+      ctex_model =
+        List.fold
+          ~init:(Map.empty (module Int))
+          ~f:(fun acc s_ ->
+            let s = Str.split (Str.regexp " *= *") s_ in
+            if not (equal (List.length s) 2) then acc
+            else
+              let key = trim (List.nth_exn s 0) in
+              let data = mk_const (CInt (Int.of_string (trim (List.nth_exn s 1)))) in
+              match VarSet.find_by_name det.ctex.ctex_vars key with
+              | None -> acc
+              | Some var -> Map.set ~data acc ~key:var.vid)
+          (Str.split (Str.regexp " *, *") input);
+    }
 
 let interactive_get_positive_examples (det : term_state_detail) =
   let vars =
@@ -389,7 +406,8 @@ let interactive_get_positive_examples (det : term_state_detail) =
                 (Set.elements vars)))));
   match Stdio.In_channel.input_line Stdio.stdin with
   | None -> []
-  | Some s -> ( match parse_positive_example det s with None -> [] | Some ctex -> [ ctex ])
+  | Some s -> (
+      match parse_interactive_positive_example det s with None -> [] | Some ctex -> [ ctex ])
 
 let synthesize_new_lemma (det : term_state_detail) : (string * variable list * term) option =
   let set_logic = CSetLogic "DTLIA" in
