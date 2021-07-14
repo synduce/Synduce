@@ -181,40 +181,53 @@ let gen_target (s : Algo.AState.soln option) =
       List.map aux sol.soln_implems
   | None -> []
 
-let sum, soln = Lib.solve_file "benchmarks/tree/sum.ml"
+let sum, soln = Lib.solve_file "benchmarks/list/min.ml"
 
 let tau_decl = get_typ_decl !Algo.AState._tau
 
 let theta_decl = get_typ_decl !Algo.AState._theta
 
+let is_identity (args : variable list) (fbody : term) =
+  if List.length args != 1 then false else term_equal (mk_var (List.nth args 0)) fbody
+
 let toplevel =
   let new_target =
     let aux (t : function_descr) =
       let fv = Lang.Analysis.free_variables t.f_body in
-      let subs : (term * term) list =
+      (* let _ = Fmt.(pf stdout "%a" (list ~sep:comma pp_variable) (Base.Set.elements fv)) in *)
+      let const_subs : (term * term) list =
         match soln with
         | Some soln ->
-            List.map
-              (fun (name, _, body) ->
-                match VarSet.find_by_name fv name with
-                | Some var -> (mk_var var, body)
-                | None ->
-                    failwith
-                      (Fmt.str "Free var %s not found in %a" name
-                         (Fmt.list ~sep:Fmt.comma Fmt.string)
-                         (VarSet.names fv)))
-              (List.filter (fun (_, args, _) -> List.length args = 0) soln.soln_implems)
+            List.concat
+              (List.map
+                 (fun (name, _, body) ->
+                   match VarSet.find_by_name fv name with
+                   | Some var -> [ (mk_var var, body) ]
+                   | None -> [])
+                 (List.filter (fun (_, args, _) -> List.length args = 0) soln.soln_implems))
         | None -> []
       in
-      { t with f_body = substitution subs t.f_body }
+      let id_subs : term =
+        match soln with
+        | Some soln ->
+            List.fold_left
+              (fun term (name, _, _) ->
+                match VarSet.find_by_name fv name with
+                | Some var -> Lang.Analysis.replace_id_calls ~func:var term
+                | None -> term)
+              t.f_body
+              (List.filter (fun (_, args, body) -> is_identity args body) soln.soln_implems)
+        | None -> t.f_body
+      in
+      { t with f_body = substitution const_subs id_subs }
     in
     List.map aux sum.pd_target
   in
   List.map gen_func_descr (sum.pd_repr @ sum.pd_reference @ new_target)
 
 let correctness_lemma : d_toplevel =
-  let tree_type = mk_named_type (get_t_name !Algo.AState._theta) in
-  let signature = mk_method_sig [ ("x", tree_type) ] in
+  let theta_type = mk_named_type (get_t_name !Algo.AState._theta) in
+  let signature = mk_method_sig [ ("x", theta_type) ] in
   let spec =
     mk_simple_spec
       ~ensures:
@@ -228,7 +241,8 @@ let correctness_lemma : d_toplevel =
         (* target(t)  == spec(repr(t))*)
       ~requires:[] DSpecMethod
   in
-  let body = Body "" in
+  let match_theta = mk_match (mk_var (Variable.mk "x")) [] in
+  let body = Body (Fmt.str "%a" pp_d_term match_theta) in
   mk_toplevel (mk_lemma "correctness_lemma" signature spec body)
 
 let get_num_params = function
