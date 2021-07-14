@@ -487,8 +487,7 @@ let solve_constant_eqns (unknowns : VarSet.t) (eqns : equation list) =
     let f eqn =
       match eqn.erhs.tkind with
       | TVar x when Set.mem unknowns x ->
-          (* TODO check that lhs is a constant term. (Should be the case if wf) *)
-          Either.first (x, eqn.elhs)
+          if Analysis.is_constant eqn.elhs then Either.first (x, eqn.elhs) else Either.Second eqn
       | _ -> Either.Second eqn
     in
     List.partition_map ~f eqns

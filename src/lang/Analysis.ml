@@ -46,6 +46,10 @@ let operators_of (t : term) : OpSet.t =
   in
   reduce ~init:OpSet.empty ~join:Set.union ~case t
 
+let is_constant =
+  let case _ t = match t.tkind with TConst _ -> Some true | _ -> None in
+  reduce ~init:false ~join:( && ) ~case
+
 let is_norec =
   let case _ t =
     match t.tkind with
