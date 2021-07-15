@@ -47,6 +47,17 @@ let reinterpret_model (m0i, m0j') var_subst =
           | Some data -> (m, Map.set m' ~key:v.vid ~data)
           | None -> (m, m')))
 
+let unrealizability_ctex_of_constmap (i, j) (eqn_i, eqn_j) (vseti, vsetj) var_subst model =
+  let m0i, m0j =
+    Map.partitioni_tf ~f:(fun ~key ~data:_ -> Option.is_some (VarSet.find_by_name vseti key)) model
+  in
+  (* Remap the names to ids of the original variables in m' *)
+  let m_i, m_j = reinterpret_model (m0i, m0j) var_subst in
+  let vset = Set.union vseti vsetj in
+  let ctex_i : ctex = { ctex_eqn = eqn_i; ctex_vars = vset; ctex_model = m_i } in
+  let ctex_j : ctex = { ctex_eqn = eqn_j; ctex_vars = vset; ctex_model = m_j } in
+  { i; j; ci = ctex_i; cj = ctex_j }
+
 (** Check if system of equations defines a functionally realizable synthesis problem.
   If any equation defines an unsolvable problem, an unrealizability_ctex is added to the
   list of counterexamples to be returned.
@@ -60,16 +71,15 @@ let check_unrealizable (unknowns : VarSet.t) (eqns : equation_system) : unrealiz
   Solvers.load_min_max_defs solver;
   (* Main part of the check, applied to each equation in eqns. *)
   let check_eqn_accum (ctexs : unrealizability_ctex list) ((i, eqn_i), (j, eqn_j)) =
-    let vseti =
-      Set.diff
-        (Set.union (Analysis.free_variables eqn_i.elhs) (Analysis.free_variables eqn_i.erhs))
-        unknowns
+    let fv e =
+      VarSet.union_list
+        [
+          Analysis.free_variables e.elhs;
+          Analysis.free_variables e.erhs;
+          Option.value_map ~default:VarSet.empty ~f:Analysis.free_variables e.eprecond;
+        ]
     in
-    let vsetj =
-      Set.diff
-        (Set.union (Analysis.free_variables eqn_j.elhs) (Analysis.free_variables eqn_j.erhs))
-        unknowns
-    in
+    let vseti = Set.diff (fv eqn_i) unknowns and vsetj = Set.diff (fv eqn_j) unknowns in
     let var_subst = VarSet.prime vsetj in
     let vsetj' = VarSet.of_list (List.map ~f:snd var_subst) in
     let sub = List.map ~f:(fun (v, v') -> (mk_var v, mk_var v')) var_subst in
@@ -108,34 +118,38 @@ let check_unrealizable (unknowns : VarSet.t) (eqns : equation_system) : unrealiz
             Solvers.declare_all solver (decls_of_vars (Analysis.free_variables pre_j));
             Solvers.smt_assert solver (smt_of_term (substitution sub pre_j))
         | None -> ());
-        (* The lhs of i and j must be different. **)
+        (* Assert that the lhs of i and j must be different. **)
         let lhs_diff =
           let projs = projection_eqns eqn_i.elhs (substitution sub eqn_j.elhs) in
           List.map ~f:(fun (lhs, rhs) -> mk_un Not (mk_bin Eq lhs rhs)) projs
         in
         List.iter lhs_diff ~f:(fun eqn -> Solvers.smt_assert solver (smt_of_term eqn));
-        (* The rhs must be equal. *)
+        (* Assert that the rhs must be equal. *)
         List.iter2_exn rhs_args_i rhs_args_j ~f:(fun rhs_i_arg_term rhs_j_arg_term ->
             let rhs_eqs = projection_eqns rhs_i_arg_term (substitution sub rhs_j_arg_term) in
             List.iter rhs_eqs ~f:(fun (lhs, rhs) ->
                 Solvers.smt_assert solver (smt_of_term (mk_bin Eq lhs rhs))));
+        (* Check sat and get model. *)
         let new_ctexs =
           match Solvers.check_sat solver with
           | Sat -> (
               match Solvers.get_model solver with
               | SExps s ->
                   let model = model_to_constmap (SExps s) in
-                  let m0i, m0j =
-                    Map.partitioni_tf
-                      ~f:(fun ~key ~data:_ -> Option.is_some (VarSet.find_by_name vseti key))
-                      model
+                  (* Search for a few additional models. *)
+                  let other_models =
+                    if !Config.fuzzing_count > 0 then
+                      request_different_models model !Config.fuzzing_count solver
+                    else []
                   in
-                  (* Remap the names to ids of the original variables in m' *)
-                  let m_i, m_j = reinterpret_model (m0i, m0j) var_subst in
-                  let vset = Set.union vseti vsetj in
-                  let ctex_i : ctex = { ctex_eqn = eqn_i; ctex_vars = vset; ctex_model = m_i } in
-                  let ctex_j : ctex = { ctex_eqn = eqn_j; ctex_vars = vset; ctex_model = m_j } in
-                  { i; j; ci = ctex_i; cj = ctex_j } :: ctexs
+                  let new_ctexs =
+                    List.map
+                      ~f:
+                        (unrealizability_ctex_of_constmap (i, j) (eqn_i, eqn_j) (vseti, vsetj)
+                           var_subst)
+                      (model :: other_models)
+                  in
+                  new_ctexs @ ctexs
               | _ -> ctexs)
           | _ -> ctexs
         in

@@ -210,3 +210,14 @@ let rewrite_limit = ref 100
 let set_rewrite_limit (s : string) =
   let i = Int.of_string s in
   rewrite_limit := i
+
+(** When a model has been found, attempt fuzzing to find models that satisfy the same constraints.
+  Used in Counterexamples.ml.
+*)
+let fuzzing_count = ref 0
+
+let set_fuzzing_count (s : string) =
+  try
+    let i = Int.of_string s in
+    if i >= 0 && i < 1024 then fuzzing_count := i
+  with _ -> ()

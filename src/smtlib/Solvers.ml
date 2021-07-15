@@ -192,8 +192,6 @@ let call_solver solver commands =
       Log.(error_msg "Called solver without any command.");
       SExps []
 
-(* TODO: change the path of the solver. *)
-
 (** Create a process with a Z3 solver. *)
 let make_z3_solver () = make_solver ~name:"Z3" Utils.Config.z3_binary_path [ "-in"; "-smt2" ]
 

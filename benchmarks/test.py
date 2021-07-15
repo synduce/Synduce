@@ -72,6 +72,8 @@ reduced_benchmark_set_table3 = [
 ]
 
 benchmark_set = [
+    ["misc/unknowns_are_ids.ml", ""],
+    ["misc/composed_unkwns.ml", ""],
     ["ptree/sum.pmrs", ""],
     ["tree/sumtree.pmrs", ""],
     ["tailopt/sum.pmrs", ""],
@@ -128,7 +130,7 @@ benchmark_set = [
     ["zippers/list_sum_basic.ml", ""],
     ["zippers/list_sum.ml", ""],
     ["lifting/mits_nosum.ml", ""],
-    ["lifting/mpsl.ml", ""]
+    ["lifting/mpsl.ml", ""],
 ]
 
 extra_benchmarks = [

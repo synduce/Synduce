@@ -48,6 +48,11 @@ val model_to_subst : VarSet.t -> SmtLib.solver_response -> (term * term) list
       model obtained through (get-model).
 *)
 
+val request_different_models : term_model -> int -> Smtlib.Solvers.online_solver -> term_model list
+(** [request_different_models m i s] uses solver [s] to find [i] models different from [m] that
+      satisfy the current stack of assertions.
+  *)
+
 val decls_of_vars : VarSet.t -> SmtLib.command list
 (** Generate a list of commands from a set of variables. The list of commands may then be passsed to
      a Smtlib.Solvers.online_solver instance through the Smtlib.Solvers.declare_all command.

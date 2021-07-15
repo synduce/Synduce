@@ -1,5 +1,5 @@
 
-let odot (j, j0, j1) (j2, j3, j4) = (j, max j0 j3, (j0 > j3) && j1)
+let odot (j, j0, j1) (j2, j3, j4) = (j, max j0 j3, (j > j3) && j1)
 
 let f_0 x8 = (x8, x8, true)
 

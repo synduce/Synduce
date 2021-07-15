@@ -17,6 +17,7 @@ let print_usage () =
     \    -m --style-math                Print math-style.\n\
     \    -i --info-off                  Print timing information only.\n\
     \    -o --output=PATH               Output solution in folder PATH.\n\
+    \       --fuzzing=NUM               Fuzz SMT solutions on some problems.(Default=0, no fuzzing).\n\
     \  Otimizations off/on:\n\
     \    -s --no-splitting              Do not split systems into subsystems.\n\
     \       --no-syndef                 Do not use syntactic definitions.\n\
@@ -77,6 +78,7 @@ let options =
     ('C', "interactive-check-lemma", set Config.interactive_check_lemma true, None);
     ('\000', "acegis", set Config.use_acegis true, None);
     ('\000', "ccegis", set Config.use_ccegis true, None);
+    ('\000', "fuzzing", None, Some Config.set_fuzzing_count);
     ('\000', "parse-only", set parse_only true, None);
     ('\000', "no-gropt", set Config.optimize_grammars false, None);
     ('\000', "no-lifting", set Config.attempt_lifting false, None);

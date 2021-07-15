@@ -248,6 +248,28 @@ let model_to_subst (ctx : VarSet.t) (s : solver_response) =
   in
   List.concat_map ~f map
 
+let request_different_models (model : term_model) (num_models : int)
+    (solver : Smtlib.Solvers.online_solver) =
+  let open Smtlib.Solvers in
+  let rec req_loop model i models =
+    (* Assert all variables different. *)
+    List.iter
+      ~f:(fun (varname, value) ->
+        let smt_val = smt_of_term value in
+        smt_assert solver (mk_not (mk_eq (mk_var varname) smt_val)))
+      (Map.to_alist model);
+    match check_sat solver with
+    | Sat -> (
+        match get_model solver with
+        | SExps s ->
+            (* New model has been found, recursively find new ones. *)
+            let new_model = model_to_constmap (SExps s) in
+            if i > 0 then req_loop new_model (i - 1) (new_model :: models) else new_model :: models
+        | _ -> models)
+    | _ -> models
+  in
+  req_loop model num_models []
+
 (* ============================================================================================= *)
 (*                           COMMANDS                                                            *)
 (* ============================================================================================= *)
