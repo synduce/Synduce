@@ -281,6 +281,10 @@ module Asyncs = struct
     *)
     match s with
     | Sexp.Atom "success" -> ()
+    | Sexp.List (Sexp.Atom "error" :: err_msgs) ->
+        List.iter
+          ~f:(fun err -> Log.verbose (fun fmt () -> Fmt.pf fmt "Solver error: %a" Sexp.pp_hum err))
+          err_msgs
     | _ ->
         let resp_ind, prev_resp =
           Option.value ~default:(0, Sexp.Atom "none") (Hashtbl.find _last_resp solver.s_pid)
@@ -343,7 +347,7 @@ module Asyncs = struct
 
   let log ?(solver = None) c =
     match solver with
-    | Some s -> write_command s.s_log_outc c
+    | Some s -> ( try write_command s.s_log_outc c with _ -> ())
     | None -> (
         match !log_out with
         | Some oc -> write_command oc c
@@ -420,6 +424,8 @@ module Asyncs = struct
     (* The solver returned is bound to a task that can be cancelled. *)
     try
       let (m, task_r) : int t * int u = Lwt.task () in
+      Log.debug_msg
+        Fmt.(str "Solver %s started:  pid: %i log: %s" solver.s_name solver.s_pid solver.s_log_file);
       ( solver,
         Lwt.bind m (fun i ->
             let%lwt r = exec_command solver mk_print_success in
@@ -441,7 +447,8 @@ module Asyncs = struct
         match s.s_pinfo#state with
         | Lwt_process.Exited _ -> ()
         | Running ->
-            Log.debug_msg Fmt.(str "Terminating solver %s (PID : %i)" s.s_name s.s_pid);
+            Log.debug_msg
+              Fmt.(str "Terminating solver %s (PID : %i) (log: %s)" s.s_name s.s_pid s.s_log_file);
             s.s_pinfo#terminate)
 
   let close_solver (solver : solver) : unit t =

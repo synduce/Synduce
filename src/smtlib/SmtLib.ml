@@ -757,6 +757,7 @@ let parse_response (r : Sexp.t list) : solver_response =
   | [ Sexp.Atom "unsat" ] -> Unsat
   | [ Sexp.Atom "unknown" ] -> Unknown
   | [ Sexp.Atom "success" ] -> Success
+  | [ Sexp.List [ Sexp.Atom "error"; msg ] ] -> Error (Sexp.to_string msg)
   | _ -> SExps r
 
 let pp_solver_response f r =

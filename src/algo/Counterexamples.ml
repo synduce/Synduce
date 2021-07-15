@@ -190,9 +190,8 @@ let check_tinv_unsat ~(p : psi_def) (tinv : PMRS.t) (ctex : ctex) :
         (fun x ->
           let%lwt _ = Asyncs.exec_command cvc4_instance x in
           return ())
-        (smt_of_pmrs tinv
-        @ (if p.psi_repr_is_identity then [] else smt_of_pmrs p.psi_repr)
-        @ smt_of_pmrs p.psi_reference)
+        (smt_of_pmrs tinv @ smt_of_pmrs p.psi_reference
+        @ if p.psi_repr_is_identity then [] else smt_of_pmrs p.psi_repr)
     in
     let fv =
       Set.union (Analysis.free_variables ctex.ctex_eqn.eterm) (VarSet.of_list p.psi_reference.pargs)
@@ -326,6 +325,7 @@ let check_tinv_sat ~(p : psi_def) (tinv : PMRS.t) (ctex : ctex) :
           | Sat -> return SmtLib.Sat
           | _ -> expand_loop (return (Set.union (Set.remove u t0) u')))
       | None, true ->
+          Log.verbose_msg "Bounded checking is complete.";
           (* All expansions have been checked. *)
           return SmtLib.Unsat
       | _, false ->
@@ -346,15 +346,20 @@ let check_tinv_sat ~(p : psi_def) (tinv : PMRS.t) (ctex : ctex) :
 let satisfies_tinv ~(p : psi_def) (tinv : PMRS.t) (ctex : ctex) :
     [ `Fst of ctex | `Snd of ctex | `Trd of ctex ] =
   let resp =
-    Lwt_main.run
-      ((* This call is expected to respond "unsat" when terminating. *)
-       let pr1, resolver1 = check_tinv_unsat ~p tinv ctex in
-       (* This call is expected to respond "sat" when terminating. *)
-       let pr2, resolver2 = check_tinv_sat ~p tinv ctex in
-       Lwt.wakeup resolver1 1;
-       Lwt.wakeup resolver2 1;
-       (* The first call to return is kept, the other one is ignored. *)
-       Lwt.pick [ pr1; pr2 ])
+    try
+      Lwt_main.run
+        ((* This call is expected to respond "unsat" when terminating. *)
+         let pr1, resolver1 = check_tinv_unsat ~p tinv ctex in
+         (* This call is expected to respond "sat" when terminating. *)
+         let pr2, resolver2 = check_tinv_sat ~p tinv ctex in
+         Lwt.wakeup resolver2 1;
+         Lwt.wakeup resolver1 1;
+         (* The first call to return is kept, the other one is ignored. *)
+         Lwt.pick [ pr1; pr2 ])
+    with End_of_file ->
+      Log.error_msg "Solvers terminated unexpectedly  ⚠️ .";
+      Log.error_msg "Please inspect logs.";
+      SmtLib.Unknown
   in
   Log.verbose (fun frmt () ->
       if Solvers.is_unsat resp then
