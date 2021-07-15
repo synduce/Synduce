@@ -239,40 +239,52 @@ let smt_of_lemma_validity ~(p : psi_def) lemma (det : term_state_detail) =
   let if_then = smt_of_lemma_app lemma in
   [ S.mk_assert (S.mk_not (S.mk_forall quants (S.mk_or (S.mk_not if_condition) if_then))) ]
 
+let set_up_lemma_solver solver ~(p : psi_def) lemma_candidate =
+  Solvers.set_logic solver "ALL";
+  Solvers.set_option solver "quant-ind" "true";
+  Solvers.set_option solver "produce-models" "true";
+  Solvers.set_option solver "incremental" "true";
+  if !Config.induction_proof_tlimit >= 0 then
+    Solvers.set_option solver "tlimit" (Int.to_string !Config.induction_proof_tlimit);
+  Solvers.load_min_max_defs solver;
+  List.iter
+    ~f:(fun x -> ignore (Solvers.exec_command solver x))
+    ((match p.psi_tinv with None -> [] | Some tinv -> Smt.smt_of_pmrs tinv)
+    @ (if p.psi_repr_is_identity then Smt.smt_of_pmrs p.psi_reference
+      else Smt.smt_of_pmrs p.psi_reference @ Smt.smt_of_pmrs p.psi_repr)
+    (* Declare lemmas. *)
+    @ [
+        (match lemma_candidate with
+        | name, vars, body ->
+            Smt.mk_def_fun_command name
+              (List.map ~f:(fun v -> (v.vname, RType.TInt)) vars)
+              RType.TBool body);
+      ])
+
+let bounded_check ~(p : psi_def) lemma_candidate (det : term_state_detail) : Solvers.solver_response
+    =
+  ignore p;
+  ignore det;
+  ignore lemma_candidate;
+  failwith "Not Implemented"
+
 let verify_lemma_candidate ~(p : psi_def) (det : term_state_detail) :
     Solvers.online_solver * Solvers.solver_response =
   match det.lemma_candidate with
   | None -> failwith "Cannot verify lemma candidate; there is none."
   | Some lemma_candidate ->
       Log.verbose (fun f () -> Fmt.(pf f "Checking lemma candidate..."));
-      let _start_time = Unix.gettimeofday () in
       (* This solver is later closed in lemma_refinement_loop *)
-      (* TODO: don't redo all the setup work in every iteration of the lemma refinement loop. Use push/pop instead. *)
       let solver = Smtlib.Solvers.make_cvc4_solver () in
-      Solvers.set_logic solver "ALL";
-      Solvers.set_option solver "quant-ind" "true";
-      Solvers.set_option solver "produce-models" "true";
-      Solvers.set_option solver "incremental" "true";
-      if !Config.induction_proof_tlimit >= 0 then
-        Solvers.set_option solver "tlimit" (Int.to_string !Config.induction_proof_tlimit);
-      Solvers.load_min_max_defs solver;
-      (* Declare Tinv, repr and reference functions. *)
-      List.iter
-        ~f:(fun x -> ignore (Solvers.exec_command solver x))
-        ((match p.psi_tinv with None -> [] | Some tinv -> Smt.smt_of_pmrs tinv)
-        @ (if p.psi_repr_is_identity then Smt.smt_of_pmrs p.psi_reference
-          else Smt.smt_of_pmrs p.psi_reference @ Smt.smt_of_pmrs p.psi_repr)
-        (* Declare lemmas. *)
-        @ [
-            (match lemma_candidate with
-            | name, vars, body ->
-                Smt.mk_def_fun_command name
-                  (List.map ~f:(fun v -> (v.vname, RType.TInt)) vars)
-                  RType.TBool body);
-          ]
-        @ smt_of_lemma_validity ~p lemma_candidate det);
-
-      let result = Solvers.check_sat solver in
+      set_up_lemma_solver solver ~p lemma_candidate;
+      let result =
+        if !Config.bounded_lemma_check then bounded_check ~p lemma_candidate det
+        else (
+          List.iter
+            ~f:(fun x -> ignore (Solvers.exec_command solver x))
+            (smt_of_lemma_validity ~p lemma_candidate det);
+          Solvers.check_sat solver)
+      in
       (solver, result)
 
 let classify_ctexs_opt ~(p : psi_def) ctexs =
@@ -516,14 +528,14 @@ let synthesize_lemmas ~(p : psi_def) synt_failure_info (lstate : refinement_loop
     | _ -> failwith "There is no synt_failure_info in synthesize_lemmas."
   in
   if
-    !Config.interactive_lemmas_loop
-    && (success
-       ||
+    success
+    || !Config.interactive_lemmas_loop
+       &&
        (Log.info (fun frmt () -> Fmt.pf frmt "No luck. Try again? (Y/N)");
         match Stdio.In_channel.input_line Stdio.stdin with
         | None | Some "" | Some "N" -> false
         | Some "Y" -> true
-        | _ -> false))
+        | _ -> false)
   then Ok { lstate with term_state = new_state }
   else
     match synt_failure_info with

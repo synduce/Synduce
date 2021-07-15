@@ -70,6 +70,8 @@ let attempt_lifting = ref true
 *)
 let no_bounded_sat_as_unsat = ref false
 
+let bounded_lemma_check = ref false
+
 (* ============================================================================================= *)
 (*                                GLOBAL TIMING INFO                                             *)
 (* ============================================================================================= *)

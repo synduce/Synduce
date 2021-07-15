@@ -44,6 +44,8 @@ let print_usage () =
     \  -L   --interactive-loop          Request lemmas interactively in a loop.\n\
     \  -X   --classify-ctex             Manually classify ctex as pos or neg.\n\
     \  -N   --no-sat-as-unsat           No sat found in bounded checking is accepted as unsat.\n\
+    \  -B   --bounded-lemma-check       Use depth-bounded check to verify lemma candidates and \
+     generate positive examples for lemma synth.\n\
     \  -C   --interactive-check-lemma   Manually set if a lemma is true and, if not, give \
      counterexample.\n\
     \       --parse-only                Just parse the input.\n\
@@ -66,6 +68,7 @@ let options =
     ('m', "style-math", set Config.math_display true, None);
     ('n', "verification", None, Some Config.set_num_expansions_check);
     ('N', "no-sat-as-unsat", set Config.no_bounded_sat_as_unsat true, None);
+    ('B', "bounded-lemma-check", set Config.bounded_lemma_check true, None);
     ('o', "output", None, Some Config.set_output_folder);
     ('s', "no-splitting", set Config.split_solve_on false, None);
     ('t', "no-detupling", set Config.detupling_on false, None);
