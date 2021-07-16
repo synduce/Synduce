@@ -362,7 +362,7 @@ let bounded_check solver ~(p : psi_def) lemma_candidate (det : term_state_detail
         (SmtLib.Unsat, None)
     | _, false ->
         (* Check reached limit. *)
-        if !Config.no_bounded_sat_as_unsat then (SmtLib.Unsat, None) else (SmtLib.Unknown, None)
+        if !Config.bounded_lemma_check then (SmtLib.Unsat, None) else (SmtLib.Unknown, None)
   in
   let res = expand_loop (TermSet.singleton det.term) in
   res
