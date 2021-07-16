@@ -494,7 +494,13 @@ let rec lemma_refinement_loop (det : term_state_detail) ~(p : psi_def) : term_st
                 (String.concat ~sep:" " (List.map ~f:(fun v -> v.vname) vars))
                 pp_term lemma_term pp_term det.term pp_subs det.ctex.ctex_eqn.eelim));
         match Stdio.In_channel.input_line Stdio.stdin with
-        | Some "Y" -> Some { det with lemma_candidate = None; lemmas = lemma_term :: det.lemmas }
+        | Some "Y" ->
+            let lemma =
+              match det.ctex.ctex_eqn.eprecond with
+              | None -> lemma_term
+              | Some pre -> mk_bin Binop.Or (mk_un Unop.Not pre) lemma_term
+            in
+            Some { det with lemma_candidate = None; lemmas = lemma :: det.lemmas }
         | _ -> (
             Log.info (fun f () ->
                 Fmt.(
@@ -521,7 +527,12 @@ let rec lemma_refinement_loop (det : term_state_detail) ~(p : psi_def) : term_st
                 Fmt.pf frmt "Lemma for term %a: \"%s %s = @[%a@]\"." pp_term det.term name
                   (String.concat ~sep:" " (List.map ~f:(fun v -> v.vname) vars))
                   pp_term lemma_term);
-            Some { det with lemma_candidate = None; lemmas = lemma_term :: det.lemmas }
+            let lemma =
+              match det.ctex.ctex_eqn.eprecond with
+              | None -> lemma_term
+              | Some pre -> mk_bin Binop.Or (mk_un Unop.Not pre) lemma_term
+            in
+            Some { det with lemma_candidate = None; lemmas = lemma :: det.lemmas }
         | solver, (Sat, maybe_model) | solver, (Unknown, maybe_model) ->
             Log.verbose (fun f () ->
                 Fmt.(pf f "This lemma has not been proven correct. Refining lemma..."));
