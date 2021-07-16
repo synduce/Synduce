@@ -85,8 +85,9 @@ let pp (frmt : Formatter.t) (pmrs : t) : unit =
   in
   Fmt.(
     pf frmt "%s⟨%a⟩(%a): %a -> %a@;%a@;= @;@[<v 2>{@;%a@;}@]" pmrs.pvar.vname
-      VarSet.pp_var_names pmrs.psyntobjs (list Variable.pp) pmrs.pargs (list ~sep:comma RType.pp)
-      pmrs.pinput_typ RType.pp pmrs.poutput_typ (box pp_spec) pmrs.pspec pp_rules ())
+      VarSet.pp_var_names pmrs.psyntobjs (list ~sep:comma Variable.pp) pmrs.pargs
+      (list ~sep:comma RType.pp) pmrs.pinput_typ RType.pp pmrs.poutput_typ (box pp_spec) pmrs.pspec
+      pp_rules ())
 
 let pp_ocaml (frmt : Formatter.t) (pmrs : t) : unit =
   let print_caml_def (frmt : Formatter.t) (nt, args, cases) =

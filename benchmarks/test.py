@@ -122,6 +122,7 @@ benchmark_set = [
     ["list_to_tree/search_v2.pmrs", ""],
     ["list_to_tree/search_v3.pmrs", ""],
     ["list_to_tree/mls.pmrs", ""],
+    ["misc/count_between.ml", ""],
     ["list/maxhom.pmrs", ""],
     ["list/sumodds.pmrs", ""],
     ["list/sumgt.ml", ""],

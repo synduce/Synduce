@@ -596,23 +596,25 @@ let preprocess_deconstruct_if (unknowns : VarSet.t) (eqns : equation list) :
   let eqns' =
     let f eqn =
       match eqn.erhs.tkind with
-      | TIte (rhs_c, rhs_bt, rhs_bf) -> (
-          match eqn.elhs.tkind with
-          | TIte (lhs_c, lhs_bt, lhs_bf) when Terms.equal rhs_c lhs_c ->
-              [
-                { eqn with eprecond = and_opt eqn.eprecond rhs_c; elhs = lhs_bt; erhs = rhs_bt };
-                {
-                  eqn with
-                  eprecond = and_opt eqn.eprecond (mk_un Not rhs_c);
-                  elhs = lhs_bf;
-                  erhs = rhs_bf;
-                };
-              ]
-          | _ ->
-              [
-                { eqn with eprecond = and_opt eqn.eprecond rhs_c; erhs = rhs_bt };
-                { eqn with eprecond = and_opt eqn.eprecond (mk_un Not rhs_c); erhs = rhs_bf };
-              ])
+      | TIte (rhs_c, rhs_bt, rhs_bf) ->
+          if Set.is_empty (Set.inter (Analysis.free_variables rhs_c) unknowns) then
+            match eqn.elhs.tkind with
+            | TIte (lhs_c, lhs_bt, lhs_bf) when Terms.equal rhs_c lhs_c ->
+                [
+                  { eqn with eprecond = and_opt eqn.eprecond rhs_c; elhs = lhs_bt; erhs = rhs_bt };
+                  {
+                    eqn with
+                    eprecond = and_opt eqn.eprecond (mk_un Not rhs_c);
+                    elhs = lhs_bf;
+                    erhs = rhs_bf;
+                  };
+                ]
+            | _ ->
+                [
+                  { eqn with eprecond = and_opt eqn.eprecond rhs_c; erhs = rhs_bt };
+                  { eqn with eprecond = and_opt eqn.eprecond (mk_un Not rhs_c); erhs = rhs_bf };
+                ]
+          else [ eqn ]
       | _ -> [ eqn ]
     in
     List.concat_map ~f eqns

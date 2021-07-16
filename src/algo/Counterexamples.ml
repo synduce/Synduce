@@ -98,7 +98,11 @@ let check_unrealizable (unknowns : VarSet.t) (eqns : equation_system) : unrealiz
             (* Check there are no unknowns in the args. *)
             if Set.are_disjoint fv_args unknowns then Some (args_i, args_j) else None
           else None
-      | _ -> None
+      | TVar v_i, TVar v_j when Set.mem unknowns v_i && Set.mem unknowns v_j -> Some ([], [])
+      | _ ->
+          Log.debug_msg
+            Fmt.(str "Unrealizability check: %a is not a function application." pp_term eqn_i.erhs);
+          None
     in
     match maybe_rhs_args with
     | None -> ctexs (* If we cannot match the expected structure, skip it. *)
