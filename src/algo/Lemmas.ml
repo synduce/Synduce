@@ -101,7 +101,7 @@ let create_or_update_term_state_for_ctex (is_pos_ctex : bool) (ts : term_state) 
           | None -> failwith "Term detail does not exist."
           | Some det ->
               if is_pos_ctex then { det with positive_ctexs = ctex :: det.positive_ctexs }
-              else { det with negative_ctexs = ctex :: det.negative_ctexs })
+              else { det with ctex; negative_ctexs = ctex :: det.negative_ctexs })
 
 let update_term_state_for_ctexs (ts : term_state) ~(pos_ctexs : ctex list) ~(neg_ctexs : ctex list)
     : term_state =
