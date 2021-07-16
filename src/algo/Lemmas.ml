@@ -261,32 +261,6 @@ let set_up_lemma_solver solver ~(p : psi_def) lemma_candidate =
               RType.TBool body);
       ])
 
-let bounded_check ~(p : psi_def) lemma_candidate (det : term_state_detail) : Solvers.solver_response
-    =
-  ignore p;
-  ignore det;
-  ignore lemma_candidate;
-  failwith "Not Implemented"
-
-let verify_lemma_candidate ~(p : psi_def) (det : term_state_detail) :
-    Solvers.online_solver * Solvers.solver_response =
-  match det.lemma_candidate with
-  | None -> failwith "Cannot verify lemma candidate; there is none."
-  | Some lemma_candidate ->
-      Log.verbose (fun f () -> Fmt.(pf f "Checking lemma candidate..."));
-      (* This solver is later closed in lemma_refinement_loop *)
-      let solver = Smtlib.Solvers.make_cvc4_solver () in
-      set_up_lemma_solver solver ~p lemma_candidate;
-      let result =
-        if !Config.bounded_lemma_check then bounded_check ~p lemma_candidate det
-        else (
-          List.iter
-            ~f:(fun x -> ignore (Solvers.exec_command solver x))
-            (smt_of_lemma_validity ~p lemma_candidate det);
-          Solvers.check_sat solver)
-      in
-      (solver, result)
-
 let classify_ctexs_opt ~(p : psi_def) ctexs =
   if !Config.classify_ctex then
     let f (p, n, u) ctex =
@@ -317,36 +291,99 @@ let smt_of_disallow_ctex_values (ctexs : ctex list) : S.smtTerm =
                  ~init:[] ctex.ctex_model)))
        ctexs)
 
+let set_up_to_get_model solver ~(p : psi_def) lemma (det : term_state_detail) =
+  (* Step 1. Declare vars for term, and assert that term satisfies tinv. *)
+  Solvers.declare_all solver (Smt.decls_of_vars (Analysis.free_variables det.term));
+  ignore (Solvers.exec_command solver (S.mk_assert (smt_of_tinv_app ~p det)));
+  ignore (Solvers.check_sat solver);
+  (* ^ Why do I do this sat check? *)
+  (* Step 2. Declare scalars (vars for recursion elimination & spec param) and their constraints (preconds & recurs elim eqns) *)
+  Solvers.declare_all solver
+    (Smt.decls_of_vars (Set.union det.vars (VarSet.of_list p.psi_reference.pargs)));
+  ignore (Solvers.exec_command solver (S.mk_assert (smt_of_recurs_elim_eqns det.recurs_elim ~p)));
+  (match det.ctex.ctex_eqn.eprecond with
+  | None -> ()
+  | Some pre -> ignore (Solvers.exec_command solver (S.mk_assert (Smt.smt_of_term pre))));
+  ignore (Solvers.check_sat solver);
+  (* Step 3. Disallow repeated positive examples. *)
+  if List.length det.positive_ctexs > 0 then
+    ignore
+      (Solvers.exec_command solver (S.mk_assert (smt_of_disallow_ctex_values det.positive_ctexs)));
+  (* Step 4. Assert that lemma candidate is false. *)
+  ignore (Solvers.exec_command solver (S.mk_assert (S.mk_not (smt_of_lemma_app lemma))))
+
+let bounded_check solver ~(p : psi_def) lemma_candidate (det : term_state_detail) :
+    Solvers.solver_response =
+  set_up_to_get_model solver ~p lemma_candidate det;
+  let steps = ref 0 in
+  let rec check_bounded_sol terms =
+    let f t =
+      let rec_instantation =
+        Option.value ~default:VarMap.empty (Analysis.matches t ~pattern:det.term)
+      in
+      Solvers.spush solver;
+      Map.iteri
+        ~f:(fun ~key ~data ->
+          (* Declare variables in term `data` *)
+          Solvers.declare_all solver (Smt.decls_of_vars (Analysis.free_variables data));
+          (* Assert that `key` variable is equal to `data` term *)
+          ignore
+            (Solvers.exec_command solver
+               (S.mk_assert (S.mk_eq (S.mk_var key.vname) (Smt.smt_of_term data))))
+          (* Log.verbose (fun f () ->
+              Fmt.(pf f "Here is key: %s, and data: %a" key.vname pp_term data) *))
+        rec_instantation;
+      let resp = Solvers.check_sat solver in
+      Solvers.spop solver;
+      resp
+    in
+    match terms with
+    | [] -> None
+    | t0 :: tl -> ( match f t0 with Sat -> Some SmtLib.Sat | _ -> check_bounded_sol tl)
+  in
+  let rec expand_loop u =
+    match (Set.min_elt u, !steps < !Config.num_expansions_check) with
+    | Some t0, true -> (
+        let tset, u' = Expand.simple t0 in
+        let check_result = check_bounded_sol (Set.elements tset) in
+        steps := !steps + Set.length tset;
+        match check_result with
+        | Some Sat -> SmtLib.Sat
+        | _ -> expand_loop (Set.union (Set.remove u t0) u'))
+    | None, true ->
+        (* All expansions have been checked. *)
+        SmtLib.Unsat
+    | _, false ->
+        (* Check reached limit. *)
+        if !Config.no_bounded_sat_as_unsat then SmtLib.Unsat else SmtLib.Unknown
+  in
+  let res = expand_loop (TermSet.singleton det.term) in
+  res
+
+let verify_lemma_candidate ~(p : psi_def) (det : term_state_detail) :
+    Solvers.online_solver * Solvers.solver_response =
+  match det.lemma_candidate with
+  | None -> failwith "Cannot verify lemma candidate; there is none."
+  | Some lemma_candidate ->
+      Log.verbose (fun f () -> Fmt.(pf f "Checking lemma candidate..."));
+      (* This solver is later closed in lemma_refinement_loop *)
+      let solver = Smtlib.Solvers.make_cvc4_solver () in
+      set_up_lemma_solver solver ~p lemma_candidate;
+      let result =
+        if !Config.bounded_lemma_check then bounded_check solver ~p lemma_candidate det
+        else (
+          List.iter
+            ~f:(fun x -> ignore (Solvers.exec_command solver x))
+            (smt_of_lemma_validity ~p lemma_candidate det);
+          Solvers.check_sat solver)
+      in
+      (solver, result)
+
 let get_positive_examples (solver : Solvers.online_solver) (det : term_state_detail) ~(p : psi_def)
     (lemma : symbol * variable list * term) : ctex list =
   (* TODO: make fresh variables, since this may in the future be called for multiple terms, for multiple lemma candidates, or to generate multiple pos examples, in one solver instance *)
   Log.verbose (fun f () -> Fmt.(pf f "Searching for a positive example."));
-
-  (* Step 1. Declare vars for term, and assert that term satisfies tinv. *)
-  let _ =
-    Solvers.declare_all solver (Smt.decls_of_vars (Analysis.free_variables det.term));
-    ignore (Solvers.exec_command solver (S.mk_assert (smt_of_tinv_app ~p det)));
-    ignore (Solvers.check_sat solver)
-  in
-  (* Step 2. Declare scalars (vars for recursion elimination & spec param) and their constraints (preconds & recurs elim eqns) *)
-  let _ =
-    Solvers.declare_all solver
-      (Smt.decls_of_vars (Set.union det.vars (VarSet.of_list p.psi_reference.pargs)));
-    ignore (Solvers.exec_command solver (S.mk_assert (smt_of_recurs_elim_eqns det.recurs_elim ~p)));
-    (match det.ctex.ctex_eqn.eprecond with
-    | None -> ()
-    | Some pre -> ignore (Solvers.exec_command solver (S.mk_assert (Smt.smt_of_term pre))));
-    ignore (Solvers.check_sat solver)
-  in
-  (* Step 3. Disallow repeated positive examples. *)
-  let _ =
-    if List.length det.positive_ctexs > 0 then
-      ignore
-        (Solvers.exec_command solver (S.mk_assert (smt_of_disallow_ctex_values det.positive_ctexs)))
-  in
-  (* Step 4. Assert that lemma candidate is false. *)
-  let _ = ignore (Solvers.exec_command solver (S.mk_assert (S.mk_not (smt_of_lemma_app lemma)))) in
-
+  set_up_to_get_model solver ~p lemma det;
   match Solvers.check_sat solver with
   | Sat | Unknown -> (
       match Solvers.get_model solver with
