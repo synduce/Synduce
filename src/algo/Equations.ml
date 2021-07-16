@@ -594,30 +594,29 @@ let preprocess_deconstruct_if (unknowns : VarSet.t) (eqns : equation list) :
     match precond with Some pre -> Some (mk_bin And pre t) | None -> Some t
   in
   let eqns' =
-    let f eqn =
+    let rec split_if eqn =
       match eqn.erhs.tkind with
       | TIte (rhs_c, rhs_bt, rhs_bf) ->
           if Set.is_empty (Set.inter (Analysis.free_variables rhs_c) unknowns) then
             match eqn.elhs.tkind with
             | TIte (lhs_c, lhs_bt, lhs_bf) when Terms.equal rhs_c lhs_c ->
-                [
-                  { eqn with eprecond = and_opt eqn.eprecond rhs_c; elhs = lhs_bt; erhs = rhs_bt };
-                  {
-                    eqn with
-                    eprecond = and_opt eqn.eprecond (mk_un Not rhs_c);
-                    elhs = lhs_bf;
-                    erhs = rhs_bf;
-                  };
-                ]
+                split_if
+                  { eqn with eprecond = and_opt eqn.eprecond rhs_c; elhs = lhs_bt; erhs = rhs_bt }
+                @ split_if
+                    {
+                      eqn with
+                      eprecond = and_opt eqn.eprecond (mk_un Not rhs_c);
+                      elhs = lhs_bf;
+                      erhs = rhs_bf;
+                    }
             | _ ->
-                [
-                  { eqn with eprecond = and_opt eqn.eprecond rhs_c; erhs = rhs_bt };
-                  { eqn with eprecond = and_opt eqn.eprecond (mk_un Not rhs_c); erhs = rhs_bf };
-                ]
+                split_if { eqn with eprecond = and_opt eqn.eprecond rhs_c; erhs = rhs_bt }
+                @ split_if
+                    { eqn with eprecond = and_opt eqn.eprecond (mk_un Not rhs_c); erhs = rhs_bf }
           else [ eqn ]
       | _ -> [ eqn ]
     in
-    List.concat_map ~f eqns
+    List.concat_map ~f:split_if eqns
   in
   (unknowns, eqns', fun x -> x)
 
