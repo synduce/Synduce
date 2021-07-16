@@ -313,7 +313,7 @@ let set_up_to_get_model solver ~(p : psi_def) lemma (det : term_state_detail) =
   ignore (Solvers.exec_command solver (S.mk_assert (S.mk_not (smt_of_lemma_app lemma))))
 
 let bounded_check solver ~(p : psi_def) lemma_candidate (det : term_state_detail) :
-    Solvers.solver_response =
+    Solvers.solver_response * Solvers.solver_response option =
   set_up_to_get_model solver ~p lemma_candidate det;
   let steps = ref 0 in
   let rec check_bounded_sol terms =
@@ -334,12 +334,19 @@ let bounded_check solver ~(p : psi_def) lemma_candidate (det : term_state_detail
               Fmt.(pf f "Here is key: %s, and data: %a" key.vname pp_term data) *))
         rec_instantation;
       let resp = Solvers.check_sat solver in
+      (* Note that I am getting a model after check-sat unknown response. This may not halt.  *)
+      let result =
+        match resp with SmtLib.Sat | SmtLib.Unknown -> Some (Solvers.get_model solver) | _ -> None
+      in
       Solvers.spop solver;
-      resp
+      (resp, result)
     in
     match terms with
     | [] -> None
-    | t0 :: tl -> ( match f t0 with Sat -> Some SmtLib.Sat | _ -> check_bounded_sol tl)
+    | t0 :: tl -> (
+        match f t0 with
+        | status, Some model -> Some (status, Some model)
+        | _ -> check_bounded_sol tl)
   in
   let rec expand_loop u =
     match (Set.min_elt u, !steps < !Config.num_expansions_check) with
@@ -348,20 +355,20 @@ let bounded_check solver ~(p : psi_def) lemma_candidate (det : term_state_detail
         let check_result = check_bounded_sol (Set.elements tset) in
         steps := !steps + Set.length tset;
         match check_result with
-        | Some Sat -> SmtLib.Sat
+        | Some (_, Some model) -> (SmtLib.Sat, Some model)
         | _ -> expand_loop (Set.union (Set.remove u t0) u'))
     | None, true ->
         (* All expansions have been checked. *)
-        SmtLib.Unsat
+        (SmtLib.Unsat, None)
     | _, false ->
         (* Check reached limit. *)
-        if !Config.no_bounded_sat_as_unsat then SmtLib.Unsat else SmtLib.Unknown
+        if !Config.no_bounded_sat_as_unsat then (SmtLib.Unsat, None) else (SmtLib.Unknown, None)
   in
   let res = expand_loop (TermSet.singleton det.term) in
   res
 
 let verify_lemma_candidate ~(p : psi_def) (det : term_state_detail) :
-    Solvers.online_solver * Solvers.solver_response =
+    Solvers.online_solver * (Solvers.solver_response * Solvers.solver_response option) =
   match det.lemma_candidate with
   | None -> failwith "Cannot verify lemma candidate; there is none."
   | Some lemma_candidate ->
@@ -375,42 +382,42 @@ let verify_lemma_candidate ~(p : psi_def) (det : term_state_detail) :
           List.iter
             ~f:(fun x -> ignore (Solvers.exec_command solver x))
             (smt_of_lemma_validity ~p lemma_candidate det);
-          Solvers.check_sat solver)
+          (Solvers.check_sat solver, None))
       in
       (solver, result)
 
+let parse_positive_example_solver_model response (det : term_state_detail) =
+  match response with
+  | SmtLib.SExps s ->
+      let model = Smt.model_to_constmap (SExps s) in
+      let m, _ =
+        Map.partitioni_tf
+          ~f:(fun ~key ~data:_ -> Option.is_some (VarSet.find_by_name det.ctex.ctex_vars key))
+          model
+      in
+      (* Remap the names to ids of the original variables in m' *)
+      [
+        ({
+           det.ctex with
+           ctex_model =
+             Map.fold
+               ~init:(Map.empty (module Int))
+               ~f:(fun ~key ~data acc ->
+                 match VarSet.find_by_name det.ctex.ctex_vars key with
+                 | None -> acc
+                 | Some var -> Map.set ~data acc ~key:var.vid)
+               m;
+         }
+          : ctex);
+      ]
+  | _ -> failwith "Parse model failure: Positive example cannot be found during lemma refinement."
+
 let get_positive_examples (solver : Solvers.online_solver) (det : term_state_detail) ~(p : psi_def)
     (lemma : symbol * variable list * term) : ctex list =
-  (* TODO: make fresh variables, since this may in the future be called for multiple terms, for multiple lemma candidates, or to generate multiple pos examples, in one solver instance *)
   Log.verbose (fun f () -> Fmt.(pf f "Searching for a positive example."));
   set_up_to_get_model solver ~p lemma det;
   match Solvers.check_sat solver with
-  | Sat | Unknown -> (
-      match Solvers.get_model solver with
-      | SExps s ->
-          let model = Smt.model_to_constmap (SExps s) in
-          let m, _ =
-            Map.partitioni_tf
-              ~f:(fun ~key ~data:_ -> Option.is_some (VarSet.find_by_name det.ctex.ctex_vars key))
-              model
-          in
-          (* Remap the names to ids of the original variables in m' *)
-          [
-            ({
-               det.ctex with
-               ctex_model =
-                 Map.fold
-                   ~init:(Map.empty (module Int))
-                   ~f:(fun ~key ~data acc ->
-                     match VarSet.find_by_name det.ctex.ctex_vars key with
-                     | None -> acc
-                     | Some var -> Map.set ~data acc ~key:var.vid)
-                   m;
-             }
-              : ctex);
-          ]
-      | _ -> failwith "Get model failure: Positive example cannot be found during lemma refinement."
-      )
+  | Sat | Unknown -> parse_positive_example_solver_model (Solvers.get_model solver) det
   | _ -> failwith "Check sat failure: Positive example cannot be found during lemma refinement."
 
 let trim (s : string) = Str.global_replace (Str.regexp "[\r\n\t ]") "" s
@@ -507,7 +514,7 @@ let rec lemma_refinement_loop (det : term_state_detail) ~(p : psi_def) : term_st
         match
           verify_lemma_candidate ~p { det with lemma_candidate = Some (name, vars, lemma_term) }
         with
-        | solver, Unsat ->
+        | solver, (Unsat, _) ->
             Log.verbose (fun f () -> Fmt.(pf f "This lemma has been proven correct."));
             Solvers.close_solver solver;
             Log.info (fun frmt () ->
@@ -515,10 +522,14 @@ let rec lemma_refinement_loop (det : term_state_detail) ~(p : psi_def) : term_st
                   (String.concat ~sep:" " (List.map ~f:(fun v -> v.vname) vars))
                   pp_term lemma_term);
             Some { det with lemma_candidate = None; lemmas = lemma_term :: det.lemmas }
-        | solver, Sat | solver, Unknown ->
+        | solver, (Sat, maybe_model) | solver, (Unknown, maybe_model) ->
             Log.verbose (fun f () ->
                 Fmt.(pf f "This lemma has not been proven correct. Refining lemma..."));
-            let new_positive_ctexs = get_positive_examples solver det ~p (name, vars, lemma_term) in
+            let new_positive_ctexs =
+              match maybe_model with
+              | Some model -> parse_positive_example_solver_model model det
+              | _ -> get_positive_examples solver det ~p (name, vars, lemma_term)
+            in
             List.iter
               ~f:(fun ctex ->
                 Log.verbose (fun f () ->
