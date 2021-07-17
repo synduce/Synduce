@@ -3,7 +3,7 @@ import os
 import sys
 
 # Timeout for all experiments.
-timeout_value = 400  # 4min timeout for the review
+timeout_value = 240  # 4min timeout for the review
 # Maximum 4gb memory - this should not be limiting!
 memout_value = 8000 * (2 ** 10)  # 4GB memory limit
 
