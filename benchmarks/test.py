@@ -3,7 +3,7 @@ import os
 import sys
 
 # Timeout for all experiments.
-timeout_value = 240  # 4min timeout for the review
+timeout_value = 400  # 4min timeout for the review
 # Maximum 4gb memory - this should not be limiting!
 memout_value = 8000 * (2 ** 10)  # 4GB memory limit
 
@@ -132,12 +132,19 @@ benchmark_set = [
     ["zippers/list_sum.ml", ""],
     ["lifting/mits_nosum.ml", ""],
     ["lifting/mpsl.ml", ""],
+    ["constraints/sortedlist/min.ml", ""],
+    ["constraints/sortedlist/max.ml", ""],
+    ["constraints/sortedlist/count_lt.ml", ""],
+    ["constraints/sortedlist/index_of.ml", ""],
+    ["constraints/constantlist/index_of.ml", ""],
+    ["constraints/constantlist/contains.ml", ""],
+    ["constraints/bst/contains.ml", ""],
 ]
 
 extra_benchmarks = [
     ["list/bal.ml", ""],
     ["list/lpeak.ml", ""],
-]
+]  
 
 root = os.getcwd()
 exec_path = os.path.join(root, "_build/default/bin/Synduce.exe")
@@ -207,7 +214,7 @@ if __name__ == "__main__":
 
     for filename_with_opt in input_files:
         filename = filename_with_opt[0]
-        category = filename.split("/")[0]
+        category = os.path.dirname(filename)
         extra_opt = filename_with_opt[1]
         for algo in algos:
             for optim in optims:
@@ -218,9 +225,11 @@ if __name__ == "__main__":
                               (timeout, exec_path, algo[1], optim[1], extra_opt,
                                os.path.realpath(os.path.join("benchmarks", filename))))
                 else:
+                    if not os.path.exists(os.path.dirname("extras/solutions/%s" % filename)): 
+                        os.makedirs(os.path.dirname("extras/solutions/%s" % filename))
                     os.system("%s %s %s -i %s %s %s -o %s" %
                               (timeout, exec_path, algo[1], optim[1], extra_opt,
                                os.path.realpath(os.path.join(
                                    "benchmarks", filename)),
                                "extras/solutions/%s/" % category
-                               ))
+                                ))
