@@ -11,15 +11,33 @@ module Smt = SmtInterface
 module S = Smtlib.SmtLib
 module T = Term
 
-let make_term_state_detail (term : term) =
+let make_new_recurs_elim_from_term (term : term) ~(p : psi_def) : (term * term) list * variable list
+    =
+  Set.fold ~init:([], [])
+    ~f:(fun (rec_elim, vars) var ->
+      match Variable.vtype var with
+      | None -> (rec_elim, var :: vars)
+      | Some t ->
+          if RType.is_recursive t then
+            match Expand.mk_recursion_elimination_term p with
+            | None -> (rec_elim, vars)
+            | Some (a, _) ->
+                (* When are a and b different? *)
+                ((mk_var var, a) :: rec_elim, vars @ Set.elements (Analysis.free_variables a))
+          else (rec_elim, var :: vars))
+    (Analysis.free_variables term)
+
+let make_term_state_detail ~(p : psi_def) (term : term) : term_state_detail =
+  let recurs_elim, scalar_vars = make_new_recurs_elim_from_term ~p term in
   {
     term;
     lemmas = [];
     lemma_candidate = None;
     negative_ctexs = [];
     positive_ctexs = [];
-    recurs_elim = [];
-    vars = Analysis.free_variables term;
+    recurs_elim;
+    scalar_vars;
+    current_preconds = None;
     ctex =
       (* TODO: this is hacky. Make ctex optional here. *)
       {
@@ -29,17 +47,34 @@ let make_term_state_detail (term : term) =
       };
   }
 
-let make_term_state_detail_from_ctex (is_pos_ctex : bool) (ctex : ctex) : term_state_detail =
+let subs_from_elim_to_elim elim1 elim2 : (term * term) list =
+  List.map
+    ~f:(fun (a, b) ->
+      let rec f lst =
+        match lst with
+        | [] -> failwith "Failed to get subs from ctex to term elims."
+        | (a', b') :: tl -> if Terms.(equal a a') then (b', b) else f tl
+      in
+      f elim2)
+    elim1
+
+let make_term_state_detail_from_ctex ~(p : psi_def) (is_pos_ctex : bool) (ctex : ctex) :
+    term_state_detail =
   let neg = if is_pos_ctex then [] else [ ctex ] in
   let pos = if is_pos_ctex then [ ctex ] else [] in
+  let recurs_elim, scalar_vars = make_new_recurs_elim_from_term ~p ctex.ctex_eqn.eterm in
   {
     term = ctex.ctex_eqn.eterm;
     lemmas = [];
     lemma_candidate = None;
     negative_ctexs = neg;
     positive_ctexs = pos;
-    recurs_elim = ctex.ctex_eqn.eelim;
-    vars = Set.union (Analysis.free_variables ctex.ctex_eqn.eterm) ctex.ctex_vars;
+    recurs_elim;
+    scalar_vars;
+    current_preconds =
+      (match ctex.ctex_eqn.eprecond with
+      | None -> None
+      | Some pre -> Some (substitution (subs_from_elim_to_elim recurs_elim ctex.ctex_eqn.eelim) pre));
     ctex;
   }
 
@@ -71,29 +106,17 @@ let term_detail_to_lemma ~(p : psi_def) (det : term_state_detail) : term option 
 
 let empty_term_state : term_state = Map.empty (module Terms)
 
-let set_term_lemma (ts : term_state) ~(key : term) ~(lemma : term) : term_state =
+let set_term_lemma ~(p : psi_def) (ts : term_state) ~(key : term) ~(lemma : term) : term_state =
   match Map.find ts key with
-  | None -> Map.add_exn ts ~key ~data:{ (make_term_state_detail key) with lemmas = [ lemma ] }
+  | None -> Map.add_exn ts ~key ~data:{ (make_term_state_detail ~p key) with lemmas = [ lemma ] }
   | Some det -> Map.add_exn ts ~key ~data:{ det with lemmas = [ lemma ] }
 
-let add_ctexs_of_term (ts : term_state) ~(key : term) ~(pos_ctexs : ctex list)
-    ~(neg_ctexs : ctex list) : term_state =
-  Map.update ts key ~f:(fun lem ->
-      match lem with
-      | None -> failwith "set_lemma failure: could not find lemma detail for this term."
-      | Some lem ->
-          {
-            lem with
-            positive_ctexs = lem.positive_ctexs @ pos_ctexs;
-            negative_ctexs = lem.negative_ctexs @ neg_ctexs;
-          })
-
-let create_or_update_term_state_for_ctex (is_pos_ctex : bool) (ts : term_state) (ctex : ctex) :
-    term_state =
+let create_or_update_term_state_for_ctex ~(p : psi_def) (is_pos_ctex : bool) (ts : term_state)
+    (ctex : ctex) : term_state =
   match Map.find ts ctex.ctex_eqn.eterm with
   | None ->
       Map.add_exn ~key:ctex.ctex_eqn.eterm
-        ~data:(make_term_state_detail_from_ctex is_pos_ctex ctex)
+        ~data:(make_term_state_detail_from_ctex ~p is_pos_ctex ctex)
         ts
   | Some _ ->
       Map.update ts ctex.ctex_eqn.eterm ~f:(fun maybe_det ->
@@ -101,13 +124,25 @@ let create_or_update_term_state_for_ctex (is_pos_ctex : bool) (ts : term_state) 
           | None -> failwith "Term detail does not exist."
           | Some det ->
               if is_pos_ctex then { det with positive_ctexs = ctex :: det.positive_ctexs }
-              else { det with ctex; negative_ctexs = ctex :: det.negative_ctexs })
+              else
+                {
+                  det with
+                  current_preconds =
+                    (match ctex.ctex_eqn.eprecond with
+                    | None -> None
+                    | Some pre ->
+                        Some
+                          (substitution
+                             (subs_from_elim_to_elim det.recurs_elim ctex.ctex_eqn.eelim)
+                             pre));
+                  negative_ctexs = ctex :: det.negative_ctexs;
+                })
 
-let update_term_state_for_ctexs (ts : term_state) ~(pos_ctexs : ctex list) ~(neg_ctexs : ctex list)
-    : term_state =
+let update_term_state_for_ctexs ~(p : psi_def) (ts : term_state) ~(pos_ctexs : ctex list)
+    ~(neg_ctexs : ctex list) : term_state =
   List.fold
-    ~init:(List.fold ~init:ts ~f:(create_or_update_term_state_for_ctex true) pos_ctexs)
-    ~f:(create_or_update_term_state_for_ctex false)
+    ~init:(List.fold ~init:ts ~f:(create_or_update_term_state_for_ctex ~p true) pos_ctexs)
+    ~f:(create_or_update_term_state_for_ctex ~p false)
     neg_ctexs
 
 let get_lemma ~(p : psi_def) (ts : term_state) ~(key : term) : term option =
@@ -145,29 +180,64 @@ let add_lemmas_interactively ~(p : psi_def) (lstate : refinement_loop_state) : r
         in
         match smtterm with
         | None -> existing_lemmas
-        | Some x -> set_term_lemma existing_lemmas ~key:t ~lemma:(term x))
+        | Some x -> set_term_lemma ~p existing_lemmas ~key:t ~lemma:(term x))
   in
   { lstate with term_state = Set.fold ~f ~init:lstate.term_state lstate.t_set }
 
 let ith_synth_fun index = "lemma_" ^ Int.to_string index
 
-let synthfun_of_ctex (det : term_state_detail) (lem_id : int) : command * (string * sygus_sort) list
-    =
+let synthfun_of_ctex ~(p : psi_def) (det : term_state_detail) (lem_id : int) :
+    command * (string * sygus_sort) list =
   let params =
     List.map
       ~f:(fun scalar -> (scalar.vname, sort_of_rtype RType.TInt))
-      (Set.elements det.ctex.ctex_vars)
+      (p.psi_reference.pargs @ det.scalar_vars)
   in
   let ret_sort = sort_of_rtype RType.TBool in
   let grammar = Grammars.generate_grammar ~guess:None ~bools:true OpSet.empty params ret_sort in
   (CSynthFun (ith_synth_fun lem_id, params, ret_sort, grammar), params)
 
-let ctex_model_to_args params ctex =
+let term_var_string term : string =
+  match Set.elements (Analysis.free_variables term) with
+  | [] -> failwith (Fmt.str "Failed to extract string of variable name in term %a" pp_term term)
+  | var :: _ -> var.vname
+
+let convert_term_rec_to_ctex_rec ~(p : psi_def) (det : term_state_detail) (ctex : ctex)
+    (name : string) : string =
+  let rec g recvar lst =
+    match lst with
+    | [] -> failwith (Fmt.str "Could not convert name %s to ctex rec elim." name)
+    | (a, b) :: tl ->
+        let i = term_var_string b in
+        let l = term_var_string a in
+        if String.(equal l recvar) then i else g recvar tl
+  in
+  let rec f lst =
+    match lst with
+    | [] -> failwith (Fmt.str "Could not convert name %s to ctex rec elim." name)
+    | (a, b) :: tl ->
+        let i = term_var_string b in
+        let l = term_var_string a in
+        if String.(equal i name) then g l ctex.ctex_eqn.eelim else f tl
+  in
+  match
+    VarSet.find_by_name (Set.union (VarSet.of_list p.psi_reference.pargs) ctex.ctex_vars) name
+  with
+  | None -> f det.recurs_elim
+  | Some _ -> name
+
+let ctex_model_to_args ~(p : psi_def) (det : term_state_detail)
+    (params : (string * sygus_sort) list) ctex : sygus_term list =
   List.map
-    ~f:(fun (name, _) ->
+    ~f:(fun (name_, _) ->
       match
+        let name = convert_term_rec_to_ctex_rec ~p det ctex name_ in
         Map.find ctex.ctex_model
-          (match VarSet.find_by_name ctex.ctex_vars name with
+          (match
+             VarSet.find_by_name
+               (Set.union (VarSet.of_list p.psi_reference.pargs) ctex.ctex_vars)
+               name
+           with
           | None ->
               failwith
                 (Fmt.str "Failed to extract argument list from ctex model (%s unknown)." name)
@@ -177,13 +247,16 @@ let ctex_model_to_args params ctex =
       | Some t -> sygus_of_term t)
     params
 
-let constraint_of_neg_ctex index params ctex =
+let constraint_of_neg_ctex index ~(p : psi_def) (det : term_state_detail)
+    (params : (string * sygus_sort) list) ctex =
   CConstraint
     (SyApp
-       (IdSimple "not", [ SyApp (IdSimple (ith_synth_fun index), ctex_model_to_args params ctex) ]))
+       ( IdSimple "not",
+         [ SyApp (IdSimple (ith_synth_fun index), ctex_model_to_args ~p det params ctex) ] ))
 
-let constraint_of_pos_ctex index params ctex =
-  CConstraint (SyApp (IdSimple (ith_synth_fun index), ctex_model_to_args params ctex))
+let constraint_of_pos_ctex index ~(p : psi_def) (det : term_state_detail)
+    (params : (string * sygus_sort) list) ctex =
+  CConstraint (SyApp (IdSimple (ith_synth_fun index), ctex_model_to_args ~p det params ctex))
 
 let log_soln s vs t =
   Log.verbose (fun frmt () ->
@@ -191,10 +264,16 @@ let log_soln s vs t =
         (String.concat ~sep:" " (List.map ~f:(fun v -> v.vname) vs))
         pp_term t)
 
-let handle_lemma_synth_response (det : term_state_detail) (resp : solver_response option) =
+let handle_lemma_synth_response ~(p : psi_def) (det : term_state_detail)
+    (resp : solver_response option) =
   let parse_synth_fun (fname, _fargs, _, fbody) =
-    let args = Set.elements det.ctex.ctex_vars in
-    let body, _ = infer_type (term_of_sygus (VarSet.to_env det.ctex.ctex_vars) fbody) in
+    let args = p.psi_reference.pargs @ det.scalar_vars in
+    let body, _ =
+      infer_type
+        (term_of_sygus
+           (VarSet.to_env (VarSet.of_list (p.psi_reference.pargs @ det.scalar_vars)))
+           fbody)
+    in
     (fname, args, body)
   in
   match resp with
@@ -226,10 +305,13 @@ let smt_of_lemma_validity ~(p : psi_def) lemma (det : term_state_detail) =
   let quants =
     List.map
       ~f:(fun var -> (S.SSimple var.vname, mk_sort (Variable.vtype var)))
-      (Set.elements det.vars @ p.psi_reference.pargs)
+      (Set.elements (Analysis.free_variables det.term)
+      @ p.psi_reference.pargs
+      @ List.concat_map ~f:(fun (_, b) -> Set.elements (Analysis.free_variables b)) det.recurs_elim
+      )
   in
   let preconds =
-    match det.ctex.ctex_eqn.eprecond with None -> [] | Some pre -> [ Smt.smt_of_term pre ]
+    match det.current_preconds with None -> [] | Some pre -> [ Smt.smt_of_term pre ]
   in
   (* TODO: if condition should account for other preconditions *)
   let if_condition =
@@ -299,16 +381,17 @@ let set_up_to_get_model solver ~(p : psi_def) lemma (det : term_state_detail) =
   (* ^ Why do I do this sat check? *)
   (* Step 2. Declare scalars (vars for recursion elimination & spec param) and their constraints (preconds & recurs elim eqns) *)
   Solvers.declare_all solver
-    (Smt.decls_of_vars (Set.union det.vars (VarSet.of_list p.psi_reference.pargs)));
+    (Smt.decls_of_vars
+       (Set.union (VarSet.of_list det.scalar_vars) (VarSet.of_list p.psi_reference.pargs)));
   ignore (Solvers.exec_command solver (S.mk_assert (smt_of_recurs_elim_eqns det.recurs_elim ~p)));
-  (match det.ctex.ctex_eqn.eprecond with
+  (match det.current_preconds with
   | None -> ()
   | Some pre -> ignore (Solvers.exec_command solver (S.mk_assert (Smt.smt_of_term pre))));
   ignore (Solvers.check_sat solver);
   (* Step 3. Disallow repeated positive examples. *)
-  if List.length det.positive_ctexs > 0 then
-    ignore
-      (Solvers.exec_command solver (S.mk_assert (smt_of_disallow_ctex_values det.positive_ctexs)));
+  (* if List.length det.positive_ctexs > 0 then
+     ignore
+       (Solvers.exec_command solver (S.mk_assert (smt_of_disallow_ctex_values det.positive_ctexs))); *)
   (* Step 4. Assert that lemma candidate is false. *)
   ignore (Solvers.exec_command solver (S.mk_assert (S.mk_not (smt_of_lemma_app lemma))))
 
@@ -329,9 +412,7 @@ let bounded_check solver ~(p : psi_def) lemma_candidate (det : term_state_detail
           (* Assert that `key` variable is equal to `data` term *)
           ignore
             (Solvers.exec_command solver
-               (S.mk_assert (S.mk_eq (S.mk_var key.vname) (Smt.smt_of_term data))))
-          (* Log.verbose (fun f () ->
-              Fmt.(pf f "Here is key: %s, and data: %a" key.vname pp_term data) *))
+               (S.mk_assert (S.mk_eq (S.mk_var key.vname) (Smt.smt_of_term data)))))
         rec_instantation;
       let resp = Solvers.check_sat solver in
       (* Note that I am getting a model after check-sat unknown response. This may not halt.  *)
@@ -386,25 +467,34 @@ let verify_lemma_candidate ~(p : psi_def) (det : term_state_detail) :
       in
       (solver, result)
 
-let parse_positive_example_solver_model response (det : term_state_detail) =
+let parse_positive_example_solver_model ~(p : psi_def) response (det : term_state_detail) =
   match response with
   | SmtLib.SExps s ->
       let model = Smt.model_to_constmap (SExps s) in
       let m, _ =
         Map.partitioni_tf
-          ~f:(fun ~key ~data:_ -> Option.is_some (VarSet.find_by_name det.ctex.ctex_vars key))
+          ~f:(fun ~key ~data:_ ->
+            Option.is_some
+              (VarSet.find_by_name (VarSet.of_list (det.scalar_vars @ p.psi_reference.pargs)) key))
           model
       in
       (* Remap the names to ids of the original variables in m' *)
       [
         ({
-           det.ctex with
+           ctex_eqn = { det.ctex.ctex_eqn with eelim = det.recurs_elim };
+           ctex_vars = VarSet.of_list det.scalar_vars;
            ctex_model =
              Map.fold
                ~init:(Map.empty (module Int))
                ~f:(fun ~key ~data acc ->
-                 match VarSet.find_by_name det.ctex.ctex_vars key with
-                 | None -> acc
+                 match
+                   VarSet.find_by_name
+                     (VarSet.of_list (p.psi_reference.pargs @ det.scalar_vars))
+                     key
+                 with
+                 | None ->
+                     Log.info (fun f () -> Fmt.(pf f "Could not find by name %s" key));
+                     acc
                  | Some var -> Map.set ~data acc ~key:var.vid)
                m;
          }
@@ -417,7 +507,7 @@ let get_positive_examples (solver : Solvers.online_solver) (det : term_state_det
   Log.verbose (fun f () -> Fmt.(pf f "Searching for a positive example."));
   set_up_to_get_model solver ~p lemma det;
   match Solvers.check_sat solver with
-  | Sat | Unknown -> parse_positive_example_solver_model (Solvers.get_model solver) det
+  | Sat | Unknown -> parse_positive_example_solver_model ~p (Solvers.get_model solver) det
   | _ -> failwith "Check sat failure: Positive example cannot be found during lemma refinement."
 
 let trim (s : string) = Str.global_replace (Str.regexp "[\r\n\t ]") "" s
@@ -435,7 +525,7 @@ let parse_interactive_positive_example (det : term_state_detail) (input : string
             else
               let key = trim (List.nth_exn s 0) in
               let data = mk_const (CInt (Int.of_string (trim (List.nth_exn s 1)))) in
-              match VarSet.find_by_name det.ctex.ctex_vars key with
+              match VarSet.find_by_name (VarSet.of_list det.scalar_vars) key with
               | None -> acc
               | Some var -> Map.set ~data acc ~key:var.vid)
           (Str.split (Str.regexp " *, *") input);
@@ -446,7 +536,7 @@ let interactive_get_positive_examples (det : term_state_detail) =
     Set.filter
       ~f:(fun var ->
         match Variable.vtype var with None -> false | Some t -> not (RType.is_recursive t))
-      det.vars
+      (Analysis.free_variables det.term)
   in
   Log.info (fun f () ->
       Fmt.(
@@ -465,24 +555,31 @@ let interactive_get_positive_examples (det : term_state_detail) =
   | Some s -> (
       match parse_interactive_positive_example det s with None -> [] | Some ctex -> [ ctex ])
 
-let synthesize_new_lemma (det : term_state_detail) : (string * variable list * term) option =
+let synthesize_new_lemma ~(p : psi_def) (det : term_state_detail) :
+    (string * variable list * term) option =
   let set_logic = CSetLogic "DTLIA" in
   (* TODO: How to choose logic? *)
   let lem_id = 0 in
-  let synth_objs, params = synthfun_of_ctex det lem_id in
-  let neg_constraints = List.map ~f:(constraint_of_neg_ctex lem_id params) det.negative_ctexs in
-  let pos_constraints = List.map ~f:(constraint_of_pos_ctex lem_id params) det.positive_ctexs in
+  let synth_objs, params = synthfun_of_ctex ~p det lem_id in
+  let neg_constraints =
+    List.map ~f:(constraint_of_neg_ctex lem_id ~p det params) det.negative_ctexs
+  in
+  let pos_constraints =
+    List.map ~f:(constraint_of_pos_ctex lem_id ~p det params) det.positive_ctexs
+  in
   let extra_defs = [ max_definition; min_definition ] in
   let commands =
     set_logic :: (extra_defs @ [ synth_objs ] @ neg_constraints @ pos_constraints @ [ CCheckSynth ])
   in
-  match handle_lemma_synth_response det (Syguslib.Solvers.SygusSolver.solve_commands commands) with
+  match
+    handle_lemma_synth_response ~p det (Syguslib.Solvers.SygusSolver.solve_commands commands)
+  with
   | None -> None
   | Some solns -> List.nth solns 0
 (* TODO: will the lemma we wanted to synth always be first? *)
 
 let rec lemma_refinement_loop (det : term_state_detail) ~(p : psi_def) : term_state_detail option =
-  match synthesize_new_lemma det with
+  match synthesize_new_lemma ~p det with
   | None ->
       Log.debug_msg "Lemma synthesis failure.";
       None
@@ -492,11 +589,11 @@ let rec lemma_refinement_loop (det : term_state_detail) ~(p : psi_def) : term_st
             Fmt.(
               pf f "Is the lemma \"%s %s = @[%a@]\" for term %a[%a] correct? [Y/N]" name
                 (String.concat ~sep:" " (List.map ~f:(fun v -> v.vname) vars))
-                pp_term lemma_term pp_term det.term pp_subs det.ctex.ctex_eqn.eelim));
+                pp_term lemma_term pp_term det.term pp_subs det.recurs_elim));
         match Stdio.In_channel.input_line Stdio.stdin with
         | Some "Y" ->
             let lemma =
-              match det.ctex.ctex_eqn.eprecond with
+              match det.current_preconds with
               | None -> lemma_term
               | Some pre -> mk_bin Binop.Or (mk_un Unop.Not pre) lemma_term
             in
@@ -528,7 +625,7 @@ let rec lemma_refinement_loop (det : term_state_detail) ~(p : psi_def) : term_st
                   (String.concat ~sep:" " (List.map ~f:(fun v -> v.vname) vars))
                   pp_term lemma_term);
             let lemma =
-              match det.ctex.ctex_eqn.eprecond with
+              match det.current_preconds with
               | None -> lemma_term
               | Some pre -> mk_bin Binop.Or (mk_un Unop.Not pre) lemma_term
             in
@@ -538,7 +635,7 @@ let rec lemma_refinement_loop (det : term_state_detail) ~(p : psi_def) : term_st
                 Fmt.(pf f "This lemma has not been proven correct. Refining lemma..."));
             let new_positive_ctexs =
               match maybe_model with
-              | Some model -> parse_positive_example_solver_model model det
+              | Some model -> parse_positive_example_solver_model ~p model det
               | _ -> get_positive_examples solver det ~p (name, vars, lemma_term)
             in
             List.iter
@@ -571,7 +668,7 @@ let synthesize_lemmas ~(p : psi_def) synt_failure_info (lstate : refinement_loop
         (* Classify in negative and positive cexs. *)
         let positive_ctexs, negative_ctexs, _ = classify_ctexs_opt ~p ctexs in
         let ts : term_state =
-          update_term_state_for_ctexs lstate.term_state ~neg_ctexs:negative_ctexs
+          update_term_state_for_ctexs ~p lstate.term_state ~neg_ctexs:negative_ctexs
             ~pos_ctexs:positive_ctexs
         in
         if List.is_empty negative_ctexs then (ts, false)

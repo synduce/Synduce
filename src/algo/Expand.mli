@@ -1,6 +1,8 @@
 open Lang
 open Base
 
+val mk_recursion_elimination_term : AState.psi_def -> (Term.term * Term.term) option
+
 val subst_recursive_calls :
   AState.psi_def -> Term.term list -> (Term.term * Term.term) list * Term.TermSet.t
 

@@ -103,7 +103,8 @@ type term_state_detail = {
   negative_ctexs : ctex list;
   positive_ctexs : ctex list;
   recurs_elim : (term * term) list;
-  vars : VarSet.t;
+  scalar_vars : variable list;
+  current_preconds : term option;
   ctex : ctex;
 }
 

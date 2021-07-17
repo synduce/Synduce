@@ -17,4 +17,4 @@ let spec x t =
 let target y t =
   let rec g = function Elt a -> [%synt xi_0] y a | Cons (hd, tl) -> [%synt xi_1] y hd in
   g t
-(* [@@requires constant_list] *)
+  [@@requires constant_list]
