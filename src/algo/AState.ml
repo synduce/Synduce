@@ -105,7 +105,6 @@ type term_state_detail = {
   recurs_elim : (term * term) list;
   scalar_vars : variable list;
   current_preconds : term option;
-  ctex : ctex;
 }
 
 type term_state = (term, term_state_detail, Terms.comparator_witness) Map.t
