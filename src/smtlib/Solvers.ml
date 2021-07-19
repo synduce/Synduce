@@ -165,6 +165,8 @@ let make_solver ~(name : string) (path : string) (options : string list) : onlin
     }
   in
   online_solvers := (Pid.to_int pinfo.pid, solver) :: !online_solvers;
+  Log.debug_msg
+    Fmt.(str "Solver %s started:  pid: %i log: %s" solver.s_name solver.s_pid solver.s_log_file);
   try
     match exec_command solver mk_print_success with
     | Success -> solver

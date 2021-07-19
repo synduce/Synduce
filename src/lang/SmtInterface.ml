@@ -118,7 +118,10 @@ let rec smt_of_term (t : term) : smtTerm =
   | TApp ({ tkind = TVar v; _ }, args) -> mk_simple_app v.vname (List.map ~f:smt_of_term args)
   | TData (cstr, args) -> (
       match args with
-      | [] -> SmtTQualdId (QI (Id (SSimple cstr)))
+      | [] ->
+          let t = t.ttyp in
+          let sort = sort_of_rtype t in
+          SmtTQualdId (QIas (Id (SSimple cstr), sort))
       | _ -> mk_simple_app cstr (List.map ~f:smt_of_term args))
   | TMatch (tm, cases) -> SmtTMatch (smt_of_term tm, List.map ~f:smt_of_case cases)
   | TApp (_, _) ->
@@ -173,6 +176,7 @@ let rec term_of_smt (env : (string, variable, String.comparator_witness) Map.t) 
       | IVar v -> Term.mk_var v
       | IBool true -> mk_const Constant.CTrue
       | IBool false -> mk_const Constant.CFalse
+      | ICstr c -> mk_data c []
       | _ -> failwith Fmt.(str "Smt: undefined variable %s" s))
   | SmtTSpecConst l -> mk_const (constant_of_smtConst l)
   | SmtTApp (QIas (Id (SSimple s), _), args) | SmtTApp (QI (Id (SSimple s)), args) -> (
