@@ -41,12 +41,15 @@ let make_term_state_detail ~(p : psi_def) (term : term) : term_state_detail =
   }
 
 let subs_from_elim_to_elim elim1 elim2 : (term * term) list =
-  List.map
+  List.concat_map
     ~f:(fun (a, b) ->
       let rec f lst =
         match lst with
-        | [] -> failwith "Failed to get subs from ctex to term elims."
-        | (a', b') :: tl -> if Terms.(equal a a') then (b', b) else f tl
+        | [] ->
+            Log.debug_msg
+              (Fmt.str "Failed to get subs from ctex to term elims when matching %a." pp_term a);
+            []
+        | (a', b') :: tl -> if Terms.(equal a a') then [ (b', b) ] else f tl
       in
       f elim2)
     elim1
@@ -55,8 +58,47 @@ let make_term_state_detail_from_ctex ~(p : psi_def) (is_pos_ctex : bool) (ctex :
     term_state_detail =
   let neg = if is_pos_ctex then [] else [ ctex ] in
   let pos = if is_pos_ctex then [ ctex ] else [] in
-  let recurs_elim, scalar_vars = make_new_recurs_elim_from_term ~p ctex.ctex_eqn.eterm in
-  let subs = subs_from_elim_to_elim recurs_elim ctex.ctex_eqn.eelim in
+  let recurs_elim_, scalar_vars_ = make_new_recurs_elim_from_term ~p ctex.ctex_eqn.eterm in
+  let recurs_elim =
+    List.filter
+      ~f:(fun (l, _) ->
+        let rec f l lst =
+          match lst with
+          | [] -> false
+          | (hd, _) :: tl -> if Terms.(equal l hd) then true else f l tl
+        in
+        f l ctex.ctex_eqn.eelim)
+      recurs_elim_
+  in
+  let subs_ = subs_from_elim_to_elim recurs_elim ctex.ctex_eqn.eelim in
+  let scalar_vars =
+    (* Filter out the vars that are not relevant to this ctex's model *)
+    List.filter
+      ~f:(fun v ->
+        let rec g v' s =
+          match s with
+          | [] ->
+              Log.debug_msg (Fmt.str "Filtering out irrelevant scalar var %a" pp_term (mk_var v'));
+              false
+          | (_, b) :: tl -> if Terms.(equal (mk_var v') b) then true else g v' tl
+        in
+        let rec f lst =
+          match lst with
+          | [] -> false
+          | hd :: tl -> if Variable.(equal v hd) then true else if g v subs_ then true else f tl
+        in
+        f (Set.elements ctex.ctex_vars))
+      scalar_vars_
+  in
+  let subs =
+    (* Filter out the vars that are not relevant to this ctex's model *)
+    List.filter
+      ~f:(fun (_, b) ->
+        let is_in = List.mem (List.map ~f:mk_var scalar_vars) ~equal:Terms.equal b in
+        Log.debug_msg (Fmt.str "Is %a in? %s" pp_term b (if is_in then "yes" else "no"));
+        is_in)
+      subs_
+  in
   {
     term = ctex.ctex_eqn.eterm;
     lemmas = [];
@@ -64,22 +106,7 @@ let make_term_state_detail_from_ctex ~(p : psi_def) (is_pos_ctex : bool) (ctex :
     negative_ctexs = neg;
     positive_ctexs = pos;
     recurs_elim;
-    scalar_vars =
-      (* Filter out the vars that are not relevant to this ctex's model *)
-      List.filter
-        ~f:(fun v ->
-          let rec g v' s =
-            match s with
-            | [] -> false
-            | (_, b) :: tl -> if Terms.(equal (mk_var v') b) then true else g v' tl
-          in
-          let rec f lst =
-            match lst with
-            | [] -> false
-            | hd :: tl -> if Variable.(equal v hd) then true else if g v subs then true else f tl
-          in
-          f (Set.elements ctex.ctex_vars))
-        scalar_vars;
+    scalar_vars;
     current_preconds =
       (match ctex.ctex_eqn.eprecond with None -> None | Some pre -> Some (substitution subs pre));
   }
@@ -291,11 +318,13 @@ let handle_lemma_synth_response (det : term_state_detail) (resp : solver_respons
   | Some RInfeasible | Some RFail | Some RUnknown | None -> None
 
 let smt_of_recurs_elim_eqns (elim : (term * term) list) ~(p : psi_def) : S.smtTerm =
-  S.mk_assoc_and
-    (List.map
-       ~f:(fun (t1, t2) ->
-         S.mk_eq (Smt.smt_of_term (mk_f_compose_r_orig ~p t1)) (Smt.smt_of_term t2))
-       elim)
+  let lst =
+    List.map
+      ~f:(fun (t1, t2) ->
+        S.mk_eq (Smt.smt_of_term (mk_f_compose_r_orig ~p t1)) (Smt.smt_of_term t2))
+      elim
+  in
+  if equal (List.length lst) 0 then S.mk_true else S.mk_assoc_and lst
 
 let smt_of_tinv_app ~(p : psi_def) (det : term_state_detail) =
   match p.psi_tinv with
