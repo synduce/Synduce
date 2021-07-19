@@ -3,6 +3,7 @@ open Base
 open Term
 open Utils
 open Specifications
+open Option.Let_syntax
 
 (* ============================================================================================= *)
 (*                      TYPE DEFINITIONS AND UTILS                                               *)
@@ -15,15 +16,17 @@ type rewrite_rule = variable * variable list * pattern option * term
 type top_function = variable * variable list * term
 
 type t = {
-  pvar : Variable.t;  (** The main function symbol *)
+  pvar : Variable.t;
+      (**
+    The main function symbol.
+    The specification associated to the PMRS may be found using:
+    [get_spec pvar]
+  *)
   pinput_typ : RType.t list;
       (**
     The input type(s). For now, it should be a singleton list.
     The input type is only the type of the recursively-typed argument of the PMRS, not the parameters.
   *)
-  pspec : spec;
-  (* A specification for the PMRS, in the form of optional requires and ensures clauses.
-   *)
   poutput_typ : RType.t;  (** Output type and optional invariant on output of function. *)
   pargs : variable list;  (** Parameter arguments.  *)
   psyntobjs : VarSet.t;  (** The unknowns to synthesize.*)
@@ -45,7 +48,7 @@ type variables = variable Map.M(String).t
 *)
 let _globals : (int, t) Hashtbl.t = Hashtbl.create (module Int)
 
-let find_by_name (pmrs_name : string) =
+let find_by_name (pmrs_name : string) : variable option =
   let matches = Hashtbl.filter ~f:(fun p -> String.(p.pvar.vname = pmrs_name)) _globals in
   Option.map ~f:(fun (_, p) -> p.pvar) (Hashtbl.choose matches)
 
@@ -53,6 +56,12 @@ let find_by_name (pmrs_name : string) =
     variable id.
 *)
 let _nonterminals : (int, t) Hashtbl.t = Hashtbl.create (module Int)
+
+let find_nonterminal_by_name (name : string) : variable option =
+  let r = ref None in
+  Hashtbl.iter _nonterminals ~f:(fun t ->
+      match VarSet.find_by_name t.pnon_terminals name with Some x -> r := Some x | None -> ());
+  !r
 
 let lhs (nt, args, pat, rhs) =
   let all_args =
@@ -86,7 +95,9 @@ let pp (frmt : Formatter.t) (pmrs : t) : unit =
   Fmt.(
     pf frmt "%s⟨%a⟩(%a): %a -> %a@;%a@;= @;@[<v 2>{@;%a@;}@]" pmrs.pvar.vname
       VarSet.pp_var_names pmrs.psyntobjs (list ~sep:comma Variable.pp) pmrs.pargs
-      (list ~sep:comma RType.pp) pmrs.pinput_typ RType.pp pmrs.poutput_typ (box pp_spec) pmrs.pspec
+      (list ~sep:comma RType.pp) pmrs.pinput_typ RType.pp pmrs.poutput_typ
+      (option (box pp_spec))
+      (Specifications.get_spec pmrs.pvar)
       pp_rules ())
 
 let pp_ocaml (frmt : Formatter.t) (pmrs : t) : unit =
@@ -217,14 +228,13 @@ let infer_pmrs_types (prog : t) =
       let typ_in, typ_out = RType.fun_typ_unpack (Variable.vtype_or_new prog.pmain_symb) in
       Variable.update_var_types
         [ (Variable.vtype_or_new prog.pvar, Variable.vtype_or_new prog.pmain_symb) ];
-      let invariant = Option.map ~f:(fun x -> first (infer_type x)) prog.pspec.ensures in
-      {
-        prog with
-        prules = new_rules;
-        pinput_typ = typ_in;
-        poutput_typ = typ_out;
-        pspec = { prog.pspec with ensures = invariant };
-      }
+      (* Change types in the specification. *)
+      let _ =
+        let%bind spec = get_spec prog.pvar in
+        let%map invariant = Option.map ~f:(fun ens -> first (infer_type ens)) spec.ensures in
+        Specifications.set_spec prog.pvar { spec with ensures = Some invariant }
+      in
+      { prog with prules = new_rules; pinput_typ = typ_in; poutput_typ = typ_out }
   | Error e ->
       Log.error_msg Fmt.(str "Error: %a" Sexp.pp_hum e);
       failwith "Type inference failed for pmrs."
@@ -288,7 +298,6 @@ let func_to_pmrs (f : Variable.t) (args : fpattern list) (body : Term.term) =
     pvar = f;
     pinput_typ = [ tin ];
     poutput_typ = tout;
-    pspec = empty_spec;
     pargs = Set.elements (fpat_vars (FPatTup args));
     psyntobjs = VarSet.empty;
     (* PMRS from a function cannot have unkowns. *)

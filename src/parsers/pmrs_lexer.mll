@@ -7,7 +7,7 @@ exception SyntaxError of string
 
 let keywords =
     [
-        "@inv", INVARIANT;
+        "@ensures", ENSURES;
         "@equiv", EQUIV;
         "@defining", DEFINING;
         "abs", ABS;
@@ -21,6 +21,7 @@ let keywords =
         "if", IF;
         "int", INTSORT;
         "let", LET;
+        "lemma", LEMMA;
         "pmrs", LETPMRS;
         "max", MAX;
         "min", MIN;

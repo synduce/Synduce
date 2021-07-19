@@ -209,6 +209,7 @@ let pmrs_of_rules loc (globs : (string, Term.variable) Hashtbl.t) (synt_objs : T
     let f x = fterm_to_term x.pos allv globs Term.VarSet.empty x in
     (Option.map requires ~f, Option.map ~f ensures)
   in
+  Specifications.set_spec pvar { ensures = ensures_func; requires = _requires_func };
   let pmrs0 =
     PMRS.
       {
@@ -216,7 +217,6 @@ let pmrs_of_rules loc (globs : (string, Term.variable) Hashtbl.t) (synt_objs : T
         pargs = args;
         pinput_typ = [ RType.TNamed "_?" ];
         poutput_typ = RType.TNamed "_?";
-        pspec = { ensures = ensures_func; requires = _requires_func };
         psyntobjs = Term.VarSet.of_list synt_objs;
         pnon_terminals = nont;
         prules = rules;
@@ -259,30 +259,44 @@ let translate (prog : program) =
           | `Duplicate -> loc_fatal_errmsg loc (Fmt.str "%s already declared." fname))
       | _ -> ());
   (* Second pass  *)
-  List.fold
-    ~init:(Map.empty (module String))
-    prog
-    ~f:(fun pmrses decl ->
-      match decl with
-      | PMRSDef (loc, params, pname, args, requires, ensures, body) ->
-          let vparams = List.map ~f:Term.Variable.mk params in
-          let pvar = Hashtbl.find_exn globals pname in
-          let vargs = List.map ~f:Term.Variable.mk args in
-          let pmrs = pmrs_of_rules loc globals vparams vargs pvar (requires, ensures) body in
-          (match Hashtbl.add PMRS._globals ~key:pvar.vid ~data:pmrs with
-          | `Ok -> Log.verbose_msg ("Parsed " ^ pname)
-          | `Duplicate -> Log.error_msg (pname ^ " already declared, ignoring."));
-          Set.iter pmrs.pnon_terminals ~f:(fun x ->
-              match Hashtbl.add PMRS._nonterminals ~key:x.vid ~data:pmrs with
-              | `Ok -> Log.verbose_msg ("Referenced " ^ x.vname)
-              | `Duplicate -> ());
-          Map.set pmrses ~key:pname ~data:pmrs
-      | FunDef (loc, fname, args, invariant, body) ->
-          let vargs = List.map ~f:Term.Variable.mk args in
-          let fvar = Hashtbl.find_exn globals fname in
-          let func_info = translate_function loc globals fvar vargs invariant body in
-          (match Hashtbl.add Term._globals ~key:fvar.vname ~data:func_info with
-          | `Ok -> Log.verbose_msg ("Parsed " ^ fvar.vname)
-          | `Duplicate -> Log.error_msg (fvar.vname ^ " already declared."));
-          pmrses
-      | _ -> pmrses)
+  let pmrses =
+    List.fold
+      ~init:(Map.empty (module String))
+      prog
+      ~f:(fun pmrses decl ->
+        match decl with
+        | PMRSDef (loc, params, pname, args, requires, ensures, body) ->
+            let vparams = List.map ~f:Term.Variable.mk params in
+            let pvar = Hashtbl.find_exn globals pname in
+            let vargs = List.map ~f:Term.Variable.mk args in
+            let pmrs = pmrs_of_rules loc globals vparams vargs pvar (requires, ensures) body in
+            (match Hashtbl.add PMRS._globals ~key:pvar.vid ~data:pmrs with
+            | `Ok -> Log.verbose_msg ("Parsed " ^ pname)
+            | `Duplicate -> Log.error_msg (pname ^ " already declared, ignoring."));
+            Set.iter pmrs.pnon_terminals ~f:(fun x ->
+                match Hashtbl.add PMRS._nonterminals ~key:x.vid ~data:pmrs with
+                | `Ok -> Log.verbose_msg ("Referenced " ^ x.vname)
+                | `Duplicate -> ());
+            Map.set pmrses ~key:pname ~data:pmrs
+        | FunDef (loc, fname, args, invariant, body) ->
+            let vargs = List.map ~f:Term.Variable.mk args in
+            let fvar = Hashtbl.find_exn globals fname in
+            let func_info = translate_function loc globals fvar vargs invariant body in
+            (match Hashtbl.add Term._globals ~key:fvar.vname ~data:func_info with
+            | `Ok -> Log.verbose_msg ("Parsed " ^ fvar.vname)
+            | `Duplicate -> Log.error_msg (fvar.vname ^ " already declared."));
+            pmrses
+        | _ -> pmrses)
+  in
+  (* Third pass : extra ensures. *)
+  List.iter prog ~f:(function
+    | EnsuresDef (loc, ident, ensures) -> (
+        let t = fterm_to_term loc Term.VarSet.empty globals Term.VarSet.empty ensures in
+        match Hashtbl.find Term._globals ident with
+        | Some (func, _, _, _) -> Specifications.set_ensures func t
+        | None -> (
+            match PMRS.find_nonterminal_by_name ident with
+            | Some x -> Specifications.set_ensures x t
+            | None -> ()))
+    | _ -> ());
+  pmrses

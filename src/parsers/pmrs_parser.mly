@@ -37,7 +37,7 @@
 %token TRUE
 %token TYPE
 %token VBAR
-%token EQUIV INVARIANT DEFINING
+%token EQUIV ENSURES DEFINING LEMMA
 %token EOF
 
 
@@ -63,6 +63,7 @@ def:
     | LET REC p=letpmrsdef LBRACKET EQUIV spec=IDENT repr=IDENT RBRACKET
                                                 { SyntObjDecl($loc, p , spec, repr) }
     | LET REC p=letpmrsdef                      { p }
+    | LEMMA f=IDENT ENSURES t=expr              { EnsuresDef($loc, f, t) }
 
 
 
@@ -121,7 +122,7 @@ letpmrsdef:
     | defs=separated_list(LETAND, functdef)           { CamlPMRSDef($loc, [], None, None, defs) }
     | defs=separated_list(LETAND, functdef) LBRACKET DEFINING xi=list(IDENT) RBRACKET
                                                         { CamlPMRSDef($loc, xi, None, None, defs) }
-    | defs=separated_list(LETAND, functdef) LBRACKET INVARIANT invariant=expr RBRACKET
+    | defs=separated_list(LETAND, functdef) LBRACKET ENSURES invariant=expr RBRACKET
                                                         { CamlPMRSDef($loc, [], None, Some invariant, defs) }
 
 functdef:  n=IDENT args=list(IDENT) EQ rules=function_body       { n, args, rules }

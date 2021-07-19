@@ -4,6 +4,7 @@ open Lang
 open Lang.Term
 open Syguslib.Sygus
 open Utils
+open Option.Let_syntax
 
 let rec refinement_loop (p : psi_def) (lstate : refinement_loop_state) =
   Int.incr refinement_steps;
@@ -208,11 +209,11 @@ let solve_problem (psi_comps : (string * string * string) option)
     match repr with Either.First p -> p | Either.Second (f, a, b) -> PMRS.func_to_pmrs f a b
   in
   let tinv_pmrs =
-    match target_f.pspec.requires with
-    | Some t -> (
-        match t.tkind with TVar func_var -> Hashtbl.find PMRS._globals func_var.vid | _ -> None)
-    | None -> None
+    let%bind spec = Specifications.get_spec target_f.pvar in
+    let%bind t = spec.requires in
+    match t.tkind with TVar func_var -> Hashtbl.find PMRS._globals func_var.vid | _ -> None
   in
+
   let problem =
     sync_args
       {
@@ -244,6 +245,7 @@ let solve_problem (psi_comps : (string * string * string) option)
         | Either.First pmrs -> pf fmt "%a" PMRS.pp pmrs
         | Either.Second (fv, args, body) ->
             pf fmt "%s(%a) = %a" fv.vname (list ~sep:comma Term.pp_fpattern) args Term.pp_term body);
+  Log.info Specifications.dump_all;
   (* Print the condition on the reference function's input, if there is one. *)
   (match problem.psi_tinv with
   | Some tinv -> Log.info (fun formt () -> Fmt.(pf formt "%a" PMRS.pp tinv))
@@ -251,7 +253,7 @@ let solve_problem (psi_comps : (string * string * string) option)
   (* Set global information. *)
   AState._tau := tau;
   AState._theta := theta;
-  AState._alpha := (t_out, reference_f.pspec.ensures);
+  AState._alpha := (t_out, Specifications.get_ensures reference_f.pvar);
   AState._span := List.length (Analysis.terms_of_max_depth 1 theta);
   AState.refinement_steps := 0;
   (* Solve the problem. *)

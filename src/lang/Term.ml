@@ -64,13 +64,17 @@ module Variable = struct
   include T
   include Comparator.Make (T)
 
-  let _types : (int, RType.t) Hashtbl.t = Hashtbl.create (module Int)
+  let types_tbl : (int, RType.t) Hashtbl.t = Hashtbl.create (module Int)
+
+  let names_tbl : (int, string) Hashtbl.t = Hashtbl.create (module Int)
 
   let _print_info = ref false
 
-  let vtype_assign (v : t) (t : RType.t) = Hashtbl.set _types ~key:v.vid ~data:t
+  let vtype_assign (v : t) (t : RType.t) = Hashtbl.set types_tbl ~key:v.vid ~data:t
 
-  let vtype (v : t) = Hashtbl.find _types v.vid
+  let vtype (v : t) = Hashtbl.find types_tbl v.vid
+
+  let get_name (vid : int) = Hashtbl.find names_tbl vid
 
   let clear_type (v : t) =
     let new_t = RType.get_fresh_tvar () in
@@ -90,10 +94,11 @@ module Variable = struct
         new_t
 
   let update_var_types (tsubs : (RType.t * RType.t) list) =
-    Hashtbl.map_inplace _types ~f:(fun t -> RType.sub_all tsubs t)
+    Hashtbl.map_inplace ~f:(fun t -> RType.sub_all tsubs t) types_tbl
 
   let mk ?(attrs = Attributes.empty) ?(t = None) (name : string) =
     let v = Alpha.mk_with_id (-1) name (fun vid -> { vname = name; vid; vattrs = attrs }) in
+    Hashtbl.set names_tbl ~key:v.vid ~data:v.vname;
     (match t with Some t -> vtype_assign v t | None -> vtype_assign v (RType.get_fresh_tvar ()));
     v
 
@@ -128,7 +133,7 @@ module Variable = struct
 
   let free (var : t) =
     Alpha.forget var.vid var.vname;
-    Hashtbl.remove _types var.vid
+    Hashtbl.remove types_tbl var.vid
 
   let print_summary (frmt : Formatter.t) () =
     Utils.Log.(debug (wrap "Variables in tables:"));
@@ -138,7 +143,7 @@ module Variable = struct
     Fmt.(pf frmt "\t  ID | %*s : TYPE@." le "NAME");
     Fmt.(pf frmt "\t---------------------------@.");
     Hashtbl.iteri (Alpha.get_ids ()) ~f:(fun ~key ~data ->
-        match Hashtbl.find _types key with
+        match Hashtbl.find types_tbl key with
         | Some t -> Fmt.(pf frmt "\t%4i | %*s : %a@." key le data RType.pp t)
         | None -> Fmt.(pf frmt "\t%4i | %*s : ??@." key le data))
 end

@@ -126,6 +126,7 @@ let parse_term_attribute ~(name : string) (attr : attribute) : Front.term option
         None)
   else None
 
+(** Returns requires, ensures *)
 let get_predicate (b : value_binding) =
   (* TODO: parse mutlitple predicates? Currently, only the first "ensures" and the first "requires"
      is kept.
@@ -192,7 +193,9 @@ let rules_of_case_list loc (nont : ident) (preargs : ident list) (cases : case l
   case, or a `fun` expression, in which case we have only one rule without pattern
   matching.
  *)
-let as_pmrs (pat : pattern) (expr : expression) (_ : attribute list) =
+let as_pmrs (vb : value_binding) : (ident * (loc * term * term) list * term option) option =
+  let pat, expr = (vb.pvb_pat, vb.pvb_expr) in
+
   (* Prepend `s preargs ..` as the head of each rule in expr. *)
   let rec as_pmrs_named s preargs expr =
     match expr.pexp_desc with
@@ -209,7 +212,7 @@ let as_pmrs (pat : pattern) (expr : expression) (_ : attribute list) =
         with _ -> [])
   in
   match pat.ppat_desc with
-  | Ppat_var iloc -> Some (iloc.txt, as_pmrs_named iloc.txt [] expr)
+  | Ppat_var iloc -> Some (iloc.txt, as_pmrs_named iloc.txt [] expr, snd (get_predicate vb))
   | _ -> None
 
 let params_of (expr : expression) =
@@ -228,38 +231,42 @@ let params_of (expr : expression) =
     defining a PMRS. Each binding should be a function. Each binding will be interpreted as a
     set of rules.
 *)
-let to_rules (vb : value_binding list) =
+let to_rules (vb : value_binding list) : ident list * pmrs_body * (ident * term) list =
   let f vb =
-    match as_pmrs vb.pvb_pat vb.pvb_expr vb.pvb_attributes with
-    | Some (fname, l) -> (Some fname, l)
-    | None -> (None, [])
+    match as_pmrs vb with
+    | Some (fname, l, e) -> (
+        match e with
+        | Some ensures -> (Some fname, l, [ (fname, ensures) ])
+        | None -> (Some fname, l, []))
+    | None -> (None, [], [])
   in
   (* Each binding is interpreted as a list of rules.
       Each binding should be a function.
   *)
-  let fnames, rule_sets = List.unzip (List.map ~f vb) in
-  (List.filter_opt fnames, List.concat rule_sets)
+  let fnames, rule_sets, ensure_preds = List.unzip3 (List.map ~f vb) in
+  (List.filter_opt fnames, List.concat rule_sets, List.concat ensure_preds)
 
 let pmrs_head_of_rec_def loc (b : value_binding) (rest : value_binding list) =
   let fname = match b.pvb_pat.ppat_desc with Ppat_var id -> Some id.txt | _ -> None in
   let ppargs = params_of b.pvb_expr in
   let requires, ensures = get_predicate b in
-  let _, prules = to_rules (b :: rest) in
+  let _, prules, pensures = to_rules (b :: rest) in
   let pparams = List.map ~f:(fun (x, _) -> x) (get_objects ()) in
   reset_synt_objects ();
   match (fname, ppargs) with
   | Some fname, Some ppargs ->
       [ Front.PMRSDef (loc, pparams, fname, ppargs, requires, ensures, prules) ]
+      @ List.map ~f:(fun (i, e) -> Front.EnsuresDef (loc, i, e)) pensures
   | _ -> []
 
-let pmrs_def_of_nonrec_def loc (b : value_binding) =
+let pmrs_def_of_nonrec_def loc (b : value_binding) : definition list =
   let fname = match b.pvb_pat.ppat_desc with Ppat_var id -> Some id.txt | _ -> None in
   let ppargs = params_of b.pvb_expr in
   let requires, ensures = get_predicate b in
   let _, core = unwrap_args b.pvb_expr in
   match core.pexp_desc with
   | Pexp_let (Asttypes.Recursive, bindings, expr) ->
-      let fnames, rules = to_rules bindings in
+      let fnames, rules, part_ensures = to_rules bindings in
       let pparams = List.map ~f:(fun (x, _) -> x) (get_objects ()) in
       reset_synt_objects ();
       let is_apply_first_rule =
@@ -275,10 +282,12 @@ let pmrs_def_of_nonrec_def loc (b : value_binding) =
         | _ -> false
       in
       if is_apply_first_rule then
-        Option.map2 fname ppargs ~f:(fun x y ->
-            Front.PMRSDef (loc, pparams, x, y, requires, ensures, rules))
-      else None
-  | _ -> None
+        Option.to_list
+          (Option.map2 fname ppargs ~f:(fun x y ->
+               Front.PMRSDef (loc, pparams, x, y, requires, ensures, rules)))
+        @ List.map ~f:(fun (i, e) -> Front.EnsuresDef (loc, i, e)) part_ensures
+      else []
+  | _ -> []
 
 (* `define_value loc is_rec binding` attempts to extract a PMRS definition of a function
   definition out of a Caml value definition.
@@ -297,7 +306,7 @@ let define_value loc (is_rec : Asttypes.rec_flag) (bindings : value_binding list
          in
          g t
       *)
-      Option.to_list (pmrs_def_of_nonrec_def loc vb)
+      pmrs_def_of_nonrec_def loc vb
   | _ -> []
 
 let declare_synt_obj (assert_expr : expression) =

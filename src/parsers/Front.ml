@@ -70,6 +70,7 @@ type definition =
   | SyntObjDecl of loc * definition * id * id
       (** Declares a synthesis objective: SyntObjDecl(loc, decl, f1, f2 ) specifies that the
       function defined by decl must be equivalent to f1 composed with f2. *)
+  | EnsuresDef of loc * id * term  (** Adds an ensures to a function symbol id. *)
 
 type program = definition list
 

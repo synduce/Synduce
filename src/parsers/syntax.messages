@@ -1,9 +1,878 @@
+main: LEMMA IDENT ENSURES ABS VBAR
+##
+## Ends in an error in state: 101.
+##
+## unary_e -> ABS . unary_e [ VBAR TYPE TIMES THEN RPAR RBRACKET RBRACE QUESTION PLUS OR NEQ MOD MINUS LT LETPMRS LETAND LET LEMMA LE LBRACKET IN GT GE EQ EOF ELSE DIV COMMA COLON AND ]
+##
+## The known suffix of the stack is as follows:
+## ABS
+##
+
+<YOUR SYNTAX ERROR MESSAGE HERE>
+
+main: LEMMA IDENT ENSURES CIDENT LPAR TRUE COMMA VBAR
+##
+## Ends in an error in state: 87.
+##
+## separated_nonempty_list(COMMA,fun_app_e) -> fun_app_e COMMA . separated_nonempty_list(COMMA,fun_app_e) [ RPAR ]
+##
+## The known suffix of the stack is as follows:
+## fun_app_e COMMA
+##
+
+<YOUR SYNTAX ERROR MESSAGE HERE>
+
+main: LEMMA IDENT ENSURES CIDENT LPAR TRUE VBAR
+##
+## Ends in an error in state: 86.
+##
+## separated_nonempty_list(COMMA,fun_app_e) -> fun_app_e . [ RPAR ]
+## separated_nonempty_list(COMMA,fun_app_e) -> fun_app_e . COMMA separated_nonempty_list(COMMA,fun_app_e) [ RPAR ]
+##
+## The known suffix of the stack is as follows:
+## fun_app_e
+##
+## WARNING: This example involves spurious reductions.
+## This implies that, although the LR(1) items shown above provide an
+## accurate view of the past (what has been recognized so far), they
+## may provide an INCOMPLETE view of the future (what was expected next).
+## In state 80, spurious reduction of production fun_app_e -> primary_e
+##
+
+<YOUR SYNTAX ERROR MESSAGE HERE>
+
+main: LEMMA IDENT ENSURES CIDENT LPAR VBAR
+##
+## Ends in an error in state: 78.
+##
+## primary_e -> CIDENT LPAR . loption(separated_nonempty_list(COMMA,fun_app_e)) RPAR [ VBAR TYPE TRUE TIMES THEN RPAR RIGHTARROW RBRACKET RBRACE QUESTION PLUS OR NEQ MOD MINUS LT LPAR LETPMRS LETAND LET LEMMA LE LBRACKET INT IN IDENT GT GE FALSE EQ EOF ELSE DIV COMMA COLON CIDENT AND ]
+##
+## The known suffix of the stack is as follows:
+## CIDENT LPAR
+##
+
+<YOUR SYNTAX ERROR MESSAGE HERE>
+
+main: LEMMA IDENT ENSURES CIDENT REC
+##
+## Ends in an error in state: 77.
+##
+## primary_e -> CIDENT . LPAR loption(separated_nonempty_list(COMMA,fun_app_e)) RPAR [ VBAR TYPE TRUE TIMES THEN RPAR RIGHTARROW RBRACKET RBRACE QUESTION PLUS OR NEQ MOD MINUS LT LPAR LETPMRS LETAND LET LEMMA LE LBRACKET INT IN IDENT GT GE FALSE EQ EOF ELSE DIV COMMA COLON CIDENT AND ]
+## primary_e -> CIDENT . [ VBAR TYPE TRUE TIMES THEN RPAR RIGHTARROW RBRACKET RBRACE QUESTION PLUS OR NEQ MOD MINUS LT LPAR LETPMRS LETAND LET LEMMA LE LBRACKET INT IN IDENT GT GE FALSE EQ EOF ELSE DIV COMMA COLON CIDENT AND ]
+##
+## The known suffix of the stack is as follows:
+## CIDENT
+##
+
+<YOUR SYNTAX ERROR MESSAGE HERE>
+
+main: LEMMA IDENT ENSURES EXCLAMATION VBAR
+##
+## Ends in an error in state: 100.
+##
+## unary_e -> EXCLAMATION . unary_e [ VBAR TYPE TIMES THEN RPAR RBRACKET RBRACE QUESTION PLUS OR NEQ MOD MINUS LT LETPMRS LETAND LET LEMMA LE LBRACKET IN GT GE EQ EOF ELSE DIV COMMA COLON AND ]
+##
+## The known suffix of the stack is as follows:
+## EXCLAMATION
+##
+
+<YOUR SYNTAX ERROR MESSAGE HERE>
+
+main: LEMMA IDENT ENSURES FUN RIGHTARROW VBAR
+##
+## Ends in an error in state: 99.
+##
+## expr -> FUN list(primary_e) RIGHTARROW . tuple_e [ VBAR TYPE THEN RPAR RBRACKET RBRACE QUESTION LETPMRS LETAND LET LEMMA LBRACKET IN EOF ELSE COLON ]
+##
+## The known suffix of the stack is as follows:
+## FUN list(primary_e) RIGHTARROW
+##
+
+<YOUR SYNTAX ERROR MESSAGE HERE>
+
+main: LEMMA IDENT ENSURES FUN TRUE VBAR
+##
+## Ends in an error in state: 96.
+##
+## list(primary_e) -> primary_e . list(primary_e) [ RIGHTARROW ]
+##
+## The known suffix of the stack is as follows:
+## primary_e
+##
+
+<YOUR SYNTAX ERROR MESSAGE HERE>
+
+main: LEMMA IDENT ENSURES FUN VBAR
+##
+## Ends in an error in state: 95.
+##
+## expr -> FUN . list(primary_e) RIGHTARROW tuple_e [ VBAR TYPE THEN RPAR RBRACKET RBRACE QUESTION LETPMRS LETAND LET LEMMA LBRACKET IN EOF ELSE COLON ]
+##
+## The known suffix of the stack is as follows:
+## FUN
+##
+
+<YOUR SYNTAX ERROR MESSAGE HERE>
+
+main: LEMMA IDENT ENSURES IF TRUE THEN TRUE ELSE VBAR
+##
+## Ends in an error in state: 152.
+##
+## expr -> IF expr THEN expr ELSE . expr [ VBAR TYPE THEN RPAR RBRACKET RBRACE QUESTION LETPMRS LETAND LET LEMMA LBRACKET IN EOF ELSE COLON ]
+##
+## The known suffix of the stack is as follows:
+## IF expr THEN expr ELSE
+##
+
+<YOUR SYNTAX ERROR MESSAGE HERE>
+
+main: LEMMA IDENT ENSURES IF TRUE THEN TRUE VBAR
+##
+## Ends in an error in state: 147.
+##
+## expr -> expr . QUESTION expr COLON expr [ QUESTION ELSE ]
+## expr -> IF expr THEN expr . ELSE expr [ VBAR TYPE THEN RPAR RBRACKET RBRACE QUESTION LETPMRS LETAND LET LEMMA LBRACKET IN EOF ELSE COLON ]
+##
+## The known suffix of the stack is as follows:
+## IF expr THEN expr
+##
+## WARNING: This example involves spurious reductions.
+## This implies that, although the LR(1) items shown above provide an
+## accurate view of the past (what has been recognized so far), they
+## may provide an INCOMPLETE view of the future (what was expected next).
+## In state 80, spurious reduction of production fun_app_e -> primary_e
+## In state 103, spurious reduction of production unary_e -> fun_app_e
+## In state 105, spurious reduction of production mult_e -> unary_e
+## In state 113, spurious reduction of production add_e -> mult_e
+## In state 133, spurious reduction of production comp_e -> add_e
+## In state 130, spurious reduction of production equality_e -> comp_e
+## In state 127, spurious reduction of production logical_and_e -> equality_e
+## In state 124, spurious reduction of production logical_or_e -> logical_and_e
+## In state 118, spurious reduction of production tuple_e -> logical_or_e
+## In state 144, spurious reduction of production expr -> tuple_e
+##
+
+<YOUR SYNTAX ERROR MESSAGE HERE>
+
+main: LEMMA IDENT ENSURES IF TRUE THEN VBAR
+##
+## Ends in an error in state: 146.
+##
+## expr -> IF expr THEN . expr ELSE expr [ VBAR TYPE THEN RPAR RBRACKET RBRACE QUESTION LETPMRS LETAND LET LEMMA LBRACKET IN EOF ELSE COLON ]
+##
+## The known suffix of the stack is as follows:
+## IF expr THEN
+##
+
+<YOUR SYNTAX ERROR MESSAGE HERE>
+
+main: LEMMA IDENT ENSURES IF TRUE VBAR
+##
+## Ends in an error in state: 145.
+##
+## expr -> expr . QUESTION expr COLON expr [ THEN QUESTION ]
+## expr -> IF expr . THEN expr ELSE expr [ VBAR TYPE THEN RPAR RBRACKET RBRACE QUESTION LETPMRS LETAND LET LEMMA LBRACKET IN EOF ELSE COLON ]
+##
+## The known suffix of the stack is as follows:
+## IF expr
+##
+## WARNING: This example involves spurious reductions.
+## This implies that, although the LR(1) items shown above provide an
+## accurate view of the past (what has been recognized so far), they
+## may provide an INCOMPLETE view of the future (what was expected next).
+## In state 80, spurious reduction of production fun_app_e -> primary_e
+## In state 103, spurious reduction of production unary_e -> fun_app_e
+## In state 105, spurious reduction of production mult_e -> unary_e
+## In state 113, spurious reduction of production add_e -> mult_e
+## In state 133, spurious reduction of production comp_e -> add_e
+## In state 130, spurious reduction of production equality_e -> comp_e
+## In state 127, spurious reduction of production logical_and_e -> equality_e
+## In state 124, spurious reduction of production logical_or_e -> logical_and_e
+## In state 118, spurious reduction of production tuple_e -> logical_or_e
+## In state 144, spurious reduction of production expr -> tuple_e
+##
+
+<YOUR SYNTAX ERROR MESSAGE HERE>
+
+main: LEMMA IDENT ENSURES IF VBAR
+##
+## Ends in an error in state: 94.
+##
+## expr -> IF . expr THEN expr ELSE expr [ VBAR TYPE THEN RPAR RBRACKET RBRACE QUESTION LETPMRS LETAND LET LEMMA LBRACKET IN EOF ELSE COLON ]
+##
+## The known suffix of the stack is as follows:
+## IF
+##
+
+<YOUR SYNTAX ERROR MESSAGE HERE>
+
+main: LEMMA IDENT ENSURES LET TRUE COMMA TRUE COMMA VBAR
+##
+## Ends in an error in state: 164.
+##
+## separated_nonempty_list(COMMA,primary_e) -> primary_e COMMA . separated_nonempty_list(COMMA,primary_e) [ EQ ]
+##
+## The known suffix of the stack is as follows:
+## primary_e COMMA
+##
+
+<YOUR SYNTAX ERROR MESSAGE HERE>
+
+main: LEMMA IDENT ENSURES LET TRUE COMMA TRUE EQ TRUE IN VBAR
+##
+## Ends in an error in state: 161.
+##
+## expr -> LET primary_e COMMA separated_nonempty_list(COMMA,primary_e) EQ expr IN . expr [ VBAR TYPE THEN RPAR RBRACKET RBRACE QUESTION LETPMRS LETAND LET LEMMA LBRACKET IN EOF ELSE COLON ]
+##
+## The known suffix of the stack is as follows:
+## LET primary_e COMMA separated_nonempty_list(COMMA,primary_e) EQ expr IN
+##
+
+<YOUR SYNTAX ERROR MESSAGE HERE>
+
+main: LEMMA IDENT ENSURES LET TRUE COMMA TRUE EQ TRUE VBAR
+##
+## Ends in an error in state: 160.
+##
+## expr -> LET primary_e COMMA separated_nonempty_list(COMMA,primary_e) EQ expr . IN expr [ VBAR TYPE THEN RPAR RBRACKET RBRACE QUESTION LETPMRS LETAND LET LEMMA LBRACKET IN EOF ELSE COLON ]
+## expr -> expr . QUESTION expr COLON expr [ QUESTION IN ]
+##
+## The known suffix of the stack is as follows:
+## LET primary_e COMMA separated_nonempty_list(COMMA,primary_e) EQ expr
+##
+## WARNING: This example involves spurious reductions.
+## This implies that, although the LR(1) items shown above provide an
+## accurate view of the past (what has been recognized so far), they
+## may provide an INCOMPLETE view of the future (what was expected next).
+## In state 80, spurious reduction of production fun_app_e -> primary_e
+## In state 103, spurious reduction of production unary_e -> fun_app_e
+## In state 105, spurious reduction of production mult_e -> unary_e
+## In state 113, spurious reduction of production add_e -> mult_e
+## In state 133, spurious reduction of production comp_e -> add_e
+## In state 130, spurious reduction of production equality_e -> comp_e
+## In state 127, spurious reduction of production logical_and_e -> equality_e
+## In state 124, spurious reduction of production logical_or_e -> logical_and_e
+## In state 118, spurious reduction of production tuple_e -> logical_or_e
+## In state 144, spurious reduction of production expr -> tuple_e
+##
+
+<YOUR SYNTAX ERROR MESSAGE HERE>
+
+main: LEMMA IDENT ENSURES LET TRUE COMMA TRUE EQ VBAR
+##
+## Ends in an error in state: 159.
+##
+## expr -> LET primary_e COMMA separated_nonempty_list(COMMA,primary_e) EQ . expr IN expr [ VBAR TYPE THEN RPAR RBRACKET RBRACE QUESTION LETPMRS LETAND LET LEMMA LBRACKET IN EOF ELSE COLON ]
+##
+## The known suffix of the stack is as follows:
+## LET primary_e COMMA separated_nonempty_list(COMMA,primary_e) EQ
+##
+
+<YOUR SYNTAX ERROR MESSAGE HERE>
+
+main: LEMMA IDENT ENSURES LET TRUE COMMA TRUE VBAR
+##
+## Ends in an error in state: 163.
+##
+## separated_nonempty_list(COMMA,primary_e) -> primary_e . [ EQ ]
+## separated_nonempty_list(COMMA,primary_e) -> primary_e . COMMA separated_nonempty_list(COMMA,primary_e) [ EQ ]
+##
+## The known suffix of the stack is as follows:
+## primary_e
+##
+
+<YOUR SYNTAX ERROR MESSAGE HERE>
+
+main: LEMMA IDENT ENSURES LET TRUE COMMA VBAR
+##
+## Ends in an error in state: 157.
+##
+## expr -> LET primary_e COMMA . separated_nonempty_list(COMMA,primary_e) EQ expr IN expr [ VBAR TYPE THEN RPAR RBRACKET RBRACE QUESTION LETPMRS LETAND LET LEMMA LBRACKET IN EOF ELSE COLON ]
+##
+## The known suffix of the stack is as follows:
+## LET primary_e COMMA
+##
+
+<YOUR SYNTAX ERROR MESSAGE HERE>
+
+main: LEMMA IDENT ENSURES LET TRUE EQ TRUE IN VBAR
+##
+## Ends in an error in state: 155.
+##
+## expr -> LET primary_e EQ expr IN . expr [ VBAR TYPE THEN RPAR RBRACKET RBRACE QUESTION LETPMRS LETAND LET LEMMA LBRACKET IN EOF ELSE COLON ]
+##
+## The known suffix of the stack is as follows:
+## LET primary_e EQ expr IN
+##
+
+<YOUR SYNTAX ERROR MESSAGE HERE>
+
+main: LEMMA IDENT ENSURES LET TRUE EQ TRUE VBAR
+##
+## Ends in an error in state: 154.
+##
+## expr -> LET primary_e EQ expr . IN expr [ VBAR TYPE THEN RPAR RBRACKET RBRACE QUESTION LETPMRS LETAND LET LEMMA LBRACKET IN EOF ELSE COLON ]
+## expr -> expr . QUESTION expr COLON expr [ QUESTION IN ]
+##
+## The known suffix of the stack is as follows:
+## LET primary_e EQ expr
+##
+## WARNING: This example involves spurious reductions.
+## This implies that, although the LR(1) items shown above provide an
+## accurate view of the past (what has been recognized so far), they
+## may provide an INCOMPLETE view of the future (what was expected next).
+## In state 80, spurious reduction of production fun_app_e -> primary_e
+## In state 103, spurious reduction of production unary_e -> fun_app_e
+## In state 105, spurious reduction of production mult_e -> unary_e
+## In state 113, spurious reduction of production add_e -> mult_e
+## In state 133, spurious reduction of production comp_e -> add_e
+## In state 130, spurious reduction of production equality_e -> comp_e
+## In state 127, spurious reduction of production logical_and_e -> equality_e
+## In state 124, spurious reduction of production logical_or_e -> logical_and_e
+## In state 118, spurious reduction of production tuple_e -> logical_or_e
+## In state 144, spurious reduction of production expr -> tuple_e
+##
+
+<YOUR SYNTAX ERROR MESSAGE HERE>
+
+main: LEMMA IDENT ENSURES LET TRUE EQ VBAR
+##
+## Ends in an error in state: 93.
+##
+## expr -> LET primary_e EQ . expr IN expr [ VBAR TYPE THEN RPAR RBRACKET RBRACE QUESTION LETPMRS LETAND LET LEMMA LBRACKET IN EOF ELSE COLON ]
+##
+## The known suffix of the stack is as follows:
+## LET primary_e EQ
+##
+
+<YOUR SYNTAX ERROR MESSAGE HERE>
+
+main: LEMMA IDENT ENSURES LET TRUE VBAR
+##
+## Ends in an error in state: 92.
+##
+## expr -> LET primary_e . EQ expr IN expr [ VBAR TYPE THEN RPAR RBRACKET RBRACE QUESTION LETPMRS LETAND LET LEMMA LBRACKET IN EOF ELSE COLON ]
+## expr -> LET primary_e . COMMA separated_nonempty_list(COMMA,primary_e) EQ expr IN expr [ VBAR TYPE THEN RPAR RBRACKET RBRACE QUESTION LETPMRS LETAND LET LEMMA LBRACKET IN EOF ELSE COLON ]
+##
+## The known suffix of the stack is as follows:
+## LET primary_e
+##
+
+<YOUR SYNTAX ERROR MESSAGE HERE>
+
+main: LEMMA IDENT ENSURES LET VBAR
+##
+## Ends in an error in state: 91.
+##
+## expr -> LET . primary_e EQ expr IN expr [ VBAR TYPE THEN RPAR RBRACKET RBRACE QUESTION LETPMRS LETAND LET LEMMA LBRACKET IN EOF ELSE COLON ]
+## expr -> LET . primary_e COMMA separated_nonempty_list(COMMA,primary_e) EQ expr IN expr [ VBAR TYPE THEN RPAR RBRACKET RBRACE QUESTION LETPMRS LETAND LET LEMMA LBRACKET IN EOF ELSE COLON ]
+##
+## The known suffix of the stack is as follows:
+## LET
+##
+
+<YOUR SYNTAX ERROR MESSAGE HERE>
+
+main: LEMMA IDENT ENSURES LPAR TRUE VBAR
+##
+## Ends in an error in state: 166.
+##
+## expr -> expr . QUESTION expr COLON expr [ RPAR QUESTION ]
+## primary_e -> LPAR expr . RPAR [ VBAR TYPE TRUE TIMES THEN RPAR RIGHTARROW RBRACKET RBRACE QUESTION PLUS OR NEQ MOD MINUS LT LPAR LETPMRS LETAND LET LEMMA LE LBRACKET INT IN IDENT GT GE FALSE EQ EOF ELSE DIV COMMA COLON CIDENT AND ]
+##
+## The known suffix of the stack is as follows:
+## LPAR expr
+##
+## WARNING: This example involves spurious reductions.
+## This implies that, although the LR(1) items shown above provide an
+## accurate view of the past (what has been recognized so far), they
+## may provide an INCOMPLETE view of the future (what was expected next).
+## In state 80, spurious reduction of production fun_app_e -> primary_e
+## In state 103, spurious reduction of production unary_e -> fun_app_e
+## In state 105, spurious reduction of production mult_e -> unary_e
+## In state 113, spurious reduction of production add_e -> mult_e
+## In state 133, spurious reduction of production comp_e -> add_e
+## In state 130, spurious reduction of production equality_e -> comp_e
+## In state 127, spurious reduction of production logical_and_e -> equality_e
+## In state 124, spurious reduction of production logical_or_e -> logical_and_e
+## In state 118, spurious reduction of production tuple_e -> logical_or_e
+## In state 144, spurious reduction of production expr -> tuple_e
+##
+
+<YOUR SYNTAX ERROR MESSAGE HERE>
+
+main: LEMMA IDENT ENSURES LPAR VBAR
+##
+## Ends in an error in state: 72.
+##
+## primary_e -> LPAR . expr RPAR [ VBAR TYPE TRUE TIMES THEN RPAR RIGHTARROW RBRACKET RBRACE QUESTION PLUS OR NEQ MOD MINUS LT LPAR LETPMRS LETAND LET LEMMA LE LBRACKET INT IN IDENT GT GE FALSE EQ EOF ELSE DIV COMMA COLON CIDENT AND ]
+##
+## The known suffix of the stack is as follows:
+## LPAR
+##
+
+<YOUR SYNTAX ERROR MESSAGE HERE>
+
+main: LEMMA IDENT ENSURES MAX TRUE VBAR
+##
+## Ends in an error in state: 89.
+##
+## fun_app_e -> MAX primary_e . primary_e [ VBAR TYPE TIMES THEN RPAR RIGHTARROW RBRACKET RBRACE QUESTION PLUS OR NEQ MOD MINUS LT LETPMRS LETAND LET LEMMA LE LBRACKET IN GT GE EQ EOF ELSE DIV COMMA COLON AND ]
+##
+## The known suffix of the stack is as follows:
+## MAX primary_e
+##
+
+<YOUR SYNTAX ERROR MESSAGE HERE>
+
+main: LEMMA IDENT ENSURES MAX VBAR
+##
+## Ends in an error in state: 73.
+##
+## fun_app_e -> MAX . primary_e primary_e [ VBAR TYPE TIMES THEN RPAR RIGHTARROW RBRACKET RBRACE QUESTION PLUS OR NEQ MOD MINUS LT LETPMRS LETAND LET LEMMA LE LBRACKET IN GT GE EQ EOF ELSE DIV COMMA COLON AND ]
+##
+## The known suffix of the stack is as follows:
+## MAX
+##
+
+<YOUR SYNTAX ERROR MESSAGE HERE>
+
+main: LEMMA IDENT ENSURES MIN TRUE VBAR
+##
+## Ends in an error in state: 168.
+##
+## fun_app_e -> MIN primary_e . primary_e [ VBAR TYPE TIMES THEN RPAR RIGHTARROW RBRACKET RBRACE QUESTION PLUS OR NEQ MOD MINUS LT LETPMRS LETAND LET LEMMA LE LBRACKET IN GT GE EQ EOF ELSE DIV COMMA COLON AND ]
+##
+## The known suffix of the stack is as follows:
+## MIN primary_e
+##
+
+<YOUR SYNTAX ERROR MESSAGE HERE>
+
+main: LEMMA IDENT ENSURES MIN VBAR
+##
+## Ends in an error in state: 71.
+##
+## fun_app_e -> MIN . primary_e primary_e [ VBAR TYPE TIMES THEN RPAR RIGHTARROW RBRACKET RBRACE QUESTION PLUS OR NEQ MOD MINUS LT LETPMRS LETAND LET LEMMA LE LBRACKET IN GT GE EQ EOF ELSE DIV COMMA COLON AND ]
+##
+## The known suffix of the stack is as follows:
+## MIN
+##
+
+<YOUR SYNTAX ERROR MESSAGE HERE>
+
+main: LEMMA IDENT ENSURES MINUS VBAR
+##
+## Ends in an error in state: 70.
+##
+## unary_e -> MINUS . unary_e [ VBAR TYPE TIMES THEN RPAR RBRACKET RBRACE QUESTION PLUS OR NEQ MOD MINUS LT LETPMRS LETAND LET LEMMA LE LBRACKET IN GT GE EQ EOF ELSE DIV COMMA COLON AND ]
+##
+## The known suffix of the stack is as follows:
+## MINUS
+##
+
+<YOUR SYNTAX ERROR MESSAGE HERE>
+
+main: LEMMA IDENT ENSURES TRUE AND VBAR
+##
+## Ends in an error in state: 128.
+##
+## logical_and_e -> equality_e AND . logical_and_e [ VBAR TYPE THEN RPAR RBRACKET RBRACE QUESTION OR LETPMRS LETAND LET LEMMA LBRACKET IN EOF ELSE COMMA COLON ]
+##
+## The known suffix of the stack is as follows:
+## equality_e AND
+##
+
+<YOUR SYNTAX ERROR MESSAGE HERE>
+
+main: LEMMA IDENT ENSURES TRUE COMMA TRUE COMMA VBAR
+##
+## Ends in an error in state: 122.
+##
+## separated_nonempty_list(COMMA,logical_or_e) -> logical_or_e COMMA . separated_nonempty_list(COMMA,logical_or_e) [ VBAR TYPE THEN RPAR RBRACKET RBRACE QUESTION LETPMRS LETAND LET LEMMA LBRACKET IN EOF ELSE COLON ]
+##
+## The known suffix of the stack is as follows:
+## logical_or_e COMMA
+##
+
+<YOUR SYNTAX ERROR MESSAGE HERE>
+
+main: LEMMA IDENT ENSURES TRUE COMMA VBAR
+##
+## Ends in an error in state: 119.
+##
+## tuple_e -> logical_or_e COMMA . separated_nonempty_list(COMMA,logical_or_e) [ VBAR TYPE THEN RPAR RBRACKET RBRACE QUESTION LETPMRS LETAND LET LEMMA LBRACKET IN EOF ELSE COLON ]
+##
+## The known suffix of the stack is as follows:
+## logical_or_e COMMA
+##
+
+<YOUR SYNTAX ERROR MESSAGE HERE>
+
+main: LEMMA IDENT ENSURES TRUE DIV VBAR
+##
+## Ends in an error in state: 110.
+##
+## mult_e -> unary_e DIV . mult_e [ VBAR TYPE THEN RPAR RBRACKET RBRACE QUESTION PLUS OR NEQ MINUS LT LETPMRS LETAND LET LEMMA LE LBRACKET IN GT GE EQ EOF ELSE COMMA COLON AND ]
+##
+## The known suffix of the stack is as follows:
+## unary_e DIV
+##
+
+<YOUR SYNTAX ERROR MESSAGE HERE>
+
+main: LEMMA IDENT ENSURES TRUE EQ CIDENT NEQ
+##
+## Ends in an error in state: 127.
+##
+## logical_and_e -> equality_e . AND logical_and_e [ VBAR TYPE THEN RPAR RBRACKET RBRACE QUESTION OR LETPMRS LETAND LET LEMMA LBRACKET IN EOF ELSE COMMA COLON ]
+## logical_and_e -> equality_e . [ VBAR TYPE THEN RPAR RBRACKET RBRACE QUESTION OR LETPMRS LETAND LET LEMMA LBRACKET IN EOF ELSE COMMA COLON ]
+##
+## The known suffix of the stack is as follows:
+## equality_e
+##
+## WARNING: This example involves spurious reductions.
+## This implies that, although the LR(1) items shown above provide an
+## accurate view of the past (what has been recognized so far), they
+## may provide an INCOMPLETE view of the future (what was expected next).
+## In state 77, spurious reduction of production primary_e -> CIDENT
+## In state 80, spurious reduction of production fun_app_e -> primary_e
+## In state 103, spurious reduction of production unary_e -> fun_app_e
+## In state 105, spurious reduction of production mult_e -> unary_e
+## In state 113, spurious reduction of production add_e -> mult_e
+## In state 133, spurious reduction of production comp_e -> add_e
+## In state 143, spurious reduction of production equality_e -> comp_e EQ comp_e
+##
+
+<YOUR SYNTAX ERROR MESSAGE HERE>
+
+main: LEMMA IDENT ENSURES TRUE EQ VBAR
+##
+## Ends in an error in state: 142.
+##
+## equality_e -> comp_e EQ . comp_e [ VBAR TYPE THEN RPAR RBRACKET RBRACE QUESTION OR LETPMRS LETAND LET LEMMA LBRACKET IN EOF ELSE COMMA COLON AND ]
+##
+## The known suffix of the stack is as follows:
+## comp_e EQ
+##
+
+<YOUR SYNTAX ERROR MESSAGE HERE>
+
+main: LEMMA IDENT ENSURES TRUE GE CIDENT LT
+##
+## Ends in an error in state: 130.
+##
+## equality_e -> comp_e . EQ comp_e [ VBAR TYPE THEN RPAR RBRACKET RBRACE QUESTION OR LETPMRS LETAND LET LEMMA LBRACKET IN EOF ELSE COMMA COLON AND ]
+## equality_e -> comp_e . NEQ comp_e [ VBAR TYPE THEN RPAR RBRACKET RBRACE QUESTION OR LETPMRS LETAND LET LEMMA LBRACKET IN EOF ELSE COMMA COLON AND ]
+## equality_e -> comp_e . [ VBAR TYPE THEN RPAR RBRACKET RBRACE QUESTION OR LETPMRS LETAND LET LEMMA LBRACKET IN EOF ELSE COMMA COLON AND ]
+##
+## The known suffix of the stack is as follows:
+## comp_e
+##
+## WARNING: This example involves spurious reductions.
+## This implies that, although the LR(1) items shown above provide an
+## accurate view of the past (what has been recognized so far), they
+## may provide an INCOMPLETE view of the future (what was expected next).
+## In state 77, spurious reduction of production primary_e -> CIDENT
+## In state 80, spurious reduction of production fun_app_e -> primary_e
+## In state 103, spurious reduction of production unary_e -> fun_app_e
+## In state 105, spurious reduction of production mult_e -> unary_e
+## In state 113, spurious reduction of production add_e -> mult_e
+## In state 141, spurious reduction of production comp_e -> add_e GE add_e
+##
+
+<YOUR SYNTAX ERROR MESSAGE HERE>
+
+main: LEMMA IDENT ENSURES TRUE GE VBAR
+##
+## Ends in an error in state: 140.
+##
+## comp_e -> add_e GE . add_e [ VBAR TYPE THEN RPAR RBRACKET RBRACE QUESTION OR NEQ LETPMRS LETAND LET LEMMA LBRACKET IN EQ EOF ELSE COMMA COLON AND ]
+##
+## The known suffix of the stack is as follows:
+## add_e GE
+##
+
+<YOUR SYNTAX ERROR MESSAGE HERE>
+
+main: LEMMA IDENT ENSURES TRUE GT VBAR
+##
+## Ends in an error in state: 138.
+##
+## comp_e -> add_e GT . add_e [ VBAR TYPE THEN RPAR RBRACKET RBRACE QUESTION OR NEQ LETPMRS LETAND LET LEMMA LBRACKET IN EQ EOF ELSE COMMA COLON AND ]
+##
+## The known suffix of the stack is as follows:
+## add_e GT
+##
+
+<YOUR SYNTAX ERROR MESSAGE HERE>
+
+main: LEMMA IDENT ENSURES TRUE LE VBAR
+##
+## Ends in an error in state: 136.
+##
+## comp_e -> add_e LE . add_e [ VBAR TYPE THEN RPAR RBRACKET RBRACE QUESTION OR NEQ LETPMRS LETAND LET LEMMA LBRACKET IN EQ EOF ELSE COMMA COLON AND ]
+##
+## The known suffix of the stack is as follows:
+## add_e LE
+##
+
+<YOUR SYNTAX ERROR MESSAGE HERE>
+
+main: LEMMA IDENT ENSURES TRUE LT VBAR
+##
+## Ends in an error in state: 134.
+##
+## comp_e -> add_e LT . add_e [ VBAR TYPE THEN RPAR RBRACKET RBRACE QUESTION OR NEQ LETPMRS LETAND LET LEMMA LBRACKET IN EQ EOF ELSE COMMA COLON AND ]
+##
+## The known suffix of the stack is as follows:
+## add_e LT
+##
+
+<YOUR SYNTAX ERROR MESSAGE HERE>
+
+main: LEMMA IDENT ENSURES TRUE MINUS VBAR
+##
+## Ends in an error in state: 116.
+##
+## add_e -> mult_e MINUS . add_e [ VBAR TYPE THEN RPAR RBRACKET RBRACE QUESTION OR NEQ LT LETPMRS LETAND LET LEMMA LE LBRACKET IN GT GE EQ EOF ELSE COMMA COLON AND ]
+##
+## The known suffix of the stack is as follows:
+## mult_e MINUS
+##
+
+<YOUR SYNTAX ERROR MESSAGE HERE>
+
+main: LEMMA IDENT ENSURES TRUE MOD VBAR
+##
+## Ends in an error in state: 108.
+##
+## mult_e -> unary_e MOD . mult_e [ VBAR TYPE THEN RPAR RBRACKET RBRACE QUESTION PLUS OR NEQ MINUS LT LETPMRS LETAND LET LEMMA LE LBRACKET IN GT GE EQ EOF ELSE COMMA COLON AND ]
+##
+## The known suffix of the stack is as follows:
+## unary_e MOD
+##
+
+<YOUR SYNTAX ERROR MESSAGE HERE>
+
+main: LEMMA IDENT ENSURES TRUE NEQ VBAR
+##
+## Ends in an error in state: 131.
+##
+## equality_e -> comp_e NEQ . comp_e [ VBAR TYPE THEN RPAR RBRACKET RBRACE QUESTION OR LETPMRS LETAND LET LEMMA LBRACKET IN EOF ELSE COMMA COLON AND ]
+##
+## The known suffix of the stack is as follows:
+## comp_e NEQ
+##
+
+<YOUR SYNTAX ERROR MESSAGE HERE>
+
+main: LEMMA IDENT ENSURES TRUE OR VBAR
+##
+## Ends in an error in state: 125.
+##
+## logical_or_e -> logical_and_e OR . logical_or_e [ VBAR TYPE THEN RPAR RBRACKET RBRACE QUESTION LETPMRS LETAND LET LEMMA LBRACKET IN EOF ELSE COMMA COLON ]
+##
+## The known suffix of the stack is as follows:
+## logical_and_e OR
+##
+
+<YOUR SYNTAX ERROR MESSAGE HERE>
+
+main: LEMMA IDENT ENSURES TRUE PLUS VBAR
+##
+## Ends in an error in state: 114.
+##
+## add_e -> mult_e PLUS . add_e [ VBAR TYPE THEN RPAR RBRACKET RBRACE QUESTION OR NEQ LT LETPMRS LETAND LET LEMMA LE LBRACKET IN GT GE EQ EOF ELSE COMMA COLON AND ]
+##
+## The known suffix of the stack is as follows:
+## mult_e PLUS
+##
+
+<YOUR SYNTAX ERROR MESSAGE HERE>
+
+main: LEMMA IDENT ENSURES TRUE QUESTION TRUE COLON VBAR
+##
+## Ends in an error in state: 150.
+##
+## expr -> expr QUESTION expr COLON . expr [ VBAR TYPE THEN RPAR RBRACKET RBRACE QUESTION LETPMRS LETAND LET LEMMA LBRACKET IN EOF ELSE COLON ]
+##
+## The known suffix of the stack is as follows:
+## expr QUESTION expr COLON
+##
+
+<YOUR SYNTAX ERROR MESSAGE HERE>
+
+main: LEMMA IDENT ENSURES TRUE QUESTION TRUE VBAR
+##
+## Ends in an error in state: 149.
+##
+## expr -> expr . QUESTION expr COLON expr [ QUESTION COLON ]
+## expr -> expr QUESTION expr . COLON expr [ VBAR TYPE THEN RPAR RBRACKET RBRACE QUESTION LETPMRS LETAND LET LEMMA LBRACKET IN EOF ELSE COLON ]
+##
+## The known suffix of the stack is as follows:
+## expr QUESTION expr
+##
+## WARNING: This example involves spurious reductions.
+## This implies that, although the LR(1) items shown above provide an
+## accurate view of the past (what has been recognized so far), they
+## may provide an INCOMPLETE view of the future (what was expected next).
+## In state 80, spurious reduction of production fun_app_e -> primary_e
+## In state 103, spurious reduction of production unary_e -> fun_app_e
+## In state 105, spurious reduction of production mult_e -> unary_e
+## In state 113, spurious reduction of production add_e -> mult_e
+## In state 133, spurious reduction of production comp_e -> add_e
+## In state 130, spurious reduction of production equality_e -> comp_e
+## In state 127, spurious reduction of production logical_and_e -> equality_e
+## In state 124, spurious reduction of production logical_or_e -> logical_and_e
+## In state 118, spurious reduction of production tuple_e -> logical_or_e
+## In state 144, spurious reduction of production expr -> tuple_e
+##
+
+<YOUR SYNTAX ERROR MESSAGE HERE>
+
+main: LEMMA IDENT ENSURES TRUE QUESTION VBAR
+##
+## Ends in an error in state: 148.
+##
+## expr -> expr QUESTION . expr COLON expr [ VBAR TYPE THEN RPAR RBRACKET RBRACE QUESTION LETPMRS LETAND LET LEMMA LBRACKET IN EOF ELSE COLON ]
+##
+## The known suffix of the stack is as follows:
+## expr QUESTION
+##
+
+<YOUR SYNTAX ERROR MESSAGE HERE>
+
+main: LEMMA IDENT ENSURES TRUE REC
+##
+## Ends in an error in state: 80.
+##
+## fun_app_e -> primary_e . nonempty_list(primary_e) [ VBAR TYPE TIMES THEN RPAR RIGHTARROW RBRACKET RBRACE QUESTION PLUS OR NEQ MOD MINUS LT LETPMRS LETAND LET LEMMA LE LBRACKET IN GT GE EQ EOF ELSE DIV COMMA COLON AND ]
+## fun_app_e -> primary_e . [ VBAR TYPE TIMES THEN RPAR RIGHTARROW RBRACKET RBRACE QUESTION PLUS OR NEQ MOD MINUS LT LETPMRS LETAND LET LEMMA LE LBRACKET IN GT GE EQ EOF ELSE DIV COMMA COLON AND ]
+##
+## The known suffix of the stack is as follows:
+## primary_e
+##
+
+<YOUR SYNTAX ERROR MESSAGE HERE>
+
+main: LEMMA IDENT ENSURES TRUE RIGHTARROW
+##
+## Ends in an error in state: 105.
+##
+## mult_e -> unary_e . DIV mult_e [ VBAR TYPE THEN RPAR RBRACKET RBRACE QUESTION PLUS OR NEQ MINUS LT LETPMRS LETAND LET LEMMA LE LBRACKET IN GT GE EQ EOF ELSE COMMA COLON AND ]
+## mult_e -> unary_e . TIMES mult_e [ VBAR TYPE THEN RPAR RBRACKET RBRACE QUESTION PLUS OR NEQ MINUS LT LETPMRS LETAND LET LEMMA LE LBRACKET IN GT GE EQ EOF ELSE COMMA COLON AND ]
+## mult_e -> unary_e . MOD mult_e [ VBAR TYPE THEN RPAR RBRACKET RBRACE QUESTION PLUS OR NEQ MINUS LT LETPMRS LETAND LET LEMMA LE LBRACKET IN GT GE EQ EOF ELSE COMMA COLON AND ]
+## mult_e -> unary_e . [ VBAR TYPE THEN RPAR RBRACKET RBRACE QUESTION PLUS OR NEQ MINUS LT LETPMRS LETAND LET LEMMA LE LBRACKET IN GT GE EQ EOF ELSE COMMA COLON AND ]
+##
+## The known suffix of the stack is as follows:
+## unary_e
+##
+## WARNING: This example involves spurious reductions.
+## This implies that, although the LR(1) items shown above provide an
+## accurate view of the past (what has been recognized so far), they
+## may provide an INCOMPLETE view of the future (what was expected next).
+## In state 80, spurious reduction of production fun_app_e -> primary_e
+## In state 103, spurious reduction of production unary_e -> fun_app_e
+##
+
+<YOUR SYNTAX ERROR MESSAGE HERE>
+
+main: LEMMA IDENT ENSURES TRUE TIMES VBAR
+##
+## Ends in an error in state: 106.
+##
+## mult_e -> unary_e TIMES . mult_e [ VBAR TYPE THEN RPAR RBRACKET RBRACE QUESTION PLUS OR NEQ MINUS LT LETPMRS LETAND LET LEMMA LE LBRACKET IN GT GE EQ EOF ELSE COMMA COLON AND ]
+##
+## The known suffix of the stack is as follows:
+## unary_e TIMES
+##
+
+<YOUR SYNTAX ERROR MESSAGE HERE>
+
+main: LEMMA IDENT ENSURES TRUE TRUE REC
+##
+## Ends in an error in state: 81.
+##
+## nonempty_list(primary_e) -> primary_e . [ VBAR TYPE TIMES THEN RPAR RIGHTARROW RBRACKET RBRACE QUESTION PLUS OR NEQ MOD MINUS LT LETPMRS LETAND LET LEMMA LE LBRACKET IN GT GE EQ EOF ELSE DIV COMMA COLON AND ]
+## nonempty_list(primary_e) -> primary_e . nonempty_list(primary_e) [ VBAR TYPE TIMES THEN RPAR RIGHTARROW RBRACKET RBRACE QUESTION PLUS OR NEQ MOD MINUS LT LETPMRS LETAND LET LEMMA LE LBRACKET IN GT GE EQ EOF ELSE DIV COMMA COLON AND ]
+##
+## The known suffix of the stack is as follows:
+## primary_e
+##
+
+<YOUR SYNTAX ERROR MESSAGE HERE>
+
+main: LEMMA IDENT ENSURES TRUE VBAR
+##
+## Ends in an error in state: 242.
+##
+## def -> LEMMA IDENT ENSURES expr . [ TYPE LETPMRS LET LEMMA EOF ]
+## expr -> expr . QUESTION expr COLON expr [ TYPE QUESTION LETPMRS LET LEMMA EOF ]
+##
+## The known suffix of the stack is as follows:
+## LEMMA IDENT ENSURES expr
+##
+## WARNING: This example involves spurious reductions.
+## This implies that, although the LR(1) items shown above provide an
+## accurate view of the past (what has been recognized so far), they
+## may provide an INCOMPLETE view of the future (what was expected next).
+## In state 80, spurious reduction of production fun_app_e -> primary_e
+## In state 103, spurious reduction of production unary_e -> fun_app_e
+## In state 105, spurious reduction of production mult_e -> unary_e
+## In state 113, spurious reduction of production add_e -> mult_e
+## In state 133, spurious reduction of production comp_e -> add_e
+## In state 130, spurious reduction of production equality_e -> comp_e
+## In state 127, spurious reduction of production logical_and_e -> equality_e
+## In state 124, spurious reduction of production logical_or_e -> logical_and_e
+## In state 118, spurious reduction of production tuple_e -> logical_or_e
+## In state 144, spurious reduction of production expr -> tuple_e
+##
+
+<YOUR SYNTAX ERROR MESSAGE HERE>
+
+main: LEMMA IDENT ENSURES VBAR
+##
+## Ends in an error in state: 241.
+##
+## def -> LEMMA IDENT ENSURES . expr [ TYPE LETPMRS LET LEMMA EOF ]
+##
+## The known suffix of the stack is as follows:
+## LEMMA IDENT ENSURES
+##
+
+<YOUR SYNTAX ERROR MESSAGE HERE>
+
+main: LEMMA IDENT VBAR
+##
+## Ends in an error in state: 240.
+##
+## def -> LEMMA IDENT . ENSURES expr [ TYPE LETPMRS LET LEMMA EOF ]
+##
+## The known suffix of the stack is as follows:
+## LEMMA IDENT
+##
+
+<YOUR SYNTAX ERROR MESSAGE HERE>
+
+main: LEMMA VBAR
+##
+## Ends in an error in state: 239.
+##
+## def -> LEMMA . IDENT ENSURES expr [ TYPE LETPMRS LET LEMMA EOF ]
+##
+## The known suffix of the stack is as follows:
+## LEMMA
+##
+
+<YOUR SYNTAX ERROR MESSAGE HERE>
+
 main: LET IDENT EQ TRUE VBAR
 ##
 ## Ends in an error in state: 238.
 ##
-## def -> LET IDENT list(IDENT) EQ expr . [ TYPE LETPMRS LET EOF ]
-## expr -> expr . QUESTION expr COLON expr [ TYPE QUESTION LETPMRS LET EOF ]
+## def -> LET IDENT list(IDENT) EQ expr . [ TYPE LETPMRS LET LEMMA EOF ]
+## expr -> expr . QUESTION expr COLON expr [ TYPE QUESTION LETPMRS LET LEMMA EOF ]
 ##
 ## The known suffix of the stack is as follows:
 ## LET IDENT list(IDENT) EQ expr
@@ -30,7 +899,7 @@ main: LET IDENT EQ VBAR
 ##
 ## Ends in an error in state: 237.
 ##
-## def -> LET IDENT list(IDENT) EQ . expr [ TYPE LETPMRS LET EOF ]
+## def -> LET IDENT list(IDENT) EQ . expr [ TYPE LETPMRS LET LEMMA EOF ]
 ##
 ## The known suffix of the stack is as follows:
 ## LET IDENT list(IDENT) EQ
@@ -42,8 +911,8 @@ main: LET IDENT IDENT RBRACKET
 ##
 ## Ends in an error in state: 231.
 ##
-## def -> LET IDENT list(IDENT) . LBRACE expr RBRACE EQ expr [ TYPE LETPMRS LET EOF ]
-## def -> LET IDENT list(IDENT) . EQ expr [ TYPE LETPMRS LET EOF ]
+## def -> LET IDENT list(IDENT) . LBRACE expr RBRACE EQ expr [ TYPE LETPMRS LET LEMMA EOF ]
+## def -> LET IDENT list(IDENT) . EQ expr [ TYPE LETPMRS LET LEMMA EOF ]
 ##
 ## The known suffix of the stack is as follows:
 ## LET IDENT list(IDENT)
@@ -62,8 +931,8 @@ main: LET IDENT LBRACE TRUE RBRACE EQ TRUE VBAR
 ##
 ## Ends in an error in state: 236.
 ##
-## def -> LET IDENT list(IDENT) LBRACE expr RBRACE EQ expr . [ TYPE LETPMRS LET EOF ]
-## expr -> expr . QUESTION expr COLON expr [ TYPE QUESTION LETPMRS LET EOF ]
+## def -> LET IDENT list(IDENT) LBRACE expr RBRACE EQ expr . [ TYPE LETPMRS LET LEMMA EOF ]
+## expr -> expr . QUESTION expr COLON expr [ TYPE QUESTION LETPMRS LET LEMMA EOF ]
 ##
 ## The known suffix of the stack is as follows:
 ## LET IDENT list(IDENT) LBRACE expr RBRACE EQ expr
@@ -90,7 +959,7 @@ main: LET IDENT LBRACE TRUE RBRACE EQ VBAR
 ##
 ## Ends in an error in state: 235.
 ##
-## def -> LET IDENT list(IDENT) LBRACE expr RBRACE EQ . expr [ TYPE LETPMRS LET EOF ]
+## def -> LET IDENT list(IDENT) LBRACE expr RBRACE EQ . expr [ TYPE LETPMRS LET LEMMA EOF ]
 ##
 ## The known suffix of the stack is as follows:
 ## LET IDENT list(IDENT) LBRACE expr RBRACE EQ
@@ -102,7 +971,7 @@ main: LET IDENT LBRACE TRUE RBRACE VBAR
 ##
 ## Ends in an error in state: 234.
 ##
-## def -> LET IDENT list(IDENT) LBRACE expr RBRACE . EQ expr [ TYPE LETPMRS LET EOF ]
+## def -> LET IDENT list(IDENT) LBRACE expr RBRACE . EQ expr [ TYPE LETPMRS LET LEMMA EOF ]
 ##
 ## The known suffix of the stack is as follows:
 ## LET IDENT list(IDENT) LBRACE expr RBRACE
@@ -114,7 +983,7 @@ main: LET IDENT LBRACE TRUE VBAR
 ##
 ## Ends in an error in state: 233.
 ##
-## def -> LET IDENT list(IDENT) LBRACE expr . RBRACE EQ expr [ TYPE LETPMRS LET EOF ]
+## def -> LET IDENT list(IDENT) LBRACE expr . RBRACE EQ expr [ TYPE LETPMRS LET LEMMA EOF ]
 ## expr -> expr . QUESTION expr COLON expr [ RBRACE QUESTION ]
 ##
 ## The known suffix of the stack is as follows:
@@ -142,7 +1011,7 @@ main: LET IDENT LBRACE VBAR
 ##
 ## Ends in an error in state: 232.
 ##
-## def -> LET IDENT list(IDENT) LBRACE . expr RBRACE EQ expr [ TYPE LETPMRS LET EOF ]
+## def -> LET IDENT list(IDENT) LBRACE . expr RBRACE EQ expr [ TYPE LETPMRS LET LEMMA EOF ]
 ##
 ## The known suffix of the stack is as follows:
 ## LET IDENT list(IDENT) LBRACE
@@ -154,8 +1023,8 @@ main: LET IDENT VBAR
 ##
 ## Ends in an error in state: 230.
 ##
-## def -> LET IDENT . list(IDENT) LBRACE expr RBRACE EQ expr [ TYPE LETPMRS LET EOF ]
-## def -> LET IDENT . list(IDENT) EQ expr [ TYPE LETPMRS LET EOF ]
+## def -> LET IDENT . list(IDENT) LBRACE expr RBRACE EQ expr [ TYPE LETPMRS LET LEMMA EOF ]
+## def -> LET IDENT . list(IDENT) EQ expr [ TYPE LETPMRS LET LEMMA EOF ]
 ##
 ## The known suffix of the stack is as follows:
 ## LET IDENT
@@ -167,7 +1036,7 @@ main: LET REC IDENT EQ CIDENT LETAND VBAR
 ##
 ## Ends in an error in state: 228.
 ##
-## separated_nonempty_list(LETAND,functdef) -> functdef LETAND . separated_nonempty_list(LETAND,functdef) [ TYPE LETPMRS LET LBRACKET EOF ]
+## separated_nonempty_list(LETAND,functdef) -> functdef LETAND . separated_nonempty_list(LETAND,functdef) [ TYPE LETPMRS LET LEMMA LBRACKET EOF ]
 ##
 ## The known suffix of the stack is as follows:
 ## functdef LETAND
@@ -179,7 +1048,7 @@ main: LET REC IDENT EQ FUNCTION TRUE RIGHTARROW CIDENT VBAR VBAR
 ##
 ## Ends in an error in state: 207.
 ##
-## separated_nonempty_list(VBAR,frule) -> frule VBAR . separated_nonempty_list(VBAR,frule) [ TYPE LETPMRS LETAND LET LBRACKET EOF ]
+## separated_nonempty_list(VBAR,frule) -> frule VBAR . separated_nonempty_list(VBAR,frule) [ TYPE LETPMRS LETAND LET LEMMA LBRACKET EOF ]
 ##
 ## The known suffix of the stack is as follows:
 ## frule VBAR
@@ -191,8 +1060,8 @@ main: LET REC IDENT EQ FUNCTION TRUE RIGHTARROW TRUE THEN
 ##
 ## Ends in an error in state: 205.
 ##
-## expr -> expr . QUESTION expr COLON expr [ VBAR TYPE QUESTION LETPMRS LETAND LET LBRACKET EOF ]
-## frule -> primary_e RIGHTARROW expr . [ VBAR TYPE LETPMRS LETAND LET LBRACKET EOF ]
+## expr -> expr . QUESTION expr COLON expr [ VBAR TYPE QUESTION LETPMRS LETAND LET LEMMA LBRACKET EOF ]
+## frule -> primary_e RIGHTARROW expr . [ VBAR TYPE LETPMRS LETAND LET LEMMA LBRACKET EOF ]
 ##
 ## The known suffix of the stack is as follows:
 ## primary_e RIGHTARROW expr
@@ -219,7 +1088,7 @@ main: LET REC IDENT EQ FUNCTION TRUE RIGHTARROW VBAR
 ##
 ## Ends in an error in state: 204.
 ##
-## frule -> primary_e RIGHTARROW . expr [ VBAR TYPE LETPMRS LETAND LET LBRACKET EOF ]
+## frule -> primary_e RIGHTARROW . expr [ VBAR TYPE LETPMRS LETAND LET LEMMA LBRACKET EOF ]
 ##
 ## The known suffix of the stack is as follows:
 ## primary_e RIGHTARROW
@@ -231,7 +1100,7 @@ main: LET REC IDENT EQ FUNCTION TRUE VBAR
 ##
 ## Ends in an error in state: 203.
 ##
-## frule -> primary_e . RIGHTARROW expr [ VBAR TYPE LETPMRS LETAND LET LBRACKET EOF ]
+## frule -> primary_e . RIGHTARROW expr [ VBAR TYPE LETPMRS LETAND LET LEMMA LBRACKET EOF ]
 ##
 ## The known suffix of the stack is as follows:
 ## primary_e
@@ -243,8 +1112,8 @@ main: LET REC IDENT EQ FUNCTION TYPE
 ##
 ## Ends in an error in state: 200.
 ##
-## function_body -> FUNCTION . VBAR separated_nonempty_list(VBAR,frule) [ TYPE LETPMRS LETAND LET LBRACKET EOF ]
-## function_body -> FUNCTION . separated_nonempty_list(VBAR,frule) [ TYPE LETPMRS LETAND LET LBRACKET EOF ]
+## function_body -> FUNCTION . VBAR separated_nonempty_list(VBAR,frule) [ TYPE LETPMRS LETAND LET LEMMA LBRACKET EOF ]
+## function_body -> FUNCTION . separated_nonempty_list(VBAR,frule) [ TYPE LETPMRS LETAND LET LEMMA LBRACKET EOF ]
 ##
 ## The known suffix of the stack is as follows:
 ## FUNCTION
@@ -256,7 +1125,7 @@ main: LET REC IDENT EQ FUNCTION VBAR VBAR
 ##
 ## Ends in an error in state: 201.
 ##
-## function_body -> FUNCTION VBAR . separated_nonempty_list(VBAR,frule) [ TYPE LETPMRS LETAND LET LBRACKET EOF ]
+## function_body -> FUNCTION VBAR . separated_nonempty_list(VBAR,frule) [ TYPE LETPMRS LETAND LET LEMMA LBRACKET EOF ]
 ##
 ## The known suffix of the stack is as follows:
 ## FUNCTION VBAR
@@ -268,8 +1137,8 @@ main: LET REC IDENT EQ TRUE VBAR
 ##
 ## Ends in an error in state: 211.
 ##
-## expr -> expr . QUESTION expr COLON expr [ TYPE QUESTION LETPMRS LETAND LET LBRACKET EOF ]
-## function_body -> expr . [ TYPE LETPMRS LETAND LET LBRACKET EOF ]
+## expr -> expr . QUESTION expr COLON expr [ TYPE QUESTION LETPMRS LETAND LET LEMMA LBRACKET EOF ]
+## function_body -> expr . [ TYPE LETPMRS LETAND LET LEMMA LBRACKET EOF ]
 ##
 ## The known suffix of the stack is as follows:
 ## expr
@@ -296,7 +1165,7 @@ main: LET REC IDENT EQ VBAR
 ##
 ## Ends in an error in state: 199.
 ##
-## functdef -> IDENT list(IDENT) EQ . function_body [ TYPE LETPMRS LETAND LET LBRACKET EOF ]
+## functdef -> IDENT list(IDENT) EQ . function_body [ TYPE LETPMRS LETAND LET LEMMA LBRACKET EOF ]
 ##
 ## The known suffix of the stack is as follows:
 ## IDENT list(IDENT) EQ
@@ -308,7 +1177,7 @@ main: LET REC IDENT IDENT RBRACKET
 ##
 ## Ends in an error in state: 198.
 ##
-## functdef -> IDENT list(IDENT) . EQ function_body [ TYPE LETPMRS LETAND LET LBRACKET EOF ]
+## functdef -> IDENT list(IDENT) . EQ function_body [ TYPE LETPMRS LETAND LET LEMMA LBRACKET EOF ]
 ##
 ## The known suffix of the stack is as follows:
 ## IDENT list(IDENT)
@@ -327,7 +1196,7 @@ main: LET REC IDENT VBAR
 ##
 ## Ends in an error in state: 197.
 ##
-## functdef -> IDENT . list(IDENT) EQ function_body [ TYPE LETPMRS LETAND LET LBRACKET EOF ]
+## functdef -> IDENT . list(IDENT) EQ function_body [ TYPE LETPMRS LETAND LET LEMMA LBRACKET EOF ]
 ##
 ## The known suffix of the stack is as follows:
 ## IDENT
@@ -339,7 +1208,7 @@ main: LET REC LBRACKET DEFINING IDENT LBRACE
 ##
 ## Ends in an error in state: 219.
 ##
-## letpmrsdef -> loption(separated_nonempty_list(LETAND,functdef)) LBRACKET DEFINING list(IDENT) . RBRACKET [ TYPE LETPMRS LET LBRACKET EOF ]
+## letpmrsdef -> loption(separated_nonempty_list(LETAND,functdef)) LBRACKET DEFINING list(IDENT) . RBRACKET [ TYPE LETPMRS LET LEMMA LBRACKET EOF ]
 ##
 ## The known suffix of the stack is as follows:
 ## loption(separated_nonempty_list(LETAND,functdef)) LBRACKET DEFINING list(IDENT)
@@ -354,12 +1223,12 @@ main: LET REC LBRACKET DEFINING IDENT LBRACE
 
 <YOUR SYNTAX ERROR MESSAGE HERE>
 
-main: LET REC LBRACKET DEFINING RBRACKET ELSE
+main: LET REC LBRACKET DEFINING RBRACKET ENSURES
 ##
 ## Ends in an error in state: 221.
 ##
-## def -> LET REC letpmrsdef . LBRACKET EQUIV IDENT IDENT RBRACKET [ TYPE LETPMRS LET EOF ]
-## def -> LET REC letpmrsdef . [ TYPE LETPMRS LET EOF ]
+## def -> LET REC letpmrsdef . LBRACKET EQUIV IDENT IDENT RBRACKET [ TYPE LETPMRS LET LEMMA EOF ]
+## def -> LET REC letpmrsdef . [ TYPE LETPMRS LET LEMMA EOF ]
 ##
 ## The known suffix of the stack is as follows:
 ## LET REC letpmrsdef
@@ -369,7 +1238,7 @@ main: LET REC LBRACKET DEFINING RBRACKET ELSE
 
 main: LET REC LBRACKET DEFINING RBRACKET LBRACKET EQUIV IDENT IDENT RBRACKET VBAR
 ##
-## Ends in an error in state: 242.
+## Ends in an error in state: 246.
 ##
 ## list(def) -> def . list(def) [ EOF ]
 ##
@@ -383,7 +1252,7 @@ main: LET REC LBRACKET DEFINING RBRACKET LBRACKET EQUIV IDENT IDENT VBAR
 ##
 ## Ends in an error in state: 225.
 ##
-## def -> LET REC letpmrsdef LBRACKET EQUIV IDENT IDENT . RBRACKET [ TYPE LETPMRS LET EOF ]
+## def -> LET REC letpmrsdef LBRACKET EQUIV IDENT IDENT . RBRACKET [ TYPE LETPMRS LET LEMMA EOF ]
 ##
 ## The known suffix of the stack is as follows:
 ## LET REC letpmrsdef LBRACKET EQUIV IDENT IDENT
@@ -395,7 +1264,7 @@ main: LET REC LBRACKET DEFINING RBRACKET LBRACKET EQUIV IDENT VBAR
 ##
 ## Ends in an error in state: 224.
 ##
-## def -> LET REC letpmrsdef LBRACKET EQUIV IDENT . IDENT RBRACKET [ TYPE LETPMRS LET EOF ]
+## def -> LET REC letpmrsdef LBRACKET EQUIV IDENT . IDENT RBRACKET [ TYPE LETPMRS LET LEMMA EOF ]
 ##
 ## The known suffix of the stack is as follows:
 ## LET REC letpmrsdef LBRACKET EQUIV IDENT
@@ -407,7 +1276,7 @@ main: LET REC LBRACKET DEFINING RBRACKET LBRACKET EQUIV VBAR
 ##
 ## Ends in an error in state: 223.
 ##
-## def -> LET REC letpmrsdef LBRACKET EQUIV . IDENT IDENT RBRACKET [ TYPE LETPMRS LET EOF ]
+## def -> LET REC letpmrsdef LBRACKET EQUIV . IDENT IDENT RBRACKET [ TYPE LETPMRS LET LEMMA EOF ]
 ##
 ## The known suffix of the stack is as follows:
 ## LET REC letpmrsdef LBRACKET EQUIV
@@ -419,7 +1288,7 @@ main: LET REC LBRACKET DEFINING RBRACKET LBRACKET VBAR
 ##
 ## Ends in an error in state: 222.
 ##
-## def -> LET REC letpmrsdef LBRACKET . EQUIV IDENT IDENT RBRACKET [ TYPE LETPMRS LET EOF ]
+## def -> LET REC letpmrsdef LBRACKET . EQUIV IDENT IDENT RBRACKET [ TYPE LETPMRS LET LEMMA EOF ]
 ##
 ## The known suffix of the stack is as follows:
 ## LET REC letpmrsdef LBRACKET
@@ -431,7 +1300,7 @@ main: LET REC LBRACKET DEFINING VBAR
 ##
 ## Ends in an error in state: 218.
 ##
-## letpmrsdef -> loption(separated_nonempty_list(LETAND,functdef)) LBRACKET DEFINING . list(IDENT) RBRACKET [ TYPE LETPMRS LET LBRACKET EOF ]
+## letpmrsdef -> loption(separated_nonempty_list(LETAND,functdef)) LBRACKET DEFINING . list(IDENT) RBRACKET [ TYPE LETPMRS LET LEMMA LBRACKET EOF ]
 ##
 ## The known suffix of the stack is as follows:
 ## loption(separated_nonempty_list(LETAND,functdef)) LBRACKET DEFINING
@@ -439,15 +1308,15 @@ main: LET REC LBRACKET DEFINING VBAR
 
 <YOUR SYNTAX ERROR MESSAGE HERE>
 
-main: LET REC LBRACKET INVARIANT TRUE VBAR
+main: LET REC LBRACKET ENSURES TRUE VBAR
 ##
 ## Ends in an error in state: 216.
 ##
 ## expr -> expr . QUESTION expr COLON expr [ RBRACKET QUESTION ]
-## letpmrsdef -> loption(separated_nonempty_list(LETAND,functdef)) LBRACKET INVARIANT expr . RBRACKET [ TYPE LETPMRS LET LBRACKET EOF ]
+## letpmrsdef -> loption(separated_nonempty_list(LETAND,functdef)) LBRACKET ENSURES expr . RBRACKET [ TYPE LETPMRS LET LEMMA LBRACKET EOF ]
 ##
 ## The known suffix of the stack is as follows:
-## loption(separated_nonempty_list(LETAND,functdef)) LBRACKET INVARIANT expr
+## loption(separated_nonempty_list(LETAND,functdef)) LBRACKET ENSURES expr
 ##
 ## WARNING: This example involves spurious reductions.
 ## This implies that, although the LR(1) items shown above provide an
@@ -467,14 +1336,14 @@ main: LET REC LBRACKET INVARIANT TRUE VBAR
 
 <YOUR SYNTAX ERROR MESSAGE HERE>
 
-main: LET REC LBRACKET INVARIANT VBAR
+main: LET REC LBRACKET ENSURES VBAR
 ##
 ## Ends in an error in state: 215.
 ##
-## letpmrsdef -> loption(separated_nonempty_list(LETAND,functdef)) LBRACKET INVARIANT . expr RBRACKET [ TYPE LETPMRS LET LBRACKET EOF ]
+## letpmrsdef -> loption(separated_nonempty_list(LETAND,functdef)) LBRACKET ENSURES . expr RBRACKET [ TYPE LETPMRS LET LEMMA LBRACKET EOF ]
 ##
 ## The known suffix of the stack is as follows:
-## loption(separated_nonempty_list(LETAND,functdef)) LBRACKET INVARIANT
+## loption(separated_nonempty_list(LETAND,functdef)) LBRACKET ENSURES
 ##
 
 <YOUR SYNTAX ERROR MESSAGE HERE>
@@ -483,8 +1352,8 @@ main: LET REC LBRACKET VBAR
 ##
 ## Ends in an error in state: 214.
 ##
-## letpmrsdef -> loption(separated_nonempty_list(LETAND,functdef)) LBRACKET . DEFINING list(IDENT) RBRACKET [ TYPE LETPMRS LET LBRACKET EOF ]
-## letpmrsdef -> loption(separated_nonempty_list(LETAND,functdef)) LBRACKET . INVARIANT expr RBRACKET [ TYPE LETPMRS LET LBRACKET EOF ]
+## letpmrsdef -> loption(separated_nonempty_list(LETAND,functdef)) LBRACKET . DEFINING list(IDENT) RBRACKET [ TYPE LETPMRS LET LEMMA LBRACKET EOF ]
+## letpmrsdef -> loption(separated_nonempty_list(LETAND,functdef)) LBRACKET . ENSURES expr RBRACKET [ TYPE LETPMRS LET LEMMA LBRACKET EOF ]
 ##
 ## The known suffix of the stack is as follows:
 ## loption(separated_nonempty_list(LETAND,functdef)) LBRACKET
@@ -496,8 +1365,8 @@ main: LET REC VBAR
 ##
 ## Ends in an error in state: 196.
 ##
-## def -> LET REC . letpmrsdef LBRACKET EQUIV IDENT IDENT RBRACKET [ TYPE LETPMRS LET EOF ]
-## def -> LET REC . letpmrsdef [ TYPE LETPMRS LET EOF ]
+## def -> LET REC . letpmrsdef LBRACKET EQUIV IDENT IDENT RBRACKET [ TYPE LETPMRS LET LEMMA EOF ]
+## def -> LET REC . letpmrsdef [ TYPE LETPMRS LET LEMMA EOF ]
 ##
 ## The known suffix of the stack is as follows:
 ## LET REC
@@ -509,10 +1378,10 @@ main: LET VBAR
 ##
 ## Ends in an error in state: 195.
 ##
-## def -> LET . IDENT list(IDENT) LBRACE expr RBRACE EQ expr [ TYPE LETPMRS LET EOF ]
-## def -> LET . IDENT list(IDENT) EQ expr [ TYPE LETPMRS LET EOF ]
-## def -> LET . REC letpmrsdef LBRACKET EQUIV IDENT IDENT RBRACKET [ TYPE LETPMRS LET EOF ]
-## def -> LET . REC letpmrsdef [ TYPE LETPMRS LET EOF ]
+## def -> LET . IDENT list(IDENT) LBRACE expr RBRACE EQ expr [ TYPE LETPMRS LET LEMMA EOF ]
+## def -> LET . IDENT list(IDENT) EQ expr [ TYPE LETPMRS LET LEMMA EOF ]
+## def -> LET . REC letpmrsdef LBRACKET EQUIV IDENT IDENT RBRACKET [ TYPE LETPMRS LET LEMMA EOF ]
+## def -> LET . REC letpmrsdef [ TYPE LETPMRS LET LEMMA EOF ]
 ##
 ## The known suffix of the stack is as follows:
 ## LET
@@ -524,7 +1393,7 @@ main: LETPMRS IDENT EQ TRUE RIGHTARROW CIDENT VBAR VBAR
 ##
 ## Ends in an error in state: 176.
 ##
-## separated_nonempty_list(VBAR,prule) -> prule VBAR . separated_nonempty_list(VBAR,prule) [ TYPE LETPMRS LET EOF ]
+## separated_nonempty_list(VBAR,prule) -> prule VBAR . separated_nonempty_list(VBAR,prule) [ TYPE LETPMRS LET LEMMA EOF ]
 ##
 ## The known suffix of the stack is as follows:
 ## prule VBAR
@@ -536,8 +1405,8 @@ main: LETPMRS IDENT EQ TRUE RIGHTARROW TRUE THEN
 ##
 ## Ends in an error in state: 180.
 ##
-## expr -> expr . QUESTION expr COLON expr [ VBAR TYPE QUESTION LETPMRS LET EOF ]
-## prule -> fun_app_e RIGHTARROW expr . [ VBAR TYPE LETPMRS LET EOF ]
+## expr -> expr . QUESTION expr COLON expr [ VBAR TYPE QUESTION LETPMRS LET LEMMA EOF ]
+## prule -> fun_app_e RIGHTARROW expr . [ VBAR TYPE LETPMRS LET LEMMA EOF ]
 ##
 ## The known suffix of the stack is as follows:
 ## fun_app_e RIGHTARROW expr
@@ -564,7 +1433,7 @@ main: LETPMRS IDENT EQ TRUE RIGHTARROW VBAR
 ##
 ## Ends in an error in state: 179.
 ##
-## prule -> fun_app_e RIGHTARROW . expr [ VBAR TYPE LETPMRS LET EOF ]
+## prule -> fun_app_e RIGHTARROW . expr [ VBAR TYPE LETPMRS LET LEMMA EOF ]
 ##
 ## The known suffix of the stack is as follows:
 ## fun_app_e RIGHTARROW
@@ -576,7 +1445,7 @@ main: LETPMRS IDENT EQ TRUE VBAR
 ##
 ## Ends in an error in state: 178.
 ##
-## prule -> fun_app_e . RIGHTARROW expr [ VBAR TYPE LETPMRS LET EOF ]
+## prule -> fun_app_e . RIGHTARROW expr [ VBAR TYPE LETPMRS LET LEMMA EOF ]
 ##
 ## The known suffix of the stack is as follows:
 ## fun_app_e
@@ -594,7 +1463,7 @@ main: LETPMRS IDENT EQ VBAR
 ##
 ## Ends in an error in state: 192.
 ##
-## pmrsdef -> IDENT list(IDENT) EQ . pbody [ TYPE LETPMRS LET EOF ]
+## pmrsdef -> IDENT list(IDENT) EQ . pbody [ TYPE LETPMRS LET LEMMA EOF ]
 ##
 ## The known suffix of the stack is as follows:
 ## IDENT list(IDENT) EQ
@@ -606,8 +1475,8 @@ main: LETPMRS IDENT IDENT RBRACKET
 ##
 ## Ends in an error in state: 186.
 ##
-## pmrsdef -> IDENT list(IDENT) . EQ pbody [ TYPE LETPMRS LET EOF ]
-## pmrsdef -> IDENT list(IDENT) . LBRACE expr RBRACE EQ pbody [ TYPE LETPMRS LET EOF ]
+## pmrsdef -> IDENT list(IDENT) . EQ pbody [ TYPE LETPMRS LET LEMMA EOF ]
+## pmrsdef -> IDENT list(IDENT) . LBRACE expr RBRACE EQ pbody [ TYPE LETPMRS LET LEMMA EOF ]
 ##
 ## The known suffix of the stack is as follows:
 ## IDENT list(IDENT)
@@ -634,756 +1503,11 @@ main: LETPMRS IDENT IDENT VBAR
 
 <YOUR SYNTAX ERROR MESSAGE HERE>
 
-main: LETPMRS IDENT LBRACE ABS VBAR
-##
-## Ends in an error in state: 101.
-##
-## unary_e -> ABS . unary_e [ VBAR TYPE TIMES THEN RPAR RBRACKET RBRACE QUESTION PLUS OR NEQ MOD MINUS LT LETPMRS LETAND LET LE LBRACKET IN GT GE EQ EOF ELSE DIV COMMA COLON AND ]
-##
-## The known suffix of the stack is as follows:
-## ABS
-##
-
-<YOUR SYNTAX ERROR MESSAGE HERE>
-
-main: LETPMRS IDENT LBRACE CIDENT LPAR TRUE COMMA VBAR
-##
-## Ends in an error in state: 87.
-##
-## separated_nonempty_list(COMMA,fun_app_e) -> fun_app_e COMMA . separated_nonempty_list(COMMA,fun_app_e) [ RPAR ]
-##
-## The known suffix of the stack is as follows:
-## fun_app_e COMMA
-##
-
-<YOUR SYNTAX ERROR MESSAGE HERE>
-
-main: LETPMRS IDENT LBRACE CIDENT LPAR TRUE VBAR
-##
-## Ends in an error in state: 86.
-##
-## separated_nonempty_list(COMMA,fun_app_e) -> fun_app_e . [ RPAR ]
-## separated_nonempty_list(COMMA,fun_app_e) -> fun_app_e . COMMA separated_nonempty_list(COMMA,fun_app_e) [ RPAR ]
-##
-## The known suffix of the stack is as follows:
-## fun_app_e
-##
-## WARNING: This example involves spurious reductions.
-## This implies that, although the LR(1) items shown above provide an
-## accurate view of the past (what has been recognized so far), they
-## may provide an INCOMPLETE view of the future (what was expected next).
-## In state 80, spurious reduction of production fun_app_e -> primary_e
-##
-
-<YOUR SYNTAX ERROR MESSAGE HERE>
-
-main: LETPMRS IDENT LBRACE CIDENT LPAR VBAR
-##
-## Ends in an error in state: 78.
-##
-## primary_e -> CIDENT LPAR . loption(separated_nonempty_list(COMMA,fun_app_e)) RPAR [ VBAR TYPE TRUE TIMES THEN RPAR RIGHTARROW RBRACKET RBRACE QUESTION PLUS OR NEQ MOD MINUS LT LPAR LETPMRS LETAND LET LE LBRACKET INT IN IDENT GT GE FALSE EQ EOF ELSE DIV COMMA COLON CIDENT AND ]
-##
-## The known suffix of the stack is as follows:
-## CIDENT LPAR
-##
-
-<YOUR SYNTAX ERROR MESSAGE HERE>
-
-main: LETPMRS IDENT LBRACE CIDENT REC
-##
-## Ends in an error in state: 77.
-##
-## primary_e -> CIDENT . LPAR loption(separated_nonempty_list(COMMA,fun_app_e)) RPAR [ VBAR TYPE TRUE TIMES THEN RPAR RIGHTARROW RBRACKET RBRACE QUESTION PLUS OR NEQ MOD MINUS LT LPAR LETPMRS LETAND LET LE LBRACKET INT IN IDENT GT GE FALSE EQ EOF ELSE DIV COMMA COLON CIDENT AND ]
-## primary_e -> CIDENT . [ VBAR TYPE TRUE TIMES THEN RPAR RIGHTARROW RBRACKET RBRACE QUESTION PLUS OR NEQ MOD MINUS LT LPAR LETPMRS LETAND LET LE LBRACKET INT IN IDENT GT GE FALSE EQ EOF ELSE DIV COMMA COLON CIDENT AND ]
-##
-## The known suffix of the stack is as follows:
-## CIDENT
-##
-
-<YOUR SYNTAX ERROR MESSAGE HERE>
-
-main: LETPMRS IDENT LBRACE EXCLAMATION VBAR
-##
-## Ends in an error in state: 100.
-##
-## unary_e -> EXCLAMATION . unary_e [ VBAR TYPE TIMES THEN RPAR RBRACKET RBRACE QUESTION PLUS OR NEQ MOD MINUS LT LETPMRS LETAND LET LE LBRACKET IN GT GE EQ EOF ELSE DIV COMMA COLON AND ]
-##
-## The known suffix of the stack is as follows:
-## EXCLAMATION
-##
-
-<YOUR SYNTAX ERROR MESSAGE HERE>
-
-main: LETPMRS IDENT LBRACE FUN RIGHTARROW VBAR
-##
-## Ends in an error in state: 99.
-##
-## expr -> FUN list(primary_e) RIGHTARROW . tuple_e [ VBAR TYPE THEN RPAR RBRACKET RBRACE QUESTION LETPMRS LETAND LET LBRACKET IN EOF ELSE COLON ]
-##
-## The known suffix of the stack is as follows:
-## FUN list(primary_e) RIGHTARROW
-##
-
-<YOUR SYNTAX ERROR MESSAGE HERE>
-
-main: LETPMRS IDENT LBRACE FUN TRUE VBAR
-##
-## Ends in an error in state: 96.
-##
-## list(primary_e) -> primary_e . list(primary_e) [ RIGHTARROW ]
-##
-## The known suffix of the stack is as follows:
-## primary_e
-##
-
-<YOUR SYNTAX ERROR MESSAGE HERE>
-
-main: LETPMRS IDENT LBRACE FUN VBAR
-##
-## Ends in an error in state: 95.
-##
-## expr -> FUN . list(primary_e) RIGHTARROW tuple_e [ VBAR TYPE THEN RPAR RBRACKET RBRACE QUESTION LETPMRS LETAND LET LBRACKET IN EOF ELSE COLON ]
-##
-## The known suffix of the stack is as follows:
-## FUN
-##
-
-<YOUR SYNTAX ERROR MESSAGE HERE>
-
-main: LETPMRS IDENT LBRACE IF TRUE THEN TRUE ELSE VBAR
-##
-## Ends in an error in state: 152.
-##
-## expr -> IF expr THEN expr ELSE . expr [ VBAR TYPE THEN RPAR RBRACKET RBRACE QUESTION LETPMRS LETAND LET LBRACKET IN EOF ELSE COLON ]
-##
-## The known suffix of the stack is as follows:
-## IF expr THEN expr ELSE
-##
-
-<YOUR SYNTAX ERROR MESSAGE HERE>
-
-main: LETPMRS IDENT LBRACE IF TRUE THEN TRUE VBAR
-##
-## Ends in an error in state: 147.
-##
-## expr -> expr . QUESTION expr COLON expr [ QUESTION ELSE ]
-## expr -> IF expr THEN expr . ELSE expr [ VBAR TYPE THEN RPAR RBRACKET RBRACE QUESTION LETPMRS LETAND LET LBRACKET IN EOF ELSE COLON ]
-##
-## The known suffix of the stack is as follows:
-## IF expr THEN expr
-##
-## WARNING: This example involves spurious reductions.
-## This implies that, although the LR(1) items shown above provide an
-## accurate view of the past (what has been recognized so far), they
-## may provide an INCOMPLETE view of the future (what was expected next).
-## In state 80, spurious reduction of production fun_app_e -> primary_e
-## In state 103, spurious reduction of production unary_e -> fun_app_e
-## In state 105, spurious reduction of production mult_e -> unary_e
-## In state 113, spurious reduction of production add_e -> mult_e
-## In state 133, spurious reduction of production comp_e -> add_e
-## In state 130, spurious reduction of production equality_e -> comp_e
-## In state 127, spurious reduction of production logical_and_e -> equality_e
-## In state 124, spurious reduction of production logical_or_e -> logical_and_e
-## In state 118, spurious reduction of production tuple_e -> logical_or_e
-## In state 144, spurious reduction of production expr -> tuple_e
-##
-
-<YOUR SYNTAX ERROR MESSAGE HERE>
-
-main: LETPMRS IDENT LBRACE IF TRUE THEN VBAR
-##
-## Ends in an error in state: 146.
-##
-## expr -> IF expr THEN . expr ELSE expr [ VBAR TYPE THEN RPAR RBRACKET RBRACE QUESTION LETPMRS LETAND LET LBRACKET IN EOF ELSE COLON ]
-##
-## The known suffix of the stack is as follows:
-## IF expr THEN
-##
-
-<YOUR SYNTAX ERROR MESSAGE HERE>
-
-main: LETPMRS IDENT LBRACE IF TRUE VBAR
-##
-## Ends in an error in state: 145.
-##
-## expr -> expr . QUESTION expr COLON expr [ THEN QUESTION ]
-## expr -> IF expr . THEN expr ELSE expr [ VBAR TYPE THEN RPAR RBRACKET RBRACE QUESTION LETPMRS LETAND LET LBRACKET IN EOF ELSE COLON ]
-##
-## The known suffix of the stack is as follows:
-## IF expr
-##
-## WARNING: This example involves spurious reductions.
-## This implies that, although the LR(1) items shown above provide an
-## accurate view of the past (what has been recognized so far), they
-## may provide an INCOMPLETE view of the future (what was expected next).
-## In state 80, spurious reduction of production fun_app_e -> primary_e
-## In state 103, spurious reduction of production unary_e -> fun_app_e
-## In state 105, spurious reduction of production mult_e -> unary_e
-## In state 113, spurious reduction of production add_e -> mult_e
-## In state 133, spurious reduction of production comp_e -> add_e
-## In state 130, spurious reduction of production equality_e -> comp_e
-## In state 127, spurious reduction of production logical_and_e -> equality_e
-## In state 124, spurious reduction of production logical_or_e -> logical_and_e
-## In state 118, spurious reduction of production tuple_e -> logical_or_e
-## In state 144, spurious reduction of production expr -> tuple_e
-##
-
-<YOUR SYNTAX ERROR MESSAGE HERE>
-
-main: LETPMRS IDENT LBRACE IF VBAR
-##
-## Ends in an error in state: 94.
-##
-## expr -> IF . expr THEN expr ELSE expr [ VBAR TYPE THEN RPAR RBRACKET RBRACE QUESTION LETPMRS LETAND LET LBRACKET IN EOF ELSE COLON ]
-##
-## The known suffix of the stack is as follows:
-## IF
-##
-
-<YOUR SYNTAX ERROR MESSAGE HERE>
-
-main: LETPMRS IDENT LBRACE LET TRUE COMMA TRUE COMMA VBAR
-##
-## Ends in an error in state: 164.
-##
-## separated_nonempty_list(COMMA,primary_e) -> primary_e COMMA . separated_nonempty_list(COMMA,primary_e) [ EQ ]
-##
-## The known suffix of the stack is as follows:
-## primary_e COMMA
-##
-
-<YOUR SYNTAX ERROR MESSAGE HERE>
-
-main: LETPMRS IDENT LBRACE LET TRUE COMMA TRUE EQ TRUE IN VBAR
-##
-## Ends in an error in state: 161.
-##
-## expr -> LET primary_e COMMA separated_nonempty_list(COMMA,primary_e) EQ expr IN . expr [ VBAR TYPE THEN RPAR RBRACKET RBRACE QUESTION LETPMRS LETAND LET LBRACKET IN EOF ELSE COLON ]
-##
-## The known suffix of the stack is as follows:
-## LET primary_e COMMA separated_nonempty_list(COMMA,primary_e) EQ expr IN
-##
-
-<YOUR SYNTAX ERROR MESSAGE HERE>
-
-main: LETPMRS IDENT LBRACE LET TRUE COMMA TRUE EQ TRUE VBAR
-##
-## Ends in an error in state: 160.
-##
-## expr -> LET primary_e COMMA separated_nonempty_list(COMMA,primary_e) EQ expr . IN expr [ VBAR TYPE THEN RPAR RBRACKET RBRACE QUESTION LETPMRS LETAND LET LBRACKET IN EOF ELSE COLON ]
-## expr -> expr . QUESTION expr COLON expr [ QUESTION IN ]
-##
-## The known suffix of the stack is as follows:
-## LET primary_e COMMA separated_nonempty_list(COMMA,primary_e) EQ expr
-##
-## WARNING: This example involves spurious reductions.
-## This implies that, although the LR(1) items shown above provide an
-## accurate view of the past (what has been recognized so far), they
-## may provide an INCOMPLETE view of the future (what was expected next).
-## In state 80, spurious reduction of production fun_app_e -> primary_e
-## In state 103, spurious reduction of production unary_e -> fun_app_e
-## In state 105, spurious reduction of production mult_e -> unary_e
-## In state 113, spurious reduction of production add_e -> mult_e
-## In state 133, spurious reduction of production comp_e -> add_e
-## In state 130, spurious reduction of production equality_e -> comp_e
-## In state 127, spurious reduction of production logical_and_e -> equality_e
-## In state 124, spurious reduction of production logical_or_e -> logical_and_e
-## In state 118, spurious reduction of production tuple_e -> logical_or_e
-## In state 144, spurious reduction of production expr -> tuple_e
-##
-
-<YOUR SYNTAX ERROR MESSAGE HERE>
-
-main: LETPMRS IDENT LBRACE LET TRUE COMMA TRUE EQ VBAR
-##
-## Ends in an error in state: 159.
-##
-## expr -> LET primary_e COMMA separated_nonempty_list(COMMA,primary_e) EQ . expr IN expr [ VBAR TYPE THEN RPAR RBRACKET RBRACE QUESTION LETPMRS LETAND LET LBRACKET IN EOF ELSE COLON ]
-##
-## The known suffix of the stack is as follows:
-## LET primary_e COMMA separated_nonempty_list(COMMA,primary_e) EQ
-##
-
-<YOUR SYNTAX ERROR MESSAGE HERE>
-
-main: LETPMRS IDENT LBRACE LET TRUE COMMA TRUE VBAR
-##
-## Ends in an error in state: 163.
-##
-## separated_nonempty_list(COMMA,primary_e) -> primary_e . [ EQ ]
-## separated_nonempty_list(COMMA,primary_e) -> primary_e . COMMA separated_nonempty_list(COMMA,primary_e) [ EQ ]
-##
-## The known suffix of the stack is as follows:
-## primary_e
-##
-
-<YOUR SYNTAX ERROR MESSAGE HERE>
-
-main: LETPMRS IDENT LBRACE LET TRUE COMMA VBAR
-##
-## Ends in an error in state: 157.
-##
-## expr -> LET primary_e COMMA . separated_nonempty_list(COMMA,primary_e) EQ expr IN expr [ VBAR TYPE THEN RPAR RBRACKET RBRACE QUESTION LETPMRS LETAND LET LBRACKET IN EOF ELSE COLON ]
-##
-## The known suffix of the stack is as follows:
-## LET primary_e COMMA
-##
-
-<YOUR SYNTAX ERROR MESSAGE HERE>
-
-main: LETPMRS IDENT LBRACE LET TRUE EQ TRUE IN VBAR
-##
-## Ends in an error in state: 155.
-##
-## expr -> LET primary_e EQ expr IN . expr [ VBAR TYPE THEN RPAR RBRACKET RBRACE QUESTION LETPMRS LETAND LET LBRACKET IN EOF ELSE COLON ]
-##
-## The known suffix of the stack is as follows:
-## LET primary_e EQ expr IN
-##
-
-<YOUR SYNTAX ERROR MESSAGE HERE>
-
-main: LETPMRS IDENT LBRACE LET TRUE EQ TRUE VBAR
-##
-## Ends in an error in state: 154.
-##
-## expr -> LET primary_e EQ expr . IN expr [ VBAR TYPE THEN RPAR RBRACKET RBRACE QUESTION LETPMRS LETAND LET LBRACKET IN EOF ELSE COLON ]
-## expr -> expr . QUESTION expr COLON expr [ QUESTION IN ]
-##
-## The known suffix of the stack is as follows:
-## LET primary_e EQ expr
-##
-## WARNING: This example involves spurious reductions.
-## This implies that, although the LR(1) items shown above provide an
-## accurate view of the past (what has been recognized so far), they
-## may provide an INCOMPLETE view of the future (what was expected next).
-## In state 80, spurious reduction of production fun_app_e -> primary_e
-## In state 103, spurious reduction of production unary_e -> fun_app_e
-## In state 105, spurious reduction of production mult_e -> unary_e
-## In state 113, spurious reduction of production add_e -> mult_e
-## In state 133, spurious reduction of production comp_e -> add_e
-## In state 130, spurious reduction of production equality_e -> comp_e
-## In state 127, spurious reduction of production logical_and_e -> equality_e
-## In state 124, spurious reduction of production logical_or_e -> logical_and_e
-## In state 118, spurious reduction of production tuple_e -> logical_or_e
-## In state 144, spurious reduction of production expr -> tuple_e
-##
-
-<YOUR SYNTAX ERROR MESSAGE HERE>
-
-main: LETPMRS IDENT LBRACE LET TRUE EQ VBAR
-##
-## Ends in an error in state: 93.
-##
-## expr -> LET primary_e EQ . expr IN expr [ VBAR TYPE THEN RPAR RBRACKET RBRACE QUESTION LETPMRS LETAND LET LBRACKET IN EOF ELSE COLON ]
-##
-## The known suffix of the stack is as follows:
-## LET primary_e EQ
-##
-
-<YOUR SYNTAX ERROR MESSAGE HERE>
-
-main: LETPMRS IDENT LBRACE LET TRUE VBAR
-##
-## Ends in an error in state: 92.
-##
-## expr -> LET primary_e . EQ expr IN expr [ VBAR TYPE THEN RPAR RBRACKET RBRACE QUESTION LETPMRS LETAND LET LBRACKET IN EOF ELSE COLON ]
-## expr -> LET primary_e . COMMA separated_nonempty_list(COMMA,primary_e) EQ expr IN expr [ VBAR TYPE THEN RPAR RBRACKET RBRACE QUESTION LETPMRS LETAND LET LBRACKET IN EOF ELSE COLON ]
-##
-## The known suffix of the stack is as follows:
-## LET primary_e
-##
-
-<YOUR SYNTAX ERROR MESSAGE HERE>
-
-main: LETPMRS IDENT LBRACE LET VBAR
-##
-## Ends in an error in state: 91.
-##
-## expr -> LET . primary_e EQ expr IN expr [ VBAR TYPE THEN RPAR RBRACKET RBRACE QUESTION LETPMRS LETAND LET LBRACKET IN EOF ELSE COLON ]
-## expr -> LET . primary_e COMMA separated_nonempty_list(COMMA,primary_e) EQ expr IN expr [ VBAR TYPE THEN RPAR RBRACKET RBRACE QUESTION LETPMRS LETAND LET LBRACKET IN EOF ELSE COLON ]
-##
-## The known suffix of the stack is as follows:
-## LET
-##
-
-<YOUR SYNTAX ERROR MESSAGE HERE>
-
-main: LETPMRS IDENT LBRACE LPAR TRUE VBAR
-##
-## Ends in an error in state: 166.
-##
-## expr -> expr . QUESTION expr COLON expr [ RPAR QUESTION ]
-## primary_e -> LPAR expr . RPAR [ VBAR TYPE TRUE TIMES THEN RPAR RIGHTARROW RBRACKET RBRACE QUESTION PLUS OR NEQ MOD MINUS LT LPAR LETPMRS LETAND LET LE LBRACKET INT IN IDENT GT GE FALSE EQ EOF ELSE DIV COMMA COLON CIDENT AND ]
-##
-## The known suffix of the stack is as follows:
-## LPAR expr
-##
-## WARNING: This example involves spurious reductions.
-## This implies that, although the LR(1) items shown above provide an
-## accurate view of the past (what has been recognized so far), they
-## may provide an INCOMPLETE view of the future (what was expected next).
-## In state 80, spurious reduction of production fun_app_e -> primary_e
-## In state 103, spurious reduction of production unary_e -> fun_app_e
-## In state 105, spurious reduction of production mult_e -> unary_e
-## In state 113, spurious reduction of production add_e -> mult_e
-## In state 133, spurious reduction of production comp_e -> add_e
-## In state 130, spurious reduction of production equality_e -> comp_e
-## In state 127, spurious reduction of production logical_and_e -> equality_e
-## In state 124, spurious reduction of production logical_or_e -> logical_and_e
-## In state 118, spurious reduction of production tuple_e -> logical_or_e
-## In state 144, spurious reduction of production expr -> tuple_e
-##
-
-<YOUR SYNTAX ERROR MESSAGE HERE>
-
-main: LETPMRS IDENT LBRACE LPAR VBAR
-##
-## Ends in an error in state: 72.
-##
-## primary_e -> LPAR . expr RPAR [ VBAR TYPE TRUE TIMES THEN RPAR RIGHTARROW RBRACKET RBRACE QUESTION PLUS OR NEQ MOD MINUS LT LPAR LETPMRS LETAND LET LE LBRACKET INT IN IDENT GT GE FALSE EQ EOF ELSE DIV COMMA COLON CIDENT AND ]
-##
-## The known suffix of the stack is as follows:
-## LPAR
-##
-
-<YOUR SYNTAX ERROR MESSAGE HERE>
-
-main: LETPMRS IDENT LBRACE MAX TRUE VBAR
-##
-## Ends in an error in state: 89.
-##
-## fun_app_e -> MAX primary_e . primary_e [ VBAR TYPE TIMES THEN RPAR RIGHTARROW RBRACKET RBRACE QUESTION PLUS OR NEQ MOD MINUS LT LETPMRS LETAND LET LE LBRACKET IN GT GE EQ EOF ELSE DIV COMMA COLON AND ]
-##
-## The known suffix of the stack is as follows:
-## MAX primary_e
-##
-
-<YOUR SYNTAX ERROR MESSAGE HERE>
-
-main: LETPMRS IDENT LBRACE MAX VBAR
-##
-## Ends in an error in state: 73.
-##
-## fun_app_e -> MAX . primary_e primary_e [ VBAR TYPE TIMES THEN RPAR RIGHTARROW RBRACKET RBRACE QUESTION PLUS OR NEQ MOD MINUS LT LETPMRS LETAND LET LE LBRACKET IN GT GE EQ EOF ELSE DIV COMMA COLON AND ]
-##
-## The known suffix of the stack is as follows:
-## MAX
-##
-
-<YOUR SYNTAX ERROR MESSAGE HERE>
-
-main: LETPMRS IDENT LBRACE MIN TRUE VBAR
-##
-## Ends in an error in state: 168.
-##
-## fun_app_e -> MIN primary_e . primary_e [ VBAR TYPE TIMES THEN RPAR RIGHTARROW RBRACKET RBRACE QUESTION PLUS OR NEQ MOD MINUS LT LETPMRS LETAND LET LE LBRACKET IN GT GE EQ EOF ELSE DIV COMMA COLON AND ]
-##
-## The known suffix of the stack is as follows:
-## MIN primary_e
-##
-
-<YOUR SYNTAX ERROR MESSAGE HERE>
-
-main: LETPMRS IDENT LBRACE MIN VBAR
-##
-## Ends in an error in state: 71.
-##
-## fun_app_e -> MIN . primary_e primary_e [ VBAR TYPE TIMES THEN RPAR RIGHTARROW RBRACKET RBRACE QUESTION PLUS OR NEQ MOD MINUS LT LETPMRS LETAND LET LE LBRACKET IN GT GE EQ EOF ELSE DIV COMMA COLON AND ]
-##
-## The known suffix of the stack is as follows:
-## MIN
-##
-
-<YOUR SYNTAX ERROR MESSAGE HERE>
-
-main: LETPMRS IDENT LBRACE MINUS VBAR
-##
-## Ends in an error in state: 70.
-##
-## unary_e -> MINUS . unary_e [ VBAR TYPE TIMES THEN RPAR RBRACKET RBRACE QUESTION PLUS OR NEQ MOD MINUS LT LETPMRS LETAND LET LE LBRACKET IN GT GE EQ EOF ELSE DIV COMMA COLON AND ]
-##
-## The known suffix of the stack is as follows:
-## MINUS
-##
-
-<YOUR SYNTAX ERROR MESSAGE HERE>
-
-main: LETPMRS IDENT LBRACE TRUE AND VBAR
-##
-## Ends in an error in state: 128.
-##
-## logical_and_e -> equality_e AND . logical_and_e [ VBAR TYPE THEN RPAR RBRACKET RBRACE QUESTION OR LETPMRS LETAND LET LBRACKET IN EOF ELSE COMMA COLON ]
-##
-## The known suffix of the stack is as follows:
-## equality_e AND
-##
-
-<YOUR SYNTAX ERROR MESSAGE HERE>
-
-main: LETPMRS IDENT LBRACE TRUE COMMA TRUE COMMA VBAR
-##
-## Ends in an error in state: 122.
-##
-## separated_nonempty_list(COMMA,logical_or_e) -> logical_or_e COMMA . separated_nonempty_list(COMMA,logical_or_e) [ VBAR TYPE THEN RPAR RBRACKET RBRACE QUESTION LETPMRS LETAND LET LBRACKET IN EOF ELSE COLON ]
-##
-## The known suffix of the stack is as follows:
-## logical_or_e COMMA
-##
-
-<YOUR SYNTAX ERROR MESSAGE HERE>
-
-main: LETPMRS IDENT LBRACE TRUE COMMA VBAR
-##
-## Ends in an error in state: 119.
-##
-## tuple_e -> logical_or_e COMMA . separated_nonempty_list(COMMA,logical_or_e) [ VBAR TYPE THEN RPAR RBRACKET RBRACE QUESTION LETPMRS LETAND LET LBRACKET IN EOF ELSE COLON ]
-##
-## The known suffix of the stack is as follows:
-## logical_or_e COMMA
-##
-
-<YOUR SYNTAX ERROR MESSAGE HERE>
-
-main: LETPMRS IDENT LBRACE TRUE DIV VBAR
-##
-## Ends in an error in state: 110.
-##
-## mult_e -> unary_e DIV . mult_e [ VBAR TYPE THEN RPAR RBRACKET RBRACE QUESTION PLUS OR NEQ MINUS LT LETPMRS LETAND LET LE LBRACKET IN GT GE EQ EOF ELSE COMMA COLON AND ]
-##
-## The known suffix of the stack is as follows:
-## unary_e DIV
-##
-
-<YOUR SYNTAX ERROR MESSAGE HERE>
-
-main: LETPMRS IDENT LBRACE TRUE EQ CIDENT NEQ
-##
-## Ends in an error in state: 127.
-##
-## logical_and_e -> equality_e . AND logical_and_e [ VBAR TYPE THEN RPAR RBRACKET RBRACE QUESTION OR LETPMRS LETAND LET LBRACKET IN EOF ELSE COMMA COLON ]
-## logical_and_e -> equality_e . [ VBAR TYPE THEN RPAR RBRACKET RBRACE QUESTION OR LETPMRS LETAND LET LBRACKET IN EOF ELSE COMMA COLON ]
-##
-## The known suffix of the stack is as follows:
-## equality_e
-##
-## WARNING: This example involves spurious reductions.
-## This implies that, although the LR(1) items shown above provide an
-## accurate view of the past (what has been recognized so far), they
-## may provide an INCOMPLETE view of the future (what was expected next).
-## In state 77, spurious reduction of production primary_e -> CIDENT
-## In state 80, spurious reduction of production fun_app_e -> primary_e
-## In state 103, spurious reduction of production unary_e -> fun_app_e
-## In state 105, spurious reduction of production mult_e -> unary_e
-## In state 113, spurious reduction of production add_e -> mult_e
-## In state 133, spurious reduction of production comp_e -> add_e
-## In state 143, spurious reduction of production equality_e -> comp_e EQ comp_e
-##
-
-<YOUR SYNTAX ERROR MESSAGE HERE>
-
-main: LETPMRS IDENT LBRACE TRUE EQ VBAR
-##
-## Ends in an error in state: 142.
-##
-## equality_e -> comp_e EQ . comp_e [ VBAR TYPE THEN RPAR RBRACKET RBRACE QUESTION OR LETPMRS LETAND LET LBRACKET IN EOF ELSE COMMA COLON AND ]
-##
-## The known suffix of the stack is as follows:
-## comp_e EQ
-##
-
-<YOUR SYNTAX ERROR MESSAGE HERE>
-
-main: LETPMRS IDENT LBRACE TRUE GE CIDENT LT
-##
-## Ends in an error in state: 130.
-##
-## equality_e -> comp_e . EQ comp_e [ VBAR TYPE THEN RPAR RBRACKET RBRACE QUESTION OR LETPMRS LETAND LET LBRACKET IN EOF ELSE COMMA COLON AND ]
-## equality_e -> comp_e . NEQ comp_e [ VBAR TYPE THEN RPAR RBRACKET RBRACE QUESTION OR LETPMRS LETAND LET LBRACKET IN EOF ELSE COMMA COLON AND ]
-## equality_e -> comp_e . [ VBAR TYPE THEN RPAR RBRACKET RBRACE QUESTION OR LETPMRS LETAND LET LBRACKET IN EOF ELSE COMMA COLON AND ]
-##
-## The known suffix of the stack is as follows:
-## comp_e
-##
-## WARNING: This example involves spurious reductions.
-## This implies that, although the LR(1) items shown above provide an
-## accurate view of the past (what has been recognized so far), they
-## may provide an INCOMPLETE view of the future (what was expected next).
-## In state 77, spurious reduction of production primary_e -> CIDENT
-## In state 80, spurious reduction of production fun_app_e -> primary_e
-## In state 103, spurious reduction of production unary_e -> fun_app_e
-## In state 105, spurious reduction of production mult_e -> unary_e
-## In state 113, spurious reduction of production add_e -> mult_e
-## In state 141, spurious reduction of production comp_e -> add_e GE add_e
-##
-
-<YOUR SYNTAX ERROR MESSAGE HERE>
-
-main: LETPMRS IDENT LBRACE TRUE GE VBAR
-##
-## Ends in an error in state: 140.
-##
-## comp_e -> add_e GE . add_e [ VBAR TYPE THEN RPAR RBRACKET RBRACE QUESTION OR NEQ LETPMRS LETAND LET LBRACKET IN EQ EOF ELSE COMMA COLON AND ]
-##
-## The known suffix of the stack is as follows:
-## add_e GE
-##
-
-<YOUR SYNTAX ERROR MESSAGE HERE>
-
-main: LETPMRS IDENT LBRACE TRUE GT VBAR
-##
-## Ends in an error in state: 138.
-##
-## comp_e -> add_e GT . add_e [ VBAR TYPE THEN RPAR RBRACKET RBRACE QUESTION OR NEQ LETPMRS LETAND LET LBRACKET IN EQ EOF ELSE COMMA COLON AND ]
-##
-## The known suffix of the stack is as follows:
-## add_e GT
-##
-
-<YOUR SYNTAX ERROR MESSAGE HERE>
-
-main: LETPMRS IDENT LBRACE TRUE LE VBAR
-##
-## Ends in an error in state: 136.
-##
-## comp_e -> add_e LE . add_e [ VBAR TYPE THEN RPAR RBRACKET RBRACE QUESTION OR NEQ LETPMRS LETAND LET LBRACKET IN EQ EOF ELSE COMMA COLON AND ]
-##
-## The known suffix of the stack is as follows:
-## add_e LE
-##
-
-<YOUR SYNTAX ERROR MESSAGE HERE>
-
-main: LETPMRS IDENT LBRACE TRUE LT VBAR
-##
-## Ends in an error in state: 134.
-##
-## comp_e -> add_e LT . add_e [ VBAR TYPE THEN RPAR RBRACKET RBRACE QUESTION OR NEQ LETPMRS LETAND LET LBRACKET IN EQ EOF ELSE COMMA COLON AND ]
-##
-## The known suffix of the stack is as follows:
-## add_e LT
-##
-
-<YOUR SYNTAX ERROR MESSAGE HERE>
-
-main: LETPMRS IDENT LBRACE TRUE MINUS VBAR
-##
-## Ends in an error in state: 116.
-##
-## add_e -> mult_e MINUS . add_e [ VBAR TYPE THEN RPAR RBRACKET RBRACE QUESTION OR NEQ LT LETPMRS LETAND LET LE LBRACKET IN GT GE EQ EOF ELSE COMMA COLON AND ]
-##
-## The known suffix of the stack is as follows:
-## mult_e MINUS
-##
-
-<YOUR SYNTAX ERROR MESSAGE HERE>
-
-main: LETPMRS IDENT LBRACE TRUE MOD VBAR
-##
-## Ends in an error in state: 108.
-##
-## mult_e -> unary_e MOD . mult_e [ VBAR TYPE THEN RPAR RBRACKET RBRACE QUESTION PLUS OR NEQ MINUS LT LETPMRS LETAND LET LE LBRACKET IN GT GE EQ EOF ELSE COMMA COLON AND ]
-##
-## The known suffix of the stack is as follows:
-## unary_e MOD
-##
-
-<YOUR SYNTAX ERROR MESSAGE HERE>
-
-main: LETPMRS IDENT LBRACE TRUE NEQ VBAR
-##
-## Ends in an error in state: 131.
-##
-## equality_e -> comp_e NEQ . comp_e [ VBAR TYPE THEN RPAR RBRACKET RBRACE QUESTION OR LETPMRS LETAND LET LBRACKET IN EOF ELSE COMMA COLON AND ]
-##
-## The known suffix of the stack is as follows:
-## comp_e NEQ
-##
-
-<YOUR SYNTAX ERROR MESSAGE HERE>
-
-main: LETPMRS IDENT LBRACE TRUE OR VBAR
-##
-## Ends in an error in state: 125.
-##
-## logical_or_e -> logical_and_e OR . logical_or_e [ VBAR TYPE THEN RPAR RBRACKET RBRACE QUESTION LETPMRS LETAND LET LBRACKET IN EOF ELSE COMMA COLON ]
-##
-## The known suffix of the stack is as follows:
-## logical_and_e OR
-##
-
-<YOUR SYNTAX ERROR MESSAGE HERE>
-
-main: LETPMRS IDENT LBRACE TRUE PLUS VBAR
-##
-## Ends in an error in state: 114.
-##
-## add_e -> mult_e PLUS . add_e [ VBAR TYPE THEN RPAR RBRACKET RBRACE QUESTION OR NEQ LT LETPMRS LETAND LET LE LBRACKET IN GT GE EQ EOF ELSE COMMA COLON AND ]
-##
-## The known suffix of the stack is as follows:
-## mult_e PLUS
-##
-
-<YOUR SYNTAX ERROR MESSAGE HERE>
-
-main: LETPMRS IDENT LBRACE TRUE QUESTION TRUE COLON VBAR
-##
-## Ends in an error in state: 150.
-##
-## expr -> expr QUESTION expr COLON . expr [ VBAR TYPE THEN RPAR RBRACKET RBRACE QUESTION LETPMRS LETAND LET LBRACKET IN EOF ELSE COLON ]
-##
-## The known suffix of the stack is as follows:
-## expr QUESTION expr COLON
-##
-
-<YOUR SYNTAX ERROR MESSAGE HERE>
-
-main: LETPMRS IDENT LBRACE TRUE QUESTION TRUE VBAR
-##
-## Ends in an error in state: 149.
-##
-## expr -> expr . QUESTION expr COLON expr [ QUESTION COLON ]
-## expr -> expr QUESTION expr . COLON expr [ VBAR TYPE THEN RPAR RBRACKET RBRACE QUESTION LETPMRS LETAND LET LBRACKET IN EOF ELSE COLON ]
-##
-## The known suffix of the stack is as follows:
-## expr QUESTION expr
-##
-## WARNING: This example involves spurious reductions.
-## This implies that, although the LR(1) items shown above provide an
-## accurate view of the past (what has been recognized so far), they
-## may provide an INCOMPLETE view of the future (what was expected next).
-## In state 80, spurious reduction of production fun_app_e -> primary_e
-## In state 103, spurious reduction of production unary_e -> fun_app_e
-## In state 105, spurious reduction of production mult_e -> unary_e
-## In state 113, spurious reduction of production add_e -> mult_e
-## In state 133, spurious reduction of production comp_e -> add_e
-## In state 130, spurious reduction of production equality_e -> comp_e
-## In state 127, spurious reduction of production logical_and_e -> equality_e
-## In state 124, spurious reduction of production logical_or_e -> logical_and_e
-## In state 118, spurious reduction of production tuple_e -> logical_or_e
-## In state 144, spurious reduction of production expr -> tuple_e
-##
-
-<YOUR SYNTAX ERROR MESSAGE HERE>
-
-main: LETPMRS IDENT LBRACE TRUE QUESTION VBAR
-##
-## Ends in an error in state: 148.
-##
-## expr -> expr QUESTION . expr COLON expr [ VBAR TYPE THEN RPAR RBRACKET RBRACE QUESTION LETPMRS LETAND LET LBRACKET IN EOF ELSE COLON ]
-##
-## The known suffix of the stack is as follows:
-## expr QUESTION
-##
-
-<YOUR SYNTAX ERROR MESSAGE HERE>
-
 main: LETPMRS IDENT LBRACE TRUE RBRACE EQ VBAR
 ##
 ## Ends in an error in state: 190.
 ##
-## pmrsdef -> IDENT list(IDENT) LBRACE expr RBRACE EQ . pbody [ TYPE LETPMRS LET EOF ]
+## pmrsdef -> IDENT list(IDENT) LBRACE expr RBRACE EQ . pbody [ TYPE LETPMRS LET LEMMA EOF ]
 ##
 ## The known suffix of the stack is as follows:
 ## IDENT list(IDENT) LBRACE expr RBRACE EQ
@@ -1395,70 +1519,10 @@ main: LETPMRS IDENT LBRACE TRUE RBRACE VBAR
 ##
 ## Ends in an error in state: 189.
 ##
-## pmrsdef -> IDENT list(IDENT) LBRACE expr RBRACE . EQ pbody [ TYPE LETPMRS LET EOF ]
+## pmrsdef -> IDENT list(IDENT) LBRACE expr RBRACE . EQ pbody [ TYPE LETPMRS LET LEMMA EOF ]
 ##
 ## The known suffix of the stack is as follows:
 ## IDENT list(IDENT) LBRACE expr RBRACE
-##
-
-<YOUR SYNTAX ERROR MESSAGE HERE>
-
-main: LETPMRS IDENT LBRACE TRUE REC
-##
-## Ends in an error in state: 80.
-##
-## fun_app_e -> primary_e . nonempty_list(primary_e) [ VBAR TYPE TIMES THEN RPAR RIGHTARROW RBRACKET RBRACE QUESTION PLUS OR NEQ MOD MINUS LT LETPMRS LETAND LET LE LBRACKET IN GT GE EQ EOF ELSE DIV COMMA COLON AND ]
-## fun_app_e -> primary_e . [ VBAR TYPE TIMES THEN RPAR RIGHTARROW RBRACKET RBRACE QUESTION PLUS OR NEQ MOD MINUS LT LETPMRS LETAND LET LE LBRACKET IN GT GE EQ EOF ELSE DIV COMMA COLON AND ]
-##
-## The known suffix of the stack is as follows:
-## primary_e
-##
-
-<YOUR SYNTAX ERROR MESSAGE HERE>
-
-main: LETPMRS IDENT LBRACE TRUE RIGHTARROW
-##
-## Ends in an error in state: 105.
-##
-## mult_e -> unary_e . DIV mult_e [ VBAR TYPE THEN RPAR RBRACKET RBRACE QUESTION PLUS OR NEQ MINUS LT LETPMRS LETAND LET LE LBRACKET IN GT GE EQ EOF ELSE COMMA COLON AND ]
-## mult_e -> unary_e . TIMES mult_e [ VBAR TYPE THEN RPAR RBRACKET RBRACE QUESTION PLUS OR NEQ MINUS LT LETPMRS LETAND LET LE LBRACKET IN GT GE EQ EOF ELSE COMMA COLON AND ]
-## mult_e -> unary_e . MOD mult_e [ VBAR TYPE THEN RPAR RBRACKET RBRACE QUESTION PLUS OR NEQ MINUS LT LETPMRS LETAND LET LE LBRACKET IN GT GE EQ EOF ELSE COMMA COLON AND ]
-## mult_e -> unary_e . [ VBAR TYPE THEN RPAR RBRACKET RBRACE QUESTION PLUS OR NEQ MINUS LT LETPMRS LETAND LET LE LBRACKET IN GT GE EQ EOF ELSE COMMA COLON AND ]
-##
-## The known suffix of the stack is as follows:
-## unary_e
-##
-## WARNING: This example involves spurious reductions.
-## This implies that, although the LR(1) items shown above provide an
-## accurate view of the past (what has been recognized so far), they
-## may provide an INCOMPLETE view of the future (what was expected next).
-## In state 80, spurious reduction of production fun_app_e -> primary_e
-## In state 103, spurious reduction of production unary_e -> fun_app_e
-##
-
-<YOUR SYNTAX ERROR MESSAGE HERE>
-
-main: LETPMRS IDENT LBRACE TRUE TIMES VBAR
-##
-## Ends in an error in state: 106.
-##
-## mult_e -> unary_e TIMES . mult_e [ VBAR TYPE THEN RPAR RBRACKET RBRACE QUESTION PLUS OR NEQ MINUS LT LETPMRS LETAND LET LE LBRACKET IN GT GE EQ EOF ELSE COMMA COLON AND ]
-##
-## The known suffix of the stack is as follows:
-## unary_e TIMES
-##
-
-<YOUR SYNTAX ERROR MESSAGE HERE>
-
-main: LETPMRS IDENT LBRACE TRUE TRUE REC
-##
-## Ends in an error in state: 81.
-##
-## nonempty_list(primary_e) -> primary_e . [ VBAR TYPE TIMES THEN RPAR RIGHTARROW RBRACKET RBRACE QUESTION PLUS OR NEQ MOD MINUS LT LETPMRS LETAND LET LE LBRACKET IN GT GE EQ EOF ELSE DIV COMMA COLON AND ]
-## nonempty_list(primary_e) -> primary_e . nonempty_list(primary_e) [ VBAR TYPE TIMES THEN RPAR RIGHTARROW RBRACKET RBRACE QUESTION PLUS OR NEQ MOD MINUS LT LETPMRS LETAND LET LE LBRACKET IN GT GE EQ EOF ELSE DIV COMMA COLON AND ]
-##
-## The known suffix of the stack is as follows:
-## primary_e
 ##
 
 <YOUR SYNTAX ERROR MESSAGE HERE>
@@ -1468,7 +1532,7 @@ main: LETPMRS IDENT LBRACE TRUE VBAR
 ## Ends in an error in state: 188.
 ##
 ## expr -> expr . QUESTION expr COLON expr [ RBRACE QUESTION ]
-## pmrsdef -> IDENT list(IDENT) LBRACE expr . RBRACE EQ pbody [ TYPE LETPMRS LET EOF ]
+## pmrsdef -> IDENT list(IDENT) LBRACE expr . RBRACE EQ pbody [ TYPE LETPMRS LET LEMMA EOF ]
 ##
 ## The known suffix of the stack is as follows:
 ## IDENT list(IDENT) LBRACE expr
@@ -1495,7 +1559,7 @@ main: LETPMRS IDENT LBRACE VBAR
 ##
 ## Ends in an error in state: 187.
 ##
-## pmrsdef -> IDENT list(IDENT) LBRACE . expr RBRACE EQ pbody [ TYPE LETPMRS LET EOF ]
+## pmrsdef -> IDENT list(IDENT) LBRACE . expr RBRACE EQ pbody [ TYPE LETPMRS LET LEMMA EOF ]
 ##
 ## The known suffix of the stack is as follows:
 ## IDENT list(IDENT) LBRACE
@@ -1507,8 +1571,8 @@ main: LETPMRS IDENT VBAR
 ##
 ## Ends in an error in state: 185.
 ##
-## pmrsdef -> IDENT . list(IDENT) EQ pbody [ TYPE LETPMRS LET EOF ]
-## pmrsdef -> IDENT . list(IDENT) LBRACE expr RBRACE EQ pbody [ TYPE LETPMRS LET EOF ]
+## pmrsdef -> IDENT . list(IDENT) EQ pbody [ TYPE LETPMRS LET LEMMA EOF ]
+## pmrsdef -> IDENT . list(IDENT) LBRACE expr RBRACE EQ pbody [ TYPE LETPMRS LET LEMMA EOF ]
 ##
 ## The known suffix of the stack is as follows:
 ## IDENT
@@ -1545,7 +1609,7 @@ main: LETPMRS LPAR RPAR IDENT EQ VBAR
 ##
 ## Ends in an error in state: 183.
 ##
-## pmrsdef -> LPAR loption(separated_nonempty_list(COMMA,IDENT)) RPAR IDENT list(IDENT) EQ . pbody [ TYPE LETPMRS LET EOF ]
+## pmrsdef -> LPAR loption(separated_nonempty_list(COMMA,IDENT)) RPAR IDENT list(IDENT) EQ . pbody [ TYPE LETPMRS LET LEMMA EOF ]
 ##
 ## The known suffix of the stack is as follows:
 ## LPAR loption(separated_nonempty_list(COMMA,IDENT)) RPAR IDENT list(IDENT) EQ
@@ -1557,8 +1621,8 @@ main: LETPMRS LPAR RPAR IDENT IDENT RBRACKET
 ##
 ## Ends in an error in state: 67.
 ##
-## pmrsdef -> LPAR loption(separated_nonempty_list(COMMA,IDENT)) RPAR IDENT list(IDENT) . EQ pbody [ TYPE LETPMRS LET EOF ]
-## pmrsdef -> LPAR loption(separated_nonempty_list(COMMA,IDENT)) RPAR IDENT list(IDENT) . LBRACE expr RBRACE EQ pbody [ TYPE LETPMRS LET EOF ]
+## pmrsdef -> LPAR loption(separated_nonempty_list(COMMA,IDENT)) RPAR IDENT list(IDENT) . EQ pbody [ TYPE LETPMRS LET LEMMA EOF ]
+## pmrsdef -> LPAR loption(separated_nonempty_list(COMMA,IDENT)) RPAR IDENT list(IDENT) . LBRACE expr RBRACE EQ pbody [ TYPE LETPMRS LET LEMMA EOF ]
 ##
 ## The known suffix of the stack is as follows:
 ## LPAR loption(separated_nonempty_list(COMMA,IDENT)) RPAR IDENT list(IDENT)
@@ -1577,7 +1641,7 @@ main: LETPMRS LPAR RPAR IDENT LBRACE TRUE RBRACE EQ VBAR
 ##
 ## Ends in an error in state: 173.
 ##
-## pmrsdef -> LPAR loption(separated_nonempty_list(COMMA,IDENT)) RPAR IDENT list(IDENT) LBRACE expr RBRACE EQ . pbody [ TYPE LETPMRS LET EOF ]
+## pmrsdef -> LPAR loption(separated_nonempty_list(COMMA,IDENT)) RPAR IDENT list(IDENT) LBRACE expr RBRACE EQ . pbody [ TYPE LETPMRS LET LEMMA EOF ]
 ##
 ## The known suffix of the stack is as follows:
 ## LPAR loption(separated_nonempty_list(COMMA,IDENT)) RPAR IDENT list(IDENT) LBRACE expr RBRACE EQ
@@ -1589,7 +1653,7 @@ main: LETPMRS LPAR RPAR IDENT LBRACE TRUE RBRACE VBAR
 ##
 ## Ends in an error in state: 172.
 ##
-## pmrsdef -> LPAR loption(separated_nonempty_list(COMMA,IDENT)) RPAR IDENT list(IDENT) LBRACE expr RBRACE . EQ pbody [ TYPE LETPMRS LET EOF ]
+## pmrsdef -> LPAR loption(separated_nonempty_list(COMMA,IDENT)) RPAR IDENT list(IDENT) LBRACE expr RBRACE . EQ pbody [ TYPE LETPMRS LET LEMMA EOF ]
 ##
 ## The known suffix of the stack is as follows:
 ## LPAR loption(separated_nonempty_list(COMMA,IDENT)) RPAR IDENT list(IDENT) LBRACE expr RBRACE
@@ -1602,7 +1666,7 @@ main: LETPMRS LPAR RPAR IDENT LBRACE TRUE VBAR
 ## Ends in an error in state: 171.
 ##
 ## expr -> expr . QUESTION expr COLON expr [ RBRACE QUESTION ]
-## pmrsdef -> LPAR loption(separated_nonempty_list(COMMA,IDENT)) RPAR IDENT list(IDENT) LBRACE expr . RBRACE EQ pbody [ TYPE LETPMRS LET EOF ]
+## pmrsdef -> LPAR loption(separated_nonempty_list(COMMA,IDENT)) RPAR IDENT list(IDENT) LBRACE expr . RBRACE EQ pbody [ TYPE LETPMRS LET LEMMA EOF ]
 ##
 ## The known suffix of the stack is as follows:
 ## LPAR loption(separated_nonempty_list(COMMA,IDENT)) RPAR IDENT list(IDENT) LBRACE expr
@@ -1629,7 +1693,7 @@ main: LETPMRS LPAR RPAR IDENT LBRACE VBAR
 ##
 ## Ends in an error in state: 68.
 ##
-## pmrsdef -> LPAR loption(separated_nonempty_list(COMMA,IDENT)) RPAR IDENT list(IDENT) LBRACE . expr RBRACE EQ pbody [ TYPE LETPMRS LET EOF ]
+## pmrsdef -> LPAR loption(separated_nonempty_list(COMMA,IDENT)) RPAR IDENT list(IDENT) LBRACE . expr RBRACE EQ pbody [ TYPE LETPMRS LET LEMMA EOF ]
 ##
 ## The known suffix of the stack is as follows:
 ## LPAR loption(separated_nonempty_list(COMMA,IDENT)) RPAR IDENT list(IDENT) LBRACE
@@ -1641,8 +1705,8 @@ main: LETPMRS LPAR RPAR IDENT VBAR
 ##
 ## Ends in an error in state: 64.
 ##
-## pmrsdef -> LPAR loption(separated_nonempty_list(COMMA,IDENT)) RPAR IDENT . list(IDENT) EQ pbody [ TYPE LETPMRS LET EOF ]
-## pmrsdef -> LPAR loption(separated_nonempty_list(COMMA,IDENT)) RPAR IDENT . list(IDENT) LBRACE expr RBRACE EQ pbody [ TYPE LETPMRS LET EOF ]
+## pmrsdef -> LPAR loption(separated_nonempty_list(COMMA,IDENT)) RPAR IDENT . list(IDENT) EQ pbody [ TYPE LETPMRS LET LEMMA EOF ]
+## pmrsdef -> LPAR loption(separated_nonempty_list(COMMA,IDENT)) RPAR IDENT . list(IDENT) LBRACE expr RBRACE EQ pbody [ TYPE LETPMRS LET LEMMA EOF ]
 ##
 ## The known suffix of the stack is as follows:
 ## LPAR loption(separated_nonempty_list(COMMA,IDENT)) RPAR IDENT
@@ -1654,8 +1718,8 @@ main: LETPMRS LPAR RPAR VBAR
 ##
 ## Ends in an error in state: 63.
 ##
-## pmrsdef -> LPAR loption(separated_nonempty_list(COMMA,IDENT)) RPAR . IDENT list(IDENT) EQ pbody [ TYPE LETPMRS LET EOF ]
-## pmrsdef -> LPAR loption(separated_nonempty_list(COMMA,IDENT)) RPAR . IDENT list(IDENT) LBRACE expr RBRACE EQ pbody [ TYPE LETPMRS LET EOF ]
+## pmrsdef -> LPAR loption(separated_nonempty_list(COMMA,IDENT)) RPAR . IDENT list(IDENT) EQ pbody [ TYPE LETPMRS LET LEMMA EOF ]
+## pmrsdef -> LPAR loption(separated_nonempty_list(COMMA,IDENT)) RPAR . IDENT list(IDENT) LBRACE expr RBRACE EQ pbody [ TYPE LETPMRS LET LEMMA EOF ]
 ##
 ## The known suffix of the stack is as follows:
 ## LPAR loption(separated_nonempty_list(COMMA,IDENT)) RPAR
@@ -1667,8 +1731,8 @@ main: LETPMRS LPAR VBAR
 ##
 ## Ends in an error in state: 57.
 ##
-## pmrsdef -> LPAR . loption(separated_nonempty_list(COMMA,IDENT)) RPAR IDENT list(IDENT) EQ pbody [ TYPE LETPMRS LET EOF ]
-## pmrsdef -> LPAR . loption(separated_nonempty_list(COMMA,IDENT)) RPAR IDENT list(IDENT) LBRACE expr RBRACE EQ pbody [ TYPE LETPMRS LET EOF ]
+## pmrsdef -> LPAR . loption(separated_nonempty_list(COMMA,IDENT)) RPAR IDENT list(IDENT) EQ pbody [ TYPE LETPMRS LET LEMMA EOF ]
+## pmrsdef -> LPAR . loption(separated_nonempty_list(COMMA,IDENT)) RPAR IDENT list(IDENT) LBRACE expr RBRACE EQ pbody [ TYPE LETPMRS LET LEMMA EOF ]
 ##
 ## The known suffix of the stack is as follows:
 ## LPAR
@@ -1680,7 +1744,7 @@ main: LETPMRS VBAR
 ##
 ## Ends in an error in state: 56.
 ##
-## def -> LETPMRS . pmrsdef [ TYPE LETPMRS LET EOF ]
+## def -> LETPMRS . pmrsdef [ TYPE LETPMRS LET LEMMA EOF ]
 ##
 ## The known suffix of the stack is as follows:
 ## LETPMRS
@@ -1692,7 +1756,7 @@ main: TYPE IDENT EQ CIDENT OF PIDENT TIMES PIDENT TIMES VBAR
 ##
 ## Ends in an error in state: 29.
 ##
-## separated_nonempty_list(TIMES,typefun) -> typefun TIMES . separated_nonempty_list(TIMES,typefun) [ VBAR TYPE LETPMRS LET EOF ]
+## separated_nonempty_list(TIMES,typefun) -> typefun TIMES . separated_nonempty_list(TIMES,typefun) [ VBAR TYPE LETPMRS LET LEMMA EOF ]
 ##
 ## The known suffix of the stack is as follows:
 ## typefun TIMES
@@ -1704,7 +1768,7 @@ main: TYPE IDENT EQ CIDENT OF PIDENT TIMES TRUE
 ##
 ## Ends in an error in state: 27.
 ##
-## typeconstr -> CIDENT OF typefun TIMES . loption(separated_nonempty_list(TIMES,typefun)) [ VBAR TYPE LETPMRS LET EOF ]
+## typeconstr -> CIDENT OF typefun TIMES . loption(separated_nonempty_list(TIMES,typefun)) [ VBAR TYPE LETPMRS LET LEMMA EOF ]
 ##
 ## The known suffix of the stack is as follows:
 ## CIDENT OF typefun TIMES
@@ -1716,8 +1780,8 @@ main: TYPE IDENT EQ CIDENT OF VBAR
 ##
 ## Ends in an error in state: 25.
 ##
-## typeconstr -> CIDENT OF . typefun [ VBAR TYPE LETPMRS LET EOF ]
-## typeconstr -> CIDENT OF . typefun TIMES loption(separated_nonempty_list(TIMES,typefun)) [ VBAR TYPE LETPMRS LET EOF ]
+## typeconstr -> CIDENT OF . typefun [ VBAR TYPE LETPMRS LET LEMMA EOF ]
+## typeconstr -> CIDENT OF . typefun TIMES loption(separated_nonempty_list(TIMES,typefun)) [ VBAR TYPE LETPMRS LET LEMMA EOF ]
 ##
 ## The known suffix of the stack is as follows:
 ## CIDENT OF
@@ -1729,9 +1793,9 @@ main: TYPE IDENT EQ CIDENT TRUE
 ##
 ## Ends in an error in state: 24.
 ##
-## typeconstr -> CIDENT . OF typefun [ VBAR TYPE LETPMRS LET EOF ]
-## typeconstr -> CIDENT . OF typefun TIMES loption(separated_nonempty_list(TIMES,typefun)) [ VBAR TYPE LETPMRS LET EOF ]
-## typeconstr -> CIDENT . [ VBAR TYPE LETPMRS LET EOF ]
+## typeconstr -> CIDENT . OF typefun [ VBAR TYPE LETPMRS LET LEMMA EOF ]
+## typeconstr -> CIDENT . OF typefun TIMES loption(separated_nonempty_list(TIMES,typefun)) [ VBAR TYPE LETPMRS LET LEMMA EOF ]
+## typeconstr -> CIDENT . [ VBAR TYPE LETPMRS LET LEMMA EOF ]
 ##
 ## The known suffix of the stack is as follows:
 ## CIDENT
@@ -1743,7 +1807,7 @@ main: TYPE IDENT EQ CIDENT VBAR VBAR
 ##
 ## Ends in an error in state: 39.
 ##
-## separated_nonempty_list(VBAR,typeconstr) -> typeconstr VBAR . separated_nonempty_list(VBAR,typeconstr) [ TYPE LETPMRS LET EOF ]
+## separated_nonempty_list(VBAR,typeconstr) -> typeconstr VBAR . separated_nonempty_list(VBAR,typeconstr) [ TYPE LETPMRS LET LEMMA EOF ]
 ##
 ## The known suffix of the stack is as follows:
 ## typeconstr VBAR
@@ -1767,7 +1831,7 @@ main: TYPE IDENT EQ LPAR PIDENT COMMA PIDENT RPAR VBAR
 ##
 ## Ends in an error in state: 22.
 ##
-## typeapp -> LPAR typeapp COMMA separated_nonempty_list(COMMA,typeapp) RPAR . typetermb [ VBAR TYPE TIMES RPAR RIGHTARROW PIDENT LPAR LETPMRS LET INTSORT IDENT EOF COMMA BOOLSORT ]
+## typeapp -> LPAR typeapp COMMA separated_nonempty_list(COMMA,typeapp) RPAR . typetermb [ VBAR TYPE TIMES RPAR RIGHTARROW PIDENT LPAR LETPMRS LET LEMMA INTSORT IDENT EOF COMMA BOOLSORT ]
 ##
 ## The known suffix of the stack is as follows:
 ## LPAR typeapp COMMA separated_nonempty_list(COMMA,typeapp) RPAR
@@ -1799,7 +1863,7 @@ main: TYPE IDENT EQ LPAR PIDENT COMMA VBAR
 ##
 ## Ends in an error in state: 17.
 ##
-## typeapp -> LPAR typeapp COMMA . separated_nonempty_list(COMMA,typeapp) RPAR typetermb [ VBAR TYPE TIMES RPAR RIGHTARROW PIDENT LPAR LETPMRS LET INTSORT IDENT EOF COMMA BOOLSORT ]
+## typeapp -> LPAR typeapp COMMA . separated_nonempty_list(COMMA,typeapp) RPAR typetermb [ VBAR TYPE TIMES RPAR RIGHTARROW PIDENT LPAR LETPMRS LET LEMMA INTSORT IDENT EOF COMMA BOOLSORT ]
 ##
 ## The known suffix of the stack is as follows:
 ## LPAR typeapp COMMA
@@ -1812,8 +1876,8 @@ main: TYPE IDENT EQ LPAR PIDENT VBAR
 ## Ends in an error in state: 16.
 ##
 ## typeapp -> typeapp . typetermb [ RPAR PIDENT LPAR INTSORT IDENT COMMA BOOLSORT ]
-## typeapp -> LPAR typeapp . COMMA separated_nonempty_list(COMMA,typeapp) RPAR typetermb [ VBAR TYPE TIMES RPAR RIGHTARROW PIDENT LPAR LETPMRS LET INTSORT IDENT EOF COMMA BOOLSORT ]
-## typetermb -> LPAR typeapp . RPAR [ VBAR TYPE TIMES RPAR RIGHTARROW PIDENT LPAR LETPMRS LET INTSORT IDENT EOF COMMA BOOLSORT ]
+## typeapp -> LPAR typeapp . COMMA separated_nonempty_list(COMMA,typeapp) RPAR typetermb [ VBAR TYPE TIMES RPAR RIGHTARROW PIDENT LPAR LETPMRS LET LEMMA INTSORT IDENT EOF COMMA BOOLSORT ]
+## typetermb -> LPAR typeapp . RPAR [ VBAR TYPE TIMES RPAR RIGHTARROW PIDENT LPAR LETPMRS LET LEMMA INTSORT IDENT EOF COMMA BOOLSORT ]
 ##
 ## The known suffix of the stack is as follows:
 ## LPAR typeapp
@@ -1831,8 +1895,8 @@ main: TYPE IDENT EQ LPAR VBAR
 ##
 ## Ends in an error in state: 6.
 ##
-## typeapp -> LPAR . typeapp COMMA separated_nonempty_list(COMMA,typeapp) RPAR typetermb [ VBAR TYPE TIMES RPAR RIGHTARROW PIDENT LPAR LETPMRS LET INTSORT IDENT EOF COMMA BOOLSORT ]
-## typetermb -> LPAR . typeapp RPAR [ VBAR TYPE TIMES RPAR RIGHTARROW PIDENT LPAR LETPMRS LET INTSORT IDENT EOF COMMA BOOLSORT ]
+## typeapp -> LPAR . typeapp COMMA separated_nonempty_list(COMMA,typeapp) RPAR typetermb [ VBAR TYPE TIMES RPAR RIGHTARROW PIDENT LPAR LETPMRS LET LEMMA INTSORT IDENT EOF COMMA BOOLSORT ]
+## typetermb -> LPAR . typeapp RPAR [ VBAR TYPE TIMES RPAR RIGHTARROW PIDENT LPAR LETPMRS LET LEMMA INTSORT IDENT EOF COMMA BOOLSORT ]
 ##
 ## The known suffix of the stack is as follows:
 ## LPAR
@@ -1845,7 +1909,7 @@ main: TYPE IDENT EQ PIDENT LPAR PIDENT VBAR
 ## Ends in an error in state: 12.
 ##
 ## typeapp -> typeapp . typetermb [ RPAR PIDENT LPAR INTSORT IDENT BOOLSORT ]
-## typetermb -> LPAR typeapp . RPAR [ VBAR TYPE TIMES RPAR RIGHTARROW PIDENT LPAR LETPMRS LET INTSORT IDENT EOF COMMA BOOLSORT ]
+## typetermb -> LPAR typeapp . RPAR [ VBAR TYPE TIMES RPAR RIGHTARROW PIDENT LPAR LETPMRS LET LEMMA INTSORT IDENT EOF COMMA BOOLSORT ]
 ##
 ## The known suffix of the stack is as follows:
 ## LPAR typeapp
@@ -1863,7 +1927,7 @@ main: TYPE IDENT EQ PIDENT LPAR VBAR
 ##
 ## Ends in an error in state: 11.
 ##
-## typetermb -> LPAR . typeapp RPAR [ VBAR TYPE TIMES RPAR RIGHTARROW PIDENT LPAR LETPMRS LET INTSORT IDENT EOF COMMA BOOLSORT ]
+## typetermb -> LPAR . typeapp RPAR [ VBAR TYPE TIMES RPAR RIGHTARROW PIDENT LPAR LETPMRS LET LEMMA INTSORT IDENT EOF COMMA BOOLSORT ]
 ##
 ## The known suffix of the stack is as follows:
 ## LPAR
@@ -1875,8 +1939,8 @@ main: TYPE IDENT EQ PIDENT RIGHTARROW PIDENT RPAR
 ##
 ## Ends in an error in state: 33.
 ##
-## typeapp -> typeapp . typetermb [ VBAR TYPE TIMES RIGHTARROW PIDENT LPAR LETPMRS LET INTSORT IDENT EOF BOOLSORT ]
-## typefun -> typefun RIGHTARROW typeapp . [ VBAR TYPE TIMES RIGHTARROW LETPMRS LET EOF ]
+## typeapp -> typeapp . typetermb [ VBAR TYPE TIMES RIGHTARROW PIDENT LPAR LETPMRS LET LEMMA INTSORT IDENT EOF BOOLSORT ]
+## typefun -> typefun RIGHTARROW typeapp . [ VBAR TYPE TIMES RIGHTARROW LETPMRS LET LEMMA EOF ]
 ##
 ## The known suffix of the stack is as follows:
 ## typefun RIGHTARROW typeapp
@@ -1894,7 +1958,7 @@ main: TYPE IDENT EQ PIDENT RIGHTARROW VBAR
 ##
 ## Ends in an error in state: 32.
 ##
-## typefun -> typefun RIGHTARROW . typeapp [ VBAR TYPE TIMES RIGHTARROW LETPMRS LET EOF ]
+## typefun -> typefun RIGHTARROW . typeapp [ VBAR TYPE TIMES RIGHTARROW LETPMRS LET LEMMA EOF ]
 ##
 ## The known suffix of the stack is as follows:
 ## typefun RIGHTARROW
@@ -1906,8 +1970,8 @@ main: TYPE IDENT EQ PIDENT RPAR
 ##
 ## Ends in an error in state: 30.
 ##
-## typeapp -> typeapp . typetermb [ VBAR TYPE TIMES RIGHTARROW PIDENT LPAR LETPMRS LET INTSORT IDENT EOF BOOLSORT ]
-## typefun -> typeapp . [ VBAR TYPE TIMES RIGHTARROW LETPMRS LET EOF ]
+## typeapp -> typeapp . typetermb [ VBAR TYPE TIMES RIGHTARROW PIDENT LPAR LETPMRS LET LEMMA INTSORT IDENT EOF BOOLSORT ]
+## typefun -> typeapp . [ VBAR TYPE TIMES RIGHTARROW LETPMRS LET LEMMA EOF ]
 ##
 ## The known suffix of the stack is as follows:
 ## typeapp
@@ -1925,8 +1989,8 @@ main: TYPE IDENT EQ PIDENT TRUE
 ##
 ## Ends in an error in state: 10.
 ##
-## typeapp -> typetermb . typetermb [ VBAR TYPE TIMES RPAR RIGHTARROW PIDENT LPAR LETPMRS LET INTSORT IDENT EOF COMMA BOOLSORT ]
-## typeapp -> typetermb . [ VBAR TYPE TIMES RPAR RIGHTARROW PIDENT LPAR LETPMRS LET INTSORT IDENT EOF COMMA BOOLSORT ]
+## typeapp -> typetermb . typetermb [ VBAR TYPE TIMES RPAR RIGHTARROW PIDENT LPAR LETPMRS LET LEMMA INTSORT IDENT EOF COMMA BOOLSORT ]
+## typeapp -> typetermb . [ VBAR TYPE TIMES RPAR RIGHTARROW PIDENT LPAR LETPMRS LET LEMMA INTSORT IDENT EOF COMMA BOOLSORT ]
 ##
 ## The known suffix of the stack is as follows:
 ## typetermb
@@ -1938,8 +2002,8 @@ main: TYPE IDENT EQ PIDENT VBAR
 ##
 ## Ends in an error in state: 37.
 ##
-## typefun -> typefun . RIGHTARROW typeapp [ TYPE RIGHTARROW LETPMRS LET EOF ]
-## typeterm0 -> typefun . [ TYPE LETPMRS LET EOF ]
+## typefun -> typefun . RIGHTARROW typeapp [ TYPE RIGHTARROW LETPMRS LET LEMMA EOF ]
+## typeterm0 -> typefun . [ TYPE LETPMRS LET LEMMA EOF ]
 ##
 ## The known suffix of the stack is as follows:
 ## typefun
@@ -1958,7 +2022,7 @@ main: TYPE IDENT EQ VBAR
 ##
 ## Ends in an error in state: 53.
 ##
-## typedef -> IDENT EQ . typeterm0 [ TYPE LETPMRS LET EOF ]
+## typedef -> IDENT EQ . typeterm0 [ TYPE LETPMRS LET LEMMA EOF ]
 ##
 ## The known suffix of the stack is as follows:
 ## IDENT EQ
@@ -1970,7 +2034,7 @@ main: TYPE IDENT VBAR
 ##
 ## Ends in an error in state: 52.
 ##
-## typedef -> IDENT . EQ typeterm0 [ TYPE LETPMRS LET EOF ]
+## typedef -> IDENT . EQ typeterm0 [ TYPE LETPMRS LET LEMMA EOF ]
 ##
 ## The known suffix of the stack is as follows:
 ## IDENT
@@ -2007,7 +2071,7 @@ main: TYPE LPAR RPAR IDENT EQ VBAR
 ##
 ## Ends in an error in state: 50.
 ##
-## typedef -> LPAR loption(separated_nonempty_list(COMMA,PIDENT)) RPAR IDENT EQ . typeterm0 [ TYPE LETPMRS LET EOF ]
+## typedef -> LPAR loption(separated_nonempty_list(COMMA,PIDENT)) RPAR IDENT EQ . typeterm0 [ TYPE LETPMRS LET LEMMA EOF ]
 ##
 ## The known suffix of the stack is as follows:
 ## LPAR loption(separated_nonempty_list(COMMA,PIDENT)) RPAR IDENT EQ
@@ -2019,7 +2083,7 @@ main: TYPE LPAR RPAR IDENT VBAR
 ##
 ## Ends in an error in state: 49.
 ##
-## typedef -> LPAR loption(separated_nonempty_list(COMMA,PIDENT)) RPAR IDENT . EQ typeterm0 [ TYPE LETPMRS LET EOF ]
+## typedef -> LPAR loption(separated_nonempty_list(COMMA,PIDENT)) RPAR IDENT . EQ typeterm0 [ TYPE LETPMRS LET LEMMA EOF ]
 ##
 ## The known suffix of the stack is as follows:
 ## LPAR loption(separated_nonempty_list(COMMA,PIDENT)) RPAR IDENT
@@ -2031,7 +2095,7 @@ main: TYPE LPAR RPAR VBAR
 ##
 ## Ends in an error in state: 48.
 ##
-## typedef -> LPAR loption(separated_nonempty_list(COMMA,PIDENT)) RPAR . IDENT EQ typeterm0 [ TYPE LETPMRS LET EOF ]
+## typedef -> LPAR loption(separated_nonempty_list(COMMA,PIDENT)) RPAR . IDENT EQ typeterm0 [ TYPE LETPMRS LET LEMMA EOF ]
 ##
 ## The known suffix of the stack is as follows:
 ## LPAR loption(separated_nonempty_list(COMMA,PIDENT)) RPAR
@@ -2043,7 +2107,7 @@ main: TYPE LPAR VBAR
 ##
 ## Ends in an error in state: 42.
 ##
-## typedef -> LPAR . loption(separated_nonempty_list(COMMA,PIDENT)) RPAR IDENT EQ typeterm0 [ TYPE LETPMRS LET EOF ]
+## typedef -> LPAR . loption(separated_nonempty_list(COMMA,PIDENT)) RPAR IDENT EQ typeterm0 [ TYPE LETPMRS LET LEMMA EOF ]
 ##
 ## The known suffix of the stack is as follows:
 ## LPAR
@@ -2055,7 +2119,7 @@ main: TYPE PIDENT IDENT EQ VBAR
 ##
 ## Ends in an error in state: 4.
 ##
-## typedef -> PIDENT IDENT EQ . typeterm0 [ TYPE LETPMRS LET EOF ]
+## typedef -> PIDENT IDENT EQ . typeterm0 [ TYPE LETPMRS LET LEMMA EOF ]
 ##
 ## The known suffix of the stack is as follows:
 ## PIDENT IDENT EQ
@@ -2067,7 +2131,7 @@ main: TYPE PIDENT IDENT VBAR
 ##
 ## Ends in an error in state: 3.
 ##
-## typedef -> PIDENT IDENT . EQ typeterm0 [ TYPE LETPMRS LET EOF ]
+## typedef -> PIDENT IDENT . EQ typeterm0 [ TYPE LETPMRS LET LEMMA EOF ]
 ##
 ## The known suffix of the stack is as follows:
 ## PIDENT IDENT
@@ -2079,7 +2143,7 @@ main: TYPE PIDENT VBAR
 ##
 ## Ends in an error in state: 2.
 ##
-## typedef -> PIDENT . IDENT EQ typeterm0 [ TYPE LETPMRS LET EOF ]
+## typedef -> PIDENT . IDENT EQ typeterm0 [ TYPE LETPMRS LET LEMMA EOF ]
 ##
 ## The known suffix of the stack is as follows:
 ## PIDENT
@@ -2091,7 +2155,7 @@ main: TYPE VBAR
 ##
 ## Ends in an error in state: 1.
 ##
-## def -> TYPE . typedef [ TYPE LETPMRS LET EOF ]
+## def -> TYPE . typedef [ TYPE LETPMRS LET LEMMA EOF ]
 ##
 ## The known suffix of the stack is as follows:
 ## TYPE
