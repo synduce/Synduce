@@ -195,7 +195,9 @@ let ith_synth_fun index = "lemma_" ^ Int.to_string index
 let synthfun_of_ctex (det : term_state_detail) (lem_id : int) : command * (string * sygus_sort) list
     =
   let params =
-    List.map ~f:(fun scalar -> (scalar.vname, sort_of_rtype RType.TInt)) det.scalar_vars
+    List.map
+      ~f:(fun scalar -> (scalar.vname, sort_of_rtype (Variable.vtype_or_new scalar)))
+      det.scalar_vars
   in
   let ret_sort = sort_of_rtype RType.TBool in
   let grammar = Grammars.generate_grammar ~guess:None ~bools:true OpSet.empty params ret_sort in
@@ -344,7 +346,7 @@ let set_up_lemma_solver solver ~(p : psi_def) lemma_candidate =
         (match lemma_candidate with
         | name, vars, body ->
             Smt.mk_def_fun_command name
-              (List.map ~f:(fun v -> (v.vname, RType.TInt)) vars)
+              (List.map ~f:(fun v -> (v.vname, Variable.vtype_or_new v)) vars)
               RType.TBool body);
       ])
 
