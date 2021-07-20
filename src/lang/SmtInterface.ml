@@ -39,7 +39,7 @@ let rec sort_of_rtype (t : RType.t) : smtSort =
   | RType.TFun (tin, tout) -> Comp (Id (SSimple "->"), [ sort_of_rtype tin; sort_of_rtype tout ])
   | RType.TParam (args, t) -> dec_parametric t args
   | RType.TVar _ -> SmtSort (Id (SSimple "Int"))
-  (* Assuming polymorphism means int ok *)
+(* Assuming polymorphism means int ok *)
 
 and dec_parametric t args =
   match t with
@@ -115,7 +115,6 @@ let rec smt_of_term (t : term) : smtTerm =
       Log.error_msg Fmt.(str "SMT: creating tuple %a might cause errors in Z3." pp_term t);
       mk_simple_app "mkTuple" (List.map ~f:smt_of_term tl)
   | TSel (t, i) -> SmtTApp (QI (IdC (SSimple "tupleSel", [ INum i ])), [ smt_of_term t ])
-  | TApp ({ tkind = TVar v; _ }, args) -> mk_simple_app v.vname (List.map ~f:smt_of_term args)
   | TData (cstr, args) -> (
       match args with
       | [] ->
@@ -124,9 +123,29 @@ let rec smt_of_term (t : term) : smtTerm =
           SmtTQualdId (QIas (Id (SSimple cstr), sort))
       | _ -> mk_simple_app cstr (List.map ~f:smt_of_term args))
   | TMatch (tm, cases) -> SmtTMatch (smt_of_term tm, List.map ~f:smt_of_case cases)
-  | TApp (_, _) ->
-      Log.error_msg Fmt.(str "Smt of term %a impossible." pp_term t);
-      failwith "Smt: application function can only be variable."
+  | TApp (func, args) -> (
+      match func.tkind with
+      | TVar v -> mk_simple_app v.vname (List.map ~f:smt_of_term args)
+      | TFun (f_args, fbody) -> (
+          match List.zip f_args args with
+          | Ok pre_bindings ->
+              let f (bto, bdg) =
+                match Analysis.matches ~pattern:(fpat_to_term bto) (tuplify bdg) with
+                | Some varmap ->
+                    List.map
+                      ~f:(fun (v, t) -> (mk_symb v.vname, smt_of_term t))
+                      (Map.to_alist varmap)
+                | None ->
+                    failwith
+                      (Fmt.str "%a cannot match %a in smt term conversion." pp_term
+                         (fpat_to_term bto) pp_term (tuplify bdg))
+              in
+              let bindings = List.concat_map ~f pre_bindings in
+              mk_let bindings (smt_of_term fbody)
+          | Unequal_lengths -> failwith "Smt: unexpected malformed term.")
+      | _ ->
+          Log.error_msg Fmt.(str "Smt of term %a impossible." pp_term t);
+          failwith "Smt: application function can only be variable.")
   | TFun (_, _) -> failwith "Smt: functions in terms not supported."
 
 and smt_of_case ((p, t) : Term.match_case) : match_case = (smtPattern_of_pattern p, smt_of_term t)

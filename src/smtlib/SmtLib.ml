@@ -285,8 +285,7 @@ let rec sexp_of_smtTerm (t : smtTerm) : t =
   match t with
   | SmtTSpecConst sc -> sexp_of_smtSpecConstant sc
   | SmtTQualdId qi -> sexp_of_smtQualIdentifier qi
-  | SmtTApp (func, args) ->
-      List (sexp_of_smtQualIdentifier func :: List.map ~f:sexp_of_smtTerm args)
+  | SmtTApp (func, args) -> List (sexp_of_smtQualIdentifier func :: List.map ~f:sexp_of_smtTerm args)
   | SmtTLet (bindings, t') ->
       List [ Atom "let"; List (List.map ~f:sexp_of_binding bindings); sexp_of_smtTerm t' ]
   | SmtTForall (quants, t') ->
@@ -660,6 +659,8 @@ let mk_le t1 t2 = mk_simple_app "<=" [ t1; t2 ]
 let mk_ge t1 t2 = mk_simple_app ">=" [ t1; t2 ]
 
 let mk_not t1 = mk_simple_app "not" [ t1 ]
+
+let mk_let (bindings : var_binding list) (t : smtTerm) = SmtTLet (bindings, t)
 
 let mk_exists (sorted_vars : smtSortedVar list) (term : smtTerm) = SmtTExists (sorted_vars, term)
 

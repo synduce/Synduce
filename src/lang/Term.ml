@@ -912,6 +912,25 @@ let term_height =
 
 let term_height_compare (t1 : term) (t2 : term) = compare (term_height t1) (term_height t2)
 
+let proj_var (v : variable) : term =
+  let rec p t =
+    match t with
+    | RType.TTup tl -> mk_tup (List.mapi ~f:(fun i t -> mk_sel (p t) i) tl)
+    | _ -> mk_var v
+  in
+  p (Variable.vtype_or_new v)
+
+let tuplify (t : term) =
+  let case f t =
+    match t.tkind with
+    | TVar v -> ( match Variable.vtype_or_new v with TTup _ -> Some (proj_var v) | _ -> None)
+    | _ -> (
+        match t.ttyp with
+        | RType.TTup tl -> Some (mk_tup (List.mapi ~f:(fun i _ -> f (mk_sel t i)) tl))
+        | _ -> None)
+  in
+  transform ~case t
+
 (* ============================================================================================= *)
 (*                                    PRETTY PRINTERS                                            *)
 (* ============================================================================================= *)

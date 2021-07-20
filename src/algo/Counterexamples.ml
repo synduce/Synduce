@@ -246,7 +246,7 @@ let check_tinv_unsat ~(p : psi_def) (tinv : PMRS.t) (ctex : ctex) :
         in
         List.map ~f (Set.elements ctex.ctex_vars)
       in
-      SmtLib.mk_assoc_and (List.map ~f:smt_of_term (term_sat_tinv :: preconds @ model_sat))
+      SmtLib.mk_assoc_and (List.map ~f:smt_of_term ((term_sat_tinv :: preconds) @ model_sat))
     in
     let%lwt _ =
       Asyncs.smt_assert cvc4_instance (SmtLib.mk_exists (sorted_vars_of_vars fv) formula)
@@ -294,16 +294,22 @@ let check_tinv_sat ~(p : psi_def) (tinv : PMRS.t) (ctex : ctex) :
         let model_sat =
           let f v =
             let v_val = Map.find_exn ctex.ctex_model v.vid in
-            match
-              List.find
-                ~f:(fun (_, elimv) ->
-                  match elimv.tkind with TVar v' -> v.vid = v'.vid | _ -> false)
-                ctex.ctex_eqn.eelim
-            with
-            | Some (original_recursion_var, _) -> (
+            let rec find_original_var_and_proj (og, elimv) =
+              match elimv.tkind with
+              | TVar v' -> if v.vid = v'.vid then Some (og, []) else None
+              | TTup vars ->
+                  List.find_mapi vars ~f:(fun i t ->
+                      Option.map
+                        (find_original_var_and_proj (og, t))
+                        ~f:(fun (og, projs) -> (og, i :: projs)))
+              | _ -> None
+            in
+            match List.find_map ~f:find_original_var_and_proj ctex.ctex_eqn.eelim with
+            | Some (original_recursion_var, projs) -> (
                 match original_recursion_var.tkind with
                 | TVar ov when Map.mem rec_instantation ov ->
                     let instantiation = Map.find_exn rec_instantation ov in
+                    let _ = projs in
                     smt_of_term (mk_bin Binop.Eq (f_compose_r instantiation) v_val)
                 | _ -> SmtLib.mk_true)
             | None -> smt_of_term (mk_bin Binop.Eq (mk_var v) v_val)

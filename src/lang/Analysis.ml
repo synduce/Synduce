@@ -160,6 +160,15 @@ let matches ?(boundvars = VarSet.empty) (t : term) ~(pattern : term) : term VarM
               | Ok subs -> Ok (List.concat subs)
               | Error errs -> Error (List.concat errs))
         else Error [ (pat, t) ]
+    | TTup mems, TTup mems' ->
+        if List.length mems = List.length mems' then
+          match List.map2 ~f:aux mems mems' with
+          | List.Or_unequal_lengths.Unequal_lengths -> Error [ (pat, t) ]
+          | List.Or_unequal_lengths.Ok ls -> (
+              match Result.combine_errors ls with
+              | Ok subs -> Ok (List.concat subs)
+              | Error errs -> Error (List.concat errs))
+        else Error [ (pat, t) ]
     | TApp (pat_f, pat_args), TApp (t_f, t_args) -> (
         match List.map2 ~f:aux pat_args t_args with
         | Unequal_lengths -> Error [ (pat, t) ]
@@ -390,7 +399,7 @@ let pick_some (virt : virtual_term) : term option * virtual_term option =
           | l, hd :: tl -> (
               let t, new_hd = aux hd in
               match new_hd with
-              | Some hd' -> (t, Some (VChoice (l @ hd' :: tl)))
+              | Some hd' -> (t, Some (VChoice (l @ (hd' :: tl))))
               | None -> (t, Some (VChoice (l @ tl))))
           | _, _ -> failwith "Unexpected failure in pick_some.")
     | VConstr (cname, args) -> (

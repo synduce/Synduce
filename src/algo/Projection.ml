@@ -7,6 +7,8 @@ open Lang.Term
 (*                        PROJECTION : OPTIMIZATION FOR TUPLES                                   *)
 (* ============================================================================================= *)
 
+(** Construct the projection functions for the given variable.
+*)
 let mk_projs (targs : RType.t list) (tl : RType.t list) (xi : Variable.t) =
   let f i t =
     match targs with
