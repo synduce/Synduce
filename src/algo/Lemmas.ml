@@ -95,7 +95,6 @@ let make_term_state_detail_from_ctex ~(p : psi_def) (is_pos_ctex : bool) (ctex :
     List.filter
       ~f:(fun (_, b) ->
         let is_in = List.mem (List.map ~f:mk_var scalar_vars) ~equal:Terms.equal b in
-        Log.debug_msg (Fmt.str "Is %a in? %s" pp_term b (if is_in then "yes" else "no"));
         is_in)
       subs_
   in
@@ -219,15 +218,22 @@ let add_lemmas_interactively ~(p : psi_def) (lstate : refinement_loop_state) : r
 
 let ith_synth_fun index = "lemma_" ^ Int.to_string index
 
-let synthfun_of_ctex (det : term_state_detail) (lem_id : int) : command * (string * sygus_sort) list
-    =
+let synthfun_of_ctex ~(p : psi_def) (det : term_state_detail) (lem_id : int) :
+    command * (string * sygus_sort) list =
   let params =
     List.map
       ~f:(fun scalar -> (scalar.vname, sort_of_rtype (Variable.vtype_or_new scalar)))
       det.scalar_vars
   in
   let ret_sort = sort_of_rtype RType.TBool in
-  let grammar = Grammars.generate_grammar ~guess:None ~bools:true OpSet.empty params ret_sort in
+  let opset =
+    List.fold ~init:OpSet.empty
+      ~f:(fun acc func -> Set.union acc (Analysis.operators_of func.f_body))
+      (PMRS.func_of_pmrs p.psi_reference @ PMRS.func_of_pmrs p.psi_repr
+      @ match p.psi_tinv with None -> [] | Some pmrs -> PMRS.func_of_pmrs pmrs)
+  in
+  (* OpSet.of_list [ Binary Binop.Mod ] in *)
+  let grammar = Grammars.generate_grammar ~guess:None ~bools:true opset params ret_sort in
   (CSynthFun (ith_synth_fun lem_id, params, ret_sort, grammar), params)
 
 let term_var_string term : string =
@@ -482,6 +488,13 @@ let bounded_check solver ~(p : psi_def) lemma_candidate (det : term_state_detail
   let res = expand_loop (TermSet.singleton det.term) in
   res
 
+let do_bounded_check solver =
+  ignore solver;
+  if !Config.bounded_lemma_check then (
+    Log.info (fun f () -> Fmt.(pf f "Do bounded check? [Y/N]"));
+    match Stdio.In_channel.input_line Stdio.stdin with Some "Y" -> true | _ -> false)
+  else false
+
 let verify_lemma_candidate ~(p : psi_def) (det : term_state_detail) :
     Solvers.online_solver * (Solvers.solver_response * Solvers.solver_response option) =
   match det.lemma_candidate with
@@ -492,7 +505,7 @@ let verify_lemma_candidate ~(p : psi_def) (det : term_state_detail) :
       let solver = Smtlib.Solvers.make_cvc4_solver () in
       set_up_lemma_solver solver ~p lemma_candidate;
       let result =
-        if !Config.bounded_lemma_check then bounded_check solver ~p lemma_candidate det
+        if do_bounded_check solver then bounded_check solver ~p lemma_candidate det
         else (
           List.iter
             ~f:(fun x -> ignore (Solvers.exec_command solver x))
@@ -603,7 +616,7 @@ let synthesize_new_lemma ~(p : psi_def) (det : term_state_detail) :
   let set_logic = CSetLogic "DTLIA" in
   (* TODO: How to choose logic? *)
   let lem_id = 0 in
-  let synth_objs, params = synthfun_of_ctex det lem_id in
+  let synth_objs, params = synthfun_of_ctex ~p det lem_id in
   let neg_constraints =
     List.map ~f:(constraint_of_neg_ctex lem_id ~p det params) det.negative_ctexs
   in
