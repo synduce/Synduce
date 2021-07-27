@@ -35,7 +35,7 @@ let rec sort_of_rtype (t : RType.t) : smtSort =
   | RType.TString -> SmtSort (Id (SSimple "String"))
   | RType.TChar -> SmtSort (Id (SSimple "Char"))
   | RType.TNamed s -> SmtSort (Id (SSimple s))
-  | RType.TTup tl -> Comp (Id (SSimple "Tuple"), List.map ~f:sort_of_rtype tl)
+  | RType.TTup tl -> SmtSort (Id (SSimple (RType.get_tuple_type_name tl)))
   | RType.TFun (tin, tout) -> Comp (Id (SSimple "->"), [ sort_of_rtype tin; sort_of_rtype tout ])
   | RType.TParam (args, t) -> dec_parametric t args
   | RType.TVar _ -> SmtSort (Id (SSimple "Int"))
@@ -112,9 +112,16 @@ let rec smt_of_term (t : term) : smtTerm =
   | TVar x -> mk_var x.vname
   | TIte (c, a, b) -> mk_ite (smt_of_term c) (smt_of_term a) (smt_of_term b)
   | TTup tl ->
-      Log.error_msg Fmt.(str "SMT: creating tuple %a might cause errors in Z3." pp_term t);
-      mk_simple_app "mkTuple" (List.map ~f:smt_of_term tl)
-  | TSel (t, i) -> SmtTApp (QI (IdC (SSimple "tupleSel", [ INum i ])), [ smt_of_term t ])
+      let tuple_constructor = RType.get_tuple_constr_name (List.map ~f:(fun t -> t.ttyp) tl) in
+      mk_simple_app tuple_constructor (List.map ~f:smt_of_term tl)
+  | TSel (t, i) -> (
+      match t.ttyp with
+      | TTup tl ->
+          let proj_fun = RType.get_tuple_proj_name tl i in
+          mk_simple_app proj_fun [ smt_of_term t ]
+      | _ ->
+          Log.error_msg Fmt.(str "SMT: tuple projection %a is not correctly type." pp_term t);
+          failwith "Wrong tuple type.")
   | TData (cstr, args) -> (
       match args with
       | [] ->
@@ -271,6 +278,11 @@ let model_to_subst (ctx : VarSet.t) (s : solver_response) =
   in
   List.concat_map ~f map
 
+(** Given a term model, request additional models from the solver from the point where
+    the current model was obtained. Simply calls (get-model) multiple times, asserting
+    that the values must not be equal to the value in the previous model at each new
+    call.
+*)
 let request_different_models (model : term_model) (num_models : int)
     (solver : Smtlib.Solvers.online_solver) =
   let open Smtlib.Solvers in
@@ -297,12 +309,28 @@ let request_different_models (model : term_model) (num_models : int)
 (*                           COMMANDS                                                            *)
 (* ============================================================================================= *)
 
+let decl_of_tup_type (tl : RType.t list) : command =
+  DeclareDatatype
+    ( mk_symb (RType.get_tuple_type_name tl),
+      (* type name *)
+      DDConstr
+        (* one constructor *)
+        [
+          ( mk_symb (RType.get_tuple_constr_name tl),
+            (* one selector per tuple component *)
+            List.mapi tl ~f:(fun i t ->
+                let prof = RType.get_tuple_proj_name tl i in
+                (mk_symb prof, sort_of_rtype t)) );
+        ] )
+
 let decls_of_vars (vars : VarSet.t) =
   let f v =
-    let sort = sort_of_rtype (Variable.vtype_or_new v) in
-    DeclareConst (SSimple v.vname, sort)
+    let t = Variable.vtype_or_new v in
+    let sort = sort_of_rtype t in
+    (match t with TTup tl -> [ decl_of_tup_type tl ] | _ -> [])
+    @ [ DeclareConst (SSimple v.vname, sort) ]
   in
-  List.map ~f (Set.elements vars)
+  List.concat_map ~f (Set.elements vars)
 
 (* ============================================================================================= *)
 (*                             TRANSLATION FROM PMRS TO SMT define-funs-rec                      *)

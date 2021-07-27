@@ -123,6 +123,7 @@ benchmark_set = [
     ["list_to_tree/search_v3.pmrs", ""],
     ["list_to_tree/mls.pmrs", ""],
     ["misc/count_between.ml", ""],
+    ["list/alist_sum.ml", ""],
     ["list/maxhom.pmrs", ""],
     ["list/sumodds.pmrs", ""],
     ["list/sumgt.ml", ""],
@@ -144,7 +145,7 @@ benchmark_set = [
 extra_benchmarks = [
     ["list/bal.ml", ""],
     ["list/lpeak.ml", ""],
-]  
+]
 
 root = os.getcwd()
 exec_path = os.path.join(root, "_build/default/bin/Synduce.exe")
@@ -225,11 +226,12 @@ if __name__ == "__main__":
                               (timeout, exec_path, algo[1], optim[1], extra_opt,
                                os.path.realpath(os.path.join("benchmarks", filename))))
                 else:
-                    if not os.path.exists(os.path.dirname("extras/solutions/%s" % filename)): 
-                        os.makedirs(os.path.dirname("extras/solutions/%s" % filename))
+                    if not os.path.exists(os.path.dirname("extras/solutions/%s" % filename)):
+                        os.makedirs(os.path.dirname(
+                            "extras/solutions/%s" % filename))
                     os.system("%s %s %s -i %s %s %s -o %s" %
                               (timeout, exec_path, algo[1], optim[1], extra_opt,
                                os.path.realpath(os.path.join(
                                    "benchmarks", filename)),
                                "extras/solutions/%s/" % category
-                                ))
+                               ))

@@ -1,6 +1,6 @@
 
-let join1 x25 (j, j0) (j1, j2) =
-  (x25 + (j + j1), x25 + (max j0 (max (- x25) (j + j2))))
+let join1 x25 (x26, x260) (x27, x270) =
+  (x25 + (x26 + x27), x25 + (max x260 (max (- x25) (x26 + x270))))
 
 let f0 x23 = (x23, max 0 x23)
 

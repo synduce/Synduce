@@ -1,5 +1,5 @@
 
-let s0 (j, j0) x0 = (j < x0) && (x0 < j0)
+let s0 (x7, x8) x0 = (x7 < x0) && (x0 < x8)
 
 let le_case x1 x2 x3 x4 = ((x1 > x2) || x4) || x3
 

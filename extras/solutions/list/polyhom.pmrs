@@ -1,5 +1,5 @@
 
-let odot x (j, j0) (j1, j2) = (j1 + (j × j2), j0 × j2)
+let odot x (x0, x00) (x1, x10) = (x1 + (x0 × x10), x00 × x10)
 
 let s0  = (0, 1)
 

@@ -1,6 +1,6 @@
 
-let join x7 x8 (j, j0) (j1, j2) =
-  (j + (j0 × (x8 + (x7 × j1))), x7 × (j0 × j2))
+let join x7 x8 (x9, x90) (x10, x100) =
+  (x9 + (x90 × (x8 + (x7 × x10))), x7 × (x90 × x100))
 
 let s0  = (0, 1)
 

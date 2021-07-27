@@ -1,5 +1,5 @@
 
-let oplus (j, j0) x4 = (x4 + j, max j0 (x4 + j))
+let oplus (x3, x30) x4 = (x4 + x3, max x30 (x4 + x3))
 
 let s0  = (0, 0)
 

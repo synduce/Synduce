@@ -1,5 +1,6 @@
 
-let join x17 (j, j0) (j1, j2) = (min x17 (min j j1), max x17 (max j0 j2))
+let join x17 (x18, x180) (x19, x190) =
+  (min x17 (min x18 x19), max x17 (max x180 x190))
 
 let f0 x15 = (x15, x15)
 

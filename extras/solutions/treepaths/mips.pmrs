@@ -1,9 +1,11 @@
 
 let s0  = (0, 0)
 
-let joinl x11 (j, j0) (j1, j2) = (x11 + (j + j1), max j0 (x11 + (j + j2)))
+let joinl x11 (x12, x120) (x13, x130) =
+  (x11 + (x12 + x13), max x120 (x11 + (x12 + x130)))
 
-let joinr x17 (j3, j4) (j5, j6) = (x17 + (j3 + j5), max j6 (x17 + (j4 + j5)))
+let joinr x17 (x18, x180) (x19, x190) =
+  (x17 + (x18 + x19), max x190 (x17 + (x180 + x19)))
 
 target⟨s0, joinl, joinr⟩(): int zipper -> (int * int)  = 
 {

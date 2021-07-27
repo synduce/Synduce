@@ -1,5 +1,5 @@
 
-let join x (j, j0) (j1, j2) = (x, ((j < x) && (x < j1)) && (j0 && j2))
+let join x (x0, x00) (x1, x10) = (x, ((x0 < x) && (x < x1)) && (x00 && x10))
 
 target⟨join⟩(): int tree -> (int * bool)  = 
 {

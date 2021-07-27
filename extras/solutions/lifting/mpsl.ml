@@ -1,7 +1,8 @@
 
 let s0  = (0, 0)
 
-let join (j, j0) (j1, j2) = (max j (j0 + j1), j0 + j2)
+let join (x136, x1360) (x137, x1370) =
+  (max x136 (x1360 + x137), x1360 + x1370)
 
 let f0 x140 = (max x140 0, x140)
 

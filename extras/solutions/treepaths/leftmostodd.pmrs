@@ -1,11 +1,11 @@
 
 let s0  = (false, 1)
 
-let joinl x (j, j0) (j1, j2) =
-  (j ? j : (x % 2) = 1 ? true : j1, j ? j0 : (x % 2) = 1 ? x : j2)
+let joinl x (x0, x00) (x1, x10) =
+  (x0 ? x0 : (x % 2) = 1 ? true : x1, x0 ? x00 : (x % 2) = 1 ? x : x10)
 
-let joinr x5 (j3, j4) (j5, j6) =
-  (j5 ? j5 : (x5 % 2) = 1 ? true : j3, j5 ? j6 : (x5 % 2) = 1 ? x5 : j4)
+let joinr x5 (x6, x60) (x7, x70) =
+  (x7 ? x7 : (x5 % 2) = 1 ? true : x6, x7 ? x70 : (x5 % 2) = 1 ? x5 : x60)
 
 target⟨s0, joinl, joinr⟩(): int zipper -> (bool * int)  = 
 {

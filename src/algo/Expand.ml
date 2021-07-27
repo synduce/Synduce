@@ -119,7 +119,7 @@ let nonreduced_terms_all (p : psi_def) (t : term) =
   nonreduced_terms p all_nont t
 
 (* Replace subterms that correspond to the right-hand side of the main rule to avoid
-  capturing f(v) when v is a variable. *)
+   capturing f(v) when v is a variable. *)
 let replace_rhs_of_main ?(verbose = false) ?(for_mr = false) (p : psi_def) (f : PMRS.t) (t0 : term)
     : term =
   if verbose then Log.verbose_msg Fmt.(str "t0 = %a" pp_term t0);

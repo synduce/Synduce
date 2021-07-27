@@ -1,6 +1,7 @@
 
-let odot (j, j0, j1, j2) (j3, j4, j5, j6) =
-  (j + j3, max j4 (j0 + j3), max j1 (j + j5), max j2 (max j6 (j0 + j5)))
+let odot (x27, x270, x271, x272) (x28, x280, x281, x282) =
+  (x27 + x28, max x280 (x270 + x28), max x271 (x27 + x281),
+    max x272 (max x282 (x270 + x281)))
 
 let f0 x23 = (x23, max 0 x23, max x23 0, max 0 (max x23 0))
 

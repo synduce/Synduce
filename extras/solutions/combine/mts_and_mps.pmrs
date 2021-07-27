@@ -1,6 +1,6 @@
 
-let oplus x11 (j, j0, j1) =
-  (x11 + j, max j0 (x11 + j), x11 + (max j1 (- x11)))
+let oplus x11 (x12, x120, x121) =
+  (x11 + x12, max x120 (x11 + x12), x11 + (max x121 (- x11)))
 
 let s0  = (0, 0, 0)
 

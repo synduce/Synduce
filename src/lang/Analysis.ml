@@ -297,9 +297,11 @@ let expand_once (t : term) : term list =
     let f (cstr_name, cstr_arg_types) =
       let cstr_args =
         List.map cstr_arg_types ~f:(fun ty ->
-            mk_var
-              (Variable.mk ~t:(Some ty)
-                 (if RType.is_recursive ty then Alpha.fresh ~s:"l" () else Alpha.fresh ~s:"n" ())))
+            mk_composite_base_type ty
+            (* mk_var
+               (Variable.mk ~t:(Some ty)
+                  (if RType.is_recursive ty then Alpha.fresh ~s:"l" () else Alpha.fresh ~s:"n" ())
+                  ) *))
       in
       let t, _ = infer_type (substitution [ (mk_var v, mk_data cstr_name cstr_args) ] t) in
       t

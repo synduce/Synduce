@@ -1,5 +1,6 @@
 
-let join1 x5 (j, j0) (j1, j2) = (x5 + (j + j1), max j2 (x5 + (j0 + j1)))
+let join1 x5 (x6, x60) (x7, x70) =
+  (x5 + (x6 + x7), max x70 (x5 + (x60 + x7)))
 
 let s0  = (0, 0)
 

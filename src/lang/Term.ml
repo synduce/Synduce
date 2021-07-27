@@ -623,8 +623,9 @@ let rec mk_composite_base_type (t : RType.t) : term =
   | RType.TChar -> mk_var (Variable.mk ~t:(Some t) (Alpha.fresh ~s:"c" ()))
   | RType.TTup tl -> mk_tup (List.map ~f:mk_composite_base_type tl)
   | RType.TNamed _ -> mk_var (Variable.mk ~t:(Some t) (Alpha.fresh ~s:"l" ()))
-  | RType.TFun (_, _) | RType.TParam (_, _) | RType.TVar _ ->
-      failwith Fmt.(str "mk_composite_base_type: %a is not a base type." RType.pp t)
+  | _ -> mk_var (Variable.mk ~t:(Some t) (Alpha.fresh ~s:"p" ()))
+(* | RType.TFun (_, _) | RType.TParam (_, _) | RType.TVar _ ->
+    failwith Fmt.(str "mk_composite_base_type: %a is not a base type." RType.pp t) *)
 
 (* ============================================================================================= *)
 (*                             EQUALITY                                                          *)

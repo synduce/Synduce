@@ -1,7 +1,8 @@
 
 let s_0  = 0
 
-let odot (j, j0) (j1, j2) = (min j j1, j = j1 ? j0 + j2 : j1 > j ? j0 : j2)
+let odot (x1, x10) (x2, x20) =
+  (min x1 x2, x1 = x2 ? x10 + x20 : x2 > x1 ? x10 : x20)
 
 let f_0 x = (x, 1)
 

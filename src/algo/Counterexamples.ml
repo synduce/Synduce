@@ -83,7 +83,7 @@ let check_unrealizable (unknowns : VarSet.t) (eqns : equation_system) : unrealiz
     let var_subst = VarSet.prime vsetj in
     let vsetj' = VarSet.of_list (List.map ~f:snd var_subst) in
     let sub = List.map ~f:(fun (v, v') -> (mk_var v, mk_var v')) var_subst in
-    (* Extract the arguments of the rhs, if it is a call to an unknown. *)
+    (* Extract the arguments of the rhs, if it is a proper skeleton. *)
     let maybe_rhs_args =
       match (eqn_i.erhs.tkind, eqn_j.erhs.tkind) with
       | TApp ({ tkind = TVar f_v_i; _ }, args_i), TApp ({ tkind = TVar f_v_j; _ }, args_j) ->

@@ -175,26 +175,27 @@ let pp_implems (frmt : Formatter.t) (implems : (symbol * variable list * term) l
     | _ :: _ ->
         Fmt.(pf frmt "(%a)" (list ~sep:(fun _f () -> pf _f ", ") pp_term) (List.map ~f:second l))
   in
-
   let pp_implem frmt (s, args, t) =
     let f v =
       match Variable.vtype_or_new v with
       | TTup tl ->
           let f i typ =
-            let v' = Variable.mk ~t:(Some typ) (Alpha.fresh ~s:"j" ()) in
+            let v' = Variable.mk ~t:(Some typ) (Alpha.fresh ~s:v.vname ()) in
             (mk_sel (mk_var v) i, mk_var v')
           in
-          List.mapi ~f tl
-      | _ -> [ (mk_var v, mk_var v) ]
+          let subs1 = List.mapi ~f tl in
+          let _, vars = List.unzip subs1 in
+          ((mk_var v, mk_tup vars) :: subs1, subs1)
+      | _ -> ([], [ (mk_var v, mk_var v) ])
     in
-    let subs = List.map ~f args in
+    let subs, args = List.unzip (List.map ~f args) in
     let t' = substitution (List.concat subs) t in
     Fmt.(
       pf frmt "@[<hov 2>%a %a @[%a@] %a@;%a@]"
         (styled (`Fg `Red) string)
         "let"
         (styled (`Fg `Cyan) string)
-        s (list ~sep:sp pp_single_or_tup) subs
+        s (list ~sep:sp pp_single_or_tup) args
         (styled (`Fg `Red) string)
         "=" pp_term t')
   in

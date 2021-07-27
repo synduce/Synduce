@@ -1,5 +1,5 @@
 
-let odot (j, j0) (j1, j2) = (min j j1, min j0 (max j1 (min j j2)))
+let odot (x3, x30) (x4, x40) = (min x3 x4, min x30 (max x4 (min x3 x40)))
 
 let f_0 x x0 = (min x x0, max x x0)
 
