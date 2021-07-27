@@ -71,6 +71,19 @@ reduced_benchmark_set_table3 = [
     ["tree/mips.pmrs", ""],
 ]
 
+constraint_benchmarks = [
+    ["constraints/sortedlist/min.ml", ""],
+    ["constraints/sortedlist/max.ml", ""],
+    ["constraints/sortedlist/count_lt.ml", ""],
+    ["constraints/sortedlist/index_of.ml", ""],
+    ["constraints/constantlist/index_of.ml", ""],
+    ["constraints/constantlist/contains.ml", ""],
+    ["constraints/evenlist/parity_of_first.ml", ""],
+    ["constraints/evenlist/parity_of_last.ml", ""],
+    ["constraints/evenlist/first_odd.ml", ""],
+    ["constraints/bst/contains.ml", ""],
+]
+
 benchmark_set = [
     ["misc/unknowns_are_ids.ml", ""],
     ["misc/composed_unkwns.ml", ""],
@@ -132,14 +145,8 @@ benchmark_set = [
     ["zippers/list_sum.ml", ""],
     ["lifting/mits_nosum.ml", ""],
     ["lifting/mpsl.ml", ""],
-    ["constraints/sortedlist/min.ml", ""],
-    ["constraints/sortedlist/max.ml", ""],
-    ["constraints/sortedlist/count_lt.ml", ""],
-    ["constraints/sortedlist/index_of.ml", ""],
-    ["constraints/constantlist/index_of.ml", ""],
-    ["constraints/constantlist/contains.ml", ""],
-    ["constraints/bst/contains.ml", ""],
-]
+
+] + constraint_benchmarks 
 
 extra_benchmarks = [
     ["list/bal.ml", ""],
@@ -189,6 +196,9 @@ if __name__ == "__main__":
                 ["d", "--no-syndef --no-gropt"],
                 ["off", "-st --no-syndef --no-gropt"]
             ]
+        elif table_no == 4:
+            algos = [["requation", ""]]
+            optims = [["all", ""]]
     else:
         print(
             "Usage:python3 test.py TABLE_NO [USE_REDUCED_SET]\n\
@@ -206,6 +216,8 @@ if __name__ == "__main__":
                 input_files = reduced_benchmark_set_table2
             elif table_no == 3:
                 input_files = reduced_benchmark_set_table3
+            elif table_no == 4:
+                input_files = constraint_benchmarks
             else:
                 input_files = kick_the_tires_set
 
