@@ -48,7 +48,7 @@ and dec_parametric t args =
   | t -> sort_of_rtype t
 (* Not really parametric? *)
 
-let declare_datatype_of_rtype (t0 : RType.t) : (smtSymbol list * command) list =
+let rec declare_datatype_of_rtype (t0 : RType.t) : (smtSymbol list * command) list =
   let declare_orig tname t =
     let params =
       match t with
@@ -83,7 +83,9 @@ let declare_datatype_of_rtype (t0 : RType.t) : (smtSymbol list * command) list =
   in
   match RType.base_name t0 with
   | Some tname -> (
-      match RType.get_type tname with Some orig_t -> declare_orig tname orig_t | None -> [])
+      let deps = RType.get_datatype_depends t0 in
+      List.concat_map ~f:declare_datatype_of_rtype deps
+      @ match RType.get_type tname with Some orig_t -> declare_orig tname orig_t | None -> [])
   | None -> []
 
 let smtPattern_of_pattern (p : pattern) =

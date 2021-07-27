@@ -416,3 +416,14 @@ let is_recursive =
     | l -> if List.exists l ~f:is_recursive_variant then Some true else None
   in
   reduce ~case ~init:false ~join:( || )
+
+let rec is_user_defined t =
+  match t with
+  | TBool | TInt | TString | TChar | TVar _ -> false
+  | TNamed _ | TTup _ | TParam _ -> true
+  | TFun (a, b) -> is_user_defined a || is_user_defined b
+
+let get_datatype_depends (t : t) =
+  List.filter
+    ~f:(fun t' -> is_user_defined t' && not (subtype_of t' t))
+    (List.concat_map ~f:snd (get_variants t))

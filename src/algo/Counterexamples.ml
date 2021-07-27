@@ -317,7 +317,9 @@ let check_tinv_sat ~(p : psi_def) (tinv : PMRS.t) (ctex : ctex) :
           List.map ~f (Set.elements ctex.ctex_vars)
         in
         let vars =
-          Set.union (Analysis.free_variables t) (Analysis.free_variables (f_compose_r t))
+          VarSet.union_list
+            (Option.(to_list (map ~f:Analysis.free_variables ctex.ctex_eqn.eprecond))
+            @ [ Analysis.free_variables t; Analysis.free_variables (f_compose_r t) ])
         in
         (* Start sequence of solver commands, bind on accum. *)
         let%lwt _ = accum in
