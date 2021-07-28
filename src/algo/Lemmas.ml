@@ -145,6 +145,7 @@ let create_or_update_term_state_for_ctex ~(p : psi_def) (is_pos_ctex : bool) (ts
     (ctex : ctex) : term_state =
   match Map.find ts ctex.ctex_eqn.eterm with
   | None ->
+      Log.debug_msg Fmt.(str "Creating new term state for term %a" pp_term ctex.ctex_eqn.eterm);
       Map.add_exn ~key:ctex.ctex_eqn.eterm
         ~data:(make_term_state_detail_from_ctex ~p is_pos_ctex ctex)
         ts
@@ -614,7 +615,15 @@ let interactive_get_positive_examples (det : term_state_detail) =
 
 let synthesize_new_lemma ~(p : psi_def) (det : term_state_detail) :
     (string * variable list * term) option =
-  Log.info (fun f () -> Fmt.(pf f "Synthesizing a new lemma candidate."));
+  Log.debug (fun f () ->
+      Fmt.(
+        match det.current_preconds with
+        | None ->
+            pf f "Synthesizing a new lemma candidate for term %a[%a]." pp_term det.term pp_subs
+              det.recurs_elim
+        | Some pre ->
+            pf f "Synthesizing a new lemma candidate for term %a[%a] with precondition %a" pp_term
+              det.term pp_subs det.recurs_elim pp_term pre));
   let set_logic = CSetLogic "DTLIA" in
   (* TODO: How to choose logic? *)
   let lem_id = 0 in
@@ -768,4 +777,6 @@ let synthesize_lemmas ~(p : psi_def) synt_failure_info (lstate : refinement_loop
            answer unknowns. We interpret it as "no solution can be found". *)
         Log.error_msg "SyGuS solver returned unknown.";
         Error RUnknown
-    | s_resp, _ -> Error s_resp
+    | s_resp, _ ->
+        Log.error_msg "SyGuS solver did not succeed.";
+        Error s_resp
