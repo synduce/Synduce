@@ -78,7 +78,7 @@ let rec ccegis_loop (p : psi_def) (t_set : TermSet.t) =
   let s_resp, solution = Equations.solve ~p eqns in
   match (s_resp, solution) with
   | RSuccess _, First sol -> (
-      match Verify.bounded_check ~concrete_ctex:true ~p sol with
+      match Verify.bounded_check ~use_concrete_ctex:true ~p sol with
       (* A concrete conterexample term is returned. *)
       | Some eqn ->
           Log.debug (fun frmt () ->

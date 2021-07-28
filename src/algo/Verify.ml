@@ -27,6 +27,44 @@ let constr_eqn (eqn : equation) =
   | Some inv -> SmtLib.mk_or (SmtLib.mk_not (smt_of_term inv)) equality
   | None -> equality
 
+(* ============================================================================================= *)
+(*                               Partially-bounded checking                                      *)
+(* ============================================================================================= *)
+
+let check_eqn solver has_sat eqn =
+  let formula = SmtLib.mk_not eqn in
+  Solvers.spush solver;
+  Solvers.smt_assert solver formula;
+  let x =
+    match Solvers.check_sat solver with
+    | Sat -> Continue_or_stop.Stop true
+    | _ -> Continue_or_stop.Continue has_sat
+  in
+  Solvers.spop solver;
+  x
+
+(* During verification, some terms that have partially bounded might lack the lemmas that ensure
+   verification is sound (the counterexamples obtained during verification might be spurious). In
+   that case, the partially-bounded checking reverts to (fully-)bounded checking.
+*)
+let partial_bounding_checker ~(p : psi_def) (lstate : refinement_loop_state) (t_set : TermSet.t) :
+    TermSet.t =
+  let f t =
+    match Specifications.get_requires p.psi_target.pvar with
+    | Some _ -> (
+        match Lemmas.get_lemma ~p lstate.term_state ~key:t with
+        | Some _ ->
+            (* Everything ok, a lemma has been computed *)
+            t
+        | None ->
+            (* There is a requires and no lemma, the term has to be bounded. *)
+            Fmt.(pf stdout "\t %a needs to be bounded@." pp_term t);
+            Fmt.(pf stdout "\t ---> %a@." pp_term (Expand.make_bounded t));
+            Expand.make_bounded t)
+    | None -> t
+  in
+  TermSet.map ~f t_set
+
 let check_solution ?(use_acegis = false) ~(p : psi_def) (lstate : refinement_loop_state)
     (soln : (string * variable list * term) list) =
   if use_acegis then Log.info (fun f () -> Fmt.(pf f "Check solution."))
@@ -39,44 +77,29 @@ let check_solution ?(use_acegis = false) ~(p : psi_def) (lstate : refinement_loo
   let init_vardecls = decls_of_vars free_vars in
   let solver = Solvers.make_z3_solver () in
   Solvers.load_min_max_defs solver;
-  let check_eqn has_sat eqn =
-    let formula = SmtLib.mk_not eqn in
-    Solvers.spush solver;
-    Solvers.smt_assert solver formula;
-    let x =
-      match Solvers.check_sat solver with
-      | Sat -> Continue_or_stop.Stop true
-      | _ -> Continue_or_stop.Continue has_sat
-    in
-    Solvers.spop solver;
-    x
-  in
   let expand_and_check i (t0 : term) =
     let t_set, u_set = Expand.to_maximally_reducible p t0 in
-    let num_terms = Set.length t_set in
-    if num_terms > 0 then (
+    let t_set = partial_bounding_checker ~p lstate t_set in
+    let num_terms_to_check = Set.length t_set in
+    if num_terms_to_check > 0 then (
       let sys_eqns, _ =
         Equations.make ~force_replace_off:true
           ~p:{ p with psi_target = target_inst }
           ~term_state:lstate.term_state ~lifting:lstate.lifting t_set
       in
       let smt_eqns = List.map sys_eqns ~f:constr_eqn in
-      let new_free_vars =
-        let f fv eqn =
-          Set.union fv
-            (Set.union
-               (Lang.Analysis.free_variables eqn.elhs)
-               (Lang.Analysis.free_variables eqn.erhs))
-        in
-        Set.diff (List.fold ~f ~init:VarSet.empty sys_eqns) free_vars
-      in
       (* Solver calls. *)
       Solvers.spush solver;
-      Solvers.declare_all solver (decls_of_vars new_free_vars);
-      let has_ctex = List.fold_until ~finish:(fun x -> x) ~init:false ~f:check_eqn smt_eqns in
+      (* Declare all the new variables used in the system of equations. *)
+      Solvers.declare_all solver
+        (decls_of_vars (Set.diff (Equations.free_vars_of_equations sys_eqns) free_vars));
+      let has_ctex =
+        List.fold_until ~finish:(fun x -> x) ~init:false ~f:(check_eqn solver) smt_eqns
+      in
       Solvers.spop solver;
       (* Result of solver calls. *)
-      if has_ctex then (true, t_set, u_set, i + 1) else (false, TermSet.empty, u_set, i + num_terms))
+      if has_ctex then (true, t_set, u_set, i + 1)
+      else (false, TermSet.empty, u_set, i + num_terms_to_check))
     else (
       (* set is empty *)
       Log.debug_msg Fmt.(str "Checked all terms.");
@@ -115,8 +138,24 @@ let check_solution ?(use_acegis = false) ~(p : psi_def) (lstate : refinement_loo
   Config.verbose := verb;
   ctex_or_none
 
+(* ============================================================================================= *)
+(*                               Bounded-checking                                                *)
+(* ============================================================================================= *)
+
+let bounded_check_eqn ?(use_concrete_ctex = false) solver eqn =
+  let formula = SmtLib.mk_not eqn in
+  Solvers.spush solver;
+  Solvers.smt_assert solver formula;
+  let x = Solvers.check_sat solver in
+  let model =
+    if use_concrete_ctex then match x with Sat -> Some (Solvers.get_model solver) | _ -> None
+    else None
+  in
+  Solvers.spop solver;
+  (x, model)
+
 (* Perform a bounded check of the solution *)
-let bounded_check ?(concrete_ctex = false) ~(p : psi_def)
+let bounded_check ?(use_concrete_ctex = false) ~(p : psi_def)
     (soln : (string * variable list * term) list) =
   Log.info (fun f () -> Fmt.(pf f "Checking solution (bounded check)..."));
   let start_time = Unix.gettimeofday () in
@@ -125,18 +164,6 @@ let bounded_check ?(concrete_ctex = false) ~(p : psi_def)
   let init_vardecls = decls_of_vars free_vars in
   let solver = Solvers.make_z3_solver () in
   Solvers.load_min_max_defs solver;
-  let check_eqn eqn =
-    let formula = SmtLib.mk_not eqn in
-    Solvers.spush solver;
-    Solvers.smt_assert solver formula;
-    let x = Solvers.check_sat solver in
-    let model =
-      if concrete_ctex then match x with Sat -> Some (Solvers.get_model solver) | _ -> None
-      else None
-    in
-    Solvers.spop solver;
-    (x, model)
-  in
   let check term =
     let sys_eqns, _ =
       Equations.make ~force_replace_off:true
@@ -159,7 +186,7 @@ let bounded_check ?(concrete_ctex = false) ~(p : psi_def)
       match _eqns with
       | [] -> None
       | (eqn, smt_eqn) :: tl -> (
-          match check_eqn smt_eqn with
+          match bounded_check_eqn ~use_concrete_ctex solver smt_eqn with
           | Sat, Some model_response ->
               let model = model_to_constmap model_response in
               let concr = Lang.Analysis.concretize ~model in

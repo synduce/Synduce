@@ -34,6 +34,9 @@ set is a set of *bounded* terms, the second set is a set of unbounded terms. In 
 should keep track of the unbounded terms as well and recursively expand them as necessary.
 *)
 
+val make_bounded : Term.term -> Term.term
+(** Heuristic to bound terms. Unbounded symbols will be bound using some arbitrary expansion. *)
+
 val is_mr : AState.psi_def -> PMRS.t -> Term.term -> Term.VarSet.t -> bool
 
 val is_mr_all : AState.psi_def -> Term.term -> bool

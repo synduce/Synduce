@@ -122,6 +122,7 @@ let filter_elims all_subs t =
 let make ?(force_replace_off = false) ~(p : psi_def) ~(term_state : term_state) ~(lifting : lifting)
     (tset : TermSet.t) : equation list * lifting =
   let proj_to_non_lifting = Lifting.proj_to_non_lifting p in
+  (* Compute a first set of constraints E(t) : spec o repr (t) = target (t) *)
   let eqns =
     let fold_f eqns t =
       let lhs = compute_lhs p t in
@@ -130,19 +131,23 @@ let make ?(force_replace_off = false) ~(p : psi_def) ~(term_state : term_state) 
     in
     Set.fold ~init:[] ~f:fold_f tset
   in
+  (* Compute the recursion eliminations as well as related invariants that need applying. *)
   let all_subs, invariants =
     Expand.subst_recursive_calls p
       (List.concat (List.map ~f:(fun (_, lhs, rhs) -> [ lhs; rhs ]) eqns))
   in
+  (* Substitution function: some substitution opportunities appear after a first pass of subsitution
+     followed by a lambda-reduction.
+  *)
   let applic x = substitution all_subs (Reduce.reduce_term (substitution all_subs x)) in
   if Set.length invariants > 0 then
     Log.verbose
       Fmt.(
         fun frmt () ->
-          pf frmt "Invariants: @[<hov 2>%a@]"
+          pf frmt "Imᵢₙᵥ: @[<hov 2>%a@]"
             (styled `Italic (list ~sep:comma pp_term))
             (Set.elements invariants))
-  else Log.verbose_msg "No invariants.";
+  else Log.verbose_msg "No image invariants.";
   let pure_eqns, lifting =
     let f (eqns_accum, lifting) (eterm, lhs, rhs) =
       (* Compute the lhs and rhs of the equations. *)
@@ -269,6 +274,14 @@ let revert_projs (orig_xi : VarSet.t)
     List.map ~f (Set.elements xi_projected)
   in
   rest @ new_xi_solns
+
+let free_vars_of_equations (sys_eq : equation list) : VarSet.t =
+  VarSet.union_list
+    (List.concat_map
+       ~f:(fun eqn ->
+         [ Analysis.free_variables eqn.elhs; Analysis.free_variables eqn.erhs ]
+         @ Option.(to_list (map ~f:Analysis.free_variables eqn.eprecond)))
+       sys_eq)
 
 (* ============================================================================================= *)
 (*                               SOLVING SYSTEMS OF EQUATIONS                                    *)

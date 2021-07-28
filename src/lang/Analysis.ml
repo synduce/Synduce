@@ -58,6 +58,9 @@ let is_norec =
   in
   reduce ~init:true ~join:( && ) ~case
 
+(** A term has no variant if it is a variable and the type of that
+  variable has no variants. This means that term cannot be expanded.
+*)
 let is_novariant =
   let case _ t =
     match t.tkind with
@@ -281,7 +284,7 @@ let matches_pattern (t : term) (p : pattern) : term VarMap.t option =
   aux (p, t)
 
 (* ============================================================================================= *)
-(*                                  TERM EXPANSION                                               *)
+(*                                  NAIVE TERM EXPANSION                                         *)
 (* ============================================================================================= *)
 
 let expand_once (t : term) : term list =

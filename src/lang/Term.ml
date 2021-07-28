@@ -1221,6 +1221,8 @@ module TermSet = struct
 
   let empty = Set.empty (module Terms)
 
+  let map (s : S.t) = Set.map (module Terms) s
+
   let singleton = Set.singleton (module Terms)
 
   let of_list = Set.of_list (module Terms)

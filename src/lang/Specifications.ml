@@ -13,7 +13,7 @@ let get_ensures (v : variable) : term option =
   match Hashtbl.find specs v.vid with Some spec -> spec.ensures | None -> None
 
 let get_requires (v : variable) : term option =
-  match Hashtbl.find specs v.vid with Some spec -> spec.ensures | None -> None
+  match Hashtbl.find specs v.vid with Some spec -> spec.requires | None -> None
 
 let set_spec (v : variable) (spec : spec) : unit = Hashtbl.set specs ~key:v.vid ~data:spec
 

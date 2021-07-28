@@ -164,10 +164,13 @@ let replace_rhs_of_mains (p : psi_def) (t0 : term) : term =
   replace_rhs_of_main p p.psi_target __t0
 
 (* ============================================================================================= *)
-(*                                   acegis TERM EXPANSION                                        *)
+(*                                   acegis TERM EXPANSION                                       *)
 (* ============================================================================================= *)
 
-let is_max_expanded (t : term) = Analysis.is_novariant t
+let is_bounded (t : term) =
+  Term.reduce ~init:true ~join:( && )
+    ~case:(fun _ t -> match t.tkind with TVar _ -> Some (Analysis.is_novariant t) | _ -> None)
+    t
 
 let simple ?(verbose = false) ?(max_height = !Config.expand_cut) (t0 : term) =
   if verbose then Log.verbose_msg Fmt.(str "@[Simple expansion of %a.@]" pp_term t0);
@@ -180,7 +183,7 @@ let simple ?(verbose = false) ?(max_height = !Config.expand_cut) (t0 : term) =
           match List.sort ~compare:term_height_compare u with
           | uhd :: utl ->
               let t_exp = Analysis.expand_once uhd in
-              let t', u' = List.partition_tf ~f:is_max_expanded t_exp in
+              let t', u' = List.partition_tf ~f:Analysis.is_novariant t_exp in
               aux (d + 1) (t', utl @ u')
           | [] -> (t, u))
   in
@@ -191,6 +194,18 @@ let simple ?(verbose = false) ?(max_height = !Config.expand_cut) (t0 : term) =
       Log.verbose Fmt.(fun f () -> pf f "t = @[<hov 2>%a@]" (list ~sep:comma pp_term) t);
       Log.verbose Fmt.(fun f () -> pf f "u = @[<hov 2>%a@]" (list ~sep:comma pp_term) u));
     (TermSet.of_list t, TermSet.of_list u)
+
+let make_bounded (t0 : term) =
+  let case _ t =
+    if is_bounded t then Some t
+    else
+      match t.tkind with
+      | TVar _ ->
+          let t_set, _ = simple t in
+          Set.max_elt t_set
+      | _ -> None
+  in
+  transform ~case t0
 
 (* ============================================================================================= *)
 (*                               MAIN ENTRY POINTS: MR_TERMS                                     *)

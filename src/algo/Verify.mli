@@ -20,7 +20,7 @@ val check_solution :
 *)
 
 val bounded_check :
-  ?concrete_ctex:bool ->
+  ?use_concrete_ctex:bool ->
   p:AState.psi_def ->
   (string * variable list * term) list ->
   AState.equation option

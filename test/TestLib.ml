@@ -1,4 +1,7 @@
 open Fmt
+open Lang
+open Term
+open Base
 
 let sum, soln = Lib.solve_file "benchmarks/tree/sum.ml"
 
@@ -8,10 +11,29 @@ let eqns = Lib.get_lemma_hints ()
   We'll solve this limitation later.
 *)
 (* let search, _ = Lib.solve_file "benchmarks/list/search.ml" *)
-
 ;;
-Lib.pp_problem_descr stdout sum;
-match soln with Some s -> Algo.AState.pp_soln ~use_ocaml_syntax:true stdout s | None -> ()
 
+Lib.pp_problem_descr Fmt.stdout sum;
+match soln with Some s -> Algo.AState.pp_soln ~use_ocaml_syntax:true Fmt.stdout s | None -> ()
 ;;
-List.iter (fun eqn -> pf stdout "%a@." Algo.AState.pp_equation eqn) eqns
+
+List.iter ~f:(fun eqn -> pf Fmt.stdout "%a@." Algo.AState.pp_equation eqn) eqns;;
+
+Fmt.(pf stdout "=== EXPAND ===@.");
+let v = mk_var (Variable.mk ~t:(Some !Algo.AState._theta) (Alpha.fresh ())) in
+Fmt.(pf stdout "%a@." pp_term v);
+let expansions = Analysis.expand_once v in
+List.iter ~f:(fun t -> Fmt.(pf stdout "@[%a -> %a@]@." pp_term v pp_term t)) expansions;
+let l1 = mk_var (Variable.mk "l1") in
+let match_case =
+  (* Reduction function: Reduce.reduce_term (mk_app f [t]) *)
+  mk_match v
+    (List.map
+       ~f:(fun t ->
+         ( pattern_of_term t,
+           let free_v = VarSet.elements (Analysis.free_variables t) in
+           mk_app l1
+             (List.filter ~f:(fun t -> not (Analysis.is_norec t)) (List.map ~f:mk_var free_v)) ))
+       expansions)
+in
+Fmt.(pf stdout "%a@." pp_term match_case)
