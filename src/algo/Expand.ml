@@ -200,9 +200,16 @@ let make_bounded (t0 : term) =
     if is_bounded t then Some t
     else
       match t.tkind with
-      | TVar _ ->
-          let t_set, _ = simple t in
-          Set.max_elt t_set
+      | TVar _ -> (
+          match
+            List.filter ~f:(fun t -> not (Analysis.is_novariant t)) (Analysis.expand_once t)
+          with
+          | hd :: _ ->
+              let t_set, _ = simple hd in
+              Set.max_elt t_set
+          | _ ->
+              let t_set, _ = simple t in
+              Set.max_elt t_set)
       | _ -> None
   in
   transform ~case t0
