@@ -77,9 +77,7 @@ let make_term_state_detail_from_ctex ~(p : psi_def) (is_pos_ctex : bool) (ctex :
       ~f:(fun v ->
         let rec g v' s =
           match s with
-          | [] ->
-              Log.debug_msg (Fmt.str "Filtering out irrelevant scalar var %a" pp_term (mk_var v'));
-              false
+          | [] -> false
           | (_, b) :: tl -> if Terms.(equal (mk_var v') b) then true else g v' tl
         in
         let rec f lst =
@@ -398,7 +396,8 @@ let classify_ctexs_opt ~(p : psi_def) ctexs =
     List.fold ~f ~init:([], [], []) ctexs
   else classify_ctexs ~p ctexs
 
-let smt_of_disallow_ctex_values (ctexs : ctex list) : S.smtTerm =
+let smt_of_disallow_ctex_values (det : term_state_detail) : S.smtTerm =
+  let ctexs = det.positive_ctexs in
   S.mk_assoc_and
     (List.map
        ~f:(fun ctex ->
@@ -409,9 +408,11 @@ let smt_of_disallow_ctex_values (ctexs : ctex list) : S.smtTerm =
                    let var =
                      match VarSet.find_by_id ctex.ctex_vars key with
                      | None -> failwith "Something went wrong."
-                     | Some v -> v
+                     | Some v ->
+                         let subs = subs_from_elim_to_elim det.recurs_elim ctex.ctex_eqn.eelim in
+                         Term.substitution subs (mk_var v)
                    in
-                   S.mk_eq (S.mk_var var.vname) (Smt.smt_of_term data) :: acc)
+                   S.mk_eq (Smt.smt_of_term var) (Smt.smt_of_term data) :: acc)
                  ~init:[] ctex.ctex_model)))
        ctexs)
 
@@ -429,9 +430,8 @@ let set_up_to_get_model solver ~(p : psi_def) lemma (det : term_state_detail) =
   | Some pre -> ignore (Solvers.exec_command solver (S.mk_assert (Smt.smt_of_term pre))));
   ignore (Solvers.check_sat solver);
   (* Step 3. Disallow repeated positive examples. *)
-  (* if List.length det.positive_ctexs > 0 then
-     ignore
-       (Solvers.exec_command solver (S.mk_assert (smt_of_disallow_ctex_values det.positive_ctexs))); *)
+  if List.length det.positive_ctexs > 0 then
+    ignore (Solvers.exec_command solver (S.mk_assert (smt_of_disallow_ctex_values det)));
   (* Step 4. Assert that lemma candidate is false. *)
   ignore (Solvers.exec_command solver (S.mk_assert (S.mk_not (smt_of_lemma_app lemma))))
 
