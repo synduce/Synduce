@@ -490,10 +490,11 @@ let bounded_check solver ~(p : psi_def) lemma_candidate (det : term_state_detail
 
 let do_bounded_check solver =
   ignore solver;
-  if !Config.bounded_lemma_check then (
-    Log.info (fun f () -> Fmt.(pf f "Do bounded check? [Y/N]"));
-    match Stdio.In_channel.input_line Stdio.stdin with Some "Y" -> true | _ -> false)
-  else false
+  (* if !Config.bounded_lemma_check then (
+       Log.info (fun f () -> Fmt.(pf f "Do bounded check? [Y/N]"));
+       match Stdio.In_channel.input_line Stdio.stdin with Some "Y" -> true | _ -> false)
+     else false *)
+  !Config.bounded_lemma_check
 
 let verify_lemma_candidate ~(p : psi_def) (det : term_state_detail) :
     Solvers.online_solver * (Solvers.solver_response * Solvers.solver_response option) =
@@ -613,6 +614,7 @@ let interactive_get_positive_examples (det : term_state_detail) =
 
 let synthesize_new_lemma ~(p : psi_def) (det : term_state_detail) :
     (string * variable list * term) option =
+  Log.info (fun f () -> Fmt.(pf f "Synthesizing a new lemma candidate."));
   let set_logic = CSetLogic "DTLIA" in
   (* TODO: How to choose logic? *)
   let lem_id = 0 in
