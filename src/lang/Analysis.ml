@@ -139,9 +139,9 @@ let unify (terms : term list) =
   | hd :: tl -> if List.for_all ~f:(fun x -> Terms.equal x hd) tl then Some hd else None
 
 (**
-   matches ~boundvars ~pattern t returns a map from variables in pattern to subterms of t
-   if the term t matches the pattern.
-   During the matching process the variables in boundvars cannot be substituted in the
+   [matches ~boundvars ~pattern t] returns a map from variables in [pattern] to subterms of [t]
+   if the term [t] matches the [pattern].
+   During the matching process the variables in [boundvars] cannot be substituted in the
    pattern.
 *)
 let matches ?(boundvars = VarSet.empty) (t : term) ~(pattern : term) : term VarMap.t option =
@@ -199,6 +199,9 @@ let matches ?(boundvars = VarSet.empty) (t : term) ~(pattern : term) : term VarM
         Some substs
       with _ -> None)
 
+(** [matches_subpattern ~boundvars t ~pattern] returns some triple [t', subs, vs]
+    when some sub-pattern of [pattern] matches [t].
+*)
 let matches_subpattern ?(boundvars = VarSet.empty) (t : term) ~(pattern : term) :
     (term * (term * term) list * VarSet.t) option =
   let match_locations = ref [] in

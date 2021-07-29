@@ -72,30 +72,31 @@ reduced_benchmark_set_table3 = [
 ]
 
 constraint_benchmarks = [
-    # sortedlist 
+    # sortedlist
     ["constraints/sortedlist/min.ml", ""],
     ["constraints/sortedlist/max.ml", ""],
     ["constraints/sortedlist/count_lt.ml", ""],
     ["constraints/sortedlist/index_of.ml", ""],
-    # constantlist 
+    # constantlist
     ["constraints/constantlist/index_of.ml", ""],
     ["constraints/constantlist/contains.ml", ""],
-    # evenlist 
+    # evenlist
     ["constraints/evenlist/parity_of_first.ml", ""],
     ["constraints/evenlist/parity_of_last.ml", ""],
     ["constraints/evenlist/first_odd.ml", ""],
     ["constraints/evenlist/parity_of_sum.ml", ""],
-    # bst 
+    # bst
     ["constraints/bst/contains.ml", ""],
     ["constraints/bst/count_lt.ml", "--no-sat-as-unsat"],
-    # balanced_tree 
+    # balanced_tree
     ["constraints/balanced_tree/node_count.ml", "-B --no-sat-as-unsat"],
     ["constraints/balanced_tree/height.ml", "-B --no-sat-as-unsat"],
-    # memo 
+    # memo
     ["constraints/memo/tree_size.ml", "-B --no-sat-as-unsat"],
     ["constraints/memo/constant.ml", ""],
     ["constraints/memo/max_contains.ml", "-B"],
     ["constraints/memo/count_lt.ml", "-B --no-sat-as-unsat -n 50"],
+    ["constraints/memo/max_sum_gt.ml", "-B --no-sat-as-unsat"],
     # empty_right
     ["constraints/empty_right_subtree/contains.ml", "-B --no-sat-as-unsat"],
     # alist
@@ -168,7 +169,7 @@ benchmark_set = [
     ["lifting/mits_nosum.ml", ""],
     ["lifting/mpsl.ml", ""],
 
-] + constraint_benchmarks 
+] + constraint_benchmarks
 
 extra_benchmarks = [
     ["list/bal.ml", ""],
