@@ -69,6 +69,11 @@ let is_novariant =
   in
   reduce ~init:true ~join:( && ) ~case
 
+let is_bounded (t : term) =
+  Term.reduce ~init:true ~join:( && )
+    ~case:(fun _ t -> match t.tkind with TVar _ -> Some (is_novariant t) | _ -> None)
+    t
+
 let subst_args (fpatterns : fpattern list) (args : term list) =
   let rec f (fpat, t) =
     match (fpat, t.tkind) with

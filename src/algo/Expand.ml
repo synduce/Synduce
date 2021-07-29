@@ -167,11 +167,6 @@ let replace_rhs_of_mains (p : psi_def) (t0 : term) : term =
 (*                                   acegis TERM EXPANSION                                       *)
 (* ============================================================================================= *)
 
-let is_bounded (t : term) =
-  Term.reduce ~init:true ~join:( && )
-    ~case:(fun _ t -> match t.tkind with TVar _ -> Some (Analysis.is_novariant t) | _ -> None)
-    t
-
 let simple ?(verbose = false) ?(max_height = !Config.expand_cut) (t0 : term) =
   if verbose then Log.verbose_msg Fmt.(str "@[Simple expansion of %a.@]" pp_term t0);
   let rec aux d (t, u) =
@@ -197,7 +192,7 @@ let simple ?(verbose = false) ?(max_height = !Config.expand_cut) (t0 : term) =
 
 let make_bounded (t0 : term) =
   let case _ t =
-    if is_bounded t then Some t
+    if Analysis.is_bounded t then Some t
     else
       match t.tkind with
       | TVar _ -> (

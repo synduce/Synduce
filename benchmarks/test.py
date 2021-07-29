@@ -101,6 +101,9 @@ constraint_benchmarks = [
     ["constraints/empty_right_subtree/contains.ml", "-B --no-sat-as-unsat"],
     # alist
     ["constraints/alist/count_eq2.ml", "-B --no-sat-as-unsat"],
+    ["constraints/alist/count_eq.ml", ""],
+    ["constraints/alist/sums.ml", ""],
+    ["constraints/alist/most_frequent.ml", ""],
     # even_tree
     ["constraints/even_tree/sum_of_parities.ml", "-B --no-sat-as-unsat"],
     ["constraints/even_tree/parity_of_max.ml", ""]

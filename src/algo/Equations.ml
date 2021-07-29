@@ -102,12 +102,20 @@ let compute_rhs ?(force_replace_off = false) p t =
     in
     res
 
-let precond_from_term_state ~p ~term_state subst eterm =
+let compute_preconds ~p ~term_state subst eterm =
   match Lemmas.get_lemma ~p term_state ~key:eterm with
   | Some lemma_for_eterm ->
       let t = Reduce.reduce_term (subst lemma_for_eterm) in
       Some t
-  | None -> None
+  | None ->
+      (* If the term is bounded and there is a invariant, add a precondition.
+         This will avoid calls to the lemma synthesis.
+      *)
+      if Analysis.is_bounded eterm then
+        Option.map
+          ~f:(fun req -> Eval.simplify (Reduce.reduce_term (mk_app req [ eterm ])))
+          (Specifications.get_requires p.psi_target.PMRS.pvar)
+      else None
 
 let filter_elims all_subs t =
   List.remove_consecutive_duplicates
@@ -165,7 +173,7 @@ let make ?(force_replace_off = false) ~(p : psi_def) ~(term_state : term_state) 
       *)
       let eelim = filter_elims all_subs eterm in
       (* Get the precondition, from the lemmas in the term state, *)
-      let precond = precond_from_term_state ~p ~term_state applic eterm in
+      let precond = compute_preconds ~p ~term_state applic eterm in
       (* Replace the boxed expressions of the lifting. *)
       let lifting' =
         let eprecond =
@@ -209,7 +217,7 @@ let make ?(force_replace_off = false) ~(p : psi_def) ~(term_state : term_state) 
         Lifting.replace_boxed_expressions ~p lifting (Reduce.reduce_term (mk_sel t0_rhs i))
       in
       let elhs = lft in
-      let precond = precond_from_term_state ~p ~term_state (fun x -> x) t0 in
+      let precond = compute_preconds ~p ~term_state (fun x -> x) t0 in
       let eprecond =
         match invar invariants elhs erhs with
         | Some im_f -> (
