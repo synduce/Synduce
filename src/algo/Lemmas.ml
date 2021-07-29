@@ -128,12 +128,7 @@ let term_detail_to_lemma ~(p : psi_def) (det : term_state_detail) : term option 
   let f lem = Term.substitution subst lem in
   (* let f _lem = Term.mk_const CTrue in *)
   let result = T.mk_assoc Binop.And (List.map ~f det.lemmas) in
-  match result with
-  | None -> result
-  | Some x ->
-      Log.debug (fun frmt () ->
-          Fmt.pf frmt "This is the lemma after substitution: \"@[%a@]\"." pp_term x);
-      result
+  match result with None -> result | Some _ -> result
 
 let empty_term_state : term_state = Map.empty (module Terms)
 
