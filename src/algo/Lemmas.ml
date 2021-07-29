@@ -167,6 +167,7 @@ let create_or_update_term_state_for_ctex ~(p : psi_def) (is_pos_ctex : bool) (ts
                              (subs_from_elim_to_elim det.recurs_elim ctex.ctex_eqn.eelim)
                              pre));
                   negative_ctexs = ctex :: det.negative_ctexs;
+                  positive_ctexs = [];
                 })
 
 let update_term_state_for_ctexs ~(p : psi_def) (ts : term_state) ~(pos_ctexs : ctex list)
