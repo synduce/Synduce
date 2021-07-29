@@ -1,9 +1,9 @@
 
-let xi_0 x16 x17 = x17 = x16 ? 1 : 0
+let xi_0 x19 x20 = x20 = x19 ? 1 : 0
 
-let xi_2 x18 x19 x20 = x19 = x18 ? 1 : x20 = 0 ? 0 : 1 + x20
+let xi_2 x21 x22 x23 = x22 = x21 ? 1 : x23 = 0 ? 0 : 1 + x23
 
-let xi_1 x21 x22 = x21 = x22 ? 1 : 0
+let xi_1 x24 x25 = x24 = x25 ? 1 : 0
 
 let rec g  =
   function Elt(a) -> xi_0 x a
