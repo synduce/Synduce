@@ -1,7 +1,7 @@
 
-let xi_0 x5 x6 = x6 < x5 ? 1 : 0
+let xi_0 x15 x16 = x16 < x15 ? 1 : 0
 
-let xi_1 x7 = 1 + x7
+let xi_1 x17 = 1 + x17
 
 let c0  = 0
 

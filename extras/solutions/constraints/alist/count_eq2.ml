@@ -1,9 +1,9 @@
 
-let s0 x6 = 0
+let s0 x34 = 0
 
-let f1 x7 x8 = x8
+let f1 x35 x36 = x36
 
-let f0 x9 = x9
+let f0 x37 = x37
 
 let rec g  =
   function ANil -> s0 a
