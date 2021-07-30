@@ -1,3 +1,4 @@
+open Lwt
 open AState
 open Base
 open Counterexamples
@@ -127,12 +128,7 @@ let term_detail_to_lemma ~(p : psi_def) (det : term_state_detail) : term option 
   let f lem = Term.substitution subst lem in
   (* let f _lem = Term.mk_const CTrue in *)
   let result = T.mk_assoc Binop.And (List.map ~f det.lemmas) in
-  match result with
-  | None -> result
-  | Some x ->
-      Log.debug (fun frmt () ->
-          Fmt.pf frmt "This is the lemma after substitution: \"@[%a@]\"." pp_term x);
-      result
+  match result with None -> result | Some _ -> result
 
 let empty_term_state : term_state = Map.empty (module Terms)
 
@@ -363,6 +359,37 @@ let smt_of_lemma_validity ~(p : psi_def) lemma (det : term_state_detail) =
   let if_then = smt_of_lemma_app lemma in
   [ S.mk_assert (S.mk_not (S.mk_forall quants (S.mk_or (S.mk_not if_condition) if_then))) ]
 
+let set_up_lemma_solver_async solver ~(p : psi_def) lemma_candidate =
+  let open Solvers in
+  let%lwt () = Asyncs.set_logic solver "ALL" in
+  let%lwt () = Asyncs.set_option solver "quant-ind" "true" in
+  let%lwt () = Asyncs.set_option solver "produce-models" "true" in
+  let%lwt () = Asyncs.set_option solver "incremental" "true" in
+  let%lwt () =
+    if !Config.induction_proof_tlimit >= 0 then
+      Asyncs.set_option solver "tlimit" (Int.to_string !Config.induction_proof_tlimit)
+    else return ()
+  in
+  let%lwt () = Asyncs.load_min_max_defs solver in
+  let%lwt () =
+    Lwt_list.iter_p
+      (fun x ->
+        let%lwt _ = Asyncs.exec_command solver x in
+        return ())
+      ((match p.psi_tinv with None -> [] | Some tinv -> Smt.smt_of_pmrs tinv)
+      @ (if p.psi_repr_is_identity then Smt.smt_of_pmrs p.psi_reference
+        else Smt.smt_of_pmrs p.psi_reference @ Smt.smt_of_pmrs p.psi_repr)
+      (* Declare lemmas. *)
+      @ [
+          (match lemma_candidate with
+          | name, vars, body ->
+              Smt.mk_def_fun_command name
+                (List.map ~f:(fun v -> (v.vname, Variable.vtype_or_new v)) vars)
+                RType.TBool body);
+        ])
+  in
+  return ()
+
 let set_up_lemma_solver solver ~(p : psi_def) lemma_candidate =
   Solvers.set_logic solver "ALL";
   Solvers.set_option solver "quant-ind" "true";
@@ -437,6 +464,36 @@ let set_up_to_get_model solver ~(p : psi_def) lemma (det : term_state_detail) =
   (* Step 4. Assert that lemma candidate is false. *)
   ignore (Solvers.exec_command solver (S.mk_assert (S.mk_not (smt_of_lemma_app lemma))))
 
+let set_up_to_get_model_async solver ~(p : psi_def) lemma (det : term_state_detail) =
+  let open Solvers in
+  (* Step 1. Declare vars for term, and assert that term satisfies tinv. *)
+  let%lwt () = Asyncs.declare_all solver (Smt.decls_of_vars (Analysis.free_variables det.term)) in
+  let%lwt _ = Asyncs.exec_command solver (S.mk_assert (smt_of_tinv_app ~p det)) in
+  let%lwt _ = Asyncs.check_sat solver in
+  (* ^ Why do I do this sat check? *)
+  (* Step 2. Declare scalars (vars for recursion elimination & spec param) and their constraints (preconds & recurs elim eqns) *)
+  let%lwt () = Asyncs.declare_all solver (Smt.decls_of_vars (VarSet.of_list det.scalar_vars)) in
+  let%lwt _ =
+    Asyncs.exec_command solver (S.mk_assert (smt_of_recurs_elim_eqns det.recurs_elim ~p))
+  in
+  let%lwt () =
+    match det.current_preconds with
+    | None -> return ()
+    | Some pre ->
+        let%lwt _ = Asyncs.exec_command solver (S.mk_assert (Smt.smt_of_term pre)) in
+        return ()
+  in
+  let%lwt _ = Asyncs.check_sat solver in
+  (* Step 3. Disallow repeated positive examples. *)
+  let%lwt () =
+    if List.length det.positive_ctexs > 0 then
+      let%lwt _ = Asyncs.exec_command solver (S.mk_assert (smt_of_disallow_ctex_values det)) in
+      return ()
+    else return ()
+  in
+  (* Step 4. Assert that lemma candidate is false. *)
+  Asyncs.exec_command solver (S.mk_assert (S.mk_not (smt_of_lemma_app lemma)))
+
 let bounded_check solver ~(p : psi_def) lemma_candidate (det : term_state_detail) :
     Solvers.solver_response * Solvers.solver_response option =
   set_up_to_get_model solver ~p lemma_candidate det;
@@ -498,24 +555,128 @@ let do_bounded_check solver =
      else false *)
   !Config.bounded_lemma_check
 
-let verify_lemma_candidate ~(p : psi_def) (det : term_state_detail) :
-    Solvers.online_solver * (Solvers.solver_response * Solvers.solver_response option) =
+let verify_lemma_bounded ~(p : psi_def) (det : term_state_detail) lemma_candidate :
+    Solvers.Asyncs.response * int Lwt.u =
+  let open Solvers in
+  let task (solver, starter) =
+    let%lwt _ = starter in
+    let%lwt _ = set_up_lemma_solver_async solver ~p lemma_candidate in
+    let%lwt _ = set_up_to_get_model_async solver ~p lemma_candidate det in
+    let steps = ref 0 in
+    let rec check_bounded_sol accum terms =
+      let f accum t =
+        let rec_instantation =
+          Option.value ~default:VarMap.empty (Analysis.matches t ~pattern:det.term)
+        in
+        let%lwt _ = accum in
+        let%lwt () = Asyncs.spush solver in
+        let%lwt () =
+          Lwt_list.iter_p
+            (fun (key, data) ->
+              (* Declare variables in term `data` *)
+              let%lwt _ =
+                Asyncs.declare_all solver (Smt.decls_of_vars (Analysis.free_variables data))
+              in
+              (* Assert that `key` variable is equal to `data` term *)
+              let%lwt _ =
+                Asyncs.exec_command solver
+                  (S.mk_assert (S.mk_eq (S.mk_var key.vname) (Smt.smt_of_term data)))
+              in
+              return ())
+            (Map.fold ~init:[] ~f:(fun ~key ~data acc -> (key, data) :: acc) rec_instantation)
+        in
+        let%lwt resp = Asyncs.check_sat solver in
+        (* Note that I am getting a model after check-sat unknown response. This may not halt.  *)
+        let result =
+          match resp with
+          | SmtLib.Sat | SmtLib.Unknown -> Some (Asyncs.get_model solver)
+          | _ -> None
+        in
+        let%lwt () = Asyncs.spop solver in
+        return (resp, result)
+      in
+      match terms with
+      | [] -> accum
+      | t0 :: tl -> (
+          let%lwt accum' = f accum t0 in
+          match accum' with
+          | status, Some model -> return (status, Some model)
+          | _ -> check_bounded_sol (return accum') tl)
+    in
+    let rec expand_loop u =
+      match (Set.min_elt u, !steps < !Config.num_expansions_check) with
+      | Some t0, true -> (
+          let tset, u' = Expand.simple t0 in
+          let%lwt check_result =
+            check_bounded_sol (return (SmtLib.Unknown, None)) (Set.elements tset)
+          in
+          steps := !steps + Set.length tset;
+          match check_result with
+          | _, Some model ->
+              Log.debug_msg
+                "Bounded lemma verification has found a counterexample to the lemma candidate.";
+              model
+          | _ -> expand_loop (Set.union (Set.remove u t0) u'))
+      | None, true ->
+          (* All expansions have been checked. *)
+          return SmtLib.Unsat
+      | _, false ->
+          (* Check reached limit. *)
+          Log.debug_msg "Bounded lemma verification has reached limit.";
+          if !Config.bounded_lemma_check then return SmtLib.Unsat else return SmtLib.Unknown
+    in
+    let%lwt res = expand_loop (TermSet.singleton det.term) in
+    return res
+  in
+  Asyncs.(cancellable_task (make_cvc4_solver ()) task)
+
+let verify_lemma_unbounded ~(p : psi_def) (det : term_state_detail) lemma_candidate :
+    Solvers.Asyncs.response * int Lwt.u =
+  let open Solvers in
+  let build_task (cvc4_instance, task_start) =
+    let%lwt _ = task_start in
+    let%lwt () = set_up_lemma_solver_async cvc4_instance ~p lemma_candidate in
+    let%lwt () =
+      (Lwt_list.iter_p (fun x ->
+           let%lwt _ = Asyncs.exec_command cvc4_instance x in
+           return ()))
+        (smt_of_lemma_validity ~p lemma_candidate det)
+    in
+    let%lwt resp = Asyncs.check_sat cvc4_instance in
+    let%lwt final_response =
+      match resp with
+      | Sat | Unknown -> (
+          let%lwt _ = set_up_to_get_model_async cvc4_instance ~p lemma_candidate det in
+          let%lwt resp' = Asyncs.check_sat cvc4_instance in
+          match resp' with Sat | Unknown -> Asyncs.get_model cvc4_instance | _ -> return resp')
+      | _ -> return resp
+    in
+    let%lwt () = Asyncs.close_solver cvc4_instance in
+    Log.debug_msg "Unbounded lemma verification is complete.";
+    return final_response
+  in
+  Asyncs.(cancellable_task (Asyncs.make_cvc4_solver ()) build_task)
+
+let verify_lemma_candidate ~(p : psi_def) (det : term_state_detail) : Solvers.solver_response =
   match det.lemma_candidate with
   | None -> failwith "Cannot verify lemma candidate; there is none."
   | Some lemma_candidate ->
       Log.verbose (fun f () -> Fmt.(pf f "Checking lemma candidate..."));
-      (* This solver is later closed in lemma_refinement_loop *)
-      let solver = Smtlib.Solvers.make_cvc4_solver () in
-      set_up_lemma_solver solver ~p lemma_candidate;
-      let result =
-        if do_bounded_check solver then bounded_check solver ~p lemma_candidate det
-        else (
-          List.iter
-            ~f:(fun x -> ignore (Solvers.exec_command solver x))
-            (smt_of_lemma_validity ~p lemma_candidate det);
-          (Solvers.check_sat solver, None))
+      let resp =
+        try
+          Lwt_main.run
+            (let pr1, resolver1 = verify_lemma_bounded ~p det lemma_candidate in
+             let pr2, resolver2 = verify_lemma_unbounded ~p det lemma_candidate in
+             Lwt.wakeup resolver2 1;
+             Lwt.wakeup resolver1 1;
+             (* The first call to return is kept, the other one is ignored. *)
+             Lwt.pick [ pr1; pr2 ])
+        with End_of_file ->
+          Log.error_msg "Solvers terminated unexpectedly  ⚠️ .";
+          Log.error_msg "Please inspect logs.";
+          SmtLib.Unknown
       in
-      (solver, result)
+      resp
 
 let placeholder_ctex (det : term_state_detail) : ctex =
   {
@@ -683,9 +844,8 @@ let rec lemma_refinement_loop (det : term_state_detail) ~(p : psi_def) : term_st
         match
           verify_lemma_candidate ~p { det with lemma_candidate = Some (name, vars, lemma_term) }
         with
-        | solver, (Unsat, _) ->
+        | Unsat ->
             Log.verbose (fun f () -> Fmt.(pf f "This lemma has been proven correct."));
-            Solvers.close_solver solver;
             Log.info (fun frmt () ->
                 Fmt.pf frmt "Lemma for term %a: \"%s %s = @[%a@]\"." pp_term det.term name
                   (String.concat ~sep:" " (List.map ~f:(fun v -> v.vname) vars))
@@ -696,25 +856,26 @@ let rec lemma_refinement_loop (det : term_state_detail) ~(p : psi_def) : term_st
               | Some pre -> mk_bin Binop.Or (mk_un Unop.Not pre) lemma_term
             in
             Some { det with lemma_candidate = None; lemmas = lemma :: det.lemmas }
-        | solver, (Sat, maybe_model) | solver, (Unknown, maybe_model) ->
+        | SmtLib.SExps x ->
             Log.verbose (fun f () ->
                 Fmt.(pf f "This lemma has not been proven correct. Refining lemma..."));
-            let new_positive_ctexs =
-              match maybe_model with
-              | Some model -> parse_positive_example_solver_model model det
-              | _ -> get_positive_examples solver det ~p (name, vars, lemma_term)
-            in
+            let new_positive_ctexs = parse_positive_example_solver_model (SmtLib.SExps x) det in
             List.iter
               ~f:(fun ctex ->
                 Log.verbose (fun f () ->
                     Fmt.(pf f "Found a positive example: %a" (box pp_ctex) ctex)))
               new_positive_ctexs;
-            Solvers.close_solver solver;
             lemma_refinement_loop
               { det with positive_ctexs = det.positive_ctexs @ new_positive_ctexs }
               ~p
+        | Sat ->
+            Log.error_msg "Lemma verification returned Sat, which is weird.";
+            None
+        | Unknown ->
+            Log.error_msg "Lemma verification returned Unknown.";
+            None
         | _ ->
-            Log.error_msg "Lemma verification returned something other than Unsat, Sat, or Unknown.";
+            Log.error_msg "Lemma verification is indeterminate.";
             None)
 
 let synthesize_lemmas ~(p : psi_def) synt_failure_info (lstate : refinement_loop_state) :
