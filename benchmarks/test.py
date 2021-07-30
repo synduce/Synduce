@@ -91,6 +91,8 @@ constraint_benchmarks = [
     # balanced_tree
     ["constraints/balanced_tree/node_count.ml", "-B --no-sat-as-unsat"],
     ["constraints/balanced_tree/height.ml", "-B --no-sat-as-unsat"],
+    ["constraints/balanced_tree/height_ensures_aux.ml", "--no-sat-as-unsat"],
+    ["constraints/balanced_tree/node_count_ensures_height.ml", "--no-sat-as-unsat"],
     # memo
     ["constraints/memo/tree_size.ml", "-B --no-sat-as-unsat"],
     ["constraints/memo/constant.ml", ""],
@@ -99,6 +101,7 @@ constraint_benchmarks = [
     ["constraints/memo/max_sum_gt.ml", "-B --no-sat-as-unsat"],
     # empty_right
     ["constraints/empty_right_subtree/contains.ml", "-B --no-sat-as-unsat"],
+    ["constraints/empty_right_subtree/contains_ensures_size.ml", "--no-sat-as-unsat"],
     # alist
     ["constraints/alist/count_eq2.ml", "-B --no-sat-as-unsat"],
     ["constraints/alist/count_eq.ml", ""],
