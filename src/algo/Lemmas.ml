@@ -328,6 +328,30 @@ let smt_of_recurs_elim_eqns (elim : (term * term) list) ~(p : psi_def) : S.smtTe
   in
   if equal (List.length lst) 0 then S.mk_true else S.mk_assoc_and lst
 
+let smt_of_aux_ensures ~(p : psi_def) : S.smtTerm list =
+  let mk_sort maybe_rtype =
+    match maybe_rtype with None -> S.mk_int_sort | Some rtype -> Smt.sort_of_rtype rtype
+  in
+  List.fold ~init:[]
+    ~f:(fun acc v ->
+      let arg_types, _out_type = RType.fun_typ_unpack (Variable.vtype_or_new v) in
+      let arg_vs = List.map ~f:(fun t -> Variable.mk ~t:(Some t) (Alpha.fresh ())) arg_types in
+      let args = List.map ~f:mk_var arg_vs in
+      let quants =
+        List.map ~f:(fun var -> (S.SSimple var.vname, mk_sort (Variable.vtype var))) arg_vs
+      in
+      let maybe_ens = Specifications.get_ensures v in
+      match maybe_ens with
+      | None -> acc
+      | Some t ->
+          let ens = Reduce.reduce_term (mk_app t [ mk_app (mk_var v) args ]) in
+          let smt = S.mk_forall quants (Smt.smt_of_term ens) in
+          smt :: acc)
+    (Set.elements p.psi_reference.pnon_terminals
+    @ Set.elements p.psi_target.pnon_terminals
+    @ Set.elements p.psi_reference.pnon_terminals
+    @ match p.psi_tinv with None -> [] | Some tinv -> Set.elements tinv.pnon_terminals)
+
 let smt_of_tinv_app ~(p : psi_def) (det : term_state_detail) =
   match p.psi_tinv with
   | None -> failwith "No TInv has been specified. Cannot make smt of tinv app."
@@ -379,6 +403,8 @@ let set_up_lemma_solver_async solver ~(p : psi_def) lemma_candidate =
       ((match p.psi_tinv with None -> [] | Some tinv -> Smt.smt_of_pmrs tinv)
       @ (if p.psi_repr_is_identity then Smt.smt_of_pmrs p.psi_reference
         else Smt.smt_of_pmrs p.psi_reference @ Smt.smt_of_pmrs p.psi_repr)
+      (* Assert invariants on functions *)
+      @ List.map ~f:S.mk_assert (smt_of_aux_ensures ~p)
       (* Declare lemmas. *)
       @ [
           (match lemma_candidate with
