@@ -88,6 +88,7 @@ constraint_benchmarks = [
     # bst
     ["constraints/bst/contains.ml", ""],
     ["constraints/bst/count_lt.ml", "--no-sat-as-unsat"],
+    ["constraints/bst/most_frequent_v1.ml", ""],
     # balanced_tree
     ["constraints/balanced_tree/node_count.ml", "-B --no-sat-as-unsat"],
     ["constraints/balanced_tree/height.ml", "-B --no-sat-as-unsat"],

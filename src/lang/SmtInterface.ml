@@ -545,12 +545,12 @@ let smt_of_pmrs (pmrs : PMRS.t) : command list =
   let sort_decls_of_deps, decls_of_deps = List.unzip (List.map ~f:_smt_of_pmrs deps) in
   let sort_decls, main_decl = _smt_of_pmrs pmrs in
   let datatype_decls =
-    List.map ~f:snd
-      (List.dedup_and_sort
-         ~compare:(fun (sorts, _) (sorts', _) ->
-           List.compare
-             (fun a b -> String.compare (string_of_smtSymbol a) (string_of_smtSymbol b))
-             sorts sorts')
-         (List.concat sort_decls_of_deps @ sort_decls))
+    (* List.map ~f:snd
+       (List.dedup_and_sort
+          ~compare:(fun (sorts, _) (sorts', _) ->
+            List.compare
+              (fun a b -> String.compare (string_of_smtSymbol a) (string_of_smtSymbol b))
+              sorts sorts') *)
+    List.map ~f:snd (List.concat sort_decls_of_deps @ sort_decls)
   in
   datatype_decls @ List.concat decls_of_deps @ main_decl

@@ -1,9 +1,11 @@
+(* Non-empty lists type. *)
 type list = Elt of int | Cons of int * list
 
+(* Inductive type for prositive integers. *)
 type pos = One | S of pos
 
-(* A datatype for map. *)
-type imap = KeyValue of int * pos | Node of int * imap * imap
+(* A binary search tree with integer keys and positive natural numbers as values. *)
+type bst_map = KeyValue of int * pos | Node of int * bst_map * bst_map
 
 let rec min_key = function KeyValue (k, v) -> k | Node (a, l, r) -> min (min_key l) (min_key r)
 
@@ -19,7 +21,7 @@ and append x = function Elt y0 -> Cons (y0, x) | Cons (hd, tl) -> Cons (hd, appe
 
 and dup k = function S v -> Cons (k, dup k v) | One -> Elt k
 
-(* Return max frequency element. *)
+(* Return most frequent element with its count. *)
 let rec spec = function
   | Elt v -> (1, v)
   | Cons (hd, tl) ->
@@ -33,6 +35,7 @@ and count x = function
   | Cons (hd, tl) -> count x tl + if hd = x then 1 else 0
   [@@ensures fun x -> x > 0]
 
+(* Synthesize a parallel version that is also linear time. *)
 let rec target = function
   | KeyValue (k, v) -> [%synt s0] k (int_of v)
   | Node (hd_key, l, r) -> [%synt join] hd_key (target l) (target r)

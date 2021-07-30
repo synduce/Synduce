@@ -1,0 +1,40 @@
+;; Preamble definitions
+(datatype Nat () ((succ Nat Nat) (zero Nat)))
+(datatype Int () ((pos Nat Int) (neg Nat Int)))
+(declare-fun natplus (Nat Nat) Nat)
+(=> natplus_0 (natplus ?x zero) ?x)
+(=> natplus_succ (natplus ?x (succ ?y)) (succ (natplus ?x ?y)))
+(declare-fun plus (Int Int) Int)
+(=> plus_pos (plus (pos ?x) (pos ?y)) (pos (natplus ?x ?y)))
+(=> plus_neg (plus (neg ?x) (neg ?y)) (neg (natplus ?x ?y)))
+(=> plus_np1 (plus (pos (succ ?x)) (neg (succ ?y))) (plus (pos ?x) (neg ?y)))
+;; neg zero is -1
+(=> plus_np2 (plus (pos (succ ?x)) (neg zero)) (pos ?x))
+(=> plus_np3 (plus (pos zero) (neg ?y)) (neg ?y))
+;; commutativity
+(=> plus_com (plus ?x ?y) (plus ?y ?x))
+
+;;
+(declare-fun natle (Nat Nat) Bool)
+(=> natle0 (natle zero zero) true)
+(=> natle1 (natle (succ ?x) zero) false)
+(=> natle2 (natle zero (succ ?x)) true)
+(=> natleind (natle (succ ?x) (succ ?y)) (natle ?x ?y))
+
+(declare-fun le (Int Int) Bool)
+(=> le1 (le (pos ?x) (pos ?y)) (natle ?x ?y))
+(=> le2 (le (pos ?x) (neg ?y)) false)
+(=> le3 (le (neg ?x) (pos ?y)) true)
+(=> le4 (le (neg ?x) (neg ?y)) (natle ?y ?x))
+
+;; Proved rules
+(=> p0 (natle zero ?ts_ph_Nat_0) true)
+(=> p1 (natle ?ts_ph_Nat_0 ?ts_ph_Nat_0) (natle zero ?ts_ph_Nat_0))
+(=> p2 (natle zero ?ts_ph_Nat_0) (natle ?ts_ph_Nat_0 ?ts_ph_Nat_0))
+(=> p3 (le ?ts_ph_Int_0 ?ts_ph_Int_0) true)
+(=> p4 (natplus zero ?ts_ph_Nat_0) ?ts_ph_Nat_0)
+
+;; Can prove this lemma
+;; (prove (forall ((i Int)) (le i (plus i (pos zero)))))
+;; But not this one?
+(prove (forall ((i Int)) (le i (plus i (pos (succ zero))))))
