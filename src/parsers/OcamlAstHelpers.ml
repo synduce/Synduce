@@ -70,7 +70,7 @@ let rec fterm_of_expr (expr : expression) : term =
               match simple_ident_of_longident argid.txt with
               | Some argid -> mk_data cur_loc id [ mk_var (wloc argloc) argid ]
               | None -> failwith "Bad constructor arguments")
-          | Some _ -> failwith "Bad constructor arguments"
+          | Some e -> mk_data cur_loc id [ fterm_of_expr e ]
           | None -> mk_data cur_loc id [])
       | None -> failwith "Longident for constructor not supported.")
   | Pexp_apply (fun_or_op, args) -> (

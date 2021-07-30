@@ -111,6 +111,7 @@ constraint_benchmarks = [
 ]
 
 benchmark_set = [
+    ["misc/simple_nnf.ml", ""],
     ["misc/unknowns_are_ids.ml", ""],
     ["misc/composed_unkwns.ml", ""],
     ["ptree/sum.pmrs", ""],
