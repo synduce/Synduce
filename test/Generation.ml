@@ -181,7 +181,14 @@ let gen_target (s : Algo.AState.soln option) =
       List.map aux sol.soln_implems
   | None -> []
 
-let sum, soln = Lib.solve_file "benchmarks/list/min.ml"
+let sum, soln = Lib.solve_file "benchmarks/list/sum.ml"
+
+(* Assumption is that the main function is always the first one *)
+let repr_name = (List.hd sum.pd_repr).f_var.vname
+
+let spec_name = (List.hd sum.pd_reference).f_var.vname
+
+let target_name = (List.hd sum.pd_target).f_var.vname
 
 let tau_decl = get_typ_decl !Algo.AState._tau
 
@@ -190,11 +197,15 @@ let theta_decl = get_typ_decl !Algo.AState._theta
 let is_identity (args : variable list) (fbody : term) =
   if List.length args != 1 then false else term_equal (mk_var (List.nth args 0)) fbody
 
+let gen_match (v : term) (expansions : term list) (cases : term list) =
+  if List.length expansions != List.length cases then
+    failwith "Number of type cases don't match the number of given cases"
+  else mk_match v (List.map2 (fun t case -> (pattern_of_term t, case)) expansions cases)
+
 let toplevel =
   let new_target =
     let aux (t : function_descr) =
       let fv = Lang.Analysis.free_variables t.f_body in
-      (* let _ = Fmt.(pf stdout "%a" (list ~sep:comma pp_variable) (Base.Set.elements fv)) in *)
       let const_subs : (term * term) list =
         match soln with
         | Some soln ->
@@ -225,6 +236,61 @@ let toplevel =
   in
   List.map gen_func_descr (sum.pd_repr @ sum.pd_reference @ new_target)
 
+let _MAX_LEMMA_ID = ref 0
+
+let new_lemma_id () =
+  let i = !_MAX_LEMMA_ID in
+  _MAX_LEMMA_ID := !_MAX_LEMMA_ID + 1;
+  i
+
+let is_recur_case (case : term) =
+  let free_v = VarSet.elements (Lang.Analysis.free_variables case) in
+  List.fold_left ( || ) false (List.map (fun fv -> not (Lang.Analysis.is_norec (mk_var fv))) free_v)
+
+let get_var_sig (var : variable) =
+  let vtype = mk_named_type (get_t_name (Variable.vtype_or_new var)) in
+  (var.vname, vtype)
+
+let empty_assert = mk_var (Variable.mk "assert(true);")
+
+let rec gen_nested_match (args : term list) ?(cur_case : term list = [])
+    (base_f : term list -> term) =
+  match args with
+  | [] -> base_f cur_case
+  | hd :: tl ->
+      let expansions = Lang.Analysis.expand_once hd in
+      let cases =
+        List.map (fun case -> gen_nested_match tl ~cur_case:(cur_case @ [ case ]) base_f) expansions
+      in
+      gen_match hd expansions cases
+
+let add_case_lemma (case : term) =
+  let args = VarSet.elements (Lang.Analysis.free_variables case) in
+  let signature = mk_method_sig (List.map get_var_sig args) in
+  let spec =
+    mk_simple_spec
+      ~ensures:
+        [
+          mk_bin Binop.Eq
+            (mk_app
+               (mk_var (Variable.mk spec_name))
+               [ mk_app (mk_var (Variable.mk repr_name)) [ case ] ])
+            (mk_app (mk_var (Variable.mk target_name)) [ case ]);
+        ]
+      ~requires:[] DSpecMethod
+  in
+  let body =
+    match case.tkind with
+    | TData (_, params) -> gen_nested_match params (fun _ -> empty_assert)
+    | _ -> failwith "Unexpected match case type"
+  in
+  let name = Fmt.str "lemma%d" (new_lemma_id ()) in
+  (mk_toplevel (mk_lemma name signature spec (Body (Fmt.str "%a" pp_d_term body))), name)
+
+let skeleton : d_toplevel list ref = ref []
+
+let add_toplevel (n : d_toplevel) = skeleton := !skeleton @ [ n ]
+
 let correctness_lemma : d_toplevel =
   let theta_type = mk_named_type (get_t_name !Algo.AState._theta) in
   let signature = mk_method_sig [ ("x", theta_type) ] in
@@ -233,15 +299,29 @@ let correctness_lemma : d_toplevel =
       ~ensures:
         [
           mk_bin Binop.Eq
-            (mk_app (mk_var (Variable.mk "target")) [ mk_var (Variable.mk "x") ])
+            (mk_app (mk_var (Variable.mk target_name)) [ mk_var (Variable.mk "x") ])
             (mk_app
-               (mk_var (Variable.mk "spec"))
-               [ mk_app (mk_var (Variable.mk "repr")) [ mk_var (Variable.mk "x") ] ]);
+               (mk_var (Variable.mk spec_name))
+               [ mk_app (mk_var (Variable.mk repr_name)) [ mk_var (Variable.mk "x") ] ]);
         ]
         (* target(t)  == spec(repr(t))*)
       ~requires:[] DSpecMethod
   in
-  let match_theta = mk_match (mk_var (Variable.mk "x")) [] in
+  let v = mk_var (Variable.mk ~t:(Some !Algo.AState._theta) "x") in
+  let expansions = Lang.Analysis.expand_once v in
+  let match_theta =
+    gen_match v expansions
+      (List.map
+         (fun t ->
+           if is_recur_case t then (
+             let new_lemma, lemma_name = add_case_lemma t in
+             add_toplevel new_lemma;
+             match t.tkind with
+             | TData (_, params) -> mk_app (mk_var (Variable.mk lemma_name)) params
+             | _ -> failwith "Unexpected match case type")
+           else empty_assert)
+         expansions)
+  in
   let body = Body (Fmt.str "%a" pp_d_term match_theta) in
   mk_toplevel (mk_lemma "correctness_lemma" signature spec body)
 
@@ -256,11 +336,9 @@ let incl_decl =
     else [ theta_decl ]
   else [ tau_decl; theta_decl ]
 
-(* let sub_soln = substitution  *)
-
-let proof_skeleton = incl_decl @ toplevel @ gen_target soln @ [ correctness_lemma ]
+let proof_skeleton = incl_decl @ toplevel @ gen_target soln @ !skeleton @ [ correctness_lemma ]
 
 let ref_program : d_program = { dp_includes = []; dp_topdecls = proof_skeleton }
 
 ;;
-Utils.Log.to_file "test/generated2.dfy" (fun fmt () -> Fmt.pf fmt "%a" pp_d_program ref_program)
+Utils.Log.to_file "test/generated.dfy" (fun fmt () -> Fmt.pf fmt "%a" pp_d_program ref_program)

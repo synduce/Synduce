@@ -313,8 +313,6 @@ let rec pp_d_term (frmt : Formatter.t) (x : Term.term) =
   | TSel (t, i) -> pf frmt "@[<hov 2>%a.%i@]" pp_d_term t i
   | TFun (args, body) ->
       pf frmt "@[<hov 2>((%a) => %a)@]" (list ~sep:comma Term.pp_fpattern) args pp_d_term body
-      (* Todo: check if a separate pp_fpattern function needs to be written *)
-      (* Also todo: This needs to be rewritten to support Dafny lambda expressions*)
   | TApp (func, args) -> pf frmt "@[<hov 2>%a(%a)@]" pp_d_term func (list ~sep:comma pp_d_term) args
   | TData (cstr, args) ->
       if List.length args = 0 then pf frmt "%a" (styled (`Fg `Green) string) cstr

@@ -1,39 +1,89 @@
-datatype tree<a1> =  Node(a1, tree<a1>, tree<a1>) |  Nil
+datatype list<t> =  Cons(int, list<t>) |  Nil
 
-function repr(xre : tree<int>) : tree<int>  
+datatype clist<a1> =  Concat(clist<a1>, clist<a1>) |  Single(a1) |  CNil
+
+function clist_to_list(xclist_to_li : clist<int>) : list<int>
+decreases xclist_to_li
 {
-  xre
+  match xclist_to_li
+  case CNil => Nil
+  case Single(a) => Cons(a, Nil)
+  case Concat(x, y) => dec(y, x)
 }
-function spec(xsp : tree<int>) : int  
+
+function dec(xd : clist<int>, xd0 : clist<int>) : list<int>
+decreases xd0
 {
-  f(0, xsp)
+  match xd0
+  case CNil => clist_to_list(xd)
+  case Single(a) => Cons(a, clist_to_list(xd))
+  case Concat(x, y) => dec(Concat(y, xd), x)
 }
-function f(x5 : int, x6 : tree<int>) : int 
-// decreases x6
+
+function sum(xs : list<int>) : int
+decreases xs
 {
-  match x6
-  case Nil =>  x5
-  case Node(a, l, r) => 
-    ((sum) => f(sum + a, r))(f(x5, l))
-  
-}
-function target(xtarg : tree<int>) : int 
-// decreases xtarg
-{
-  match xtarg
+  match xs
   case Nil => 0
-  case Node(a, l, r) =>  join(a, target(l), target(r))
+  case Cons(hd, tl) => hd + sum(tl)
 }
-function join(x2 : int, x3 : int, x4 : int) : int
+
+function hsum(xhs : clist<int>) : int
+decreases xhs
 {
-  x3 + x2 + x4
+  match xhs
+  case CNil => 0
+  case Single(a) => a
+  case Concat(x, y) => join(hsum(x), hsum(y))
 }
 
+function s0() : int
 
-lemma correctness_lemma(x : tree<int>)
-ensures target(x) == spec(repr(x))
+{
+  0
+}
+
+function f0(x : int) : int
+decreases x
+{
+  x
+}
+
+function join(x0 : int, x1 : int) : int
+decreases x1
+{
+  x0 + x1
+}
+
+lemma lemma0(p74 : clist<int>, p75 : clist<int>) 
+ensures (sum(clist_to_list(Concat(p74, p75))) == hsum(Concat(p74, p75)))
+{
+  match p74
+  case CNil =>{
+   match p75
+     case CNil => assert(true);
+     case Single(p82) => assert(true);
+     case Concat(p80, p81) => assert(true);
+  }
+  case Single(p79) =>{
+   match p75
+     case CNil => assert(true);
+     case Single(p85) => assert(true);
+     case Concat(p83, p84) => assert(true);
+  }
+  case Concat(p77, p78) =>{
+   match p75
+     case CNil => assert(true);
+     case Single(p88) => assert(true);
+     case Concat(p86, p87) => assert(true);
+  }
+}
+
+lemma correctness_lemma(x : clist<int>) 
+ensures (hsum(x) == sum(clist_to_list(x)))
 {
   match x
-  case Nil => {}
-  case Node(a, l, r) => {}
+  case CNil => assert(true);
+  case Single(p76) => assert(true);
+  case Concat(p74, p75) => lemma0(p74, p75);
 }
