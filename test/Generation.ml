@@ -253,6 +253,8 @@ let get_var_sig (var : variable) =
 
 let empty_assert = mk_var (Variable.mk "assert(true);")
 
+let mk_assert (s : term) = mk_var (Variable.mk (Fmt.str "assert(%a);" pp_d_term s))
+
 let rec gen_nested_match (args : term list) ?(cur_case : term list = [])
     (base_f : term list -> term) =
   match args with
@@ -281,7 +283,28 @@ let add_case_lemma (case : term) =
   in
   let body =
     match case.tkind with
-    | TData (_, params) -> gen_nested_match params (fun _ -> empty_assert)
+    | TData (_, params) ->
+        gen_nested_match params (fun cur_cases ->
+            mk_assert
+              (mk_bin Binop.Eq
+                 (mk_app
+                    (mk_var (Variable.mk spec_name))
+                    [ mk_app (mk_var (Variable.mk repr_name)) [ case ] ])
+                 (mk_app
+                    (mk_var (Variable.mk spec_name))
+                    [
+                      mk_app
+                        (mk_var (Variable.mk repr_name))
+                        [
+                          mk_app
+                            (mk_var
+                               (Variable.mk
+                                  (match case.tkind with
+                                  | TData (name, _) -> name
+                                  | _ -> failwith "unexpected")))
+                            cur_cases;
+                        ];
+                    ])))
     | _ -> failwith "Unexpected match case type"
   in
   let name = Fmt.str "lemma%d" (new_lemma_id ()) in

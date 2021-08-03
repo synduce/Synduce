@@ -61,21 +61,39 @@ ensures (sum(clist_to_list(Concat(p74, p75))) == hsum(Concat(p74, p75)))
   match p74
   case CNil =>{
    match p75
-     case CNil => assert(true);
-     case Single(p82) => assert(true);
-     case Concat(p80, p81) => assert(true);
+     case CNil =>
+      assert((sum(clist_to_list(Concat(p74, p75))) ==
+         sum(clist_to_list(Concat(CNil, CNil)))));
+     case Single(p82) =>
+      assert((sum(clist_to_list(Concat(p74, p75))) ==
+         sum(clist_to_list(Concat(CNil, Single(p82))))));
+     case Concat(p80, p81) =>
+      assert((sum(clist_to_list(Concat(p74, p75))) ==
+         sum(clist_to_list(Concat(CNil, Concat(p80, p81))))));
   }
   case Single(p79) =>{
    match p75
-     case CNil => assert(true);
-     case Single(p85) => assert(true);
-     case Concat(p83, p84) => assert(true);
+     case CNil =>
+      assert((sum(clist_to_list(Concat(p74, p75))) ==
+         sum(clist_to_list(Concat(Single(p79), CNil)))));
+     case Single(p85) =>
+      assert((sum(clist_to_list(Concat(p74, p75))) ==
+         sum(clist_to_list(Concat(Single(p79), Single(p85))))));
+     case Concat(p83, p84) =>
+      assert((sum(clist_to_list(Concat(p74, p75))) ==
+         sum(clist_to_list(Concat(Single(p79), Concat(p83, p84))))));
   }
   case Concat(p77, p78) =>{
    match p75
-     case CNil => assert(true);
-     case Single(p88) => assert(true);
-     case Concat(p86, p87) => assert(true);
+     case CNil =>
+      assert((sum(clist_to_list(Concat(p74, p75))) ==
+         sum(clist_to_list(Concat(Concat(p77, p78), CNil)))));
+     case Single(p88) =>
+      assert((sum(clist_to_list(Concat(p74, p75))) ==
+         sum(clist_to_list(Concat(Concat(p77, p78), Single(p88))))));
+     case Concat(p86, p87) =>
+      assert((sum(clist_to_list(Concat(p74, p75))) ==
+         sum(clist_to_list(Concat(Concat(p77, p78), Concat(p86, p87))))));
   }
 }
 
