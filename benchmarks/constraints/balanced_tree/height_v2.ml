@@ -10,7 +10,8 @@ and aux = function Nil -> 0 | Node (a, b, c) -> 1 + max (aux b) (aux c)
 
 let rec height = function Nil -> 0 | Node (a, l, r) -> 1 + max (height l) (height r)
 
-let rec target = function Nil -> [%synt s0] | Node (a, l, r) -> [%synt f0] (target l)
+(* A small variation of height. *)
+let rec target = function Nil -> [%synt s0] 1 | Node (a, l, r) -> a + [%synt f0] a (target l)
   [@@requires balanced]
 ;;
 

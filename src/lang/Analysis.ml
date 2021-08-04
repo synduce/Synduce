@@ -37,6 +37,9 @@ let has_ite (t : term) : bool =
   reduce t ~init:false ~join:( || ) ~case:(fun _ t ->
       match t.tkind with TIte _ -> Some true | _ -> None)
 
+let has_calls ~(_to : VarSet.t) (t : term) : bool =
+  not (Set.is_empty (Set.inter _to (free_variables t)))
+
 let operators_of (t : term) : OpSet.t =
   let case f t =
     match t.tkind with
@@ -74,7 +77,7 @@ let is_bounded (t : term) =
     ~case:(fun _ t -> match t.tkind with TVar _ -> Some (is_novariant t) | _ -> None)
     t
 
-let subst_args (fpatterns : fpattern list) (args : term list) =
+let subst_args (fpatterns : fpattern list) (args : term list) : (term * term) list option =
   let rec f (fpat, t) =
     match (fpat, t.tkind) with
     | FPatVar x, _ -> [ (mk_var x, t) ]
@@ -87,7 +90,7 @@ let subst_args (fpatterns : fpattern list) (args : term list) =
   | Ok l -> ( try Some (List.concat (List.map ~f l)) with _ -> None)
   | _ -> None
 
-let replace_calls_to (funcs : VarSet.t) =
+let replace_calls_to (funcs : VarSet.t) : term -> term =
   let case _ t =
     match t.tkind with
     | TApp ({ tkind = TVar x; _ }, _) when Set.mem funcs x ->
@@ -96,7 +99,8 @@ let replace_calls_to (funcs : VarSet.t) =
   in
   transform ~case
 
-let apply_projections (projs : (int, variable list, Int.comparator_witness) Map.t) (t : term) =
+let apply_projections (projs : (int, variable list, Int.comparator_witness) Map.t) (t : term) : term
+    =
   let pack xlist args =
     List.map xlist ~f:(fun newx -> first (infer_type (mk_app (mk_var newx) args)))
   in
@@ -117,7 +121,7 @@ let apply_projections (projs : (int, variable list, Int.comparator_witness) Map.
   in
   transform ~case t
 
-let replace_id_calls ~(func : variable) (t : term) =
+let replace_id_calls ~(func : variable) (t : term) : term =
   (* Collect the arguments of the calls (func x) *)
   let args_of_calls_to_func =
     let case _ t =
@@ -138,7 +142,7 @@ let replace_id_calls ~(func : variable) (t : term) =
 (*                                  TERM MATCHING                                                *)
 (* ============================================================================================= *)
 
-let unify (terms : term list) =
+let unify (terms : term list) : term option =
   match terms with
   | [] -> None
   | hd :: tl -> if List.for_all ~f:(fun x -> Terms.equal x hd) tl then Some hd else None
@@ -185,6 +189,14 @@ let matches ?(boundvars = VarSet.empty) (t : term) ~(pattern : term) : term VarM
             match Result.combine_errors (f_match :: arg_match) with
             | Ok subs -> Ok (List.concat subs)
             | Error errs -> Error (List.concat errs)))
+    | TBin (pat_op, pat1, pat2), TBin (e_op, e1, e2) ->
+        if Binop.equal pat_op e_op then
+          match (aux pat1 e1, aux pat2 e2) with
+          | Ok subs, Ok subs' -> Ok (subs @ subs')
+          | Error e, _ -> Error e
+          | _, Error e -> Error e
+        else Error []
+    | TUn (pat_op, pat1), TUn (e_op, e1) -> if Unop.equal pat_op e_op then aux pat1 e1 else Error []
     | _ -> if Terms.equal pat t then Ok [] else Error []
   in
   match aux pattern t with
@@ -290,6 +302,36 @@ let matches_pattern (t : term) (p : pattern) : term VarMap.t option =
         | _ -> None)
   in
   aux (p, t)
+
+(**
+  [skeletize ~functions t] returns the term t where each subterm that does not
+  contain a call to the functions in [functions] has been reblaced by a box containing
+  a fresh variable.
+  Returns a pair of a boxed var-substitution list and the term with the boxes replacing the
+  subexpressions.
+*)
+let skeletize ~(functions : VarSet.t) (t : term) : term VarMap.t * term =
+  let skel_id = ref 0 in
+  let boxes = ref (Map.empty (module Terms)) in
+  let case _ t0 =
+    if has_calls ~_to:functions t0 then None
+    else
+      let boxv =
+        match Map.find !boxes t0 with
+        | Some boxv -> boxv
+        | None ->
+            let boxv = Variable.mk ~t:(Some t0.ttyp) (Fmt.str "?%i" !skel_id) in
+            Int.incr skel_id;
+            boxes := Map.set !boxes ~key:t0 ~data:boxv;
+            boxv
+      in
+      Some (mk_var boxv)
+  in
+  let boxed_ts = transform ~case t in
+  let varmap =
+    Map.fold !boxes ~init:VarMap.empty ~f:(fun ~key ~data m -> Map.set m ~key:data ~data:key)
+  in
+  (varmap, boxed_ts)
 
 (* ============================================================================================= *)
 (*                                  NAIVE TERM EXPANSION                                         *)

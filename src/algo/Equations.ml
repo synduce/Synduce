@@ -521,7 +521,7 @@ let solve_constant_eqns (unknowns : VarSet.t) (eqns : equation list) =
   in
   let partial_soln = List.map ~f:(fun (x, lhs) -> (x.vname, [], lhs)) constant_soln in
   if List.length partial_soln > 0 then
-    Log.debug_msg Fmt.(str "Constant:@;@[<hov 2>%a@]" pp_partial_soln partial_soln);
+    Log.debug Fmt.(fun fmt () -> pf fmt "@[Constant:@;@[<hov 2>%a@]@]" pp_partial_soln partial_soln);
   (partial_soln, Set.diff unknowns resolved, new_eqns)
 
 let split_solve partial_soln (unknowns : VarSet.t) (eqns : equation list) =

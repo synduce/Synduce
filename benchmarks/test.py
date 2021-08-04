@@ -92,6 +92,7 @@ constraint_benchmarks = [
     # balanced_tree
     ["constraints/balanced_tree/node_count.ml", "-B --no-sat-as-unsat"],
     ["constraints/balanced_tree/height.ml", "-B --no-sat-as-unsat"],
+    ["constraints/balanced_tree/height_v2.ml", "-B --no-sat-as-unsat"],
     ["constraints/balanced_tree/height_ensures_aux.ml", "--no-sat-as-unsat"],
     ["constraints/balanced_tree/node_count_ensures_height.ml", "--no-sat-as-unsat"],
     # memo
@@ -113,7 +114,7 @@ constraint_benchmarks = [
     ["constraints/even_tree/parity_of_max.ml", ""]
 ]
 
-benchmark_set = [
+base_benchmark_set = [
     ["misc/simple_nnf.ml", ""],
     ["misc/unknowns_are_ids.ml", ""],
     ["misc/composed_unkwns.ml", ""],
@@ -173,11 +174,17 @@ benchmark_set = [
     ["list/sndminhom.pmrs", ""],
     ["list/mincount.pmrs", ""],
     ["zippers/list_sum_basic.ml", ""],
-    ["zippers/list_sum.ml", ""],
+    ["zippers/list_sum.ml", ""]
+]
+
+lifting_benchmarks = [
     ["lifting/mits_nosum.ml", ""],
     ["lifting/mpsl.ml", ""],
 
-] + constraint_benchmarks
+]
+
+
+benchmark_set = constraint_benchmarks + base_benchmark_set + lifting_benchmarks
 
 extra_benchmarks = [
     ["list/bal.ml", ""],

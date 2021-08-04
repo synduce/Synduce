@@ -58,6 +58,35 @@ let unrealizability_ctex_of_constmap (i, j) (eqn_i, eqn_j) (vseti, vsetj) var_su
   let ctex_j : ctex = { ctex_eqn = eqn_j; ctex_vars = vset; ctex_model = m_j } in
   { i; j; ci = ctex_i; cj = ctex_j }
 
+let skeleton_match ~unknowns (e1 : term) (e2 : term) =
+  let args1, e1' = Analysis.skeletize ~functions:unknowns e1
+  and args2, e2' = Analysis.skeletize ~functions:unknowns e2 in
+  (* Fmt.(pf stdout "1: %a => %a@." pp_term e1 pp_term e1');
+     Fmt.(pf stdout "2: %a => %a@." pp_term e2 pp_term e2'); *)
+  match Analysis.matches ~boundvars:unknowns ~pattern:e1' e2' with
+  | Some subs ->
+      let f (v1, packedv) =
+        (* Fmt.(pf stdout "%a ~ %a?@." Variable.pp v1 pp_term packedv); *)
+        match packedv.tkind with
+        | TVar v2 -> Option.both (Map.find args1 v1) (Map.find args2 v2)
+        | _ -> None
+      in
+      (* Map.iteri subs ~f:(fun ~key ~data ->
+          Fmt.(pf stdout "%a ~~> %a@." Variable.pp key pp_term data)); *)
+      all_or_none (List.map ~f (Map.to_alist subs))
+  | None ->
+      (* Fmt.(pf stdout "No match@."); *)
+      None
+
+let components_of_unrealizability ~unknowns (eqn1 : equation) (eqn2 : equation) :
+    ((term * term) list * (term * term)) option =
+  match skeleton_match ~unknowns eqn1.erhs eqn2.erhs with
+  | Some args_1_2 -> Some (args_1_2, (eqn1.elhs, eqn2.elhs))
+  | None ->
+      Log.debug_msg
+        Fmt.(str "Unrealizability check: %a is not a function application." pp_term eqn1.erhs);
+      None
+
 (** Check if system of equations defines a functionally realizable synthesis problem.
   If any equation defines an unsolvable problem, an unrealizability_ctex is added to the
   list of counterexamples to be returned.
@@ -84,29 +113,9 @@ let check_unrealizable (unknowns : VarSet.t) (eqns : equation_system) : unrealiz
     let vsetj' = VarSet.of_list (List.map ~f:snd var_subst) in
     let sub = List.map ~f:(fun (v, v') -> (mk_var v, mk_var v')) var_subst in
     (* Extract the arguments of the rhs, if it is a proper skeleton. *)
-    let maybe_rhs_args =
-      match (eqn_i.erhs.tkind, eqn_j.erhs.tkind) with
-      | TApp ({ tkind = TVar f_v_i; _ }, args_i), TApp ({ tkind = TVar f_v_j; _ }, args_j) ->
-          if
-            Set.mem unknowns f_v_i && Set.mem unknowns f_v_j
-            && Variable.(f_v_i = f_v_j)
-            && List.length args_i = List.length args_j
-          then
-            let fv_args =
-              VarSet.union_list (List.map ~f:Analysis.free_variables (args_i @ args_j))
-            in
-            (* Check there are no unknowns in the args. *)
-            if Set.are_disjoint fv_args unknowns then Some (args_i, args_j) else None
-          else None
-      | TVar v_i, TVar v_j when Set.mem unknowns v_i && Set.mem unknowns v_j -> Some ([], [])
-      | _ ->
-          Log.debug_msg
-            Fmt.(str "Unrealizability check: %a is not a function application." pp_term eqn_i.erhs);
-          None
-    in
-    match maybe_rhs_args with
+    match components_of_unrealizability ~unknowns eqn_i eqn_j with
     | None -> ctexs (* If we cannot match the expected structure, skip it. *)
-    | Some (rhs_args_i, rhs_args_j) ->
+    | Some (rhs_args_ij, (lhs_i, lhs_j)) ->
         (* (push). *)
         Solvers.spush solver;
         (* Declare the variables. *)
@@ -124,12 +133,12 @@ let check_unrealizable (unknowns : VarSet.t) (eqns : equation_system) : unrealiz
         | None -> ());
         (* Assert that the lhs of i and j must be different. **)
         let lhs_diff =
-          let projs = projection_eqns eqn_i.elhs (substitution sub eqn_j.elhs) in
-          List.map ~f:(fun (lhs, rhs) -> mk_un Not (mk_bin Eq lhs rhs)) projs
+          let projs = projection_eqns lhs_i (substitution sub lhs_j) in
+          List.map ~f:(fun (ei, ej) -> mk_un Not (mk_bin Eq ei ej)) projs
         in
         List.iter lhs_diff ~f:(fun eqn -> Solvers.smt_assert solver (smt_of_term eqn));
         (* Assert that the rhs must be equal. *)
-        List.iter2_exn rhs_args_i rhs_args_j ~f:(fun rhs_i_arg_term rhs_j_arg_term ->
+        List.iter rhs_args_ij ~f:(fun (rhs_i_arg_term, rhs_j_arg_term) ->
             let rhs_eqs = projection_eqns rhs_i_arg_term (substitution sub rhs_j_arg_term) in
             List.iter rhs_eqs ~f:(fun (lhs, rhs) ->
                 Solvers.smt_assert solver (smt_of_term (mk_bin Eq lhs rhs))));

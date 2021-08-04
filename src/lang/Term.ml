@@ -716,6 +716,8 @@ module VarMap = struct
 
   let empty = Map.empty (module Variable)
 
+  let keyset (m : 'a t) : VarSet.t = VarSet.of_list (Map.keys m)
+
   let singleton (v : variable) (elt : 'a) = Map.singleton (module Variable) v elt
 
   let of_alist (al : (variable * 'a) list) = Map.of_alist (module Variable) al
