@@ -174,7 +174,10 @@ base_benchmark_set = [
     ["list/sndminhom.pmrs", ""],
     ["list/mincount.pmrs", ""],
     ["zippers/list_sum_basic.ml", ""],
-    ["zippers/list_sum.ml", ""]
+    ["zippers/list_sum.ml", ""],
+    ["sort_list/min.ml", ""],
+    ["sort_list/max.ml", ""],
+    ["sort_list/sumgtz.ml", ""],
 ]
 
 lifting_benchmarks = [

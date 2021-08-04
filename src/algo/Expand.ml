@@ -257,9 +257,9 @@ let composed_reduction_sequence (p : psi_def) (f : PMRS.t) (g : PMRS.t) (t0 : te
   replace_rhs_of_main p f _t2
 
 let check_max_exp p f g t =
-  let _t3 = composed_reduction_sequence p f g t in
-  match nonreduced_terms p (Set.union f.pnon_terminals g.pnon_terminals) _t3 with
-  | [] -> First (t, _t3)
+  let t3 = composed_reduction_sequence p f g t in
+  match nonreduced_terms p (Set.union f.pnon_terminals g.pnon_terminals) t3 with
+  | [] -> First (t, t3)
   | _ -> Second t
 
 let expand_max_main (p : psi_def) (f : PMRS.t) (g : PMRS.t) (t0 : term) :
