@@ -1,13 +1,6 @@
-datatype list<t> =  Cons(int, list<t>) |  Elt(int)
+datatype list<b0> =  Cons(int, list<b0>) |  Elt(int)
 
 datatype clist<a1> =  Concat(clist<a1>, clist<a1>) |  Single(a1)
-
-function min(a:int, b:int): (x: int)
-    ensures a == x || x == b
-    ensures x <= a && x <= b
-{
-    if a >= b then b else a
-}
 
 function repr(xre : clist<int>) : list<int>
 decreases xre
@@ -57,36 +50,42 @@ lemma lemma0(p20 : clist<int>, p21 : clist<int>)
 ensures (spec(repr(Concat(p20, p21))) == target(Concat(p20, p21)))
 {
   match p20
-    case Single(p25) =>
+    case Single(i14) =>
      {
        match p21
-         case Single(p28) => {
-                               calc == {
-                                 
-                                 } }
-           case Concat(p26, p27) => {
-                                      calc == {
-                                        
-                                        } }
+         case Single(i15) =>
+          {
+            calc == {
+              spec(repr(Concat(Single(i14), Single(i15))));
+              target(Concat(Single(i14), Single(i15)));
+              } }
+           case Concat(p24, p25) =>
+            {
+              calc == {
+                spec(repr(Concat(Single(i14), Concat(p24, p25))));
+                target(Concat(Single(i14), Concat(p24, p25)));
+                } }
         }
-          case Concat(p23, p24) =>
+          case Concat(p22, p23) =>
            {
              match p21
-               case Single(p31) =>
+               case Single(i16) =>
                 {
                   calc == {
-                    
+                    spec(repr(Concat(Concat(p22, p23), Single(i16))));
+                    target(Concat(Concat(p22, p23), Single(i16)));
                     } }
-                 case Concat(p29, p30) => {
-                                            calc == {
-                                              
-                                              } }
+                 case Concat(p26, p27) =>
+                  {
+                    calc == {
+                      spec(repr(Concat(Concat(p22, p23), Concat(p26, p27))));
+                      target(Concat(Concat(p22, p23), Concat(p26, p27)));
+                      } }
               } }
 
 lemma correctness_lemma(x : clist<int>) 
 ensures (target(x) == spec(repr(x)))
 {
   match x
-  case Single(p22) => assert(true);
-  case Concat(p20, p21) => lemma0(p20, p21);
-}
+    case Single(i13) => assert(true);
+    case Concat(p20, p21) => lemma0(p20, p21); }
