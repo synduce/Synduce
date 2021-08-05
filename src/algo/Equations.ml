@@ -431,7 +431,7 @@ let constraints_of_eqns (eqns : equation list) : command list =
 
 let solve_eqns (unknowns : VarSet.t) (eqns : equation list) :
     solver_response * (partial_soln, Counterexamples.unrealizability_ctex list) Either.t =
-  let aux_solve () =
+  let build_task (_cvc4_instance, _task_starter) =
     let free_vars, all_operators, has_ite =
       let f (fvs, ops, hi) eqn =
         let precond, lhs, rhs = (eqn.eprecond, eqn.elhs, eqn.erhs) in
@@ -452,7 +452,7 @@ let solve_eqns (unknowns : VarSet.t) (eqns : equation list) :
       in
       (Set.diff fvs unknowns, ops, hi)
     in
-    (* Commands *)
+    (* Prepare commands *)
     let set_logic = CSetLogic (Grammars.logic_of_operator all_operators) in
     let synth_objs = synthfuns_of_unknowns ~bools:has_ite ~eqns ~ops:all_operators unknowns in
     let sort_decls = declare_sorts_of_vars free_vars in
@@ -487,6 +487,13 @@ let solve_eqns (unknowns : VarSet.t) (eqns : equation list) :
     match Syguslib.Solvers.SygusSolver.solve_commands commands with
     | Some resp -> handle_response resp
     | None -> (RFail, Either.Second [])
+  in
+  let aux_solve () =
+    (* TODO: parallel solving with LIA < NIA < optims. < etc. ... *)
+    (* Example of failure because non-linear arith is not used:
+       benchmarks/numbers/int_nat_twomul.ml
+    *)
+    build_task ((), ())
   in
   if !Config.check_unrealizable then
     match Counterexamples.check_unrealizable unknowns eqns with
@@ -647,7 +654,7 @@ let preprocess_deconstruct_if (unknowns : VarSet.t) (eqns : equation list) :
 (*                              MAIN ENTRY POINT                                                 *)
 (* ============================================================================================= *)
 
-(** Main entry point: solve a ssytem of equations by synthesizing the unknowns. Returns either a
+(** Main entry point: solve a system of equations by synthesizing the unknowns. Returns either a
   solution as a list of implementations for the unknowns (a triple of unknown name, arguments of a
   function and body of a function) or a list of unrealizability counterexamples.
 *)

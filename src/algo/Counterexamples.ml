@@ -83,8 +83,7 @@ let components_of_unrealizability ~unknowns (eqn1 : equation) (eqn2 : equation) 
   match skeleton_match ~unknowns eqn1.erhs eqn2.erhs with
   | Some args_1_2 -> Some (args_1_2, (eqn1.elhs, eqn2.elhs))
   | None ->
-      Log.debug_msg
-        Fmt.(str "Unrealizability check: %a is not a function application." pp_term eqn1.erhs);
+      Log.debug_msg Fmt.(str "Unrealizability check: %a is not in normal form." pp_term eqn1.erhs);
       None
 
 (** Check if system of equations defines a functionally realizable synthesis problem.

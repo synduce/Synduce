@@ -5,6 +5,6 @@ let xi_1 x17 = 1 + x17
 
 let c0  = 0
 
-let rec g  =
+let rec g =
   function Elt(x) -> xi_0 a x | Cons(hd, tl) -> hd < a ? xi_1 (g tl) : c0
 

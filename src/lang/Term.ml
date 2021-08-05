@@ -325,7 +325,7 @@ module Unop = struct
 
   let of_string (s : string) : t option =
     match s with
-    | "-" -> Some Neg
+    | "~-" | "-" -> Some Neg
     | "not" -> Some Not
     | "abs " -> Some Abs
     | "inv" -> Some Inv

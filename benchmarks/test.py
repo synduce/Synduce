@@ -178,6 +178,8 @@ base_benchmark_set = [
     ["sort_list/min.ml", ""],
     ["sort_list/max.ml", ""],
     ["sort_list/sumgtz.ml", ""],
+    ["numbers/int_nat_twosum.ml", ""],
+    ["numbers/int_nat_toint.ml", ""],
 ]
 
 lifting_benchmarks = [

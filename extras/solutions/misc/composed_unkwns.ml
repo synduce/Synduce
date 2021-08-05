@@ -9,7 +9,7 @@ let f1 x1 = x1
 
 let join x2 x3 = x3 + x2
 
-let rec hsum  =
+let rec hsum =
   function CNil -> s0 | Single(a) -> f0 a
   | Concat(x, y) -> join (f1 (hsum x)) (f2 (hsum y))
 
