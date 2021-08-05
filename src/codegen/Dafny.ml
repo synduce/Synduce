@@ -97,7 +97,14 @@ type d_datatype_constr_decl = {
  *)
 
 (* Function and method bodies. *)
-type d_body = Body of string
+type d_body =
+  | Body of string  (** A string body for hardcoded parts. *)
+  | DMatch of d_body * (Term.pattern * d_body) list  (** A pattern matching construct. *)
+  | DTerm of Term.term  (** A wrapper for a term. *)
+  | DBlock of d_body list  (** A block of d_body in braces, each separeted by semicolon. *)
+  | DAssert of Term.term  (** Assert(term) *)
+  | DCalc of d_body list  (** Calc statement. *)
+  | DAssign of Term.term * d_body  (** Assign statement.  *)
 
 (* Specs *)
 type d_clause = Term.term
@@ -380,8 +387,24 @@ let pp_d_spec (fmt : Formatter.t) (spec : d_spec) : unit =
       list ~sep:sp (pp_clause "decreases") fmt spec.dspec_decreases;
       list ~sep:sp (pp_clause "modifies") fmt spec.dspec_modifies
 
-let pp_d_body (fmt : Formatter.t) (body : d_body) : unit =
-  match body with Body content -> pf fmt "@[<v>{@;<1 2>@[<hov 2>%a@]@;}@]" (box string) content
+let rec pp_d_body (fmt : Formatter.t) (body : d_body) : unit =
+  match body with
+  | Body content -> pf fmt "@[<v>{@;<1 2>@[<hov 2>%a@]@;}@]" (box string) content
+  | DMatch (t, cases) ->
+      pf fmt "@[<v>match@;%a@;<4 0>%a@]" pp_d_body t
+        (list ~sep:newl (Fmt.pair ~sep:(fun fmt () -> pf fmt "=>@;") Term.pp_pattern pp_d_body))
+        cases
+  | DTerm t -> Term.pp_term fmt t
+  | DBlock stmts ->
+      pf fmt "@[<v>{@;<1 2>@[<hov 2>%a@;}@]"
+        (list ~sep:(fun fmt () -> pf fmt ";@;<100 0>") pp_d_body)
+        stmts
+  | DAssert asserted -> pf fmt "@[assert(%a)@]" Term.pp_term asserted
+  | DCalc stmts ->
+      pf fmt "@[<v 2>=={@;@[<v>%a@]@;}@]"
+        (list ~sep:(fun fmt () -> pf fmt ";@;<100 0>") pp_d_body)
+        stmts
+  | DAssign (x, e) -> pf fmt "@[<hov 2>%a=@'%a;@]" Term.pp_term x pp_d_body e
 
 let pp_d_generic_param (fmt : Formatter.t) ((_vo, t) : d_generic_param) =
   (* Just print the type for now, we don't need the variance. *)
