@@ -24,6 +24,16 @@ let gen_variant (variant : type_term) =
 
 module SS = Set.Make (String)
 
+let rec get_params_from_type = function
+  | TTup el -> List.fold_left SS.union SS.empty (List.map get_params_from_type el)
+  | TFun (t1, t2) -> SS.union (get_params_from_type t1) (get_params_from_type t2)
+  | TParam (params, _) ->
+      List.fold_left SS.union SS.empty
+        (List.map
+           (fun param -> match param with TNamed name -> SS.singleton name | _ -> SS.empty)
+           params)
+  | _ -> SS.empty
+
 let rec get_params_from_type_term (tterm : type_term) =
   match tterm.tkind with
   | TyFun (t1, t2) -> SS.union (get_params_from_type_term t1) (get_params_from_type_term t2)
@@ -45,16 +55,6 @@ let gen_type_decl (typename : string) (tterm : type_term) =
            ~params:(List.map (fun name -> (None, name)) params)
            typename constructors)
   | _ -> failwith "Unsupported type declaration."
-
-let rec get_params_from_type = function
-  | TTup el -> List.fold_left SS.union SS.empty (List.map get_params_from_type el)
-  | TFun (t1, t2) -> SS.union (get_params_from_type t1) (get_params_from_type t2)
-  | TParam (params, _) ->
-      List.fold_left SS.union SS.empty
-        (List.map
-           (fun param -> match param with TNamed name -> SS.singleton name | _ -> SS.empty)
-           params)
-  | _ -> SS.empty
 
 let rec get_params_from_arg = function
   | FPatVar var -> (
@@ -124,6 +124,13 @@ let gen_func_decl (name : ident) (func : term) =
       mk_toplevel (mk_func name signature spec body)
   | _ -> failwith "Unsupported function declaration."
 
+let _MAX_PARAM_ID = ref 0
+
+let new_param_id () =
+  let i = !_MAX_PARAM_ID in
+  _MAX_PARAM_ID := !_MAX_PARAM_ID + 1;
+  i
+
 let rec convert_t_tkind (typ : t) : type_term =
   match typ with
   | TInt -> mk_t_int dummy_loc
@@ -136,10 +143,10 @@ let rec convert_t_tkind (typ : t) : type_term =
   | TParam (params, term) ->
       let convert_param (param : t) =
         match param with
-        | TInt -> convert_t_tkind param
-        | TBool -> convert_t_tkind param
-        | TString -> convert_t_tkind param
-        | TChar -> convert_t_tkind param
+        | TInt -> mk_t_param dummy_loc (Fmt.str "b%i" (new_param_id ()))
+        | TBool -> mk_t_param dummy_loc (Fmt.str "b%i" (new_param_id ()))
+        | TString -> mk_t_param dummy_loc (Fmt.str "b%i" (new_param_id ()))
+        | TChar -> mk_t_param dummy_loc (Fmt.str "b%i" (new_param_id ()))
         | TVar i -> mk_t_param dummy_loc (Fmt.str "a%i" i)
         | TNamed name -> mk_t_param dummy_loc name
         | _ -> failwith "Unsupported param type"
@@ -251,42 +258,37 @@ let is_recur_case (case : term) =
   List.fold_left ( || ) false (List.map (fun fv -> not (Lang.Analysis.is_norec (mk_var fv))) free_v)
 
 let get_var_sig (var : variable) =
-  let vtype = mk_named_type (get_t_name (Variable.vtype_or_new var)) in
+  let vtype = convert_otyp_to_dfy (Variable.vtype_or_new var) in
   (var.vname, vtype)
 
-let empty_assert = mk_var (Variable.mk "assert(true);")
-
-let mk_assert (s : term) = mk_var (Variable.mk (Fmt.str "assert(%a);" pp_d_term s))
-
-let rec gen_nested_match (args : term list) ?(cur_case : term list = [])
-    (base_f : term list -> d_body list) =
+let rec gen_nested_match (args : term list) ?(cur_case : (term * term) list = [])
+    (base_f : (term * term) list -> d_body list) =
   match args with
   | [] -> DBlock (base_f cur_case)
   | hd :: tl ->
       let expansions = Lang.Analysis.expand_once hd in
       let cases =
-        List.map (fun case -> gen_nested_match tl ~cur_case:(cur_case @ [ case ]) base_f) expansions
+        List.map
+          (fun case -> gen_nested_match tl ~cur_case:(cur_case @ [ (hd, case) ]) base_f)
+          expansions
       in
       gen_match hd expansions cases
 
 let add_case_lemma (case : term) =
   let args = VarSet.elements (Lang.Analysis.free_variables case) in
   let signature = mk_method_sig (List.map get_var_sig args) in
-  let spec =
-    mk_simple_spec
-      ~ensures:
-        [
-          mk_bin Binop.Eq
-            (mk_app
-               (mk_var (Variable.mk spec_name))
-               [ mk_app (mk_var (Variable.mk repr_name)) [ case ] ])
-            (mk_app (mk_var (Variable.mk target_name)) [ case ]);
-        ]
-      ~requires:[] DSpecMethod
+  let lhs =
+    mk_app (mk_var (Variable.mk spec_name)) [ mk_app (mk_var (Variable.mk repr_name)) [ case ] ]
   in
+  let rhs = mk_app (mk_var (Variable.mk target_name)) [ case ] in
+  let spec = mk_simple_spec ~ensures:[ mk_bin Binop.Eq lhs rhs ] ~requires:[] DSpecMethod in
   let body =
     match case.tkind with
-    | TData (_, params) -> gen_nested_match params (fun _ -> [DCalc []])
+    | TData (_, params) ->
+        gen_nested_match params (fun cases ->
+            let lhs_sub = substitution cases lhs in
+            let rhs_sub = substitution cases rhs in
+            [ DCalc [ DStmt (DTerm lhs_sub); DStmt (DTerm rhs_sub) ] ])
     | _ -> failwith "Unexpected match case type"
   in
   let name = Fmt.str "lemma%d" (new_lemma_id ()) in
@@ -297,8 +299,21 @@ let skeleton : d_toplevel list ref = ref []
 let add_toplevel (n : d_toplevel) = skeleton := !skeleton @ [ n ]
 
 let correctness_lemma : d_toplevel =
-  let theta_type = mk_named_type (get_t_name !Algo.AState._theta) in
-  let signature = mk_method_sig [ ("x", theta_type) ] in
+  let theta_type =
+    let target_descr = List.hd sum.pd_target in
+    let rec f arg =
+      match arg with
+      | PatVar variable -> FPatVar variable
+      | PatTuple variables -> FPatTup (List.map f variables)
+      | _ -> failwith (Fmt.str "Unsupported argument type. %a" pp_pattern arg)
+    in
+    match f (List.hd target_descr.f_args) with
+    | FPatVar var -> (
+        let typ = Variable.vtype var in
+        match typ with Some t -> t | None -> TNamed "FILL IN TYPE")
+    | _ -> failwith "Unsupported argument type"
+  in
+  let signature = mk_method_sig [ ("x", convert_otyp_to_dfy theta_type) ] in
   let spec =
     mk_simple_spec
       ~ensures:
@@ -312,7 +327,7 @@ let correctness_lemma : d_toplevel =
         (* target(t)  == spec(repr(t))*)
       ~requires:[] DSpecMethod
   in
-  let v = mk_var (Variable.mk ~t:(Some !Algo.AState._theta) "x") in
+  let v = mk_var (Variable.mk ~t:(Some theta_type) "x") in
   let expansions = Lang.Analysis.expand_once v in
   let match_theta =
     gen_match v expansions
@@ -322,9 +337,9 @@ let correctness_lemma : d_toplevel =
              let new_lemma, lemma_name = add_case_lemma t in
              add_toplevel new_lemma;
              match t.tkind with
-             | TData (_, params) -> DTerm (mk_app (mk_var (Variable.mk lemma_name)) params)
+             | TData (_, params) -> DStmt (DTerm (mk_app (mk_var (Variable.mk lemma_name)) params))
              | _ -> failwith "Unexpected match case type")
-           else DAssert (mk_const Constant.CTrue))
+           else DStmt (DAssert (mk_const Constant.CTrue)))
          expansions)
   in
   let body = match_theta in

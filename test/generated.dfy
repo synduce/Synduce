@@ -1,4 +1,4 @@
-datatype list<t> =  Cons(int, list<t>) |  Nil
+datatype list<b0> =  Cons(int, list<b0>) |  Nil
 
 datatype clist<a1> =  Concat(clist<a1>, clist<a1>) |  Single(a1) |  CNil
 
@@ -59,55 +59,78 @@ lemma lemma0(p74 : clist<int>, p75 : clist<int>)
 ensures (sum(clist_to_list(Concat(p74, p75))) == hsum(Concat(p74, p75)))
 {
   match p74
-  case CNil =>
-  {
-    match p75
-    case CNil => {
-      calc == {} 
-    }
-    case Single(p82) => {
-      calc == {} 
-    }
-    case Concat(p80, p81) => {
-      calc == {}
-    }
-  }
-  case Single(p79) =>
-  {
-    match p75
-    case CNil => {
-      calc == {}
-    }
-    case Single(p85) =>
-    {
-      calc == {}
-    }
-    case Concat(p83, p84) => {
-      calc == {}
-    }
-  }
-  case Concat(p77, p78) =>
-  {
-    match p75
-    case CNil => {
-      calc == {}
-    }
-    case Single(p88) =>
-    {
-      calc == {}
-    }
-    case Concat(p86, p87) => 
-    {
-      calc == {} 
-    } 
-  }
-}
+    case CNil =>
+     {
+       match p75
+         case CNil =>
+          {
+            calc == {
+              sum(clist_to_list(Concat(CNil, CNil)));
+              hsum(Concat(CNil, CNil));
+              } }
+           case Single(i60) =>
+            {
+              calc == {
+                sum(clist_to_list(Concat(CNil, Single(i60))));
+                hsum(Concat(CNil, Single(i60)));
+                } }
+             case Concat(p78, p79) =>
+              {
+                calc == {
+                  sum(clist_to_list(Concat(CNil, Concat(p78, p79))));
+                  hsum(Concat(CNil, Concat(p78, p79)));
+                  } } }
+        case Single(i59) =>
+         {
+           match p75
+             case CNil =>
+              {
+                calc == {
+                  sum(clist_to_list(Concat(Single(i59), CNil)));
+                  hsum(Concat(Single(i59), CNil));
+                  } }
+               case Single(i61) =>
+                {
+                  calc == {
+                    sum(clist_to_list(Concat(Single(i59), Single(i61))));
+                    hsum(Concat(Single(i59), Single(i61)));
+                    } }
+                 case Concat(p80, p81) =>
+                  {
+                    calc == {
+                      sum(clist_to_list(Concat(Single(i59), Concat(p80,
+                            p81))));
+                      hsum(Concat(Single(i59), Concat(p80, p81)));
+                      } } }
+            case Concat(p76, p77) =>
+             {
+               match p75
+                 case CNil =>
+                  {
+                    calc == {
+                      sum(clist_to_list(Concat(Concat(p76, p77), CNil)));
+                      hsum(Concat(Concat(p76, p77), CNil));
+                      } }
+                   case Single(i62) =>
+                    {
+                      calc == {
+                        sum(clist_to_list(Concat(Concat(p76, p77),
+                              Single(i62))));
+                        hsum(Concat(Concat(p76, p77), Single(i62)));
+                        } }
+                     case Concat(p82, p83) =>
+                      {
+                        calc == {
+                          sum(clist_to_list(Concat(Concat(p76, p77),
+                                Concat(p82, p83))));
+                          hsum(Concat(Concat(p76, p77), Concat(p82, p83)));
+                          } } }
+             }
 
 lemma correctness_lemma(x : clist<int>) 
 ensures (hsum(x) == sum(clist_to_list(x)))
 {
   match x
     case CNil => assert(true);
-    case Single(p76) => assert(true);
-    case Concat(p74, p75) => lemma0(p74, p75); 
-}
+    case Single(i58) => assert(true);
+    case Concat(p74, p75) => lemma0(p74, p75); }

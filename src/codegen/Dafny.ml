@@ -105,6 +105,7 @@ type d_body =
   | DAssert of Term.term  (** Assert(term) *)
   | DCalc of d_body list  (** Calc statement. *)
   | DAssign of Term.term * d_body  (** Assign statement.  *)
+  | DStmt of d_body (** A body statement with a semicolon after it*)
 
 (* Specs *)
 type d_clause = Term.term
@@ -401,14 +402,15 @@ let rec pp_d_body (fmt : Formatter.t) (body : d_body) : unit =
   | DTerm t -> pp_d_term fmt t
   | DBlock stmts ->
       pf fmt "@[<v>{@;<1 2>@[<hov 2>%a@;}@]"
-        (list ~sep:(fun fmt () -> pf fmt ";@;<100 0>") pp_d_body)
+        (list ~sep:(fun fmt () -> pf fmt "@;<100 0>") pp_d_body)
         stmts
   | DAssert asserted -> pf fmt "@[assert(%a)@]" pp_d_term asserted
   | DCalc stmts ->
       pf fmt "@[<v 2>calc == {@;@[<v>%a@]@;}@]"
-        (list ~sep:(fun fmt () -> pf fmt ";@;<100 0>") pp_d_body)
+        (list ~sep:(fun fmt () -> pf fmt "@;<100 0>") pp_d_body)
         stmts
-  | DAssign (x, e) -> pf fmt "@[<hov 2>%a=@'%a;@]" pp_d_term x pp_d_body e
+  | DAssign (x, e) -> pf fmt "@[<hov 2>%a=@'%a@]" pp_d_term x pp_d_body e
+  | DStmt st -> pf fmt "@[<hov 2>%a;@]" pp_d_body st
 
 let pp_d_generic_param (fmt : Formatter.t) ((_vo, t) : d_generic_param) =
   (* Just print the type for now, we don't need the variance. *)
