@@ -113,7 +113,9 @@ let compute_preconds ~p ~term_state subst eterm =
       *)
       if Analysis.is_bounded eterm then
         Option.map
-          ~f:(fun req -> Eval.simplify (Reduce.reduce_term (mk_app req [ eterm ])))
+          ~f:(fun req ->
+            let t = Eval.simplify (Reduce.reduce_term (mk_app req [ eterm ])) in
+            t)
           (Specifications.get_requires p.psi_target.PMRS.pvar)
       else None
 

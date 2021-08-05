@@ -1,7 +1,7 @@
 (* A data type representing lists in a tree format, where the list elements
-  are kept where the list is "split" as opposed to concat-lists where
-  all the elements are in the leaves.
- *)
+   are kept where the list is "split" as opposed to concat-lists where
+   all the elements are in the leaves.
+*)
 type 'a ulist = UNil | UElt of 'a | USplit of 'a ulist * 'a * 'a * 'a ulist
 
 (* The usual type of cons-lists *)
@@ -25,6 +25,8 @@ and aux_up pr = function Nil -> true | Cons (x, l) -> if pr <= x then aux_up x l
 
 and aux_down pr = function Nil -> true | Cons (x, l) -> pr >= x && aux_down x l
 
+let rec f = function Nil -> 0 | Cons (hd, tl) -> hd + f tl
+
 (*
   Testing a not-so-natural specification.
   Here we test first whether  at a node, the labels are zero, and if that
@@ -34,8 +36,9 @@ and aux_down pr = function Nil -> true | Cons (x, l) -> pr >= x && aux_down x l
 let rec g = function
   | UNil -> [%synt s0]
   | UElt a -> [%synt f0] a
-  | USplit (x, a, b, y) -> [%synt f1] a b (g x) (g y)
-
+  | USplit (x, a, b, y) -> [%synt join] a b (g x) (g y)
+  [@@requires is_unimodal_list]
 ;;
-assert (g = r @@ is_unimodal_list)
+
+assert (g = r @@ f)
 (* No solution: there is a clear hint that we need a lifting !! *)

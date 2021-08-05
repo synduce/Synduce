@@ -228,10 +228,17 @@ let infer_pmrs_types (prog : t) =
       Variable.update_var_types
         [ (Variable.vtype_or_new prog.pvar, Variable.vtype_or_new prog.pmain_symb) ];
       (* Change types in the specification. *)
+      (* Ensures. *)
       let _ =
         let%bind spec = get_spec prog.pvar in
         let%map invariant = Option.map ~f:(fun ens -> first (infer_type ens)) spec.ensures in
         Specifications.set_spec prog.pvar { spec with ensures = Some invariant }
+      in
+      (* Requires *)
+      let _ =
+        let%bind spec = get_spec prog.pvar in
+        let%map invariant = Option.map ~f:(fun ens -> first (infer_type ens)) spec.requires in
+        Specifications.set_spec prog.pvar { spec with requires = Some invariant }
       in
       { prog with prules = new_rules; pinput_typ = typ_in; poutput_typ = typ_out }
   | Error e ->
