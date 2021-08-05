@@ -197,10 +197,13 @@ let theta_decl = get_typ_decl !Algo.AState._theta
 let is_identity (args : variable list) (fbody : term) =
   if List.length args != 1 then false else term_equal (mk_var (List.nth args 0)) fbody
 
-let gen_match (v : term) (expansions : term list) (cases : term list) =
+let gen_match (v : term) (expansions : term list) (cases : d_body list) =
   if List.length expansions != List.length cases then
     failwith "Number of type cases don't match the number of given cases"
-  else mk_match v (List.map2 (fun t case -> (pattern_of_term t, case)) expansions cases)
+  else
+    let match_term = DTerm v in
+    DBlock
+      [ DMatch (match_term, List.map2 (fun t case -> (pattern_of_term t, case)) expansions cases) ]
 
 let toplevel =
   let new_target =
@@ -256,9 +259,9 @@ let empty_assert = mk_var (Variable.mk "assert(true);")
 let mk_assert (s : term) = mk_var (Variable.mk (Fmt.str "assert(%a);" pp_d_term s))
 
 let rec gen_nested_match (args : term list) ?(cur_case : term list = [])
-    (base_f : term list -> term) =
+    (base_f : term list -> d_body list) =
   match args with
-  | [] -> base_f cur_case
+  | [] -> DBlock (base_f cur_case)
   | hd :: tl ->
       let expansions = Lang.Analysis.expand_once hd in
       let cases =
@@ -283,32 +286,11 @@ let add_case_lemma (case : term) =
   in
   let body =
     match case.tkind with
-    | TData (_, params) ->
-        gen_nested_match params (fun cur_cases ->
-            mk_assert
-              (mk_bin Binop.Eq
-                 (mk_app
-                    (mk_var (Variable.mk spec_name))
-                    [ mk_app (mk_var (Variable.mk repr_name)) [ case ] ])
-                 (mk_app
-                    (mk_var (Variable.mk spec_name))
-                    [
-                      mk_app
-                        (mk_var (Variable.mk repr_name))
-                        [
-                          mk_app
-                            (mk_var
-                               (Variable.mk
-                                  (match case.tkind with
-                                  | TData (name, _) -> name
-                                  | _ -> failwith "unexpected")))
-                            cur_cases;
-                        ];
-                    ])))
+    | TData (_, params) -> gen_nested_match params (fun _ -> [DCalc []])
     | _ -> failwith "Unexpected match case type"
   in
   let name = Fmt.str "lemma%d" (new_lemma_id ()) in
-  (mk_toplevel (mk_lemma name signature spec (Body (Fmt.str "%a" pp_d_term body))), name)
+  (mk_toplevel (mk_lemma name signature spec body), name)
 
 let skeleton : d_toplevel list ref = ref []
 
@@ -340,12 +322,12 @@ let correctness_lemma : d_toplevel =
              let new_lemma, lemma_name = add_case_lemma t in
              add_toplevel new_lemma;
              match t.tkind with
-             | TData (_, params) -> mk_app (mk_var (Variable.mk lemma_name)) params
+             | TData (_, params) -> DTerm (mk_app (mk_var (Variable.mk lemma_name)) params)
              | _ -> failwith "Unexpected match case type")
-           else empty_assert)
+           else DAssert (mk_const Constant.CTrue))
          expansions)
   in
-  let body = Body (Fmt.str "%a" pp_d_term match_theta) in
+  let body = match_theta in
   mk_toplevel (mk_lemma "correctness_lemma" signature spec body)
 
 let get_num_params = function

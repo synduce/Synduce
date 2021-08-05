@@ -1,47 +1,92 @@
-datatype tree<a1> =  Node(a1, tree<a1>, tree<a1>) |  Nil
+datatype list<t> =  Cons(int, list<t>) |  Elt(int)
 
-function repr(xre : tree<int>) : tree<int>
+datatype clist<a1> =  Concat(clist<a1>, clist<a1>) |  Single(a1)
+
+function min(a:int, b:int): (x: int)
+    ensures a == x || x == b
+    ensures x <= a && x <= b
+{
+    if a >= b then b else a
+}
+
+function repr(xre : clist<int>) : list<int>
 decreases xre
 {
-  xre
+  match xre
+  case Single(a) => Elt(a)
+  case Concat(x, y) => dec(y, x)
 }
 
-function spec(xsp : tree<int>) : int
+function dec(xd : clist<int>, xd0 : clist<int>) : list<int>
+decreases xd0
+{
+  match xd0
+  case Single(a) => Cons(a, repr(xd))
+  case Concat(x, y) => dec(Concat(y, xd), x)
+}
+
+function spec(xsp : list<int>) : int
 decreases xsp
 {
-  f(0, xsp)
+  match xsp
+  case Elt(a) => a
+  case Cons(hd, tl) => min (hd, spec(tl))
 }
 
-function f(x5 : int, x6 : tree<int>) : int
-decreases x6
-{
-  match x6
-  case Nil => x5
-  case Node(a, l, r) => ((sum) => f(sum + a, r))(f(x5, l))
-}
-
-function target(xtarg : tree<int>) : int
+function target(xtarg : clist<int>) : int
 decreases xtarg
 {
   match xtarg
-  case Nil => 0
-  case Node(a, l, r) => join(a, target(l), target(r))
+  case Single(a) => a
+  case Concat(x, y) => odot(target(x), target(y))
 }
 
-function s0() : int
-
+function f0(x : int) : int
+decreases x
 {
-  0
+  x
 }
 
-function join(x2 : int, x3 : int, x4 : int) : int
-decreases x4
+function odot(x0 : int, x1 : int) : int
+decreases x1
 {
-  x3 + x2 + x4
+  min (x0, x1)
 }
 
-lemma correctness_lemma(x : tree) 
+lemma lemma0(p20 : clist<int>, p21 : clist<int>) 
+ensures (spec(repr(Concat(p20, p21))) == target(Concat(p20, p21)))
+{
+  match p20
+    case Single(p25) =>
+     {
+       match p21
+         case Single(p28) => {
+                               calc == {
+                                 
+                                 } }
+           case Concat(p26, p27) => {
+                                      calc == {
+                                        
+                                        } }
+        }
+          case Concat(p23, p24) =>
+           {
+             match p21
+               case Single(p31) =>
+                {
+                  calc == {
+                    
+                    } }
+                 case Concat(p29, p30) => {
+                                            calc == {
+                                              
+                                              } }
+              } }
+
+lemma correctness_lemma(x : clist<int>) 
 ensures (target(x) == spec(repr(x)))
 {
-  
+  match x
+  case Single(p22) => assert(true);
+  case Concat(p20, p21) => lemma0(p20, p21);
 }

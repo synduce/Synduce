@@ -391,20 +391,24 @@ let rec pp_d_body (fmt : Formatter.t) (body : d_body) : unit =
   match body with
   | Body content -> pf fmt "@[<v>{@;<1 2>@[<hov 2>%a@]@;}@]" (box string) content
   | DMatch (t, cases) ->
-      pf fmt "@[<v>match@;%a@;<4 0>%a@]" pp_d_body t
-        (list ~sep:newl (Fmt.pair ~sep:(fun fmt () -> pf fmt "=>@;") Term.pp_pattern pp_d_body))
+      let pp_d_match_case (frmt : Formatter.t) ((pat, body) : Term.pattern * d_body) =
+        pf frmt "@[<hov 2> case %a =>@;%a@]" Term.pp_pattern pat pp_d_body body
+      in
+      pf fmt "@[<v>match @[%a@]@;<1 1>@[<v>%a@]@]" pp_d_body t
+        (* 30 spaces should be enough to force a new line. *)
+        (list ~sep:(fun fmt () -> pf fmt "@;<30 0>") pp_d_match_case)
         cases
-  | DTerm t -> Term.pp_term fmt t
+  | DTerm t -> pp_d_term fmt t
   | DBlock stmts ->
       pf fmt "@[<v>{@;<1 2>@[<hov 2>%a@;}@]"
         (list ~sep:(fun fmt () -> pf fmt ";@;<100 0>") pp_d_body)
         stmts
-  | DAssert asserted -> pf fmt "@[assert(%a)@]" Term.pp_term asserted
+  | DAssert asserted -> pf fmt "@[assert(%a)@]" pp_d_term asserted
   | DCalc stmts ->
-      pf fmt "@[<v 2>=={@;@[<v>%a@]@;}@]"
+      pf fmt "@[<v 2>calc == {@;@[<v>%a@]@;}@]"
         (list ~sep:(fun fmt () -> pf fmt ";@;<100 0>") pp_d_body)
         stmts
-  | DAssign (x, e) -> pf fmt "@[<hov 2>%a=@'%a;@]" Term.pp_term x pp_d_body e
+  | DAssign (x, e) -> pf fmt "@[<hov 2>%a=@'%a;@]" pp_d_term x pp_d_body e
 
 let pp_d_generic_param (fmt : Formatter.t) ((_vo, t) : d_generic_param) =
   (* Just print the type for now, we don't need the variance. *)
