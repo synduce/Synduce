@@ -121,7 +121,7 @@ let rec reduce_term (t : term) : term =
             match args' with
             | [ tp ] -> Some (f (reduce_pmrs pm tp))
             | _ -> None (* PMRS are defined only with one argument for now. *))
-        | FRNonT p -> Some (pmrs_until_irreducible p t)
+        | FRNonT p -> Some (pmrs_until_irreducible p (mk_app func' args'))
         | FRUnknown -> None)
     | TFun ([], body) -> Some (f body)
     | TIte (c, tt, tf) -> (

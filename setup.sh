@@ -103,7 +103,11 @@ then
     sep "Create link Synduce to _build/default/bin/Synduce.exe"
     ln -s _build/default/bin/Synduce.exe Synduce
 fi
+# Initialize submodules
+git submodule init
+git submodule update
 
+# Running tests
 sep "Calling the tool, should print help message..."
 ./Synduce -h
 sep "Running tests: should take about 10mins..."
