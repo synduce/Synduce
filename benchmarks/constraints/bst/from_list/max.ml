@@ -12,7 +12,7 @@ and merge l = function
 
 let rec tree_min = function Leaf x -> x | Node (a, l, r) -> min a (min (tree_min l) (tree_min r))
 
-let rec tree_max = function Leaf x -> x | Node (a, l, r) -> max a (min (tree_max l) (tree_max r))
+let rec tree_max = function Leaf x -> x | Node (a, l, r) -> max a (max (tree_max l) (tree_max r))
 
 let rec is_bst = function
   | Leaf x -> true
@@ -20,7 +20,5 @@ let rec is_bst = function
 
 let rec spec = function Elt a -> a | Cons (a, l) -> max a (spec l)
 
-let rec target = function
-  | Leaf a -> [%synt xi_0] a
-  | Node (a, l, r) -> [%synt xi_1] a (target r)
+let rec target = function Leaf a -> [%synt xi_0] a | Node (a, l, r) -> [%synt xi_1] a (target r)
   [@@requires is_bst]
