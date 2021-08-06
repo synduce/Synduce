@@ -278,7 +278,8 @@ let add_case_lemma (case : term) =
   let args = VarSet.elements (Lang.Analysis.free_variables case) in
   let signature = mk_method_sig (List.map get_var_sig args) in
   let lhs =
-    mk_app (mk_var (Variable.mk spec_name)) [ mk_app (mk_var (Variable.mk repr_name)) [ case ] ]
+    mk_app_v (List.hd sum.pd_reference).f_var [mk_app_v (List.hd sum.pd_repr).f_var [case]]
+    (* mk_app (mk_var (Variable.mk spec_name)) [ mk_app (mk_var (Variable.mk repr_name)) [ case ] ] *)
   in
   let rhs = mk_app (mk_var (Variable.mk target_name)) [ case ] in
   let spec = mk_simple_spec ~ensures:[ mk_bin Binop.Eq lhs rhs ] ~requires:[] DSpecMethod in
@@ -288,7 +289,8 @@ let add_case_lemma (case : term) =
         gen_nested_match params (fun cases ->
             let lhs_sub = substitution cases lhs in
             let rhs_sub = substitution cases rhs in
-            [ DCalc [ DStmt (DTerm lhs_sub); DStmt (DTerm rhs_sub) ] ])
+            let lhs_red = Lang.Reduce.reduce_term lhs_sub in
+            [ DCalc [ DStmt (DTerm lhs_sub); DStmt (DTerm lhs_red); DStmt (DTerm rhs_sub) ] ])
     | _ -> failwith "Unexpected match case type"
   in
   let name = Fmt.str "lemma%d" (new_lemma_id ()) in
@@ -300,6 +302,7 @@ let add_toplevel (n : d_toplevel) = skeleton := !skeleton @ [ n ]
 
 let correctness_lemma : d_toplevel =
   let theta_type =
+    (* We grab the type from the target function to ensure that parametrization matches *)
     let target_descr = List.hd sum.pd_target in
     let rec f arg =
       match arg with
@@ -324,7 +327,7 @@ let correctness_lemma : d_toplevel =
                (mk_var (Variable.mk spec_name))
                [ mk_app (mk_var (Variable.mk repr_name)) [ mk_var (Variable.mk "x") ] ]);
         ]
-        (* target(t)  == spec(repr(t))*)
+        (* target(t) == spec(repr(t))*)
       ~requires:[] DSpecMethod
   in
   let v = mk_var (Variable.mk ~t:(Some theta_type) "x") in
@@ -350,7 +353,7 @@ let get_num_params = function
   | _ -> failwith "Can't get params from a non-datatype declaration."
 
 let incl_decl =
-  (*If tau and theta are the same type, prioritize one based on the number of parameters*)
+  (* If tau and theta are the same type, prioritize one based on the number of parameters *)
   if get_t_name !Algo.AState._tau = get_t_name !Algo.AState._theta then
     if get_num_params tau_decl.dt_kind >= get_num_params theta_decl.dt_kind then [ tau_decl ]
     else [ theta_decl ]
