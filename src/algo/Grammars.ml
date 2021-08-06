@@ -201,7 +201,7 @@ let bool_parametric ?(guess = None) (params : grammar_parameters) =
           else [])
         @ [ GTerm (SyApp (IdSimple "ite", [ ipred; ix; ix ])) ]
         @
-        if Set.mem params.g_opset (Binary Mod) then [ GTerm (SyApp (IdSimple "mod", [ ix; ix ])) ]
+        if Set.mem params.g_opset (Binary Mod) then [ GTerm (SyApp (IdSimple "mod", [ ix; ic ])) ]
         else [] );
     ]
     @ [

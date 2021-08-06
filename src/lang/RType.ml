@@ -409,6 +409,8 @@ let reduce ~(case : (t -> 'a) -> t -> 'a option) ~(init : 'a) ~(join : 'a -> 'a 
   in
   aux t
 
+let is_base t = match t with TInt | TBool | TChar | TString -> true | _ -> false
+
 let is_recursive =
   let case _ t =
     match get_variants t with

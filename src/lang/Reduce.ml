@@ -13,6 +13,37 @@ let until_irreducible f t0 =
   in
   apply_until_irreducible t0
 
+module CondTree = struct
+  type 'a t = CBr of 'a | CIf of term * 'a t * 'a t
+
+  let mk_if c a b = CIf (c, a, b)
+
+  let mk_br t = CBr t
+
+  let rec to_term (ct : term t) : term =
+    match ct with CBr t -> t | CIf (c, a, b) -> mk_ite c (to_term a) (to_term b)
+
+  let of_term (trm : term) : term t =
+    let rec aux trm =
+      match trm.tkind with TIte (c, a, b) -> mk_if c (aux a) (aux b) | _ -> mk_br trm
+    in
+    aux trm
+
+  let map (ct : 'a t) ~(f : 'a -> 'b) : 'b t =
+    let rec aux ct = match ct with CIf (c, a, b) -> CIf (c, aux a, aux b) | CBr x -> CBr (f x) in
+    aux ct
+
+  let all_or_none (ct : 'a option t) : 'a t option =
+    let rec aux ct =
+      match ct with
+      | CBr oa -> Option.map ~f:mk_br oa
+      | CIf (c, a, b) ->
+          let a' = aux a and b' = aux b in
+          Option.map ~f:(fun (a, b) -> mk_if c a b) (Option.both a' b')
+    in
+    aux ct
+end
+
 (* ============================================================================================= *)
 (*                                  TERM REDUCTION                                               *)
 (* ============================================================================================= *)
@@ -46,19 +77,25 @@ let rule_lookup prules (f : variable) (fargs : term list) : term list =
     let bindt = List.map ~f:mk_var bindv in
     match List.map2 ~f:Utils.pair bindt bindto with Ok x -> Some (substitution x expr) | _ -> None
   in
+  let match_with_pat (_, rule_args, _, rhs) (cstr, pat_args) first_args to_pat_match =
+    match Analysis.matches to_pat_match ~pattern:(mk_data cstr pat_args) with
+    | Some bindto_map ->
+        let bindto_list = Map.to_alist bindto_map in
+        let pat_v, pat_bto = List.unzip bindto_list in
+        app_sub (rule_args @ pat_v) (first_args @ pat_bto) rhs
+    | None -> None
+  in
   let f (nt, rule_args, rule_pat, rhs) =
     if Variable.(nt = f) then
       match rule_pat with
       (* We have a pattern, try to match it. *)
       | Some (cstr, pat_args) -> (
+          (* Separate last argument and the rest. Last argument is pattern-matched. *)
           match (List.last fargs, List.drop_last fargs) with
-          | Some pat_match, Some first_args -> (
-              match Analysis.matches pat_match ~pattern:(mk_data cstr pat_args) with
-              | Some bindto_map ->
-                  let bindto_list = Map.to_alist bindto_map in
-                  let pat_v, pat_bto = List.unzip bindto_list in
-                  app_sub (rule_args @ pat_v) (first_args @ pat_bto) rhs
-              | None -> None)
+          | Some to_pat_match, Some first_args ->
+              let f = match_with_pat (nt, rule_args, rule_pat, rhs) (cstr, pat_args) first_args in
+              let cond_pat = CondTree.of_term to_pat_match in
+              Option.map ~f:CondTree.to_term CondTree.(all_or_none (map ~f cond_pat))
           | _ -> None)
       (* Pattern is empty. Simple substitution. *)
       | None -> app_sub rule_args fargs rhs
@@ -84,7 +121,7 @@ let rec reduce_term (t : term) : term =
             match args' with
             | [ tp ] -> Some (f (reduce_pmrs pm tp))
             | _ -> None (* PMRS are defined only with one argument for now. *))
-        | FRNonT p -> Some (pmrs_until_irreducible p t)
+        | FRNonT p -> Some (pmrs_until_irreducible p (mk_app func' args'))
         | FRUnknown -> None)
     | TFun ([], body) -> Some (f body)
     | TIte (c, tt, tf) -> (
@@ -118,15 +155,16 @@ let rec reduce_term (t : term) : term =
 and pmrs_until_irreducible (prog : PMRS.t) (input : term) =
   let one_step t0 =
     let rstep = ref false in
-    let rewrite_rule _t =
-      match _t.tkind with
+    let rewrite_rule tm =
+      match tm.tkind with
       | TApp ({ tkind = TVar f; _ }, fargs) -> (
           match rule_lookup prog.prules f fargs with
-          | [] -> _t
+          | [] -> tm (* No rule matches *)
           | hd :: _ ->
+              (* Only select first match. *)
               rstep := true;
               hd)
-      | _ -> _t
+      | _ -> tm
     in
     let t0' = rewrite_with rewrite_rule t0 in
     (t0', !rstep)

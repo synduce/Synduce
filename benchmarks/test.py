@@ -72,19 +72,50 @@ reduced_benchmark_set_table3 = [
 ]
 
 constraint_benchmarks = [
+    # sortedlist
     ["constraints/sortedlist/min.ml", ""],
     ["constraints/sortedlist/max.ml", ""],
     ["constraints/sortedlist/count_lt.ml", ""],
     ["constraints/sortedlist/index_of.ml", ""],
+    # constantlist
     ["constraints/constantlist/index_of.ml", ""],
     ["constraints/constantlist/contains.ml", ""],
+    # evenlist
     ["constraints/evenlist/parity_of_first.ml", ""],
     ["constraints/evenlist/parity_of_last.ml", ""],
     ["constraints/evenlist/first_odd.ml", ""],
+    ["constraints/evenlist/parity_of_sum.ml", ""],
+    # bst
     ["constraints/bst/contains.ml", ""],
+    ["constraints/bst/count_lt.ml", "--no-sat-as-unsat"],
+    ["constraints/bst/most_frequent_v1.ml", ""],
+    # balanced_tree
+    ["constraints/balanced_tree/node_count.ml", "-B --no-sat-as-unsat"],
+    ["constraints/balanced_tree/height.ml", "-B --no-sat-as-unsat"],
+    ["constraints/balanced_tree/height_v2.ml", "-B --no-sat-as-unsat"],
+    ["constraints/balanced_tree/height_ensures_aux.ml", "--no-sat-as-unsat"],
+    ["constraints/balanced_tree/node_count_ensures_height.ml", "--no-sat-as-unsat"],
+    # memo
+    ["constraints/memo/tree_size.ml", "-B --no-sat-as-unsat"],
+    ["constraints/memo/constant.ml", ""],
+    ["constraints/memo/max_contains.ml", "-B"],
+    ["constraints/memo/count_lt.ml", "-B --no-sat-as-unsat -n 50"],
+    ["constraints/memo/max_sum_gt.ml", "-B --no-sat-as-unsat"],
+    # empty_right
+    ["constraints/empty_right_subtree/contains.ml", "-B --no-sat-as-unsat"],
+    ["constraints/empty_right_subtree/contains_ensures_size.ml", "--no-sat-as-unsat"],
+    # alist
+    ["constraints/alist/count_eq2.ml", "-B --no-sat-as-unsat"],
+    ["constraints/alist/count_eq.ml", ""],
+    ["constraints/alist/sums.ml", ""],
+    ["constraints/alist/most_frequent.ml", ""],
+    # even_tree
+    ["constraints/even_tree/sum_of_parities.ml", "-B --no-sat-as-unsat"],
+    ["constraints/even_tree/parity_of_max.ml", ""]
 ]
 
-benchmark_set = [
+base_benchmark_set = [
+    ["misc/simple_nnf.ml", ""],
     ["misc/unknowns_are_ids.ml", ""],
     ["misc/composed_unkwns.ml", ""],
     ["ptree/sum.pmrs", ""],
@@ -144,10 +175,21 @@ benchmark_set = [
     ["list/mincount.pmrs", ""],
     ["zippers/list_sum_basic.ml", ""],
     ["zippers/list_sum.ml", ""],
+    ["sort_list/min.ml", ""],
+    ["sort_list/max.ml", ""],
+    ["sort_list/sumgtz.ml", ""],
+    ["numbers/int_nat_twosum.ml", ""],
+    ["numbers/int_nat_toint.ml", ""],
+]
+
+lifting_benchmarks = [
     ["lifting/mits_nosum.ml", ""],
     ["lifting/mpsl.ml", ""],
 
-] + constraint_benchmarks 
+]
+
+
+benchmark_set = constraint_benchmarks + base_benchmark_set + lifting_benchmarks
 
 extra_benchmarks = [
     ["list/bal.ml", ""],

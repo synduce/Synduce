@@ -245,7 +245,7 @@ let solve_problem (psi_comps : (string * string * string) option)
         | Either.First pmrs -> pf fmt "%a" PMRS.pp pmrs
         | Either.Second (fv, args, body) ->
             pf fmt "%s(%a) = %a" fv.vname (list ~sep:comma Term.pp_fpattern) args Term.pp_term body);
-  Log.info Specifications.dump_all;
+  Log.verbose Specifications.dump_all;
   (* Print the condition on the reference function's input, if there is one. *)
   (match problem.psi_tinv with
   | Some tinv -> Log.info (fun formt () -> Fmt.(pf formt "%a" PMRS.pp tinv))

@@ -1,0 +1,57 @@
+;; Preamble definitions
+(datatype Nat () ((succ Nat Nat) (zero Nat)))
+(datatype Int () ((pos Nat Int) (neg Nat Int)))
+(declare-fun natplus (Nat Nat) Nat)
+(=> natplus_0 (natplus ?x zero) ?x)
+(=> natplus_succ (natplus ?x (succ ?y)) (succ (natplus ?x ?y)))
+(declare-fun plus (Int Int) Int)
+(=> plus_pos (plus (pos ?x) (pos ?y)) (pos (natplus ?x ?y)))
+(=> plus_neg (plus (neg ?x) (neg ?y)) (neg (natplus ?x ?y)))
+(=> plus_np1 (plus (pos (succ ?x)) (neg (succ ?y))) (plus (pos ?x) (neg ?y)))
+;; neg zero is -1
+(=> plus_np2 (plus (pos (succ ?x)) (neg zero)) (pos ?x))
+(=> plus_np3 (plus (pos zero) (neg ?y)) (neg ?y))
+;; commutativity
+(=> plus_com (plus ?x ?y) (plus ?y ?x))
+
+;;
+(declare-fun natle (Nat Nat) Bool)
+(=> natle0 (natle zero zero) true)
+(=> natle1 (natle (succ ?x) zero) false)
+(=> natle2 (natle zero (succ ?x)) true)
+(=> natleind (natle (succ ?x) (succ ?y)) (natle ?x ?y))
+
+(declare-fun le (Int Int) Bool)
+(=> le1 (le (pos ?x) (pos ?y)) (natle ?x ?y))
+(=> le2 (le (pos ?x) (neg ?y)) false)
+(=> le3 (le (neg ?x) (pos ?y)) true)
+(=> le4 (le (neg ?x) (neg ?y)) (natle ?y ?x))
+
+;; === Problem specific
+(datatype tree_memo () ((MNode Int Int tree_memo tree_memo tree_memo) (MLeaf Int tree_memo)))
+(datatype tree () ((Node Int tree tree tree) (Leaf Int tree)))
+(declare-fun is_memo (tree_memo) Bool)
+(declare-fun memo (tree_memo) Int)
+(declare-fun repr (tree_memo) tree)
+(declare-fun spec (tree) Int)
+(declare-fun f (tree_memo) Bool)
+;; Definition of memo
+(=> rule4 (is_memo (MLeaf ?x)) true)
+(=> rule5 (is_memo (MNode ?n ?a ?l ?r)) (and (= ?n (plus (plus (pos (succ zero)) (memo ?l)) (memo ?r))) (and (is_memo ?l) (is_memo ?r))))
+;; Definition of memo
+(=> rule6 (memo (MLeaf ?x)) 1)
+(=> rule7 (memo (MNode ?n ?a ?l ?r)) ?n)
+;; Definition of repr
+(=> rule8 (repr (MLeaf ?a)) (Leaf ?a))
+(=> rule9 (Leaf ?a) (repr (MLeaf ?a)))
+(=> rule10 (repr (MNode ?n ?a ?l ?r)) (Node ?a (repr ?l) (repr ?r)))
+;; Definition of spec
+(=> rule11 (spec (Leaf ?a)) (pos (succ zero)))
+(=> rule12 (spec (Node ?a ?l4 ?r5)) (plus (plus (pos (succ zero)) (spec ?l4)) (spec ?r5)))
+;; Definition of f
+(=> rule15 (f ?t) (or (not (is_memo ?t)) (= (memo ?t) (spec (repr ?t)))))
+
+
+;; Goal
+(prove (forall ((t tree_memo)) (= (f t) true)))
+

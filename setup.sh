@@ -30,7 +30,7 @@ sudo apt-get install -y z3 python3
 
 sep "Installing CVC4"
 CVC4_VERSION=$(cvc4 --version | sed -n 's/^.*CVC4 version \([0-9]*.[0-9]*\).*$/\1/p')
-if [ -z $CVC4_VERSION ]
+if [[ -z $CVC4_VERSION ]]
 then
     msg_fail "CVC4 not installed !"
     sep
@@ -103,7 +103,11 @@ then
     sep "Create link Synduce to _build/default/bin/Synduce.exe"
     ln -s _build/default/bin/Synduce.exe Synduce
 fi
+# Initialize submodules
+git submodule init
+git submodule update
 
+# Running tests
 sep "Calling the tool, should print help message..."
 ./Synduce -h
 sep "Running tests: should take about 10mins..."

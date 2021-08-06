@@ -48,22 +48,23 @@ let check_eqn solver has_sat eqn =
    that case, the partially-bounded checking reverts to (fully-)bounded checking.
 *)
 let partial_bounding_checker ~(p : psi_def) (lstate : refinement_loop_state) (t_set : TermSet.t) :
-    TermSet.t =
-  let f t =
+    TermSet.t * refinement_loop_state =
+  let f (acc_tset, acc_lstate) t =
     match Specifications.get_requires p.psi_target.pvar with
-    | Some _ -> (
-        match Lemmas.get_lemma ~p lstate.term_state ~key:t with
+    | Some req -> (
+        match Lemmas.get_lemma ~p acc_lstate.term_state ~key:t with
         | Some _ ->
             (* Everything ok, a lemma has been computed *)
-            t
+            (Set.add acc_tset t, acc_lstate)
         | None ->
             (* There is a requires and no lemma, the term has to be bounded. *)
-            Fmt.(pf stdout "\t %a needs to be bounded@." pp_term t);
-            Fmt.(pf stdout "\t ---> %a@." pp_term (Expand.make_bounded t));
-            Expand.make_bounded t)
-    | None -> t
+            let bt = Expand.make_bounded t in
+            let lem_t = Reduce.reduce_term (mk_app req [ bt ]) in
+            let lem_info = Lemmas.set_term_lemma ~p acc_lstate.term_state ~key:bt ~lemma:lem_t in
+            (Set.add acc_tset bt, { acc_lstate with term_state = lem_info }))
+    | None -> (Set.add acc_tset t, acc_lstate)
   in
-  TermSet.map ~f t_set
+  List.fold ~init:(TermSet.empty, lstate) ~f (Set.elements t_set)
 
 let check_solution ?(use_acegis = false) ~(p : psi_def) (lstate : refinement_loop_state)
     (soln : (string * variable list * term) list) =
@@ -79,13 +80,13 @@ let check_solution ?(use_acegis = false) ~(p : psi_def) (lstate : refinement_loo
   Solvers.load_min_max_defs solver;
   let expand_and_check i (t0 : term) =
     let t_set, u_set = Expand.to_maximally_reducible p t0 in
-    let t_set = partial_bounding_checker ~p lstate t_set in
+    let t_set, tmp_lstate = partial_bounding_checker ~p lstate t_set in
     let num_terms_to_check = Set.length t_set in
     if num_terms_to_check > 0 then (
       let sys_eqns, _ =
         Equations.make ~force_replace_off:true
           ~p:{ p with psi_target = target_inst }
-          ~term_state:lstate.term_state ~lifting:lstate.lifting t_set
+          ~term_state:tmp_lstate.term_state ~lifting:lstate.lifting t_set
       in
       let smt_eqns = List.map sys_eqns ~f:constr_eqn in
       (* Solver calls. *)

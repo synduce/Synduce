@@ -102,12 +102,22 @@ let compute_rhs ?(force_replace_off = false) p t =
     in
     res
 
-let precond_from_term_state ~p ~term_state subst eterm =
+let compute_preconds ~p ~term_state subst eterm =
   match Lemmas.get_lemma ~p term_state ~key:eterm with
   | Some lemma_for_eterm ->
       let t = Reduce.reduce_term (subst lemma_for_eterm) in
       Some t
-  | None -> None
+  | None ->
+      (* If the term is bounded and there is a invariant, add a precondition.
+         This will avoid calls to the lemma synthesis.
+      *)
+      if Analysis.is_bounded eterm then
+        Option.map
+          ~f:(fun req ->
+            let t = Eval.simplify (Reduce.reduce_term (mk_app req [ eterm ])) in
+            t)
+          (Specifications.get_requires p.psi_target.PMRS.pvar)
+      else None
 
 let filter_elims all_subs t =
   List.remove_consecutive_duplicates
@@ -165,7 +175,7 @@ let make ?(force_replace_off = false) ~(p : psi_def) ~(term_state : term_state) 
       *)
       let eelim = filter_elims all_subs eterm in
       (* Get the precondition, from the lemmas in the term state, *)
-      let precond = precond_from_term_state ~p ~term_state applic eterm in
+      let precond = compute_preconds ~p ~term_state applic eterm in
       (* Replace the boxed expressions of the lifting. *)
       let lifting' =
         let eprecond =
@@ -209,7 +219,7 @@ let make ?(force_replace_off = false) ~(p : psi_def) ~(term_state : term_state) 
         Lifting.replace_boxed_expressions ~p lifting (Reduce.reduce_term (mk_sel t0_rhs i))
       in
       let elhs = lft in
-      let precond = precond_from_term_state ~p ~term_state (fun x -> x) t0 in
+      let precond = compute_preconds ~p ~term_state (fun x -> x) t0 in
       let eprecond =
         match invar invariants elhs erhs with
         | Some im_f -> (
@@ -421,7 +431,7 @@ let constraints_of_eqns (eqns : equation list) : command list =
 
 let solve_eqns (unknowns : VarSet.t) (eqns : equation list) :
     solver_response * (partial_soln, Counterexamples.unrealizability_ctex list) Either.t =
-  let aux_solve () =
+  let build_task (_cvc4_instance, _task_starter) =
     let free_vars, all_operators, has_ite =
       let f (fvs, ops, hi) eqn =
         let precond, lhs, rhs = (eqn.eprecond, eqn.elhs, eqn.erhs) in
@@ -442,7 +452,7 @@ let solve_eqns (unknowns : VarSet.t) (eqns : equation list) :
       in
       (Set.diff fvs unknowns, ops, hi)
     in
-    (* Commands *)
+    (* Prepare commands *)
     let set_logic = CSetLogic (Grammars.logic_of_operator all_operators) in
     let synth_objs = synthfuns_of_unknowns ~bools:has_ite ~eqns ~ops:all_operators unknowns in
     let sort_decls = declare_sorts_of_vars free_vars in
@@ -477,6 +487,13 @@ let solve_eqns (unknowns : VarSet.t) (eqns : equation list) :
     match Syguslib.Solvers.SygusSolver.solve_commands commands with
     | Some resp -> handle_response resp
     | None -> (RFail, Either.Second [])
+  in
+  let aux_solve () =
+    (* TODO: parallel solving with LIA < NIA < optims. < etc. ... *)
+    (* Example of failure because non-linear arith is not used:
+       benchmarks/numbers/int_nat_twomul.ml
+    *)
+    build_task ((), ())
   in
   if !Config.check_unrealizable then
     match Counterexamples.check_unrealizable unknowns eqns with
@@ -513,7 +530,7 @@ let solve_constant_eqns (unknowns : VarSet.t) (eqns : equation list) =
   in
   let partial_soln = List.map ~f:(fun (x, lhs) -> (x.vname, [], lhs)) constant_soln in
   if List.length partial_soln > 0 then
-    Log.debug_msg Fmt.(str "Constant:@;@[<hov 2>%a@]" pp_partial_soln partial_soln);
+    Log.debug Fmt.(fun fmt () -> pf fmt "@[Constant:@;@[<hov 2>%a@]@]" pp_partial_soln partial_soln);
   (partial_soln, Set.diff unknowns resolved, new_eqns)
 
 let split_solve partial_soln (unknowns : VarSet.t) (eqns : equation list) =
@@ -637,7 +654,7 @@ let preprocess_deconstruct_if (unknowns : VarSet.t) (eqns : equation list) :
 (*                              MAIN ENTRY POINT                                                 *)
 (* ============================================================================================= *)
 
-(** Main entry point: solve a ssytem of equations by synthesizing the unknowns. Returns either a
+(** Main entry point: solve a system of equations by synthesizing the unknowns. Returns either a
   solution as a list of implementations for the unknowns (a triple of unknown name, arguments of a
   function and body of a function) or a list of unrealizability counterexamples.
 *)

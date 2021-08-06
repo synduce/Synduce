@@ -48,6 +48,22 @@ and dec_parametric t args =
   | t -> sort_of_rtype t
 (* Not really parametric? *)
 
+let decl_of_tup_type (tl : RType.t list) : smtSymbol * command =
+  let name = mk_symb (RType.get_tuple_type_name tl) in
+  ( name,
+    DeclareDatatype
+      ( name,
+        (* type name *)
+        DDConstr
+          (* one constructor *)
+          [
+            ( mk_symb (RType.get_tuple_constr_name tl),
+              (* one selector per tuple component *)
+              List.mapi tl ~f:(fun i t ->
+                  let prof = RType.get_tuple_proj_name tl i in
+                  (mk_symb prof, sort_of_rtype t)) );
+          ] ) )
+
 let rec declare_datatype_of_rtype (t0 : RType.t) : (smtSymbol list * command) list =
   let declare_orig tname t =
     let params =
@@ -81,12 +97,18 @@ let rec declare_datatype_of_rtype (t0 : RType.t) : (smtSymbol list * command) li
     in
     [ ([ fst smt_sort ], DeclareDatatypes ([ smt_sort ], [ smt_constrs ])) ]
   in
-  match RType.base_name t0 with
-  | Some tname -> (
-      let deps = RType.get_datatype_depends t0 in
-      List.concat_map ~f:declare_datatype_of_rtype deps
-      @ match RType.get_type tname with Some orig_t -> declare_orig tname orig_t | None -> [])
-  | None -> []
+  match t0 with
+  | _ when RType.is_base t0 -> []
+  | RType.TTup tl ->
+      let s, decl = decl_of_tup_type tl in
+      [ ([ s ], decl) ]
+  | _ -> (
+      match RType.base_name t0 with
+      | Some tname -> (
+          let deps = RType.get_datatype_depends t0 in
+          List.concat_map ~f:declare_datatype_of_rtype deps
+          @ match RType.get_type tname with Some orig_t -> declare_orig tname orig_t | None -> [])
+      | None -> [])
 
 let smtPattern_of_pattern (p : pattern) =
   match p with
@@ -95,8 +117,17 @@ let smtPattern_of_pattern (p : pattern) =
   | PatVar v -> Pat (mk_symb v.vname)
   | PatConstr (c, pats) ->
       PatComp (mk_symb c, List.map ~f:(fun p -> mk_symb Fmt.(str "%a" pp_pattern p)) pats)
-  | PatTuple _ ->
-      failwith "Tuple pattern in smt not supported. Need to implement tuple-type declarations."
+  | PatTuple pats ->
+      let smt_pats = List.map ~f:(fun p -> mk_symb Fmt.(str "%a" pp_pattern p)) pats in
+      let tl =
+        List.map
+          ~f:(fun pat ->
+            let t, _ = infer_type (term_of_pattern pat) in
+            t.ttyp)
+          pats
+      in
+      let cname = RType.get_tuple_constr_name tl in
+      PatComp (mk_symb cname, smt_pats)
 
 let term_of_const (c : Constant.t) : smtTerm =
   match c with
@@ -105,57 +136,110 @@ let term_of_const (c : Constant.t) : smtTerm =
   | Constant.CFalse -> mk_false
 
 let rec smt_of_term (t : term) : smtTerm =
-  let tk = t.tkind in
-  match tk with
-  | TBox t -> smt_of_term t
-  | TBin (op, t1, t2) -> mk_simple_app (Binop.to_string op) (List.map ~f:smt_of_term [ t1; t2 ])
-  | TUn (op, t1) -> mk_simple_app (Unop.to_string op) [ smt_of_term t1 ]
-  | TConst c -> term_of_const c
-  | TVar x -> mk_var x.vname
-  | TIte (c, a, b) -> mk_ite (smt_of_term c) (smt_of_term a) (smt_of_term b)
-  | TTup tl ->
-      let tuple_constructor = RType.get_tuple_constr_name (List.map ~f:(fun t -> t.ttyp) tl) in
-      mk_simple_app tuple_constructor (List.map ~f:smt_of_term tl)
-  | TSel (t, i) -> (
-      match t.ttyp with
-      | TTup tl ->
-          let proj_fun = RType.get_tuple_proj_name tl i in
-          mk_simple_app proj_fun [ smt_of_term t ]
-      | _ ->
-          Log.error_msg Fmt.(str "SMT: tuple projection %a is not correctly type." pp_term t);
-          failwith "Wrong tuple type.")
-  | TData (cstr, args) -> (
-      match args with
-      | [] ->
-          let t = t.ttyp in
-          let sort = sort_of_rtype t in
-          SmtTQualdId (QIas (Id (SSimple cstr), sort))
-      | _ -> mk_simple_app cstr (List.map ~f:smt_of_term args))
-  | TMatch (tm, cases) -> SmtTMatch (smt_of_term tm, List.map ~f:smt_of_case cases)
-  | TApp (func, args) -> (
-      match func.tkind with
-      | TVar v -> mk_simple_app v.vname (List.map ~f:smt_of_term args)
-      | TFun (f_args, fbody) -> (
-          match List.zip f_args args with
-          | Ok pre_bindings ->
-              let f (bto, bdg) =
-                match Analysis.matches ~pattern:(fpat_to_term bto) (tuplify bdg) with
-                | Some varmap ->
-                    List.map
-                      ~f:(fun (v, t) -> (mk_symb v.vname, smt_of_term t))
-                      (Map.to_alist varmap)
-                | None ->
-                    failwith
-                      (Fmt.str "%a cannot match %a in smt term conversion." pp_term
-                         (fpat_to_term bto) pp_term (tuplify bdg))
-              in
-              let bindings = List.concat_map ~f pre_bindings in
-              mk_let bindings (smt_of_term fbody)
-          | Unequal_lengths -> failwith "Smt: unexpected malformed term.")
-      | _ ->
-          Log.error_msg Fmt.(str "Smt of term %a impossible." pp_term t);
-          failwith "Smt: application function can only be variable.")
-  | TFun (_, _) -> failwith "Smt: functions in terms not supported."
+  let open Result.Let_syntax in
+  let rec aux t : (smtTerm, string) Result.t =
+    match t.tkind with
+    | TBox t -> aux t
+    | TBin (op, t1, t2) ->
+        let%map args = Result.all (List.map ~f:aux [ t1; t2 ]) in
+        mk_simple_app (Binop.to_string op) args
+    | TUn (op, t1) ->
+        let%map t1' = aux t1 in
+        mk_simple_app (Unop.to_string op) [ t1' ]
+    | TConst c -> return (term_of_const c)
+    | TVar x -> return (mk_var x.vname)
+    | TIte (c, a, b) ->
+        let%bind c' = aux c in
+        let%bind a' = aux a in
+        let%map b' = aux b in
+        mk_ite c' a' b'
+    | TTup tl ->
+        let tuple_constructor = RType.get_tuple_constr_name (List.map ~f:(fun t -> t.ttyp) tl) in
+        let%map args = Result.all (List.map ~f:aux tl) in
+        mk_simple_app tuple_constructor args
+    | TSel (t, i) -> (
+        match (fst (infer_type t)).ttyp with
+        | TTup tl ->
+            let proj_fun = RType.get_tuple_proj_name tl i in
+            let%map t' = aux t in
+            mk_simple_app proj_fun [ t' ]
+        | _ as typ ->
+            Log.error_msg Fmt.(str "SMT: tuple projection %a is not correctly typed." pp_term t);
+            Log.error_msg Fmt.(str "It has type %a." RType.pp typ);
+            failwith "Wrong tuple type.")
+    | TData (cstr, args) -> (
+        match args with
+        | [] ->
+            let t = t.ttyp in
+            let sort = sort_of_rtype t in
+            return (SmtTQualdId (QIas (Id (SSimple cstr), sort)))
+        | _ ->
+            let%map args' = Result.all (List.map ~f:aux args) in
+            mk_simple_app cstr args')
+    | TMatch (tm, cases) ->
+        let%map tm' = aux tm in
+        SmtTMatch (tm', List.map ~f:smt_of_case cases)
+    | TApp (func, args) -> (
+        match func.tkind with
+        | TVar v ->
+            let%map args' = Result.all (List.map ~f:aux args) in
+            mk_simple_app v.vname args'
+        | TFun (f_args, fbody) -> (
+            match List.zip f_args args with
+            | Ok pre_bindings ->
+                let%bind bindings, subs = make_bindings pre_bindings in
+                let%map fbody' = aux (substitution subs fbody) in
+                mk_let bindings fbody'
+            | Unequal_lengths -> Error "Smt: unexpected malformed term.")
+        | _ ->
+            Log.error_msg Fmt.(str "Smt of term %a impossible." pp_term t);
+            Error "Smt: application function can only be variable.")
+    | TFun (_, _) -> failwith "Smt: functions in terms not supported."
+  and make_bindings pre_bindings =
+    let bindings_of_varmap varmap =
+      Result.all
+        (List.map
+           ~f:(fun (v, t) ->
+             let%map t' = aux t in
+             (mk_symb v.vname, t'))
+           (Map.to_alist varmap))
+    in
+    let make_one_binding bto bdg =
+      let tto = fpat_to_term bto in
+      (* Try to transform the function into a let-binding, by first creating a tuple. *)
+      match Analysis.matches ~pattern:tto (tuplify bdg) with
+      | Some varmap -> (bindings_of_varmap varmap, [])
+      | None -> (
+          match Analysis.matches ~pattern:tto bdg with
+          | Some varmap -> (bindings_of_varmap varmap, [])
+          | None -> (
+              match tto.tkind with
+              | TTup tl ->
+                  (* Replace tuple parts that are bound by a single variable. *)
+                  let tl_typ = RType.TTup (List.map ~f:type_of tl) in
+                  let tup_var = Variable.mk ~t:(Some tl_typ) (Alpha.fresh ~s:"tup" ()) in
+                  ( (let%map x = aux bdg in
+                     [ (mk_symb tup_var.vname, x) ]),
+                    List.mapi ~f:(fun i t -> (t, mk_sel (Term.mk_var tup_var) i)) tl )
+              | _ ->
+                  ( Error
+                      (Fmt.str "%a cannot match %a or %a in smt term conversion." pp_term
+                         (fpat_to_term bto) pp_term (tuplify bdg) pp_term bdg),
+                    [] )))
+    in
+    let bindings, subs =
+      List.fold ~init:(Ok [], []) pre_bindings ~f:(fun (binds, subs) (bto, bdg) ->
+          let new_binds, new_subs = make_one_binding bto bdg in
+          (Result.combine binds new_binds ~ok:( @ ) ~err:( ^ ), subs @ new_subs))
+    in
+    Result.map bindings ~f:(fun b -> (b, subs))
+  in
+  match aux t with
+  | Ok smt_t -> smt_t
+  | Error s ->
+      Log.error_msg Fmt.(str "Error when trying to convert %a." pp_term t);
+      Log.error_msg s;
+      failwith "Smt term conversion failure."
 
 and smt_of_case ((p, t) : Term.match_case) : match_case = (smtPattern_of_pattern p, smt_of_term t)
 
@@ -311,25 +395,11 @@ let request_different_models (model : term_model) (num_models : int)
 (*                           COMMANDS                                                            *)
 (* ============================================================================================= *)
 
-let decl_of_tup_type (tl : RType.t list) : command =
-  DeclareDatatype
-    ( mk_symb (RType.get_tuple_type_name tl),
-      (* type name *)
-      DDConstr
-        (* one constructor *)
-        [
-          ( mk_symb (RType.get_tuple_constr_name tl),
-            (* one selector per tuple component *)
-            List.mapi tl ~f:(fun i t ->
-                let prof = RType.get_tuple_proj_name tl i in
-                (mk_symb prof, sort_of_rtype t)) );
-        ] )
-
 let decls_of_vars (vars : VarSet.t) =
   let f v =
     let t = Variable.vtype_or_new v in
     let sort = sort_of_rtype t in
-    (match t with TTup tl -> [ decl_of_tup_type tl ] | _ -> [])
+    (match t with TTup tl -> [ snd (decl_of_tup_type tl) ] | _ -> [])
     @ [ DeclareConst (SSimple v.vname, sort) ]
   in
   List.concat_map ~f (Set.elements vars)
@@ -417,7 +487,10 @@ let vars_and_formals (pmrs : PMRS.t) (fvar : variable) =
 
 let _smt_of_pmrs (pmrs : PMRS.t) : (smtSymbol list * command) list * command list =
   (* Sort declarations. *)
-  let datatype_decls = List.concat_map ~f:declare_datatype_of_rtype pmrs.PMRS.pinput_typ in
+  let datatype_decls =
+    List.concat_map ~f:declare_datatype_of_rtype pmrs.PMRS.pinput_typ
+    @ declare_datatype_of_rtype pmrs.PMRS.poutput_typ
+  in
   (* Define recursive functions. *)
   let fun_of_nont (nont : variable) : (func_dec * smtTerm) option =
     let out_t, vars, formals = vars_and_formals pmrs nont in
@@ -472,12 +545,12 @@ let smt_of_pmrs (pmrs : PMRS.t) : command list =
   let sort_decls_of_deps, decls_of_deps = List.unzip (List.map ~f:_smt_of_pmrs deps) in
   let sort_decls, main_decl = _smt_of_pmrs pmrs in
   let datatype_decls =
-    List.map ~f:snd
-      (List.dedup_and_sort
-         ~compare:(fun (sorts, _) (sorts', _) ->
-           List.compare
-             (fun a b -> String.compare (string_of_smtSymbol a) (string_of_smtSymbol b))
-             sorts sorts')
-         (List.concat sort_decls_of_deps @ sort_decls))
+    (* List.map ~f:snd
+       (List.dedup_and_sort
+          ~compare:(fun (sorts, _) (sorts', _) ->
+            List.compare
+              (fun a b -> String.compare (string_of_smtSymbol a) (string_of_smtSymbol b))
+              sorts sorts') *)
+    List.map ~f:snd (List.concat sort_decls_of_deps @ sort_decls)
   in
   datatype_decls @ List.concat decls_of_deps @ main_decl

@@ -167,11 +167,6 @@ let replace_rhs_of_mains (p : psi_def) (t0 : term) : term =
 (*                                   acegis TERM EXPANSION                                       *)
 (* ============================================================================================= *)
 
-let is_bounded (t : term) =
-  Term.reduce ~init:true ~join:( && )
-    ~case:(fun _ t -> match t.tkind with TVar _ -> Some (Analysis.is_novariant t) | _ -> None)
-    t
-
 let simple ?(verbose = false) ?(max_height = !Config.expand_cut) (t0 : term) =
   if verbose then Log.verbose_msg Fmt.(str "@[Simple expansion of %a.@]" pp_term t0);
   let rec aux d (t, u) =
@@ -197,12 +192,19 @@ let simple ?(verbose = false) ?(max_height = !Config.expand_cut) (t0 : term) =
 
 let make_bounded (t0 : term) =
   let case _ t =
-    if is_bounded t then Some t
+    if Analysis.is_bounded t then Some t
     else
       match t.tkind with
-      | TVar _ ->
-          let t_set, _ = simple t in
-          Set.max_elt t_set
+      | TVar _ -> (
+          match
+            List.filter ~f:(fun t -> not (Analysis.is_novariant t)) (Analysis.expand_once t)
+          with
+          | hd :: _ ->
+              let t_set, _ = simple hd in
+              Set.max_elt t_set
+          | _ ->
+              let t_set, _ = simple t in
+              Set.max_elt t_set)
       | _ -> None
   in
   transform ~case t0
@@ -255,9 +257,9 @@ let composed_reduction_sequence (p : psi_def) (f : PMRS.t) (g : PMRS.t) (t0 : te
   replace_rhs_of_main p f _t2
 
 let check_max_exp p f g t =
-  let _t3 = composed_reduction_sequence p f g t in
-  match nonreduced_terms p (Set.union f.pnon_terminals g.pnon_terminals) _t3 with
-  | [] -> First (t, _t3)
+  let t3 = composed_reduction_sequence p f g t in
+  match nonreduced_terms p (Set.union f.pnon_terminals g.pnon_terminals) t3 with
+  | [] -> First (t, t3)
   | _ -> Second t
 
 let expand_max_main (p : psi_def) (f : PMRS.t) (g : PMRS.t) (t0 : term) :

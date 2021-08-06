@@ -1,1 +1,0 @@
-rm -rf review_data

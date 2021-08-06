@@ -205,11 +205,11 @@ let pmrs_of_rules loc (globs : (string, Term.variable) Hashtbl.t) (synt_objs : T
     | Some (x, _, _, _) -> x
     | None -> loc_fatal_errmsg loc "No main rule."
   in
-  let _requires_func, ensures_func =
+  let requires_func, ensures_func =
     let f x = fterm_to_term x.pos allv globs Term.VarSet.empty x in
     (Option.map requires ~f, Option.map ~f ensures)
   in
-  Specifications.set_spec pvar { ensures = ensures_func; requires = _requires_func };
+  Specifications.set_spec pvar { ensures = ensures_func; requires = requires_func };
   let pmrs0 =
     PMRS.
       {

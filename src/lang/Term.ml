@@ -325,7 +325,7 @@ module Unop = struct
 
   let of_string (s : string) : t option =
     match s with
-    | "-" -> Some Neg
+    | "~-" | "-" -> Some Neg
     | "not" -> Some Not
     | "abs " -> Some Abs
     | "inv" -> Some Inv
@@ -716,6 +716,8 @@ module VarMap = struct
 
   let empty = Map.empty (module Variable)
 
+  let keyset (m : 'a t) : VarSet.t = VarSet.of_list (Map.keys m)
+
   let singleton (v : variable) (elt : 'a) = Map.singleton (module Variable) v elt
 
   let of_alist (al : (variable * 'a) list) = Map.of_alist (module Variable) al
@@ -913,6 +915,9 @@ let term_height =
 
 let term_height_compare (t1 : term) (t2 : term) = compare (term_height t1) (term_height t2)
 
+(** [proj_var v] returns the tuple term (v.0, v.1, ..., v.n) if [v] is a variable of
+    tuple type with n compoenents, otherwise returns v as a term.
+  *)
 let proj_var (v : variable) : term =
   let rec p t =
     match t with
@@ -921,6 +926,10 @@ let proj_var (v : variable) : term =
   in
   p (Variable.vtype_or_new v)
 
+(** [tuplify t] transforms every subterm of [t] that has a tuple type into a tuple of
+  projections. For example if t is a term of tuple type with n components, it returns
+  (t.1, t.2, .., t.n).
+*)
 let tuplify (t : term) =
   let case f t =
     match t.tkind with
@@ -1189,6 +1198,8 @@ let infer_type (t : term) : term * RType.substitution =
 let erase_term_type (t : term) =
   let f t = { t with ttyp = RType.get_fresh_tvar () } in
   transform_info ~f t
+
+let type_of (t : term) = t.ttyp
 
 (* ============================================================================================= *)
 (*                                  SETS OF TERMS                                                *)

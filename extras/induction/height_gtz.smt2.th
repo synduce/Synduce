@@ -1,0 +1,39 @@
+;; Preamble definitions
+(datatype Nat () ((succ Nat Nat) (zero Nat)))
+(datatype Int () ((pos Nat Int) (neg Nat Int)))
+(declare-fun natplus (Nat Nat) Nat)
+(=> natplus_0 (natplus ?x zero) ?x)
+(=> natplus_succ (natplus ?x (succ ?y)) (succ (natplus ?x ?y)))
+(declare-fun plus (Int Int) Int)
+(=> plus_pos (plus (pos ?x) (pos ?y)) (pos (natplus ?x ?y)))
+(=> plus_neg (plus (neg ?x) (neg ?y)) (neg (natplus ?x ?y)))
+(=> plus_np1 (plus (pos (succ ?x)) (neg (succ ?y))) (plus (pos ?x) (neg ?y)))
+;; neg zero is -1
+(=> plus_np2 (plus (pos (succ ?x)) (neg zero)) (pos ?x))
+(=> plus_np3 (plus (pos zero) (neg ?y)) (neg ?y))
+;; commutativity
+(=> plus_com (plus ?x ?y) (plus ?y ?x))
+
+(declare-fun natle (Nat Nat) Bool)
+(=> natle0 (natle zero zero) true)
+(=> natle1 (natle (succ ?x) zero) false)
+(=> natle2 (natle zero (succ ?x)) true)
+(=> natleind (natle (succ ?x) (succ ?y)) (natle ?x ?y))
+
+(declare-fun le (Int Int) Bool)
+(=> le1 (le (pos ?x) (pos ?y)) (natle ?x ?y))
+(=> le2 (le (pos ?x) (neg ?y)) false)
+(=> le3 (le (neg ?x) (pos ?y)) true)
+(=> le4 (le (neg ?x) (neg ?y)) (natle ?y ?x))
+
+
+;; === Problem specific
+(datatype Tree () ((node Int Tree Tree Tree) (nil Tree)))
+(declare-fun height (Tree) Int)
+
+;; height declaration
+(=> rule7 (height nil) (pos zero))
+(=> rule8 (pos zero) (height nil))
+(=> rule9 (height (node ?a ?b ?c)) (plus (pos (succ zero)) (ite (le (height ?c) (height ?b)) (height ?b) (height ?c))))
+;; The lemma we want.
+(prove (forall (p Tree) (le (pos zero) (height p))))

@@ -113,11 +113,15 @@ let pp_ocaml (frmt : Formatter.t) (pmrs : t) : unit =
         match pat_opt with
         | Some pat ->
             Fmt.(
-              pf frmt "@[<hov 2>%a @[%a _x@] %a@;@[match _x with@;@[%a -> %a@]@]@]"
+              pf frmt "@[<hov 2>%a @[%a_x@] %a@;@[%a _x %a@;@[%a -> %a@]@]@]"
                 (styled (`Fg `Cyan) string)
                 nt.vname (list ~sep:sp Variable.pp) args
                 (styled (`Fg `Red) string)
-                "=" pp_pattern pat pp_term rhs)
+                "="
+                (styled (`Fg `Yellow) string)
+                "match"
+                (styled (`Fg `Yellow) string)
+                "with" pp_pattern pat pp_term rhs)
         | None ->
             Fmt.(
               pf frmt "@[<hov 2>%a @[%a@] %a@;%a@]"
@@ -127,7 +131,7 @@ let pp_ocaml (frmt : Formatter.t) (pmrs : t) : unit =
                 "=" pp_term rhs))
     | _ :: _ ->
         Fmt.(
-          pf frmt "@[%a %a %a@]@;<1 2>@[%a@;%a@]"
+          pf frmt "@[%a %a%a@]@;<1 2>@[%a@;%a@]"
             (styled (`Fg `Cyan) string)
             nt.vname (list ~sep:sp Variable.pp) args
             (styled (`Fg `Red) string)
@@ -163,7 +167,8 @@ let pp_ocaml (frmt : Formatter.t) (pmrs : t) : unit =
   | [] -> ()
   | hd :: tl ->
       Fmt.(pf frmt "@[%a %a@]@." (styled (`Fg `Red) string) "let rec" print_caml_def hd);
-      List.iter tl ~f:(fun caml_def -> Fmt.(pf frmt "@[and %a@]@." print_caml_def caml_def))
+      List.iter tl ~f:(fun caml_def ->
+          Fmt.(pf frmt "@[%a %a@]@." (styled (`Fg `Red) string) "and" print_caml_def caml_def))
 
 (* ============================================================================================= *)
 (*                             BASIC PROPERTIES AND TYPE INFERENCE                               *)
@@ -228,10 +233,34 @@ let infer_pmrs_types (prog : t) =
       Variable.update_var_types
         [ (Variable.vtype_or_new prog.pvar, Variable.vtype_or_new prog.pmain_symb) ];
       (* Change types in the specification. *)
+      (* Ensures. *)
       let _ =
         let%bind spec = get_spec prog.pvar in
         let%map invariant = Option.map ~f:(fun ens -> first (infer_type ens)) spec.ensures in
         Specifications.set_spec prog.pvar { spec with ensures = Some invariant }
+      in
+      (* Requires *)
+      let _ =
+        let%bind spec = get_spec prog.pvar in
+        let%map invariant = Option.map ~f:(fun ens -> first (infer_type ens)) spec.requires in
+        (* Check that input of requires is same as input of function. *)
+        let req_t_in, _ = RType.fun_typ_unpack invariant.ttyp in
+        let err_msg =
+          Fmt.(
+            str "Input type of @@requires of %s does not match input type of %s." prog.pvar.vname
+              prog.pvar.vname)
+        in
+        match List.zip req_t_in typ_in with
+        | List.Or_unequal_lengths.Ok t -> (
+            match RType.unify t with
+            | Ok _ -> Specifications.set_spec prog.pvar { spec with requires = Some invariant }
+            | Error e ->
+                Log.error_msg (Sexp.to_string_hum e);
+                Log.error_msg err_msg;
+                failwith err_msg)
+        | List.Or_unequal_lengths.Unequal_lengths ->
+            Log.error_msg err_msg;
+            failwith err_msg
       in
       { prog with prules = new_rules; pinput_typ = typ_in; poutput_typ = typ_out }
   | Error e ->
