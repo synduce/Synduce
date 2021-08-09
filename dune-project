@@ -1,4 +1,4 @@
-(lang dune 2.6)
+(lang dune 2.9)
 
 (name Synduce)
 
@@ -26,10 +26,20 @@
  (depends
   (base
    (>= v0.14.0))
+  (core
+   (>= v0.14.0))
+  (extlib
+   (>= 1.7.7))
+  (fileutils
+   (>= 0.6.3))
   (fmt
    (>= 0.8.8))
   (getopt
    (>= 20120615))
+  (lwt
+   (>= 5.4.0))
+  (lwt_ppx
+   (>= 2.0.0))
   (menhir
    (>= 20200624))
   (parsexp
@@ -40,13 +50,7 @@
    (>= v0.14.0))
   (ppx_sexp_conv
    (>= v0.14.0))
-  (fileutils
-   (>= 0.6.3))
-  (extlib
-   (>= 1.7.7))
-  (lwt
-   (>= 5.4.0))
-  (lwt_ppx
-   (>= 2.0.0))
+  (ppx_optcomp
+   (>= v0.14.0))
   (sexplib
    (>= v0.14.0))))
