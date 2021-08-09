@@ -198,8 +198,12 @@ let call_solver solver commands =
 let make_z3_solver () = make_solver ~name:"Z3" Utils.Config.z3_binary_path [ "-in"; "-smt2" ]
 
 (** Create a process with a CVC4 solver. *)
-let make_cvc4_solver () =
-  make_solver ~name:"CVC4" Utils.Config.cvc4_binary_path [ "--lang=smt2.6"; "--incremental" ]
+let make_cvc_solver () =
+  let cvc_path = Config.cvc_binary_path () in
+  let using_cvc5 = Config.using_cvc5 () in
+  let name = if using_cvc5 then "CVC5" else "CVC4" in
+  let executable_name = if using_cvc5 then "cvc5" else "cvc4" in
+  make_solver ~name cvc_path [ executable_name; "--lang=smt2.6"; "--incremental" ]
 
 let call_solver_default solver commands =
   match solver with
@@ -438,8 +442,12 @@ module Asyncs = struct
   let make_z3_solver () = make_solver ~name:"Z3" Config.z3_binary_path [ "z3"; "-in"; "-smt2" ]
 
   (** Create a process with a CVC4 solver. *)
-  let make_cvc4_solver () =
-    make_solver ~name:"CVC4" Config.cvc4_binary_path [ "cvc4"; "--lang=smt2.6"; "--incremental" ]
+  let make_cvc_solver () =
+    let cvc_path = Config.cvc_binary_path () in
+    let using_cvc5 = Config.using_cvc5 () in
+    let name = if using_cvc5 then "CVC5" else "CVC4" in
+    let executable_name = if using_cvc5 then "cvc5" else "cvc4" in
+    make_solver ~name cvc_path [ executable_name; "--lang=smt2.6"; "--incremental" ]
 
   let solver_make_cancellable (s : solver) (p : 'a t) : unit =
     (* IF task is cancelled, kill the solver.  *)

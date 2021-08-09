@@ -42,7 +42,7 @@ let rec sort_of_rtype (t : RType.t) : sygus_sort =
       SApp (IdSimple "->", [ sort_of_rtype tin; sort_of_rtype tout ])
   | RType.TParam (args, t) -> dec_parametric t args
   | RType.TVar _ -> SId (IdSimple "Int")
-  (* TODO: declare sort? *)
+(* TODO: declare sort? *)
 
 and dec_parametric t args =
   match t with
@@ -151,11 +151,14 @@ let rec term_of_sygus (env : (string, variable, String.comparator_witness) Map.t
           | _ -> failwith "Sygus: a tuple acessor with wrong number of arguments")
       | ITupleCstr -> mk_tup args'
       | INotDef -> failwith Fmt.(str "Sygus: Undefined variable %s" s))
+  | SyApp (IdIndexed ("tupSel", [ INum i ]), [ arg ]) ->
+      let arg' = term_of_sygus env arg in
+      mk_sel arg' i
   | SyExists (_, _) -> failwith "Sygus: exists-terms not supported."
   | SyForall (_, _) -> failwith "Sygus: forall-terms not supported."
   (* TODO: add let-conversion. *)
   | SyLet (_, _) -> failwith "Sygus: let-terms not supported. TODO: add let-conversion."
-  | _ -> failwith "Composite identifier not supported."
+  | _ -> failwith "Sygus term not supported."
 
 (* ============================================================================================= *)
 (*                           COMMANDS                                                            *)

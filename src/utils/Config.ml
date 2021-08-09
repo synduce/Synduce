@@ -92,7 +92,23 @@ let root_folder = Caml.Filename.current_dir_name
 
 let base s = Caml.Filename.concat root_folder s
 
-let cvc4_binary_path = try FileUtil.which "cvc4" with _ -> failwith "CVC4 not found."
+(* Set to true to force using cvc4 even if cvc5 is available. *)
+(* There are still bugs with CVC5, leave true for now. *)
+let use_cvc4 = ref true
+
+let cvc4_binary_path = try Some (FileUtil.which "cvc4") with _ -> None
+
+let cvc5_binary_path = try Some (FileUtil.which "cvc5") with _ -> None
+
+let using_cvc5 () = Option.is_some cvc5_binary_path && not !use_cvc4
+
+let cvc_binary_path () =
+  if !use_cvc4 then match cvc4_binary_path with Some p -> p | None -> failwith "CVC4 not found."
+  else
+    match cvc5_binary_path with
+    | Some p -> p
+    | None -> (
+        match cvc4_binary_path with Some p -> p | None -> failwith "CVC5 and CVC4 not found.")
 
 let z3_binary_path = try FileUtil.which "z3" with _ -> failwith "Z3 not found."
 

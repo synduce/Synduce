@@ -299,7 +299,7 @@ let check_tinv_unsat ~(p : psi_def) (tinv : PMRS.t) (ctex : ctex) :
     let%lwt () = Asyncs.close_solver cvc4_instance in
     return resp
   in
-  Asyncs.(cancellable_task (Asyncs.make_cvc4_solver ()) build_task)
+  Asyncs.(cancellable_task (Asyncs.make_cvc_solver ()) build_task)
 
 (** [check_tinv_sat ~p tinv ctex] checks whether the counterexample [ctex] satisfies
     the invariant [tinv] (a PMRS). The function returns a pair of a promise of a solver
