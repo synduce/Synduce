@@ -126,6 +126,10 @@ let all_or_none (l : 'a option list) : 'a list option =
   let l' = Option.all l in
   match l' with Some _l -> if List.length _l = List.length l then l' else None | None -> None
 
+(* ============================================================================================= *)
+(*                  FILE MANAGEMENT HELPERS                                                      *)
+(* ============================================================================================= *)
+
 let relative_to_root (filename : string) =
   let curdir = Caml.Filename.current_dir_name in
   Str.string_after filename (String.length curdir)

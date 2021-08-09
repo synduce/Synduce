@@ -52,6 +52,8 @@ let print_usage () =
      counterexample.\n\
     \       --parse-only                Just parse the input.\n\
     \       --show-vars                 Print variables and their types at the end.\n\
+    \       --generate-benchmarks=DIR   Save SyGuS problems in DIR, including problems that are \
+     provably unrealizable.\n\
      -> Try:\n\
      ./Synduce benchmarks/list/mps.ml@.";
   Caml.exit 0
@@ -81,6 +83,7 @@ let options =
     ('\000', "ccegis", set Config.use_ccegis true, None);
     ('\000', "cvc4", set Config.use_cvc4 true, None);
     ('\000', "fuzzing", None, Some Config.set_fuzzing_count);
+    ('\000', "generate-benchmarks", None, Some Config.set_benchmark_generation_dir);
     ('\000', "parse-only", set parse_only true, None);
     ('\000', "no-gropt", set Config.optimize_grammars false, None);
     ('\000', "no-lifting", set Config.attempt_lifting false, None);
@@ -97,6 +100,7 @@ let main () =
   let filename = ref None in
   parse_cmdline options (fun s -> filename := Some s);
   let filename = match !filename with Some f -> ref f | None -> print_usage () in
+  Config.problem_name := Caml.Filename.basename (Caml.Filename.chop_extension !filename);
   set_style_renderer stdout `Ansi_tty;
   Caml.Format.set_margin 100;
   (match !Syguslib.Solvers.SygusSolver.default_solver with

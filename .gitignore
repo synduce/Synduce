@@ -9,6 +9,7 @@ Example
 *.csv
 review_data/*
 tests/*.txt
+test/tmp_benchmarks
 benchmarks/*.csv
 *.messages
 

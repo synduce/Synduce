@@ -1,5 +1,7 @@
 open Base
 
+let problem_name = ref "unknown"
+
 (** Toggle debugging. *)
 let debug = ref false
 
@@ -124,6 +126,20 @@ let smt_solver_log_file = ref "/tmp/solver.smt2"
 let smt_log_queries = ref true
 
 let smt_solve_verbose = ref true
+
+(* Generating realizable and unrealizable SyGuS benchmarks. *)
+let generate_benchmarks = ref false
+
+let benchmark_generation_dir = ref tmp_folder
+
+let set_benchmark_generation_dir (s : string) =
+  generate_benchmarks := true;
+  benchmark_generation_dir := s
+
+let new_benchmark_file ?(hint = "") suffix =
+  Caml.Filename.temp_file ~temp_dir:!benchmark_generation_dir
+    ("bench_" ^ hint ^ !problem_name)
+    suffix
 
 (* ============================================================================================= *)
 (*                  SYSTEM OF EQUATIONS OPTIMIZATION FLAGS                                       *)

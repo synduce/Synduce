@@ -276,7 +276,7 @@ if __name__ == "__main__":
                 print("B:%s,%s+%s" % (filename, algo[0], optim[0]))
                 sys.stdout.flush()
                 if table_no > 0:
-                    os.system("%s %s %s -i %s %s %s" %
+                    os.system("%s %s %s -i %s %s %s --generate-benchmarks=\"test/tmp_benchmarks\"" %
                               (timeout, exec_path, algo[1], optim[1], extra_opt,
                                os.path.realpath(os.path.join("benchmarks", filename))))
                 else:

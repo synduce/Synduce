@@ -431,7 +431,7 @@ let constraints_of_eqns (eqns : equation list) : command list =
 
 let solve_eqns (unknowns : VarSet.t) (eqns : equation list) :
     solver_response * (partial_soln, Counterexamples.unrealizability_ctex list) Either.t =
-  let build_task (_cvc4_instance, _task_starter) =
+  let build_task gen_only (_cvc4_instance, _task_starter) =
     let free_vars, all_operators, has_ite =
       let f (fvs, ops, hi) eqn =
         let precond, lhs, rhs = (eqn.eprecond, eqn.elhs, eqn.erhs) in
@@ -484,22 +484,30 @@ let solve_eqns (unknowns : VarSet.t) (eqns : equation list) :
       | RFail -> (RFail, Either.Second [])
       | RUnknown -> (RUnknown, Either.Second [])
     in
-    match Syguslib.Solvers.SygusSolver.solve_commands commands with
-    | Some resp -> handle_response resp
-    | None -> (RFail, Either.Second [])
+    if !Config.generate_benchmarks then
+      Syguslib.Solvers.commands_to_file commands
+        (* Assuming gen_only true only for unrealizable problems. *)
+        (Config.new_benchmark_file ~hint:(if gen_only then "unrealizable_" else "") ".sl");
+    if not gen_only then
+      match Syguslib.Solvers.SygusSolver.solve_commands commands with
+      | Some resp -> handle_response resp
+      | None -> (RFail, Either.Second [])
+    else (RFail, Either.Second [])
   in
-  let aux_solve () =
+  let aux_solve gen_only () =
     (* TODO: parallel solving with LIA < NIA < optims. < etc. ... *)
     (* Example of failure because non-linear arith is not used:
        benchmarks/numbers/int_nat_twomul.ml
     *)
-    build_task ((), ())
+    build_task gen_only ((), ())
   in
-  if !Config.check_unrealizable then
+  if !Config.check_unrealizable then (
     match Counterexamples.check_unrealizable unknowns eqns with
-    | [] -> aux_solve ()
-    | _ as ctexs -> (RInfeasible, Either.Second ctexs)
-  else aux_solve ()
+    | [] -> aux_solve false ()
+    | _ as ctexs ->
+        if !Config.generate_benchmarks then ignore (aux_solve true ());
+        (RInfeasible, Either.Second ctexs))
+  else aux_solve false ()
 
 let solve_eqns_proxy (unknowns : VarSet.t) (eqns : equation list) =
   if !Config.use_syntactic_definitions then
