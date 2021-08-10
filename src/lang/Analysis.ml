@@ -11,14 +11,19 @@ let rec vars_of_pattern (p : pattern) : VarSet.t =
   | PatVar v -> VarSet.singleton v
   | PatConstr (_, tl) | PatTuple tl -> VarSet.union_list (List.map ~f:vars_of_pattern tl)
 
-let free_variables (t : term) : VarSet.t =
+let free_variables ?(include_functions = true) (t : term) : VarSet.t =
   let rec f t =
     match t.tkind with
     | TBox t -> f t
     | TBin (_, t1, t2) -> Set.union (f t1) (f t2)
     | TUn (_, t1) -> f t1
     | TConst _ -> VarSet.empty
-    | TVar v -> VarSet.singleton v
+    | TVar v -> (
+        if include_functions then VarSet.singleton v
+        else
+          match Variable.vtype_or_new v with
+          | RType.TFun _ -> VarSet.empty
+          | _ -> VarSet.singleton v)
     | TIte (c, t1, t2) -> VarSet.union_list [ f c; f t1; f t2 ]
     | TTup tl -> VarSet.union_list (List.map ~f tl)
     | TSel (t, _) -> f t

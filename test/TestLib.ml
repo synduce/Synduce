@@ -24,7 +24,16 @@ let v = mk_var (Variable.mk ~t:(Some !Algo.AState._theta) (Alpha.fresh ())) in
 Fmt.(pf stdout "%a@." pp_term v);
 let expansions = Analysis.expand_once v in
 List.iter ~f:(fun t -> Fmt.(pf stdout "@[%a -> %a@]@." pp_term v pp_term t)) expansions;
+let spec = mk_var (List.nth_exn sum.pd_reference 0).f_var in
+let reductions =
+  List.map ~f:(fun t -> (mk_app spec [ t ], Reduce.calc_term (mk_app spec [ t ]))) expansions
+in
+List.iter
+  ~f:(fun (t, out) ->
+    Fmt.(pf stdout "@[%a = %a@]@." pp_term t (list ~sep:comma (braces pp_term)) out))
+  reductions;
 let l1 = mk_var (Variable.mk "l1") in
+Fmt.(pf stdout "=== MATCH CASES ===@.");
 let match_case =
   (* Reduction function: Reduce.reduce_term (mk_app f [t]) *)
   mk_match v

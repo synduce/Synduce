@@ -39,6 +39,7 @@ let print_usage () =
     \  Background solver parameters:\n\
     \       --ind-tlimit=TIMEOUT        Set the solver to timeout after TIMEOUT ms when doing an \
      induction proof.\n\
+    \       --cvc4                      Use CVC4 instead of CVC5 if both are available.\n\
     \  Debugging:\n\
     \  -I   --interactive               Request additional lemmas interactively.\n\
     \  -J   --interactive-lifting       Request expressions for lifting.\n\
@@ -51,6 +52,8 @@ let print_usage () =
      counterexample.\n\
     \       --parse-only                Just parse the input.\n\
     \       --show-vars                 Print variables and their types at the end.\n\
+    \       --generate-benchmarks=DIR   Save SyGuS problems in DIR, including problems that are \
+     provably unrealizable.\n\
      -> Try:\n\
      ./Synduce benchmarks/list/mps.ml@.";
   Caml.exit 0
@@ -78,7 +81,9 @@ let options =
     ('C', "interactive-check-lemma", set Config.interactive_check_lemma true, None);
     ('\000', "acegis", set Config.use_acegis true, None);
     ('\000', "ccegis", set Config.use_ccegis true, None);
+    ('\000', "cvc4", set Config.use_cvc4 true, None);
     ('\000', "fuzzing", None, Some Config.set_fuzzing_count);
+    ('\000', "generate-benchmarks", None, Some Config.set_benchmark_generation_dir);
     ('\000', "parse-only", set parse_only true, None);
     ('\000', "no-gropt", set Config.optimize_grammars false, None);
     ('\000', "no-lifting", set Config.attempt_lifting false, None);
@@ -95,10 +100,13 @@ let main () =
   let filename = ref None in
   parse_cmdline options (fun s -> filename := Some s);
   let filename = match !filename with Some f -> ref f | None -> print_usage () in
+  Config.problem_name := Caml.Filename.basename (Caml.Filename.chop_extension !filename);
   set_style_renderer stdout `Ansi_tty;
   Caml.Format.set_margin 100;
   (match !Syguslib.Solvers.SygusSolver.default_solver with
-  | CVC4 -> ()
+  | CVC ->
+      Utils.Log.debug_msg
+        (if Config.using_cvc5 () then "Using CVC5 ✔" else "Using CVC4. Please install CVC5.")
   | EUSolver -> failwith "EUSolver unsupported."
   | DryadSynth -> Syguslib.Sygus.use_v1 := true);
   let start_time = Unix.gettimeofday () in
@@ -136,6 +144,6 @@ let main () =
         Fmt.(pf stdout "success@."))
   | _, Error _ -> Utils.Log.error_msg "No solution found.");
   if !Config.show_vars then Term.Variable.print_summary stdout ()
-
 ;;
+
 main ()

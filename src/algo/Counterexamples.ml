@@ -299,7 +299,7 @@ let check_tinv_unsat ~(p : psi_def) (tinv : PMRS.t) (ctex : ctex) :
     let%lwt () = Asyncs.close_solver cvc4_instance in
     return resp
   in
-  Asyncs.(cancellable_task (Asyncs.make_cvc4_solver ()) build_task)
+  Asyncs.(cancellable_task (Asyncs.make_cvc_solver ()) build_task)
 
 (** [check_tinv_sat ~p tinv ctex] checks whether the counterexample [ctex] satisfies
     the invariant [tinv] (a PMRS). The function returns a pair of a promise of a solver
@@ -310,7 +310,7 @@ let check_tinv_sat ~(p : psi_def) (tinv : PMRS.t) (ctex : ctex) :
   let open Solvers in
   let f_compose_r t =
     let repr_of_v = if p.psi_repr_is_identity then t else Reduce.reduce_pmrs p.psi_repr t in
-    Reduce.reduce_pmrs p.psi_reference repr_of_v
+    Reduce.reduce_term (Reduce.reduce_pmrs p.psi_reference repr_of_v)
   in
   let initial_t = ctex.ctex_eqn.eterm in
   let task (solver, starter) =

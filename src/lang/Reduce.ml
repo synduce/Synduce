@@ -4,12 +4,21 @@ open Utils
 
 let _MAX = 1000
 
-let until_irreducible f t0 =
+let until_irreducible (f : term -> term * bool) (t0 : term) : term =
   let steps = ref 0 in
   let rec apply_until_irreducible t =
     Int.incr steps;
     let t', reduced = f t in
     if reduced && !steps < _MAX then apply_until_irreducible t' else t'
+  in
+  apply_until_irreducible t0
+
+let steps_until_irreducible (f : term -> term * bool) (t0 : term) : term list =
+  let steps = ref 0 in
+  let rec apply_until_irreducible t =
+    Int.incr steps;
+    let t', reduced = f t in
+    if reduced && !steps < _MAX then t :: apply_until_irreducible t' else [ t' ]
   in
   apply_until_irreducible t0
 
@@ -174,6 +183,81 @@ and pmrs_until_irreducible (prog : PMRS.t) (input : term) =
 and reduce_pmrs (prog : PMRS.t) (input : term) =
   let f_input = mk_app (mk_var prog.pmain_symb) [ input ] in
   reduce_term (pmrs_until_irreducible prog f_input)
+
+(* ============================================================================================= *)
+(*                                  DERIVED FROM REDUCTION                                       *)
+(* ============================================================================================= *)
+
+(**
+  reduce_term reduces a term using only the lambda-calculus
+*)
+let rec calc_term_step (rstep : bool ref) (t : term) : term =
+  let case f t =
+    match t.tkind with
+    | TApp (func, args) -> (
+        let func' = f func and args' = List.map ~f args in
+        match resolve_func func' with
+        | FRFun (fpatterns, body) -> (
+            match Analysis.subst_args fpatterns args' with
+            | Some subst -> Some (substitution subst body)
+            | None -> None)
+        | FRPmrs pm -> (
+            match args' with
+            | [ tp ] -> Some (f (pmrs_calc_one_step rstep pm (mk_app (mk_var pm.pvar) [ tp ])))
+            | _ -> None (* PMRS are defined only with one argument for now. *))
+        | FRNonT p -> Some (pmrs_calc_one_step rstep p (mk_app func' args'))
+        | FRUnknown -> None)
+    | TFun ([], body) -> Some (f body)
+    | TIte (c, tt, tf) -> (
+        match c.tkind with
+        (* Resolve constants *)
+        | TConst Constant.CFalse -> Some (f tf)
+        | TConst Constant.CTrue -> Some (f tt)
+        (* Distribute ite on tuples *)
+        | _ -> (
+            match (tt.tkind, tf.tkind) with
+            | TTup tlt, TTup tlf -> (
+                match List.zip tlt tlf with
+                | Ok zip -> Some (mk_tup (List.map zip ~f:(fun (tt', tf') -> mk_ite c tt' tf')))
+                | Unequal_lengths -> None)
+            | _, _ -> None))
+    | TSel (t, i) -> (
+        match f t with { tkind = TTup tl; _ } -> Some (List.nth_exn tl i) | _ -> None)
+    | TMatch (t, cases) -> (
+        match
+          List.filter_opt
+            (List.map
+               ~f:(fun (p, t') -> Option.map ~f:(fun m -> (m, t')) (Analysis.matches_pattern t p))
+               cases)
+        with
+        | [] -> None
+        | (subst_map, rhs_t) :: _ -> Some (substitution (VarMap.to_subst subst_map) rhs_t))
+    | TBox _ | TVar _ | TFun _ | TTup _ | TBin _ | TUn _ | TConst _ | TData _ -> None
+  in
+  transform ~case t
+
+and pmrs_calc_one_step (rstep : bool ref) (prog : PMRS.t) (input : term) : term =
+  let rewrite_rule tm =
+    match tm.tkind with
+    | TApp ({ tkind = TVar f; _ }, fargs) -> (
+        match rule_lookup prog.prules f fargs with
+        | [] -> tm (* No rule matches *)
+        | hd :: _ ->
+            (* Only select first match. *)
+            rstep := true;
+            hd)
+    | _ -> tm
+  in
+  let t0' = rewrite_with rewrite_rule input in
+  t0'
+
+let calc_term (t : term) =
+  let one_step (t0 : term) : term * bool =
+    let rstep = ref false in
+    let t0' = calc_term_step rstep t0 in
+    (t0', !rstep)
+  in
+  steps_until_irreducible one_step t
 
 (* ============================================================================================= *)
 (*                                  DERIVED FROM REDUCTION                                       *)

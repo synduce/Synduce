@@ -24,6 +24,7 @@ let pp_problem_descr (fmt : Formatter.t) (prob : problem_descr) =
   pf fmt "@[<v>%a@]@." (list ~sep:cut (box Term.pp_function_descr)) prob.pd_repr
 
 let solve_file ?(print_info = false) (filename : string) : problem_descr * soln option =
+  Utils.Config.problem_name := Caml.Filename.basename (Caml.Filename.chop_extension filename);
   Utils.Config.info := print_info;
   Utils.Config.timings := false;
   let is_ocaml_syntax = Caml.Filename.check_suffix filename ".ml" in

@@ -31,7 +31,7 @@ val call_solver : online_solver -> SmtLib.command list -> solver_response
 
 val make_z3_solver : unit -> online_solver
 
-val make_cvc4_solver : unit -> online_solver
+val make_cvc_solver : unit -> online_solver
 
 val call_solver_default : online_solver option -> SmtLib.command list -> solver_response
 
@@ -76,7 +76,7 @@ module Asyncs : sig
     s_log_outc : OC.t;
   }
 
-  val make_cvc4_solver : unit -> solver * int t * int u
+  val make_cvc_solver : unit -> solver * int t * int u
 
   val make_z3_solver : unit -> solver * int t * int u
 

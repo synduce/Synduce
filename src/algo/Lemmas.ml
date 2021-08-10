@@ -275,7 +275,8 @@ let ctex_model_to_args ~(p : psi_def) (det : term_state_detail)
           (match
              VarSet.find_by_name
                (Set.union
-                  (Analysis.free_variables det.term)
+                  (* Don't include functions, we won't get a model for them in CVC5. *)
+                  (Analysis.free_variables ~include_functions:false det.term)
                   (Set.union (VarSet.of_list p.psi_reference.pargs) ctex.ctex_vars))
                name
            with
@@ -654,7 +655,7 @@ let verify_lemma_bounded ~(p : psi_def) (det : term_state_detail) lemma_candidat
     let%lwt res = expand_loop (TermSet.singleton det.term) in
     return res
   in
-  Asyncs.(cancellable_task (make_cvc4_solver ()) task)
+  Asyncs.(cancellable_task (make_cvc_solver ()) task)
 
 let verify_lemma_unbounded ~(p : psi_def) (det : term_state_detail) lemma_candidate :
     Solvers.Asyncs.response * int Lwt.u =
@@ -681,7 +682,7 @@ let verify_lemma_unbounded ~(p : psi_def) (det : term_state_detail) lemma_candid
     Log.debug_msg "Unbounded lemma verification is complete.";
     return final_response
   in
-  Asyncs.(cancellable_task (Asyncs.make_cvc4_solver ()) build_task)
+  Asyncs.(cancellable_task (Asyncs.make_cvc_solver ()) build_task)
 
 let verify_lemma_candidate ~(p : psi_def) (det : term_state_detail) : Solvers.solver_response =
   match det.lemma_candidate with

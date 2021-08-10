@@ -480,19 +480,31 @@ let reponse_of_sexps (s : Sexp.t list) : solver_response =
     | [ Atom "unknown" ] -> Some RUnknown
     | _ -> None
   in
+  let one_command cmd =
+    try
+      match command_of_sexp cmd with
+      | CDefineFun (f, args, res, body) -> Some [ (f, args, res, body) ]
+      | _ -> None
+    with Failure _ -> None
+  in
   let success_response s =
     RSuccess
-      (List.filter_map s ~f:(function
-        | Sexp.Atom "unsat" -> None
-        | _ as cmd -> (
-            try
-              match command_of_sexp cmd with
-              | CDefineFun (f, args, res, body) -> Some (f, args, res, body)
-              | _ -> None
-            with Failure s ->
-              Utils.Log.error_msg s;
-              Utils.Log.error_msg Fmt.(str "Failed to parse %a." Sexp.pp_hum cmd);
-              None)))
+      (List.concat
+         (List.filter_map s ~f:(function
+           | Sexp.Atom "unsat" -> None (* Ignore 'unsat' printed by CVC4. *)
+           | Sexp.List l as cmd -> (
+               match one_command cmd with
+               (* A response composed of a single command. *)
+               | Some s -> Some s
+               | None -> (
+                   match Option.all (List.map ~f:one_command l) with
+                   | Some defs -> Some (List.concat defs)
+                   | None ->
+                       Utils.Log.error_msg Fmt.(str "Failed to parse %a." Sexp.pp_hum cmd);
+                       None))
+           | Sexp.Atom s ->
+               Utils.Log.error_msg Fmt.(str "Sygus: received  %s, could not parse. Ignoring." s);
+               None)))
   in
   match atomic_response s with Some r -> r | None -> success_response s
 

@@ -27,7 +27,9 @@
 (library
  (name parsers)
  (public_name Synduce.Lib.Parsers)
- (libraries str lang sexplib utils fmt menhirLib stdio compiler-libs))
+ (libraries str lang sexplib utils fmt menhirLib stdio compiler-libs)
+ (preprocess
+  (pps ppx_optcomp)))
 
 (rule
  (target updated.messages)

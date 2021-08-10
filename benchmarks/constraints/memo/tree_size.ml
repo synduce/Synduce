@@ -4,7 +4,7 @@ type 'a tree_memo = MLeaf of 'a | MNode of int * 'a * 'a tree_memo * 'a tree_mem
 
 let rec tree_min = function Leaf x -> x | Node (a, l, r) -> min a (min (tree_min l) (tree_min r))
 
-let rec tree_max = function Leaf x -> x | Node (a, l, r) -> max a (min (tree_max l) (tree_max r))
+let rec tree_max = function Leaf x -> x | Node (a, l, r) -> max a (max (tree_max l) (tree_max r))
 
 let rec is_memo = function
   | MLeaf x -> true

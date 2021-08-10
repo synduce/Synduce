@@ -46,6 +46,34 @@ let rec type_term_of_core_type (t : core_type) : type_term =
       Log.error_msg Fmt.(str "%a" Pprintast.core_type t);
       failwith "type unsupported"
 
+[%%if ocaml_version < (4, 12, 0)]
+
+let extract_params decl =
+  let f (ct, variance) =
+    match variance with
+    | Asttypes.Invariant -> (
+        match ct.ptyp_desc with
+        | Ptyp_var x -> x
+        | _ -> failwith "Only type variable as parameters supported.")
+    | _ -> failwith "Covariant and contravariant types unsupported."
+  in
+  List.map ~f decl.ptype_params
+
+[%%else]
+
+let extract_params decl =
+  let f (ct, variance) =
+    match variance with
+    | Asttypes.NoVariance, _ -> (
+        match ct.ptyp_desc with
+        | Ptyp_var x -> x
+        | _ -> failwith "Only type variable as parameters supported.")
+    | _ -> failwith "Covariant and contravariant types unsupported."
+  in
+  List.map ~f decl.ptype_params
+
+[%%endif]
+
 let type_term_of_type_decl (decl : type_declaration) =
   let variants_of_cstr clist =
     let f (cstr : constructor_declaration) =
@@ -63,18 +91,8 @@ let type_term_of_type_decl (decl : type_declaration) =
     | _ -> mk_t_int (wloc decl.ptype_loc)
   in
   let tname = decl.ptype_name in
-  let params =
-    let f (ct, variance) =
-      match variance with
-      | Asttypes.Invariant -> (
-          match ct.ptyp_desc with
-          | Ptyp_var x -> x
-          | _ -> failwith "Only type variable as parameters supported.")
-      | _ -> failwith "Covariant and contravariant types unsupported."
-    in
-    List.map ~f decl.ptype_params
-  in
-  (tname, params, tterm)
+
+  (tname, extract_params decl, tterm)
 
 let _is_recursive_flag (is_rec : Asttypes.rec_flag) =
   match is_rec with Asttypes.Recursive -> Log.info (fun f () -> Fmt.(pf f "Recursive")) | _ -> ()
@@ -290,8 +308,8 @@ let pmrs_def_of_nonrec_def loc (b : value_binding) : definition list =
   | _ -> []
 
 (* `define_value loc is_rec binding` attempts to extract a PMRS definition of a function
-  definition out of a Caml value definition.
- *)
+   definition out of a Caml value definition.
+*)
 let define_value loc (is_rec : Asttypes.rec_flag) (bindings : value_binding list) =
   match (bindings, is_rec) with
   | hd :: tl, Asttypes.Recursive ->

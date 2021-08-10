@@ -41,12 +41,12 @@ let commands_to_file (commands : program) (filename : string) =
   OC.close out_chan
 
 module SygusSolver = struct
-  type t = CVC4 | DryadSynth | EUSolver
+  type t = CVC | DryadSynth | EUSolver
 
-  let default_solver = ref CVC4
+  let default_solver = ref CVC
 
   let binary_path = function
-    | CVC4 -> Config.cvc4_binary_path
+    | CVC -> Config.cvc_binary_path ()
     | DryadSynth -> Config.dryadsynth_binary_path
     | EUSolver -> Config.eusolver_binary_path
 

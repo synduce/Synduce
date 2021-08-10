@@ -1,5 +1,7 @@
 open Base
 
+let problem_name = ref "unknown"
+
 (** Toggle debugging. *)
 let debug = ref false
 
@@ -92,7 +94,23 @@ let root_folder = Caml.Filename.current_dir_name
 
 let base s = Caml.Filename.concat root_folder s
 
-let cvc4_binary_path = try FileUtil.which "cvc4" with _ -> failwith "CVC4 not found."
+(* Set to true to force using cvc4 even if cvc5 is available. *)
+(* There are still bugs with CVC5, leave true for now. *)
+let use_cvc4 = ref true
+
+let cvc4_binary_path = try Some (FileUtil.which "cvc4") with _ -> None
+
+let cvc5_binary_path = try Some (FileUtil.which "cvc5") with _ -> None
+
+let using_cvc5 () = Option.is_some cvc5_binary_path && not !use_cvc4
+
+let cvc_binary_path () =
+  if !use_cvc4 then match cvc4_binary_path with Some p -> p | None -> failwith "CVC4 not found."
+  else
+    match cvc5_binary_path with
+    | Some p -> p
+    | None -> (
+        match cvc4_binary_path with Some p -> p | None -> failwith "CVC5 and CVC4 not found.")
 
 let z3_binary_path = try FileUtil.which "z3" with _ -> failwith "Z3 not found."
 
@@ -108,6 +126,22 @@ let smt_solver_log_file = ref "/tmp/solver.smt2"
 let smt_log_queries = ref true
 
 let smt_solve_verbose = ref true
+
+(* Generating realizable and unrealizable SyGuS benchmarks. *)
+let generate_benchmarks = ref false
+
+let benchmark_generation_dir = ref tmp_folder
+
+let benchmark_lang_version = ref "1.1"
+
+let set_benchmark_generation_dir (s : string) =
+  generate_benchmarks := true;
+  benchmark_generation_dir := s
+
+let new_benchmark_file ?(hint = "") suffix =
+  Caml.Filename.temp_file ~temp_dir:!benchmark_generation_dir
+    ("bench_" ^ hint ^ !problem_name)
+    suffix
 
 (* ============================================================================================= *)
 (*                  SYSTEM OF EQUATIONS OPTIMIZATION FLAGS                                       *)

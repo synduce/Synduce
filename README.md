@@ -6,10 +6,10 @@ The script `setup.sh` installs all the dependencies and packages from a fresh Ub
 You will need [**Z3**](https://github.com/Z3Prover/z3) (> 4.8.10) and [**CVC4**](https://cvc4.github.io) installed on your system. *Synduce* detects where your binaries are using `which z3` and `which cvc4`. Synduce needs a CVC4 version >= 1.8.
 
 
-You will need a recent [OCaml](https://ocaml.org/releases/4.11.1.html) installation and the [OCaml Package Manager (opam)](https://opam.ocaml.org) to get started.
+You will need a recent [OCaml](https://ocaml.org/releases/4.11.1.html) (>= 4.09.0) installation and the [OCaml Package Manager (opam)](https://opam.ocaml.org) to get started.
 
 The Ocaml dependencies of this project can be installed via opam (```opam install . --deps-only```).
-Once all the dependencies are installed, call ```make``` from the root of the project. The Makefile simply calls dune build and creates a shortcut to the binary executable.
+Once all the dependencies are installed, call ```make``` from the root of the project. The Makefile simply calls `dune build` and creates a shortcut to the binary executable.
 
 
 
