@@ -33,6 +33,12 @@ val reduce_pmrs : PMRS.t -> term -> term
     when `p` is in the current environment.
 *)
 
+val calc_term : term -> term list
+(**
+    Same as `reduce_term` but returns a list of terms, one for each reduction step using
+    a pmrs rule.
+ *)
+
 val instantiate_with_solution : PMRS.t -> (string * variable list * term) list -> PMRS.t
 (**
     `instantiate_with_solution p defs` returns the PMRS p, in which the unknowns have been
