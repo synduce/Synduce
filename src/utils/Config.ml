@@ -132,6 +132,8 @@ let generate_benchmarks = ref false
 
 let benchmark_generation_dir = ref tmp_folder
 
+let benchmark_lang_version = ref "1.1"
+
 let set_benchmark_generation_dir (s : string) =
   generate_benchmarks := true;
   benchmark_generation_dir := s
