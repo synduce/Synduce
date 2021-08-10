@@ -1,0 +1,11 @@
+(set-logic DTNIA)
+(synth-fun xi_1 ((x96 Int) (x97 Int)) Int ((Ix Int) (Ic Int) (Ipred Bool))
+ ((Ix Int (Ic x96 x97 (- Ix) (+ Ix Ix) (ite Ipred Ix Ix))) (Ic Int ((Constant Int)))
+  (Ipred Bool ((= Ix Ix) (> Ix Ix) (not Ipred) (and Ipred Ipred) (or Ipred Ipred)))))
+(declare-var x Int)
+(declare-var p Int)
+(declare-var i39 Int)
+(constraint
+ (or (not (and (>= i39 0) (or (not (>= i39 0)) (= p (ite (= i39 0) p x)))))
+  (= (ite (= p x) 1 (ite (= i39 0) 0 (+ 1 i39))) (xi_1 x p))))
+(check-synth)
