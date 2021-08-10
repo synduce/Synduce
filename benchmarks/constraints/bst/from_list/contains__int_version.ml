@@ -19,8 +19,12 @@ let rec is_bst = function
   | Node (a, l, r) -> a >= tree_max l && a <= tree_min r && is_bst l && is_bst r
 
 let spec x t =
-  let rec f = function Elt a -> a = x | Cons (a, l) -> a = x || f l in
+  let rec f = function
+    | Elt a -> if a = x then 1 else 0
+    | Cons (a, l) -> if a = x then 1 else if f l = 1 then 1 else 0
+  in
   f t
+  [@@ensures fun x -> x >= 0 && x <= 1]
 
 let target y t =
   let rec g = function

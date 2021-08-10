@@ -6,7 +6,10 @@ let rec balanced = function
   | Nil -> true
   | Node (a, b, c) -> height b = height c && balanced b && balanced c
 
-and height = function Nil -> 0 | Node (a, b, c) -> 1 + max (height b) (height c)
+and height = function
+  | Nil -> 0
+  | Node (a, b, c) -> 1 + max (height b) (height c)
+  [@@ensures fun x -> x >= 0]
 
 let rec count = function Nil -> 0 | Node (a, l, r) -> 1 + count l + count r
 
