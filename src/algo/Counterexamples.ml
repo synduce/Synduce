@@ -198,13 +198,92 @@ let check_unrealizable (unknowns : VarSet.t) (eqns : equation_system) : unrealiz
 (*                            CLASSIFYING SPURIOUS COUNTEREXAMPLES                               *)
 (* ============================================================================================= *)
 
+let check_image_sat ~p ctex : Solvers.Asyncs.response * int u =
+  let open Solvers in
+  let f_compose_r t =
+    let repr_of_v = if p.psi_repr_is_identity then t else Reduce.reduce_pmrs p.psi_repr t in
+    Reduce.reduce_term (Reduce.reduce_pmrs p.psi_reference repr_of_v)
+  in
+  (* Asynchronous solver task. *)
+  let build_task (solver_instance, task_start) =
+    let steps = ref 0 in
+    let t_check accum t =
+      let term_eqs =
+        List.map ctex.ctex_eqn.eelim ~f:(fun (_, elimv) ->
+            smt_of_term (mk_bin Binop.Eq (f_compose_r t) (Eval.in_model ctex.ctex_model elimv)))
+      in
+      let rec aux accum tlist =
+        let f binder t =
+          let%lwt _ = binder in
+          let%lwt _ = Asyncs.spush solver_instance in
+          let%lwt _ = Asyncs.smt_assert solver_instance t in
+          let%lwt res = Asyncs.check_sat solver_instance in
+          let%lwt _ = Asyncs.spop solver_instance in
+          return res
+        in
+        match tlist with
+        | [] -> accum
+        | t0 :: tl -> (
+            let%lwt accum' = f accum t0 in
+            match accum' with Sat -> return SmtLib.Sat | _ -> aux (return accum') tl)
+      in
+      aux accum term_eqs
+    in
+    let%lwt _ = task_start in
+    (* TODO : logic *)
+    let%lwt () = Asyncs.set_logic solver_instance "LIA" in
+    let%lwt () = Asyncs.load_min_max_defs solver_instance in
+    let%lwt res =
+      Expand.lwt_expand_loop steps t_check (return (TermSet.singleton ctex.ctex_eqn.eterm))
+    in
+    let%lwt () = Asyncs.close_solver solver_instance in
+    return res
+  in
+  Asyncs.(cancellable_task (Asyncs.make_cvc_solver ()) build_task)
+
+let check_image_unsat ~p ctex : Solvers.Asyncs.response * int u =
+  let open Solvers in
+  let _ = (p, ctex) in
+  let build_task (solver_instance, task_start) =
+    let _ = solver_instance in
+    let%lwt _ = task_start in
+    return SmtLib.Unknown
+  in
+  Asyncs.(cancellable_task (Asyncs.make_cvc_solver ()) build_task)
+
 (**
   [check_ctex_in_image ~p ctex] checks whether the recursion elimination's variables values in the
   model of [ctex] are in the image of (p.psi_reference o p.psi_repr).
 *)
-let check_ctex_in_image ~(p : psi_def) (ctex : ctex) : bool =
-  let _ = (ctex, p) in
-  true
+let check_ctex_in_image ~(p : psi_def) (ctex : ctex) : ctex =
+  let resp =
+    try
+      Lwt_main.run
+        ((* This call is expected to respond "unsat" when terminating. *)
+         let pr1, resolver1 = check_image_unsat ~p ctex in
+         (* This call is expected to respond "sat" when terminating. *)
+         let pr2, resolver2 = check_image_sat ~p ctex in
+         Lwt.wakeup resolver2 1;
+         Lwt.wakeup resolver1 1;
+         (* The first call to return is kept, the other one is ignored. *)
+         Lwt.pick [ pr1; pr2 ])
+    with End_of_file ->
+      Log.error_msg "Solvers terminated unexpectedly  ⚠️ .";
+      Log.error_msg "Please inspect logs.";
+      SmtLib.Unknown
+  in
+  Log.verbose (fun frmt () ->
+      if Solvers.is_unsat resp then
+        Fmt.(
+          pf frmt "(%a)@;<1 4>is not in the image of reference function \"%s\"." (box pp_ctex) ctex
+            p.psi_reference.pvar.vname)
+      else if Solvers.is_sat resp then
+        Fmt.(pf frmt "(%a) is in the image of %s." (box pp_ctex) ctex p.psi_reference.pvar.vname)
+      else Fmt.(pf frmt "(%a) is unknown." (box pp_ctex) ctex));
+  match resp with
+  | Sat -> { ctex with ctex_stat = Valid }
+  | Unsat -> { ctex with ctex_stat = Spurious NotInReferenceImage }
+  | _ -> ctex
 
 let rec find_original_var_and_proj v (og, elimv) =
   match elimv.tkind with
@@ -317,79 +396,51 @@ let check_tinv_sat ~(p : psi_def) (tinv : PMRS.t) (ctex : ctex) :
   let initial_t = ctex.ctex_eqn.eterm in
   let task (solver, starter) =
     let steps = ref 0 in
-    let rec check_bounded_sol accum terms =
-      let f accum t =
-        let tinv_t = Reduce.reduce_pmrs tinv t in
-        let rec_instantation =
-          Option.value ~default:VarMap.empty (Analysis.matches t ~pattern:initial_t)
-        in
-        let preconds =
-          let subs =
-            List.map
-              ~f:(fun (orig_rec_var, elimv) ->
-                match orig_rec_var.tkind with
-                | TVar rec_var when Map.mem rec_instantation rec_var ->
-                    (elimv, f_compose_r (Map.find_exn rec_instantation rec_var))
-                | _ -> failwith "all elimination variables should be substituted.")
-              ctex.ctex_eqn.eelim
-          in
-          Option.to_list
-            (Option.map ~f:(fun t -> smt_of_term (substitution subs t)) ctex.ctex_eqn.eprecond)
-        in
-        (* Assert that the variables have the values assigned by the model. *)
-        let model_sat = mk_model_sat_asserts ctex f_compose_r (Map.find rec_instantation) in
-        let vars =
-          VarSet.union_list
-            (Option.(to_list (map ~f:Analysis.free_variables ctex.ctex_eqn.eprecond))
-            @ [ Analysis.free_variables t; Analysis.free_variables (f_compose_r t) ])
-        in
-        (* Start sequence of solver commands, bind on accum. *)
-        let%lwt _ = accum in
-        let%lwt () = Asyncs.spush solver in
-        let%lwt () = Asyncs.declare_all solver (SmtInterface.decls_of_vars vars) in
-        (* Assert that Tinv(t) *)
-        let%lwt () = Asyncs.smt_assert solver (smt_of_term tinv_t) in
-        (* Assert that term satisfies model. *)
-        let%lwt () = Asyncs.smt_assert solver (SmtLib.mk_assoc_and (preconds @ model_sat)) in
-        (* Assert that preconditions hold. *)
-        let%lwt resp = Asyncs.check_sat solver in
-        let%lwt () = Asyncs.spop solver in
-        return resp
+    let t_check binder t =
+      let tinv_t = Reduce.reduce_pmrs tinv t in
+      let rec_instantation =
+        Option.value ~default:VarMap.empty (Analysis.matches t ~pattern:initial_t)
       in
-      match terms with
-      | [] -> accum
-      | t0 :: tl -> (
-          let%lwt accum' = f accum t0 in
-          match accum' with Sat -> return SmtLib.Sat | _ -> check_bounded_sol (return accum') tl)
+      let preconds =
+        let subs =
+          List.map
+            ~f:(fun (orig_rec_var, elimv) ->
+              match orig_rec_var.tkind with
+              | TVar rec_var when Map.mem rec_instantation rec_var ->
+                  (elimv, f_compose_r (Map.find_exn rec_instantation rec_var))
+              | _ -> failwith "all elimination variables should be substituted.")
+            ctex.ctex_eqn.eelim
+        in
+        Option.to_list
+          (Option.map ~f:(fun t -> smt_of_term (substitution subs t)) ctex.ctex_eqn.eprecond)
+      in
+      (* Assert that the variables have the values assigned by the model. *)
+      let model_sat = mk_model_sat_asserts ctex f_compose_r (Map.find rec_instantation) in
+      let vars =
+        VarSet.union_list
+          (Option.(to_list (map ~f:Analysis.free_variables ctex.ctex_eqn.eprecond))
+          @ [ Analysis.free_variables t; Analysis.free_variables (f_compose_r t) ])
+      in
+      (* Start sequence of solver commands, bind on accum. *)
+      let%lwt _ = binder in
+      let%lwt () = Asyncs.spush solver in
+      let%lwt () = Asyncs.declare_all solver (SmtInterface.decls_of_vars vars) in
+      (* Assert that Tinv(t) *)
+      let%lwt () = Asyncs.smt_assert solver (smt_of_term tinv_t) in
+      (* Assert that term satisfies model. *)
+      let%lwt () = Asyncs.smt_assert solver (SmtLib.mk_assoc_and (preconds @ model_sat)) in
+      (* Assert that preconditions hold. *)
+      let%lwt resp = Asyncs.check_sat solver in
+      let%lwt () = Asyncs.spop solver in
+      return resp
     in
-    let rec expand_loop u =
-      let%lwt u = u in
-      match (Set.min_elt u, !steps < !Config.num_expansions_check) with
-      | Some t0, true -> (
-          let tset, u' = Expand.simple t0 in
-          let%lwt check_result = check_bounded_sol (return SmtLib.Unknown) (Set.elements tset) in
-          steps := !steps + Set.length tset;
-          match check_result with
-          | Sat -> return SmtLib.Sat
-          | _ -> expand_loop (return (Set.union (Set.remove u t0) u')))
-      | None, true ->
-          Log.verbose_msg "Bounded checking is complete.";
-          (* All expansions have been checked. *)
-          return SmtLib.Unsat
-      | _, false ->
-          (* Check reached limit. *)
-          if !Config.no_bounded_sat_as_unsat then
-            (* Return Unsat, as if all terms had been checked. *)
-            return SmtLib.Unsat
-          else (* Otherwise, it's unknown. *)
-            return SmtLib.Unknown
-    in
-
     let%lwt _ = starter in
     (* TODO : logic *)
     let%lwt () = Asyncs.set_logic solver "LIA" in
     let%lwt () = Asyncs.load_min_max_defs solver in
-    let%lwt res = expand_loop (return (TermSet.singleton ctex.ctex_eqn.eterm)) in
+    let%lwt res =
+      Expand.lwt_expand_loop steps t_check (return (TermSet.singleton ctex.ctex_eqn.eterm))
+    in
     let%lwt () = Asyncs.close_solver solver in
     return res
   in

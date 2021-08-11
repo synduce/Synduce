@@ -42,3 +42,10 @@ val is_mr : AState.psi_def -> PMRS.t -> Term.term -> Term.VarSet.t -> bool
 val is_mr_all : AState.psi_def -> Term.term -> bool
 
 val to_maximally_reducible : AState.psi_def -> Term.term -> Term.TermSet.t * Term.TermSet.t
+
+(* Helpers to structure bounded-checking processes. *)
+val lwt_expand_loop :
+  int ref ->
+  (Smtlib.Solvers.Asyncs.response -> Term.term -> Smtlib.Solvers.Asyncs.response) ->
+  Term.TermSet.t Lwt.t ->
+  Smtlib.Solvers.Asyncs.response
