@@ -81,14 +81,30 @@ type equation = {
   Represents an equational constraint.
 *)
 
+type spurious_cause =
+  | ViolatesTargetRequires
+  | NotInReferenceImage
+      (** A counterexample can be spurious either because it wiolates the target's requires or
+  because some values assigned to recursion elimination variables are not in the reference
+  function's image.
+*)
+
+type ctex_stat =
+  | Valid
+  | Spurious of spurious_cause
+  | Unknown  (**
+  A counterexample is either valid, or spurious with some reason, or unknown.
+*)
+
 type ctex = {
   ctex_eqn : equation;  (** The equation the counterexample relates to. *)
   ctex_vars : VarSet.t;  (** The variables appearing in the model. *)
   ctex_model : (int, term, Int.comparator_witness) Map.t;
       (** The model of the counterexample, mapping variable ids to terms. The terms should be
         constants.*)
+  ctex_stat : ctex_stat;  (** The spuriousness status of the counterexample. *)
 }
-(** A counterexample related to an equation.
+(** A counterexample related to an equation and some info on the validity of the counterexample.
 *)
 
 type equation_system = equation list

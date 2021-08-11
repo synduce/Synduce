@@ -439,17 +439,17 @@ let set_up_lemma_solver solver ~(p : psi_def) lemma_candidate =
               RType.TBool body);
       ])
 
-let classify_ctexs_opt ~(p : psi_def) ctexs =
+let classify_ctexs_opt ~(p : psi_def) ctexs : ctex list =
   if !Config.classify_ctex then
-    let f (p, n, u) ctex =
+    let f ctex =
       Log.info (fun frmt () ->
           Fmt.(pf frmt "Classify this counterexample: %a (P/N/U)" (box pp_ctex) ctex));
       match Stdio.In_channel.input_line Stdio.stdin with
-      | Some "N" -> (p, ctex :: n, u)
-      | Some "P" -> (ctex :: p, n, u)
-      | _ -> (p, n, ctex :: u)
+      | Some "N" -> { ctex with ctex_stat = Spurious ViolatesTargetRequires }
+      | Some "P" -> { ctex with ctex_stat = Valid }
+      | _ -> ctex
     in
-    List.fold ~f ~init:([], [], []) ctexs
+    List.map ~f ctexs
   else classify_ctexs ~p ctexs
 
 let smt_of_disallow_ctex_values (det : term_state_detail) : S.smtTerm =
@@ -718,6 +718,7 @@ let placeholder_ctex (det : term_state_detail) : ctex =
       };
     ctex_vars = VarSet.of_list det.scalar_vars;
     ctex_model = Map.empty (module Int);
+    ctex_stat = Unknown;
   }
 
 let parse_positive_example_solver_model response (det : term_state_detail) =
@@ -920,7 +921,9 @@ let synthesize_lemmas ~(p : psi_def) synt_failure_info (lstate : refinement_loop
         (* Forget about the specific association in pairs. *)
         let ctexs = List.concat_map unrealizability_ctexs ~f:(fun uc -> [ uc.ci; uc.cj ]) in
         (* Classify in negative and positive cexs. *)
-        let positive_ctexs, negative_ctexs, _ = classify_ctexs_opt ~p ctexs in
+        let positive_ctexs, negative_ctexs, _ =
+          List.partition3_map ~f:ctex_stat_for_lemma_synt (classify_ctexs_opt ~p ctexs)
+        in
         let ts : term_state =
           update_term_state_for_ctexs ~p lstate.term_state ~neg_ctexs:negative_ctexs
             ~pos_ctexs:positive_ctexs

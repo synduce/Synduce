@@ -54,8 +54,12 @@ let unrealizability_ctex_of_constmap (i, j) (eqn_i, eqn_j) (vseti, vsetj) var_su
   (* Remap the names to ids of the original variables in m' *)
   let m_i, m_j = reinterpret_model (m0i, m0j) var_subst in
   let vset = Set.union vseti vsetj in
-  let ctex_i : ctex = { ctex_eqn = eqn_i; ctex_vars = vset; ctex_model = m_i } in
-  let ctex_j : ctex = { ctex_eqn = eqn_j; ctex_vars = vset; ctex_model = m_j } in
+  let ctex_i : ctex =
+    { ctex_eqn = eqn_i; ctex_vars = vset; ctex_model = m_i; ctex_stat = Unknown }
+  in
+  let ctex_j : ctex =
+    { ctex_eqn = eqn_j; ctex_vars = vset; ctex_model = m_j; ctex_stat = Unknown }
+  in
   { i; j; ci = ctex_i; cj = ctex_j }
 
 let skeleton_match ~unknowns (e1 : term) (e2 : term) =
@@ -190,6 +194,18 @@ let check_unrealizable (unknowns : VarSet.t) (eqns : equation_system) : unrealiz
               ctexs));
   ctexs
 
+(* ============================================================================================= *)
+(*                            CLASSIFYING SPURIOUS COUNTEREXAMPLES                               *)
+(* ============================================================================================= *)
+
+(**
+  [check_ctex_in_image ~p ctex] checks whether the recursion elimination's variables values in the
+  model of [ctex] are in the image of (p.psi_reference o p.psi_repr).
+*)
+let check_ctex_in_image ~(p : psi_def) (ctex : ctex) : bool =
+  let _ = (ctex, p) in
+  true
+
 let rec find_original_var_and_proj v (og, elimv) =
   match elimv.tkind with
   | TVar v' ->
@@ -276,20 +292,6 @@ let check_tinv_unsat ~(p : psi_def) (tinv : PMRS.t) (ctex : ctex) :
       let preconds = Option.to_list (Option.map ~f:(substitution subs) ctex.ctex_eqn.eprecond) in
       (* Assert that the variables have the values assigned by the model. *)
       let model_sat = mk_model_sat_asserts ctex f_compose_r (fun t -> Some (mk_var t)) in
-
-      (* let f v =
-           let v_val = Map.find_exn ctex.ctex_model v.vid in
-           match List.find_map ~f:(find_original_var_and_proj v) ctex.ctex_eqn.eelim with
-           | Some (instantiation, proj) ->
-               if proj >= 0 then
-                 let t = mk_sel (f_compose_r instantiation) proj in
-                 mk_bin Binop.Eq t v_val
-               else
-                 let t = f_compose_r instantiation in
-                 mk_bin Binop.Eq t v_val
-           | None -> mk_bin Binop.Eq (mk_var v) v_val
-         in
-         List.map ~f (Set.elements ctex.ctex_vars) *)
       SmtLib.mk_assoc_and (List.map ~f:smt_of_term (term_sat_tinv :: preconds) @ model_sat)
     in
     let%lwt _ =
@@ -376,7 +378,11 @@ let check_tinv_sat ~(p : psi_def) (tinv : PMRS.t) (ctex : ctex) :
           return SmtLib.Unsat
       | _, false ->
           (* Check reached limit. *)
-          if !Config.no_bounded_sat_as_unsat then return SmtLib.Unsat else return SmtLib.Unknown
+          if !Config.no_bounded_sat_as_unsat then
+            (* Return Unsat, as if all terms had been checked. *)
+            return SmtLib.Unsat
+          else (* Otherwise, it's unknown. *)
+            return SmtLib.Unknown
     in
 
     let%lwt _ = starter in
@@ -389,8 +395,7 @@ let check_tinv_sat ~(p : psi_def) (tinv : PMRS.t) (ctex : ctex) :
   in
   Asyncs.(cancellable_task (make_z3_solver ()) task)
 
-let satisfies_tinv ~(p : psi_def) (tinv : PMRS.t) (ctex : ctex) :
-    [ `Fst of ctex | `Snd of ctex | `Trd of ctex ] =
+let satisfies_tinv ~(p : psi_def) (tinv : PMRS.t) (ctex : ctex) : ctex =
   let resp =
     try
       Lwt_main.run
@@ -413,16 +418,24 @@ let satisfies_tinv ~(p : psi_def) (tinv : PMRS.t) (ctex : ctex) :
       else if Solvers.is_sat resp then
         Fmt.(pf frmt "(%a) satisfies %s." (box pp_ctex) ctex tinv.pvar.vname)
       else Fmt.(pf frmt "%s-satisfiability of (%a) is unknown." tinv.pvar.vname (box pp_ctex) ctex));
-  match resp with Sat -> `Fst ctex | Unsat -> `Snd ctex | _ -> `Trd ctex
+  match resp with
+  | Sat -> { ctex with ctex_stat = Valid }
+  | Unsat -> { ctex with ctex_stat = Spurious ViolatesTargetRequires }
+  | _ -> ctex
 
 (** Classify counterexamples into positive or negative counterexamples with respect
     to the Tinv predicate in the problem.
 *)
-let classify_ctexs ~(p : psi_def) (ctexs : ctex list) : ctex list * ctex list * ctex list =
+let classify_ctexs ~(p : psi_def) (ctexs : ctex list) : ctex list =
   let classify_with_tinv tinv =
     (* TODO: DT_LIA for z3, DTLIA for cvc4... Should write a type to represent logics. *)
     let f (ctex : ctex) = satisfies_tinv ~p tinv ctex in
-    let positives, negatives, unknowns = List.partition3_map ~f ctexs in
-    (positives, negatives, unknowns)
+    List.map ~f ctexs
   in
-  match p.psi_tinv with Some tinv -> classify_with_tinv tinv | None -> ([], [], [])
+  match p.psi_tinv with Some tinv -> classify_with_tinv tinv | None -> ctexs
+
+let ctex_stat_for_lemma_synt ctex =
+  match ctex.ctex_stat with
+  | Valid -> `Fst ctex
+  | Spurious ViolatesTargetRequires -> `Snd ctex
+  | _ -> `Trd ctex
