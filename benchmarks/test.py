@@ -89,12 +89,12 @@ constraint_benchmarks = [
     ["constraints/bst/contains.ml", ""],
     ["constraints/bst/count_lt.ml", "--no-sat-as-unsat"],
     ["constraints/bst/most_frequent_v1.ml", ""],
+    ["constraints/bst/from_list/contains.ml", ""],
+    ["constraints/bst/from_list/max.ml", "-B --no-sat-as-unsat -n 100"],
     # balanced_tree
-    ["constraints/balanced_tree/node_count.ml", "-B --no-sat-as-unsat"],
-    ["constraints/balanced_tree/height.ml", "-B --no-sat-as-unsat"],
+    ["constraints/balanced_tree/node_count.ml", "--no-sat-as-unsat --no-lifting"],
+    ["constraints/balanced_tree/height.ml", "--no-sat-as-unsat --no-lifting"],
     ["constraints/balanced_tree/height_v2.ml", "-B --no-sat-as-unsat"],
-    ["constraints/balanced_tree/height_ensures_aux.ml", "--no-sat-as-unsat"],
-    ["constraints/balanced_tree/node_count_ensures_height.ml", "--no-sat-as-unsat"],
     # memo
     ["constraints/memo/tree_size.ml", "-B --no-sat-as-unsat"],
     ["constraints/memo/constant.ml", ""],
@@ -102,8 +102,7 @@ constraint_benchmarks = [
     ["constraints/memo/count_lt.ml", "-B --no-sat-as-unsat -n 50"],
     ["constraints/memo/max_sum_gt.ml", "-B --no-sat-as-unsat"],
     # empty_right
-    ["constraints/empty_right_subtree/contains.ml", "-B --no-sat-as-unsat"],
-    ["constraints/empty_right_subtree/contains_ensures_size.ml", "--no-sat-as-unsat"],
+    ["constraints/empty_right_subtree/contains.ml", "--no-sat-as-unsat --no-lifting"],
     # alist
     ["constraints/alist/count_eq2.ml", "-B --no-sat-as-unsat"],
     ["constraints/alist/count_eq.ml", ""],
@@ -111,7 +110,9 @@ constraint_benchmarks = [
     ["constraints/alist/most_frequent.ml", ""],
     # even_tree
     ["constraints/even_tree/sum_of_parities.ml", "-B --no-sat-as-unsat"],
-    ["constraints/even_tree/parity_of_max.ml", ""]
+    ["constraints/even_tree/parity_of_max.ml", ""],
+    # program 
+    ["constraints/program/typecheck.ml", ""]
 ]
 
 base_benchmark_set = [
@@ -276,6 +277,9 @@ if __name__ == "__main__":
                 print("B:%s,%s+%s" % (filename, algo[0], optim[0]))
                 sys.stdout.flush()
                 if table_no > 0:
+                    if not os.path.exists(os.path.dirname("test/tmp_benchmarks/%s" % filename)):
+                        os.makedirs(os.path.dirname(
+                            "test/tmp_benchmarks/%s" % filename)) 
                     os.system("%s %s %s -i %s %s %s --generate-benchmarks=\"test/tmp_benchmarks\"" %
                               (timeout, exec_path, algo[1], optim[1], extra_opt,
                                os.path.realpath(os.path.join("benchmarks", filename))))
