@@ -41,6 +41,14 @@ let make_term_state_detail ~(p : psi_def) (term : term) : term_state_detail =
     current_preconds = None;
   }
 
+let flatten_rec_elim_tuples elim =
+  List.concat_map
+    ~f:(fun (a, b) ->
+      match b.tkind with
+      | TTup comps -> List.mapi comps ~f:(fun i t -> (mk_sel a i, t))
+      | _ -> [ (a, b) ])
+    elim
+
 let subs_from_elim_to_elim elim1 elim2 : (term * term) list =
   List.concat_map
     ~f:(fun (a, b) ->
@@ -52,11 +60,12 @@ let subs_from_elim_to_elim elim1 elim2 : (term * term) list =
             []
         | (a', b') :: tl -> if Terms.(equal a a') then [ (b', b) ] else f tl
       in
-      f elim2)
-    elim1
+      f (flatten_rec_elim_tuples elim2))
+    (flatten_rec_elim_tuples elim1)
 
 let make_term_state_detail_from_ctex ~(p : psi_def) (is_pos_ctex : bool) (ctex : ctex) :
     term_state_detail =
+  Log.debug_msg Fmt.(str "Here is ctex recurs elim: ");
   let neg = if is_pos_ctex then [] else [ ctex ] in
   let pos = if is_pos_ctex then [ ctex ] else [] in
   let recurs_elim_, scalar_vars_ = make_new_recurs_elim_from_term ~p ctex.ctex_eqn.eterm in
@@ -241,19 +250,43 @@ let convert_term_rec_to_ctex_rec ~(p : psi_def) (det : term_state_detail) (ctex 
     (name : string) : string =
   let rec g recvar lst =
     match lst with
-    | [] -> failwith (Fmt.str "Could not convert name %s to ctex rec elim." name)
+    | [] -> failwith (Fmt.str "Could not find name %s in the ctex's recursion elimination." name)
     | (a, b) :: tl ->
         let i = term_var_string b in
         let l = term_var_string a in
         if String.(equal l recvar) then i else g recvar tl
   in
+  let rec h recvar n elim =
+    match elim with
+    | [] -> failwith (Fmt.str "Could not find ctex rec elim entry for tuple entry named %s." name)
+    | (a, b) :: tl ->
+        let l = term_var_string a in
+        if String.(equal l recvar) then
+          match b.tkind with
+          | TTup vars -> term_var_string (List.nth_exn vars n)
+          | _ ->
+              failwith
+                Fmt.(str "Cannot get tuple entry %s in ctex rec elim; %s is not a tuple.)" name l)
+        else h recvar n tl
+  in
   let rec f lst =
     match lst with
-    | [] -> failwith (Fmt.str "Could not convert name %s to ctex rec elim." name)
-    | (a, b) :: tl ->
-        let i = term_var_string b in
-        let l = term_var_string a in
-        if String.(equal i name) then g l ctex.ctex_eqn.eelim else f tl
+    | [] -> failwith (Fmt.str "Could not find name %s in this term's recursion elimination." name)
+    | (a, b) :: tl -> (
+        match b.tkind with
+        | TTup vars -> (
+            match
+              List.find_mapi vars ~f:(fun n x ->
+                  let l = term_var_string a in
+                  let i = term_var_string x in
+                  if String.(equal i name) then Some (h l n ctex.ctex_eqn.eelim) else None)
+            with
+            | Some s -> s
+            | None -> f tl)
+        | _ ->
+            let i = term_var_string b in
+            let l = term_var_string a in
+            if String.(equal i name) then g l ctex.ctex_eqn.eelim else f tl)
   in
   match
     VarSet.find_by_name
@@ -405,7 +438,8 @@ let set_up_lemma_solver_async solver ~(p : psi_def) lemma_candidate =
       @ (if p.psi_repr_is_identity then Smt.smt_of_pmrs p.psi_reference
         else Smt.smt_of_pmrs p.psi_reference @ Smt.smt_of_pmrs p.psi_repr)
       (* Assert invariants on functions *)
-      @ List.map ~f:S.mk_assert (smt_of_aux_ensures ~p)
+      (* TODO: fix smt_of_aux_ensures for tuples, and uncomment following line *)
+      (* @ List.map ~f:S.mk_assert (smt_of_aux_ensures ~p) *)
       (* Declare lemmas. *)
       @ [
           (match lemma_candidate with
@@ -476,15 +510,12 @@ let set_up_to_get_model solver ~(p : psi_def) lemma (det : term_state_detail) =
   (* Step 1. Declare vars for term, and assert that term satisfies tinv. *)
   Solvers.declare_all solver (Smt.decls_of_vars (Analysis.free_variables det.term));
   ignore (Solvers.exec_command solver (S.mk_assert (smt_of_tinv_app ~p det)));
-  ignore (Solvers.check_sat solver);
-  (* ^ Why do I do this sat check? *)
   (* Step 2. Declare scalars (vars for recursion elimination & spec param) and their constraints (preconds & recurs elim eqns) *)
   Solvers.declare_all solver (Smt.decls_of_vars (VarSet.of_list det.scalar_vars));
   ignore (Solvers.exec_command solver (S.mk_assert (smt_of_recurs_elim_eqns det.recurs_elim ~p)));
   (match det.current_preconds with
   | None -> ()
   | Some pre -> ignore (Solvers.exec_command solver (S.mk_assert (Smt.smt_of_term pre))));
-  ignore (Solvers.check_sat solver);
   (* Step 3. Disallow repeated positive examples. *)
   if List.length det.positive_ctexs > 0 then
     ignore (Solvers.exec_command solver (S.mk_assert (smt_of_disallow_ctex_values det)));
@@ -496,8 +527,6 @@ let set_up_to_get_model_async solver ~(p : psi_def) lemma (det : term_state_deta
   (* Step 1. Declare vars for term, and assert that term satisfies tinv. *)
   let%lwt () = Asyncs.declare_all solver (Smt.decls_of_vars (Analysis.free_variables det.term)) in
   let%lwt _ = Asyncs.exec_command solver (S.mk_assert (smt_of_tinv_app ~p det)) in
-  let%lwt _ = Asyncs.check_sat solver in
-  (* ^ Why do I do this sat check? *)
   (* Step 2. Declare scalars (vars for recursion elimination & spec param) and their constraints (preconds & recurs elim eqns) *)
   let%lwt () = Asyncs.declare_all solver (Smt.decls_of_vars (VarSet.of_list det.scalar_vars)) in
   let%lwt _ =
@@ -510,7 +539,6 @@ let set_up_to_get_model_async solver ~(p : psi_def) lemma (det : term_state_deta
         let%lwt _ = Asyncs.exec_command solver (S.mk_assert (Smt.smt_of_term pre)) in
         return ()
   in
-  let%lwt _ = Asyncs.check_sat solver in
   (* Step 3. Disallow repeated positive examples. *)
   let%lwt () =
     if List.length det.positive_ctexs > 0 then
