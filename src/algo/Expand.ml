@@ -355,3 +355,42 @@ let to_maximally_reducible (p : psi_def) (t0 : term) : TermSet.t * TermSet.t =
   in
   let l1, l2 = List.fold tset0 ~f ~init:([], uset0) in
   (TermSet.of_list l1, TermSet.of_list l2)
+
+(* ============================================================================================= *)
+(*                                   EXPAND TERM UTILS                                           *)
+(* ============================================================================================= *)
+open Lwt
+open Smtlib
+
+let lwt_expand_loop (counter : int ref)
+    (t_check : Solvers.Asyncs.response -> term -> Solvers.Asyncs.response) (u : TermSet.t Lwt.t) =
+  let rec tlist_check accum terms =
+    match terms with
+    | [] -> accum
+    | t0 :: tl -> (
+        let%lwt accum' = t_check accum t0 in
+        match accum' with Sat -> return SmtLib.Sat | _ -> tlist_check (return accum') tl)
+  in
+  let rec aux u =
+    let%lwt u = u in
+    match (Set.min_elt u, !counter < !Config.num_expansions_check) with
+    | Some t0, true -> (
+        let tset, u' = simple t0 in
+        let%lwt check_result = tlist_check (return SmtLib.Unknown) (Set.elements tset) in
+        counter := !counter + Set.length tset;
+        match check_result with
+        | SmtLib.Sat -> return SmtLib.Sat
+        | _ -> aux (return (Set.union (Set.remove u t0) u')))
+    | None, true ->
+        Log.verbose_msg "Bounded checking is complete.";
+        (* All expansions have been checked. *)
+        return SmtLib.Unsat
+    | _, false ->
+        (* Check reached limit. *)
+        if !Config.no_bounded_sat_as_unsat then
+          (* Return Unsat, as if all terms had been checked. *)
+          return SmtLib.Unsat
+        else (* Otherwise, it's unknown. *)
+          return SmtLib.Unknown
+  in
+  aux u

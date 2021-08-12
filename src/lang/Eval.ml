@@ -1,3 +1,4 @@
+open Base
 open Term
 open Utils
 
@@ -56,3 +57,7 @@ let simplify t =
     if iters > !Config.reduction_limit && Terms.equal t' t then t' else until_stable (iters + 1) t'
   in
   until_stable 0 t
+
+let in_model (imap : (int, term, Int.comparator_witness) Map.t) (t : term) =
+  let remap _ t = match t.tkind with TVar v -> Map.find imap v.vid | _ -> None in
+  simplify (transform ~case:remap t)
