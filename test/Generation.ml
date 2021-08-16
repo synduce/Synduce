@@ -1,6 +1,9 @@
 open Codegen.Dafny
 open Lang.Term
 open Lang.RType
+let prob_file = "benchmarks/list/sum.ml"
+let out_file = "test/generated.dfy"
+
 
 let rec convert_tkind (t : type_term) : d_domain_type =
   match t.tkind with
@@ -74,7 +77,9 @@ let rec convert_otyp_to_dfy (typ : t) : d_domain_type =
       match typ with
       | TNamed name -> mk_named_type ~params:(List.map convert_otyp_to_dfy params) name
       | _ -> mk_named_type ~params:(List.map convert_otyp_to_dfy params) "")
-  | _ -> failwith "Unsupported type."
+  | TFun (_, _) -> failwith "Unsupported TFun type"
+  | TVar x -> mk_named_type (Fmt.str "t%i" x)
+(* failwith (Fmt.str "Unsupported TVar %d type." x) *)
 
 let rec gen_func_tup_arg (arg : fpattern) : d_domain_type =
   match arg with
@@ -112,7 +117,8 @@ let gen_func_decl (name : ident) (func : term) =
       let signature =
         mk_func_sig
           ~params:(List.map (fun name -> (None, name)) params)
-          ~returns:[ return_type ] arguments
+          ~returns:(None, [ return_type ])
+          arguments
       in
       let last_arg =
         match List.nth_opt (List.rev arguments) 0 with
@@ -188,7 +194,7 @@ let gen_target (s : Algo.AState.soln option) =
       List.map aux sol.soln_implems
   | None -> []
 
-let sum, soln = Lib.solve_file "benchmarks/list/sum.ml"
+let sum, soln = Lib.solve_file prob_file
 
 (* Assumption is that the main function is always the first one *)
 let repr_name = (List.hd sum.pd_repr).f_var.vname
@@ -274,31 +280,206 @@ let rec gen_nested_match (args : term list) ?(cur_case : (term * term) list = []
       in
       gen_match hd expansions cases
 
+let rec get_all_terms_of_type (te : term) (typ : t) (acc : term list) =
+  let cur_type, _ = infer_type te in
+  let cur_term = if cur_type.ttyp = typ then [ te ] else [] in
+  let new_terms =
+    match te.tkind with
+    | TBin (_, t1, t2) -> get_all_terms_of_type t1 typ acc @ get_all_terms_of_type t2 typ acc
+    | TUn (_, t1) -> get_all_terms_of_type t1 typ acc
+    | TConst _ -> []
+    | TVar _ -> []
+    | TBox t1 -> get_all_terms_of_type t1 typ acc
+    | TIte (_, a, b) -> get_all_terms_of_type a typ acc @ get_all_terms_of_type b typ acc
+    | TTup tl -> List.fold_left ( @ ) [] (List.map (fun x -> get_all_terms_of_type x typ acc) tl)
+    | TSel (t, i) -> (
+        match t.tkind with
+        | TTup tl -> List.nth (List.map (fun x -> get_all_terms_of_type x typ acc) tl) i
+        | _ -> failwith "Unexpected tuple projection")
+    | TFun (_, body) -> get_all_terms_of_type body typ acc
+    | TApp (_, args) ->
+        List.fold_left ( @ ) [] (List.map (fun x -> get_all_terms_of_type x typ acc) args)
+    | TData (_, args) ->
+        List.fold_left ( @ ) [] (List.map (fun x -> get_all_terms_of_type x typ acc) args)
+    | TMatch (_, _) -> []
+  in
+  acc @ new_terms @ cur_term
+
+let rec cartesian_prod terms =
+  match terms with
+  | [] -> [ [] ]
+  | hd :: tl ->
+      let rest = cartesian_prod tl in
+      List.concat (List.map (fun x -> List.map (fun rs -> x :: rs) rest) hd)
+
+let rec has_dup = function [] -> false | hd :: tl -> List.mem hd tl || has_dup tl
+
 let add_case_lemma (case : term) =
   let args = VarSet.elements (Lang.Analysis.free_variables case) in
   let signature = mk_method_sig (List.map get_var_sig args) in
   let lhs =
-    mk_app_v (List.hd sum.pd_reference).f_var [mk_app_v (List.hd sum.pd_repr).f_var [case]]
-    (* mk_app (mk_var (Variable.mk spec_name)) [ mk_app (mk_var (Variable.mk repr_name)) [ case ] ] *)
+    mk_app_v (List.hd sum.pd_reference).f_var [ mk_app_v (List.hd sum.pd_repr).f_var [ case ] ]
   in
   let rhs = mk_app (mk_var (Variable.mk target_name)) [ case ] in
   let spec = mk_simple_spec ~ensures:[ mk_bin Binop.Eq lhs rhs ] ~requires:[] DSpecMethod in
+  let name = Fmt.str "lemma%d" (new_lemma_id ()) in
   let body =
     match case.tkind with
     | TData (_, params) ->
-        gen_nested_match params (fun cases ->
+        gen_nested_match
+          (List.filter (fun param -> not (Lang.Analysis.is_norec param)) params)
+          (fun cases ->
             let lhs_sub = substitution cases lhs in
             let rhs_sub = substitution cases rhs in
-            let lhs_red = Lang.Reduce.reduce_term lhs_sub in
-            [ DCalc [ DStmt (DTerm lhs_sub); DStmt (DTerm lhs_red); DStmt (DTerm rhs_sub) ] ])
+            let lhs_calc = List.map (fun x -> DStmt (DTerm x)) (Lang.Reduce.calc_term lhs_sub) in
+            let last_term = List.hd (List.rev (Lang.Reduce.calc_term lhs_sub)) in
+            let lemma_opts =
+              List.map
+                (fun arg ->
+                  let arg_type = Variable.vtype_or_new arg in
+                  get_all_terms_of_type last_term arg_type [])
+                args
+            in
+            let prod = cartesian_prod lemma_opts in
+            let filtered_prod =
+              List.filter
+                (fun (p : term list) ->
+                  not
+                    (has_dup p
+                    || List.fold_left (fun acc (_, case) -> acc || List.mem case p) false cases))
+                prod
+            in
+            let new_lemmas =
+              List.map (fun args -> DStmt (DTerm (mk_app_v (Variable.mk name) args))) filtered_prod
+            in
+            new_lemmas @ [ DCalc (lhs_calc @ [ DStmt (DTerm rhs_sub) ]) ])
     | _ -> failwith "Unexpected match case type"
   in
-  let name = Fmt.str "lemma%d" (new_lemma_id ()) in
   (mk_toplevel (mk_lemma name signature spec body), name)
 
 let skeleton : d_toplevel list ref = ref []
 
 let add_toplevel (n : d_toplevel) = skeleton := !skeleton @ [ n ]
+
+let add_min_max =
+  let min_func : d_toplevel =
+    let signature =
+      mk_func_sig ~returns:(Some "x", [ mk_int_type ]) [ ("a", mk_int_type); ("b", mk_int_type) ]
+    in
+    let spec =
+      mk_simple_spec
+        ~ensures:
+          [
+            mk_bin Binop.Or
+              (mk_bin Binop.Eq (mk_var (Variable.mk "a")) (mk_var (Variable.mk "x")))
+              (mk_bin Binop.Eq (mk_var (Variable.mk "b")) (mk_var (Variable.mk "x")));
+            mk_bin Binop.And
+              (mk_bin Binop.Le (mk_var (Variable.mk "x")) (mk_var (Variable.mk "a")))
+              (mk_bin Binop.Le (mk_var (Variable.mk "x")) (mk_var (Variable.mk "b")));
+          ]
+        ~requires:[] DSpecFunction
+    in
+    let body = Body "if a >= b then b else a" in
+    mk_toplevel (mk_func "min" signature spec body)
+  in
+  let max_func : d_toplevel =
+    let signature =
+      mk_func_sig ~returns:(Some "x", [ mk_int_type ]) [ ("a", mk_int_type); ("b", mk_int_type) ]
+    in
+    let spec =
+      mk_simple_spec
+        ~ensures:
+          [
+            mk_bin Binop.Or
+              (mk_bin Binop.Eq (mk_var (Variable.mk "a")) (mk_var (Variable.mk "x")))
+              (mk_bin Binop.Eq (mk_var (Variable.mk "b")) (mk_var (Variable.mk "x")));
+            mk_bin Binop.And
+              (mk_bin Binop.Ge (mk_var (Variable.mk "x")) (mk_var (Variable.mk "a")))
+              (mk_bin Binop.Ge (mk_var (Variable.mk "x")) (mk_var (Variable.mk "b")));
+          ]
+        ~requires:[] DSpecFunction
+    in
+    let body = Body "if a >= b then a else b" in
+    mk_toplevel (mk_func "max" signature spec body)
+  in
+  add_toplevel max_func;
+  add_toplevel min_func
+
+
+
+(* Uncomment for termination template *)
+
+(* let add_depth_f =
+  let v = mk_var (Variable.mk ~t:(Some !Algo.AState._theta) "x") in
+  let expansions = Lang.Analysis.expand_once v in
+  let case_bodies =
+    List.map
+      (fun cur ->
+        if is_recur_case cur then
+          let get_recur c =
+            let free_v = List.map mk_var (VarSet.elements (Lang.Analysis.free_variables c)) in
+            List.filter (fun var -> not (Lang.Analysis.is_norec var)) free_v
+          in
+          mk_app
+            (mk_var (Variable.mk (Lang.Alpha.fresh ~s:"hdepth" ())))
+            (List.map (fun var -> mk_app (mk_var (Variable.mk "depth")) [ var ]) (get_recur cur))
+        else mk_var (Variable.mk (Lang.Alpha.fresh ())))
+      (* (Lang.Alpha.fresh ~s:"f" (), get_recur cur) *)
+      expansions
+  in
+  let depth_f =
+    let signature =
+      mk_func_sig
+        ~returns:(None, [ mk_int_type ])
+        [ ("x", mk_named_type (get_t_name !Algo.AState._theta)) ]
+    in
+    let spec =
+      mk_simple_spec
+        ~ensures:
+          [
+            mk_bin Binop.Ge
+              (mk_app (mk_var (Variable.mk "depth")) [ mk_var (Variable.mk "x") ])
+              (mk_const (Constant.CInt 0));
+          ]
+        ~requires:[] DSpecFunction
+    in
+    let match_theta =
+      let cases =
+        List.map2 (fun body case -> (pattern_of_term case, body)) case_bodies expansions
+      in
+      mk_match v cases
+    in
+    let variable_decls : d_body list =
+      List.map
+        (fun (body, _) -> DStmt (DAssign (body, DTerm (mk_var (Variable.mk "Fill me in")))))
+        (List.filter
+           (fun (_, case) -> not (is_recur_case case))
+           (List.combine case_bodies expansions))
+    in
+    let body = DBlock (variable_decls @ [ DTerm match_theta ]) in
+    mk_toplevel (mk_func "depth" signature spec body)
+  in
+  let helper_functions =
+    List.map
+      (fun ((body, _) : term * term) ->
+        match body.tkind with
+        | TApp (f, args) ->
+            let name =
+              match f.tkind with TVar v -> v.vname | _ -> failwith "Unsupported function type"
+            in
+            let help_sig =
+              mk_func_sig
+                ~returns:(None, [ mk_int_type ])
+                (List.map (fun _ -> (Lang.Alpha.fresh ~s:"i" (), mk_int_type)) args)
+            in
+            let help_spec = mk_simple_spec ~ensures:[] ~requires:[] DSpecFunction in
+            let help_body = Body "Fill me in" in
+            mk_toplevel (mk_func name help_sig help_spec help_body)
+        | _ -> failwith "Unexpected non-function app")
+      (List.filter (fun (_, case) -> is_recur_case case) (List.combine case_bodies expansions))
+  in
+  List.iter add_toplevel helper_functions;
+  add_toplevel depth_f *)
 
 let correctness_lemma : d_toplevel =
   let theta_type =
@@ -361,7 +542,6 @@ let incl_decl =
 
 let proof_skeleton = incl_decl @ toplevel @ gen_target soln @ !skeleton @ [ correctness_lemma ]
 
-let ref_program : d_program = { dp_includes = []; dp_topdecls = proof_skeleton }
+let ref_program : d_program = { dp_includes = []; dp_topdecls = proof_skeleton };;
 
-;;
-Utils.Log.to_file "test/generated.dfy" (fun fmt () -> Fmt.pf fmt "%a" pp_d_program ref_program)
+Utils.Log.to_file out_file (fun fmt () -> Fmt.pf fmt "%a" pp_d_program ref_program)
