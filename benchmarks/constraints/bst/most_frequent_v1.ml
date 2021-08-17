@@ -41,4 +41,4 @@ let rec target = function
   | Node (hd_key, l, r) -> [%synt join] hd_key (target l) (target r)
   [@@requires is_imap]
 
-and int_of = function S n -> 1 + int_of n | One -> 1
+and int_of = function S n -> [%synt int_succ] (int_of n) | One -> [%synt int_base]

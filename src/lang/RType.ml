@@ -4,6 +4,8 @@ open Utils
 
 let _tid = ref 0
 
+let _tvar_idx = ref 0
+
 type ident = string
 
 (** Used for type declarations*)
@@ -53,8 +55,6 @@ type t =
   | TFun of t * t
   | TParam of t list * t
   | TVar of int
-
-let _tvar_idx = ref 0
 
 let get_fresh_tvar () =
   Int.incr _tvar_idx;
@@ -145,6 +145,13 @@ let dump_types (frmt : Formatter.t) () =
   in
   Fmt.(pf frmt "@[Variants:@]@.");
   Hashtbl.iteri _variants ~f:f_v
+
+let reinit () =
+  Hashtbl.clear _variant_to_tname;
+  Hashtbl.clear _tname_to_variants;
+  Hashtbl.clear _variants;
+  _tid := 0;
+  _tvar_idx := 0
 
 (* ============================================================================================= *)
 
@@ -418,6 +425,8 @@ let is_recursive =
     | l -> if List.exists l ~f:is_recursive_variant then Some true else None
   in
   reduce ~case ~init:false ~join:( || )
+
+let is_datatype t = List.length (get_variants t) > 0
 
 let rec is_user_defined t =
   match t with

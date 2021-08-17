@@ -7,9 +7,14 @@ timeout_value = 240  # 4min timeout for the review
 # Maximum 4gb memory - this should not be limiting!
 memout_value = 8000 * (2 ** 10)  # 4GB memory limit
 
-
-timeout = ("./extras/timeout/timeout -t %i -m %i --no-info-on-success" %
-           (timeout_value, memout_value))
+if sys.platform.startswith('linux'):
+    timeout = ("./extras/timeout/timeout -t %i -m %i --no-info-on-success" %
+               (timeout_value, memout_value))
+elif sys.platform.startswith('darwin'):
+    timeout = ("timelimit -t%i" % timeout_value)
+else:
+    print("Platform %s not supported" % sys.platform)
+    exit(-1)
 
 kick_the_tires_set = [
     ["list/sumhom.pmrs", ""],
@@ -102,7 +107,8 @@ constraint_benchmarks = [
     ["constraints/memo/count_lt.ml", "-B --no-sat-as-unsat -n 50"],
     ["constraints/memo/max_sum_gt.ml", "-B --no-sat-as-unsat"],
     # empty_right
-    ["constraints/empty_right_subtree/contains.ml", "--no-sat-as-unsat --no-lifting"],
+    ["constraints/empty_right_subtree/contains.ml",
+        "--no-sat-as-unsat --no-lifting"],
     # alist
     ["constraints/alist/count_eq2.ml", "-B --no-sat-as-unsat"],
     ["constraints/alist/count_eq.ml", ""],
@@ -111,7 +117,7 @@ constraint_benchmarks = [
     # even_tree
     ["constraints/even_tree/sum_of_parities.ml", "-B --no-sat-as-unsat"],
     ["constraints/even_tree/parity_of_max.ml", ""],
-    # program 
+    # program
     ["constraints/program/typecheck.ml", ""]
 ]
 
@@ -279,7 +285,7 @@ if __name__ == "__main__":
                 if table_no > 0:
                     if not os.path.exists(os.path.dirname("test/tmp_benchmarks/%s" % filename)):
                         os.makedirs(os.path.dirname(
-                            "test/tmp_benchmarks/%s" % filename)) 
+                            "test/tmp_benchmarks/%s" % filename))
                     os.system("%s %s %s -i %s %s %s --generate-benchmarks=\"test/tmp_benchmarks\"" %
                               (timeout, exec_path, algo[1], optim[1], extra_opt,
                                os.path.realpath(os.path.join("benchmarks", filename))))

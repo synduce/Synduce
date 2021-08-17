@@ -224,7 +224,7 @@ let add_lemmas_interactively ~(p : psi_def) (lstate : refinement_loop_state) : r
 let ith_synth_fun index = "lemma_" ^ Int.to_string index
 
 let synthfun_of_ctex ~(p : psi_def) (det : term_state_detail) (lem_id : int) :
-    command * (string * sygus_sort) list =
+    command * (string * sygus_sort) list * string =
   let params =
     List.map
       ~f:(fun scalar -> (scalar.vname, sort_of_rtype (Variable.vtype_or_new scalar)))
@@ -239,7 +239,8 @@ let synthfun_of_ctex ~(p : psi_def) (det : term_state_detail) (lem_id : int) :
   in
   (* OpSet.of_list [ Binary Binop.Mod ] in *)
   let grammar = Grammars.generate_grammar ~guess:None ~bools:true opset params ret_sort in
-  (CSynthFun (ith_synth_fun lem_id, params, ret_sort, grammar), params)
+  let logic = logic_of_operators opset in
+  (CSynthFun (ith_synth_fun lem_id, params, ret_sort, grammar), params, logic)
 
 let term_var_string term : string =
   match Set.elements (Analysis.free_variables term) with
@@ -652,10 +653,10 @@ let verify_lemma_bounded ~(p : psi_def) (det : term_state_detail) lemma_candidat
         in
         let%lwt resp = Asyncs.check_sat solver in
         (* Note that I am getting a model after check-sat unknown response. This may not halt.  *)
-        let result =
+        let%lwt result =
           match resp with
-          | SmtLib.Sat | SmtLib.Unknown -> Some (Asyncs.get_model solver)
-          | _ -> None
+          | SmtLib.Sat | SmtLib.Unknown -> Lwt.map (fun x -> Some x) (Asyncs.get_model solver)
+          | _ -> return None
         in
         let%lwt () = Asyncs.spop solver in
         return (resp, result)
@@ -680,7 +681,7 @@ let verify_lemma_bounded ~(p : psi_def) (det : term_state_detail) lemma_candidat
           | _, Some model ->
               Log.debug_msg
                 "Bounded lemma verification has found a counterexample to the lemma candidate.";
-              model
+              return model
           | _ -> expand_loop (Set.union (Set.remove u t0) u'))
       | None, true ->
           (* All expansions have been checked. *)
@@ -852,10 +853,9 @@ let synthesize_new_lemma ~(p : psi_def) (det : term_state_detail) :
         | Some pre ->
             pf f "Synthesizing a new lemma candidate for term %a[%a] with precondition %a" pp_term
               det.term pp_subs det.recurs_elim pp_term pre));
-  let set_logic = CSetLogic "DTLIA" in
   (* TODO: How to choose logic? *)
   let lem_id = 0 in
-  let synth_objs, params = synthfun_of_ctex ~p det lem_id in
+  let synth_objs, params, logic = synthfun_of_ctex ~p det lem_id in
   let neg_constraints =
     List.map ~f:(constraint_of_neg_ctex lem_id ~p det params) det.negative_ctexs
   in
@@ -864,7 +864,8 @@ let synthesize_new_lemma ~(p : psi_def) (det : term_state_detail) :
   in
   let extra_defs = [ max_definition; min_definition ] in
   let commands =
-    set_logic :: (extra_defs @ [ synth_objs ] @ neg_constraints @ pos_constraints @ [ CCheckSynth ])
+    CSetLogic logic
+    :: (extra_defs @ [ synth_objs ] @ neg_constraints @ pos_constraints @ [ CCheckSynth ])
   in
   match handle_lemma_synth_response det (Syguslib.Solvers.SygusSolver.solve_commands commands) with
   | None -> None

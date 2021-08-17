@@ -55,6 +55,13 @@ let _span = ref 1
 
 let refinement_steps = ref 0
 
+let reinit () =
+  _span := 1;
+  refinement_steps := 0;
+  _alpha := (RType.TInt, None);
+  _tau := RType.TInt;
+  _theta := RType.TInt
+
 (* ============================================================================================= *)
 (*       Types for intermediate representations of solutions, lemmas, counterexamples, etc.      *)
 (* ============================================================================================= *)

@@ -8,6 +8,11 @@ let _NAMES = Hashtbl.create (module String) ~size:100
 
 let _MAX_ID = ref 0
 
+let reinit () =
+  _MAX_ID := 0;
+  Hashtbl.clear _IDS;
+  Hashtbl.clear _NAMES
+
 let new_id () =
   let i = !_MAX_ID in
   _MAX_ID := !_MAX_ID + 1;

@@ -342,31 +342,22 @@ let skeletize ~(functions : VarSet.t) (t : term) : term VarMap.t * term =
 (*                                  NAIVE TERM EXPANSION                                         *)
 (* ============================================================================================= *)
 
+let is_expandable_var (v : variable) =
+  match RType.get_variants (Variable.vtype_or_new v) with [] -> None | l -> Some (v, l)
+
 let expand_once (t : term) : term list =
   let fvt = free_variables t in
   (* Pick variables to expand on *)
-  let expandable =
-    let filter v =
-      match RType.get_variants (Variable.vtype_or_new v) with [] -> None | l -> Some (v, l)
-    in
-    List.filter_map (Set.elements fvt) ~f:filter
-  in
-  let aux (v, v_expan) =
+  let expandables = List.filter_map (Set.elements fvt) ~f:is_expandable_var in
+  let aux (v, v_constrs) =
     let f (cstr_name, cstr_arg_types) =
-      let cstr_args =
-        List.map cstr_arg_types ~f:(fun ty ->
-            mk_composite_base_type ty
-            (* mk_var
-               (Variable.mk ~t:(Some ty)
-                  (if RType.is_recursive ty then Alpha.fresh ~s:"l" () else Alpha.fresh ~s:"n" ())
-                  ) *))
-      in
+      let cstr_args = List.map cstr_arg_types ~f:(fun ty -> mk_composite_base_type ty) in
       let t, _ = infer_type (substitution [ (mk_var v, mk_data cstr_name cstr_args) ] t) in
       t
     in
-    List.map ~f v_expan
+    List.map ~f v_constrs
   in
-  List.rev (List.concat (List.map ~f:aux expandable))
+  List.rev (List.concat (List.map ~f:aux expandables))
 
 (**
   Given a list of variants, returns a list of terms that corresponds to the

@@ -96,7 +96,7 @@ let base s = Caml.Filename.concat root_folder s
 
 (* Set to true to force using cvc4 even if cvc5 is available. *)
 (* There are still bugs with CVC5, leave true for now. *)
-let use_cvc4 = ref true
+let use_cvc4 = ref false
 
 let cvc4_binary_path = try Some (FileUtil.which "cvc4") with _ -> None
 

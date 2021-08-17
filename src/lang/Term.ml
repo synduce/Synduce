@@ -68,11 +68,17 @@ module Variable = struct
 
   let names_tbl : (int, string) Hashtbl.t = Hashtbl.create (module Int)
 
+  let clear () =
+    Hashtbl.clear types_tbl;
+    Hashtbl.clear names_tbl
+
   let _print_info = ref false
 
   let vtype_assign (v : t) (t : RType.t) = Hashtbl.set types_tbl ~key:v.vid ~data:t
 
   let vtype (v : t) = Hashtbl.find types_tbl v.vid
+
+  let id (v : t) = v.vid
 
   let get_name (vid : int) = Hashtbl.find names_tbl vid
 
@@ -373,7 +379,7 @@ module Operator = struct
 
   let is_lia = function
     | Unary (Abs | Neg | Not) -> true
-    | Binary (Plus | Minus | Max | Min | And | Or) -> true
+    | Binary (Plus | Minus | Max | Min | And | Or | Eq | Lt | Gt | Le | Ge) -> true
     | _ -> false
 
   let is_bool = function Unary Not -> true | Binary (And | Or) -> true | _ -> false
@@ -573,6 +579,12 @@ let mk_un ?(pos = dummy_loc) ?(typ = None) (op : Unop.t) (t : term) =
 let mk_match ?(pos = dummy_loc) (x : term) (cases : match_case list) =
   let typ = match cases with (_, t) :: _ -> t.ttyp | _ -> RType.get_fresh_tvar () in
   { tpos = pos; tkind = TMatch (x, cases); ttyp = typ }
+
+let mk_let ?(pos = dummy_loc) ?(typ = None) (bindings : (variable * term) list) (body : term) : term
+    =
+  let var_args, term_args = List.unzip bindings in
+  let t = mk_app ~pos (mk_fun ~pos (List.map ~f:(fun x -> FPatVar x) var_args) body) term_args in
+  match typ with Some typ -> { t with ttyp = typ } | None -> { t with ttyp = body.ttyp }
 
 let term_of_pattern (p : pattern) : term =
   let rec aux p =
@@ -867,6 +879,33 @@ let transform ~(case : (term -> term) -> term -> term option) (t : term) : term 
         }
   and aux_l l = List.map ~f:aux l in
   aux t
+
+let transform_at_depth (min_depth : int) ~(case : (term -> term) -> term -> term option) (t : term)
+    : term =
+  let rec aux (d : int) (t : term) : term =
+    if d >= min_depth then match case (aux d) t with Some x -> x | None -> drec d t else drec d t
+  and drec d t =
+    let aux = aux (d + 1) in
+    let aux_l l = List.map ~f:aux l in
+    {
+      t with
+      tkind =
+        (match t.tkind with
+        | TBin (bo, t1, t2) -> TBin (bo, aux t1, aux t2)
+        | TUn (uo, t1) -> TUn (uo, aux t1)
+        | TConst _ -> t.tkind
+        | TVar _ -> t.tkind
+        | TBox _ -> t.tkind
+        | TIte (c, a, b) -> TIte (aux c, aux a, aux b)
+        | TTup tl -> TTup (aux_l tl)
+        | TSel (t, i) -> TSel (aux t, i)
+        | TFun (args, body) -> TFun (args, aux body)
+        | TApp (func, args) -> TApp (aux func, aux_l args)
+        | TData (cstr, args) -> TData (cstr, aux_l args)
+        | TMatch (tm, cases) -> TMatch (aux tm, list_map_snd ~f:aux cases));
+    }
+  in
+  aux 0 t
 
 let transform_info ~(f : term -> term) (t : term) : term =
   let rec aux (t : term) : 'a =

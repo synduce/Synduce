@@ -1,23 +1,31 @@
 # Synduce
 
-## Requirements and building
-The script `setup.sh` installs all the dependencies and packages from a fresh Ubuntu installation.
+## Building the tool
 
-You will need [**Z3**](https://github.com/Z3Prover/z3) (> 4.8.10) and [**CVC4**](https://cvc4.github.io) installed on your system. *Synduce* detects where your binaries are using `which z3` and `which cvc4`. Synduce needs a CVC4 version >= 1.8.
-
-
+Synduce is mainly written in OCaml using the `dune` build system and `opam` to install package dependencies.
 You will need a recent [OCaml](https://ocaml.org/releases/4.11.1.html) (>= 4.09.0) installation and the [OCaml Package Manager (opam)](https://opam.ocaml.org) to get started.
-
 The Ocaml dependencies of this project can be installed via opam (```opam install . --deps-only```).
 Once all the dependencies are installed, call ```make``` from the root of the project. The Makefile simply calls `dune build` and creates a shortcut to the binary executable.
 
+Synduce also requires:
+-  [**Z3**](https://github.com/Z3Prover/z3) (> 4.8.10) for solving some SMT problems during bounded checking of recursive functions.
+-  [**CVC4**](https://cvc4.github.io) (>= 1.8) for some induction proofs, SMT problems and SyGuS problem solving.
+-  (Optional) [**CVC5**](https://cvc5.github.io): Synduce can use CVC5 instead of CVC4, but has been tested mostly with CVC4.
+
+*Synduce* detects where your binaries are using `which` by calling `which z3` and `which cvc4`, so please make sure that the solver executable names are `z3` and `cvc4` (and not `cvc4-1.8` for example).
+If these solvers are not present in the environment, then Synduce will produce a runtime error.
+
+Note that *Synduce* does not rely on any specific API and instead communicates with the solver through the SMTLib v2.6 and SyGus Lib v2 language standards.
+
+## Ubuntu
+The script `setup.sh` installs all the dependencies and packages from a fresh Ubuntu installation.
 
 
 # Folder structure
 
 - `./bin/` contains all the sources for the executable,
 - `./src/` contains all the sources for the libraries. The `lang` folder is where you will find most of the language definitions and `algo` the algorithmic components.
-- `./benchmarks/` contains benchmarks and sample inputs. `parse_examples/parsing.pmrs` is an example of the input syntax for the PMRS with recursive type definitions. The syntax is similar to Caml, except for the recursion scheme declarations. Call `./benchmarks/report.py` to see a list of benchmarks. The `./benchmarks/unrealizable` folder contains examples on which the tool either fails or runs forever because no solution exists.
+- `./benchmarks/` contains benchmarks and sample inputs. `parse_examples/parsing.pmrs` is an example of the input syntax for the PMRS with recursive type definitions. The syntax is similar to Caml, except for the recursion scheme declarations. Call `./benchmarks/report.py` to see a list of benchmarks. The `./benchmarks/unrealizable` folder contains examples on which the tool either fails or runs forever because no solution exists. You will find benchmarks with predicates on input type in the `benchmarks/constraints` folder.
 
 ### Basic Usage
 `./Synduce -h` should get you started.
@@ -104,14 +112,27 @@ This is specified by the `[@@ensures predicate]` where `predicate` is a function
 the function to which the attribute is attached, to booleans.
 
 
+### Requires attribute
+A requires attributes can be provided to constrain the inputs that a function can accept. For an example, see `benchmarks/constraints/bst/contains.ml`.
+The target recursion skeleton here is expected to be only applied to trees that are binary search trees. The user specifies their intent by adding the attribute `[@@requires is_bst]` in the following:
+```ocaml
+let target y t =
+  let rec g = function
+    | Leaf a -> [%synt xi_0] y a
+    | Node (a, l, r) -> if y < a then [%synt xi_1] (g l) else [%synt xi_2] y a (g l) (g r)
+  in
+  g t
+  [@@requires is_bst]
+```
+
 ### Functions with additional parameters
 
 The tool is not limited to unary functions. An example of a benchmark where the function also accepts and additional argument can be found in `benchmarks/list/sum.ml`.
 The syntax to write functions with additional non-recursible parameters is of the form:
 ```ocaml
-(* The last argument t must be the one used in the recursion.
-    The other arguments a,b,c are "parameters" of the pattern-matching recursion scheme. *)
 let f a b c t =
+    (* The last argument t must be the one used in the recursion.
+    The other arguments a,b,c are "parameters" of the pattern-matching recursion scheme. *)
     (* Define mutually recursive functions. Parameters are in scope. *)
     let rec aux = function _ -> (* .. *)
     and aux2 = (* function defintion .. *)
@@ -120,8 +141,10 @@ let f a b c t =
     aux t
 ```
 
-
-
+**General remark on writing functions with multiple parameters for recursion**
+If one wants to write a function that accepts two trees as arguments one can always write a function that accept as input a type with a single constructor that combines two trees. In general, the user of the tool can provide functions with multiple input parameters, with the specificity that in this case the function application cannot be partial.
+In practice, this also potentially limits the applicability of recursion elimination and partial bounding, as the toplevel function that can be eliminated is now the function that accepts a specific datatype that is not the main datatype of interest.
+An example can be found in `benchmarks/numbers/int_nat_twosum.ml`.
 
 ## PMRS syntax
 

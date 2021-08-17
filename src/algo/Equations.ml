@@ -402,7 +402,9 @@ let synthfuns_of_unknowns ?(bools = false) ?(eqns = []) ?(ops = OpSet.empty) (un
           xi
       else None
     in
-    let grammar = Grammars.generate_grammar ~guess ~bools ops args ret_sort in
+    let grammar =
+      Grammars.generate_grammar ~guess ~bools ~special_const_prod:false ops args ret_sort
+    in
     CSynthFun (xi.vname, args, ret_sort, grammar)
   in
   List.map ~f (Set.elements unknowns)
@@ -444,7 +446,7 @@ let solve_eqns (unknowns : VarSet.t) (eqns : equation list) :
             ]
         in
         ( Set.union fvs set',
-          Set.union ops (Set.union (Grammars.operators_of lhs) (Grammars.operators_of rhs)),
+          Set.union ops (Set.union (Analysis.operators_of lhs) (Analysis.operators_of rhs)),
           hi || Analysis.has_ite lhs || Analysis.has_ite rhs )
       in
       let fvs, ops, hi =
@@ -453,8 +455,17 @@ let solve_eqns (unknowns : VarSet.t) (eqns : equation list) :
       (Set.diff fvs unknowns, ops, hi)
     in
     (* Prepare commands *)
-    let set_logic = CSetLogic (Grammars.logic_of_operator all_operators) in
+    let logic =
+      let base_logic = logic_of_operators all_operators in
+      let needs_dt =
+        List.exists
+          ~f:(fun v -> requires_dt_theory (Variable.vtype_or_new v))
+          (Set.elements free_vars @ Set.elements unknowns)
+      in
+      if needs_dt then dt_extend_base_logic base_logic else base_logic
+    in
     let synth_objs = synthfuns_of_unknowns ~bools:has_ite ~eqns ~ops:all_operators unknowns in
+    let set_logic = CSetLogic logic in
     let sort_decls = declare_sorts_of_vars free_vars in
     let var_decls = List.map ~f:declaration_of_var (Set.elements free_vars) in
     let constraints = constraints_of_eqns eqns in
@@ -597,24 +608,27 @@ let solve_stratified (unknowns : VarSet.t) (eqns : equation list) =
 (*                               PREPROCESSING SYSTEM OF EQUATIONS                               *)
 (* ============================================================================================= *)
 
-type preprocessing_action_result =
-  VarSet.t
-  * equation list
-  * (solver_response * (partial_soln, Counterexamples.unrealizability_ctex list) Either.t ->
-    solver_response * (partial_soln, Counterexamples.unrealizability_ctex list) Either.t)
+type preprocessing_action_result = {
+  pre_unknowns : VarSet.t;
+  pre_equations : equation list;
+  pre_postprocessing :
+    solver_response * (partial_soln, Counterexamples.unrealizability_ctex list) Either.t ->
+    solver_response * (partial_soln, Counterexamples.unrealizability_ctex list) Either.t;
+}
 
 (** A preprocessing action should return a new system of equations,
    and optionally a new set of unknowns together with a postprocessing function. *)
 
-let preprocess_none u eqs = (u, eqs, fun x -> x)
+let preprocess_none u eqs =
+  { pre_unknowns = u; pre_equations = eqs; pre_postprocessing = (fun x -> x) }
 
 (** Project unknowns that return tuple into a tuple of unknowns and change the equations
     accordingly.
 *)
 let preprocess_detuple (unknowns : VarSet.t) (eqns : equation list) : preprocessing_action_result =
-  let new_unknowns, projections = proj_unknowns unknowns in
-  let new_eqns = proj_and_detuple_eqns projections eqns in
-  let postprocessing (resp, soln) =
+  let pre_unknowns, projections = proj_unknowns unknowns in
+  let pre_equations = proj_and_detuple_eqns projections eqns in
+  let pre_postprocessing (resp, soln) =
     Either.(
       match soln with
       | First soln ->
@@ -624,14 +638,14 @@ let preprocess_detuple (unknowns : VarSet.t) (eqns : equation list) : preprocess
           (resp, First soln)
       | Second ctexs -> (resp, Second ctexs))
   in
-  (new_unknowns, new_eqns, postprocessing)
+  { pre_unknowns; pre_equations; pre_postprocessing }
 
 let preprocess_deconstruct_if (unknowns : VarSet.t) (eqns : equation list) :
     preprocessing_action_result =
   let and_opt precond t =
     match precond with Some pre -> Some (mk_bin And pre t) | None -> Some t
   in
-  let eqns' =
+  let pre_equations =
     let rec split_if eqn =
       match eqn.erhs.tkind with
       | TIte (rhs_c, rhs_bt, rhs_bf) ->
@@ -656,7 +670,27 @@ let preprocess_deconstruct_if (unknowns : VarSet.t) (eqns : equation list) :
     in
     List.concat_map ~f:split_if eqns
   in
-  (unknowns, eqns', fun x -> x)
+  { pre_unknowns = unknowns; pre_equations; pre_postprocessing = (fun x -> x) }
+
+(** For each equation, search within the system of equations whether there is another
+    equation that constrains a subexpression.
+*)
+let preprocess_factor_subexpressions (unknowns : VarSet.t) (eqns : equation list) :
+    preprocessing_action_result =
+  let finder sube = List.find ~f:(fun e' -> Terms.equal e'.erhs sube) eqns in
+  let precond_compat eqn1 eqn2 = Option.equal Terms.equal eqn1.eprecond eqn2.eprecond in
+  let pre_equations =
+    let replace_rhs_subexpr eqn1 =
+      let case _ t =
+        Option.bind (finder t) ~f:(fun eqn2 ->
+            if precond_compat eqn1 eqn2 then Some eqn2.elhs else None)
+      in
+      let erhs' = transform_at_depth 1 ~case eqn1.erhs in
+      { eqn1 with erhs = erhs' }
+    in
+    List.map ~f:replace_rhs_subexpr eqns
+  in
+  { pre_unknowns = unknowns; pre_equations; pre_postprocessing = (fun x -> x) }
 
 (* ============================================================================================= *)
 (*                              MAIN ENTRY POINT                                                 *)
@@ -673,6 +707,7 @@ let solve ~(p : psi_def) (eqns : equation list) :
     [
       preprocess_deconstruct_if;
       (if !Config.detupling_on then preprocess_detuple else preprocess_none);
+      preprocess_factor_subexpressions;
     ]
   in
   let soln_final =
@@ -680,8 +715,8 @@ let solve ~(p : psi_def) (eqns : equation list) :
     let unknowns', eqns', postprocessing_actions =
       List.fold preprocessing_actions ~init:(unknowns, eqns, [])
         ~f:(fun (u, e, post_acts) pre_act ->
-          let u', e', post = pre_act u e in
-          (u', e', post :: post_acts))
+          let ppact = pre_act u e in
+          (ppact.pre_unknowns, ppact.pre_equations, ppact.pre_postprocessing :: post_acts))
     in
     (* Apply the postprocessing after solving. *)
     List.fold postprocessing_actions ~init:(solve_stratified unknowns' eqns')
