@@ -65,7 +65,6 @@ let subs_from_elim_to_elim elim1 elim2 : (term * term) list =
 
 let make_term_state_detail_from_ctex ~(p : psi_def) (is_pos_ctex : bool) (ctex : ctex) :
     term_state_detail =
-  Log.debug_msg Fmt.(str "Here is ctex recurs elim: ");
   let neg = if is_pos_ctex then [] else [ ctex ] in
   let pos = if is_pos_ctex then [ ctex ] else [] in
   let recurs_elim_, scalar_vars_ = make_new_recurs_elim_from_term ~p ctex.ctex_eqn.eterm in
@@ -427,6 +426,22 @@ let smt_of_lemma_validity ~(p : psi_def) lemma (det : term_state_detail) =
   let if_then = smt_of_lemma_app lemma in
   [ S.mk_assert (S.mk_not (S.mk_forall quants (S.mk_or (S.mk_not if_condition) if_then))) ]
 
+let set_up_bounded_lemma_solver_async det solver ~(p : psi_def) lemma_candidate =
+  ignore p;
+  ignore lemma_candidate;
+  let open Solvers in
+  let%lwt () = Asyncs.set_logic solver "LIA" in
+  let%lwt () = Asyncs.set_option solver "produce-models" "true" in
+  let%lwt () = Asyncs.set_option solver "incremental" "true" in
+  let%lwt () =
+    if !Config.induction_proof_tlimit >= 0 then
+      Asyncs.set_option solver "tlimit" (Int.to_string !Config.induction_proof_tlimit)
+    else return ()
+  in
+  let%lwt () = Asyncs.load_min_max_defs solver in
+  let%lwt () = Asyncs.declare_all solver (Smt.decls_of_vars (VarSet.of_list det.scalar_vars)) in
+  return ()
+
 let set_up_lemma_solver_async solver ~(p : psi_def) lemma_candidate =
   let open Solvers in
   let%lwt () = Asyncs.set_logic solver "ALL" in
@@ -612,21 +627,34 @@ let bounded_check solver ~(p : psi_def) lemma_candidate (det : term_state_detail
   let res = expand_loop (TermSet.singleton det.term) in
   res
 
-let do_bounded_check solver =
-  ignore solver;
-  (* if !Config.bounded_lemma_check then (
-       Log.info (fun f () -> Fmt.(pf f "Do bounded check? [Y/N]"));
-       match Stdio.In_channel.input_line Stdio.stdin with Some "Y" -> true | _ -> false)
-     else false *)
-  !Config.bounded_lemma_check
+let mk_model_sat_asserts det f_o_r instantiate =
+  let f v =
+    let v_val = mk_var (List.find_exn ~f:(fun x -> equal v.vid x.vid) det.scalar_vars) in
+    match List.find_map ~f:(find_original_var_and_proj v) det.recurs_elim with
+    | Some (original_recursion_var, proj) -> (
+        match original_recursion_var.tkind with
+        | TVar ov when Option.is_some (instantiate ov) ->
+            let instantiation = Option.value_exn (instantiate ov) in
+            if proj >= 0 then
+              let t = Reduce.reduce_term (mk_sel (f_o_r instantiation) proj) in
+              Smt.smt_of_term (mk_bin Binop.Eq t v_val)
+            else
+              let t = f_o_r instantiation in
+              Smt.smt_of_term (mk_bin Binop.Eq t v_val)
+        | _ ->
+            Log.error_msg
+              Fmt.(str "Warning: skipped instantiating %a." pp_term original_recursion_var);
+            SmtLib.mk_true)
+    | None -> Smt.smt_of_term (mk_bin Binop.Eq (mk_var v) v_val)
+  in
+  List.map ~f det.scalar_vars
 
 let verify_lemma_bounded ~(p : psi_def) (det : term_state_detail) lemma_candidate :
     Solvers.Asyncs.response * int Lwt.u =
   let open Solvers in
   let task (solver, starter) =
     let%lwt _ = starter in
-    let%lwt _ = set_up_lemma_solver_async solver ~p lemma_candidate in
-    let%lwt _ = set_up_to_get_model_async solver ~p lemma_candidate det in
+    let%lwt _ = set_up_bounded_lemma_solver_async det solver ~p lemma_candidate in
     let steps = ref 0 in
     let rec check_bounded_sol accum terms =
       let f accum t =
@@ -634,28 +662,64 @@ let verify_lemma_bounded ~(p : psi_def) (det : term_state_detail) lemma_candidat
           Option.value ~default:VarMap.empty (Analysis.matches t ~pattern:det.term)
         in
         let%lwt _ = accum in
+        let f_compose_r t =
+          let repr_of_v = if p.psi_repr_is_identity then t else Reduce.reduce_pmrs p.psi_repr t in
+          Reduce.reduce_term (Reduce.reduce_pmrs p.psi_reference repr_of_v)
+        in
+        let subs =
+          List.map
+            ~f:(fun (orig_rec_var, elimv) ->
+              match orig_rec_var.tkind with
+              | TVar rec_var when Map.mem rec_instantation rec_var ->
+                  (elimv, f_compose_r (Map.find_exn rec_instantation rec_var))
+              | _ -> failwith "all elimination variables should be substituted.")
+            det.recurs_elim
+          (* Map.fold ~init:[] ~f:(fun ~key ~data acc -> (mk_var key, data) :: acc) rec_instantation *)
+        in
+        let preconds =
+          Option.to_list (Option.map ~f:(fun t -> substitution subs t) det.current_preconds)
+        in
+        let model_sat = mk_model_sat_asserts det f_compose_r (Map.find rec_instantation) in
         let%lwt () = Asyncs.spush solver in
+        (* Assert that preconditions hold and map original term's recurs elim variables to the variables that they reduce to for this concrete term. *)
+        let%lwt _ =
+          Asyncs.declare_all solver
+            (Smt.decls_of_vars
+               (List.fold ~init:VarSet.empty
+                  ~f:(fun acc t -> Set.union acc (Analysis.free_variables t))
+                  (preconds @ Map.data rec_instantation)))
+        in
         let%lwt () =
-          Lwt_list.iter_p
-            (fun (key, data) ->
-              (* Declare variables in term `data` *)
+          Asyncs.smt_assert solver
+            (SmtLib.mk_assoc_and (List.map ~f:Smt.smt_of_term preconds @ model_sat))
+        in
+        (* Assert that TInv is true for this concrete term t *)
+        let%lwt _ =
+          match p.psi_tinv with
+          | None -> return ()
+          | Some tinv ->
+              let tinv_t = Reduce.reduce_pmrs tinv t in
               let%lwt _ =
-                Asyncs.declare_all solver (Smt.decls_of_vars (Analysis.free_variables data))
+                Asyncs.declare_all solver (Smt.decls_of_vars (Analysis.free_variables tinv_t))
               in
-              (* Assert that `key` variable is equal to `data` term *)
-              let%lwt _ =
-                Asyncs.exec_command solver
-                  (S.mk_assert (S.mk_eq (S.mk_var key.vname) (Smt.smt_of_term data)))
-              in
-              return ())
-            (Map.fold ~init:[] ~f:(fun ~key ~data acc -> (key, data) :: acc) rec_instantation)
+              let%lwt _ = Asyncs.smt_assert solver (Smt.smt_of_term tinv_t) in
+
+              return ()
+        in
+        (* Assert that lemma is false for this concrete term t  *)
+        let _, _, lemma = lemma_candidate in
+        let%lwt _ =
+          Asyncs.exec_command solver
+            (S.mk_assert (S.mk_not (Smt.smt_of_term (substitution subs lemma))))
         in
         let%lwt resp = Asyncs.check_sat solver in
         (* Note that I am getting a model after check-sat unknown response. This may not halt.  *)
-        let result =
+        let%lwt result =
           match resp with
-          | SmtLib.Sat | SmtLib.Unknown -> Some (Asyncs.get_model solver)
-          | _ -> None
+          | SmtLib.Sat | SmtLib.Unknown ->
+              let%lwt model = Asyncs.get_model solver in
+              return (Some model)
+          | _ -> return None
         in
         let%lwt () = Asyncs.spop solver in
         return (resp, result)
@@ -680,7 +744,7 @@ let verify_lemma_bounded ~(p : psi_def) (det : term_state_detail) lemma_candidat
           | _, Some model ->
               Log.debug_msg
                 "Bounded lemma verification has found a counterexample to the lemma candidate.";
-              model
+              return model
           | _ -> expand_loop (Set.union (Set.remove u t0) u'))
       | None, true ->
           (* All expansions have been checked. *)
