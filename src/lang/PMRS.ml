@@ -71,6 +71,10 @@ let lhs (nt, args, pat, rhs) =
   let t, _ = infer_type (mk_app ~pos:rhs.tpos (mk_var nt) all_args) in
   t
 
+let reinit () =
+  Hashtbl.clear _globals;
+  Hashtbl.clear _nonterminals
+
 (* ============================================================================================= *)
 (*                                 PRETTY PRINTING                                               *)
 (* ============================================================================================= *)
@@ -93,9 +97,9 @@ let pp (frmt : Formatter.t) (pmrs : t) : unit =
       pmrs.prules
   in
   Fmt.(
-    pf frmt "%s⟨%a⟩(%a): %a -> %a@;%a@;= @;@[<v 2>{@;%a@;}@]" pmrs.pvar.vname VarSet.pp_var_names
-      pmrs.psyntobjs (list ~sep:comma Variable.pp) pmrs.pargs (list ~sep:comma RType.pp)
-      pmrs.pinput_typ RType.pp pmrs.poutput_typ
+    pf frmt "@[<hov> %s⟨%a⟩(%a): %a -> %a@;%a@;= @;@[<v 2>{@;%a@;}@]@]" pmrs.pvar.vname
+      VarSet.pp_var_names pmrs.psyntobjs (list ~sep:comma Variable.pp) pmrs.pargs
+      (list ~sep:comma RType.pp) pmrs.pinput_typ RType.pp pmrs.poutput_typ
       (option (box pp_spec))
       (Specifications.get_spec pmrs.pvar)
       pp_rules ())

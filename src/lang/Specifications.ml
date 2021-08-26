@@ -7,6 +7,8 @@ let empty_spec = { ensures = None; requires = None }
 
 let specs : (int, spec) Hashtbl.t = Hashtbl.create (module Int)
 
+let reinit () = Hashtbl.clear specs
+
 let get_spec (v : variable) : spec option = Hashtbl.find specs v.vid
 
 let get_ensures (v : variable) : term option =

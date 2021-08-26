@@ -164,6 +164,7 @@ let make_solver ~(name : string) (path : string) (options : string list) : onlin
       s_log_outc = OC.create log_file;
     }
   in
+  Stats.log_solver_start solver.s_pid name;
   online_solvers := (Pid.to_int pinfo.pid, solver) :: !online_solvers;
   Log.debug_msg
     Fmt.(str "Solver %s started:  pid: %i log: %s" solver.s_name solver.s_pid solver.s_log_file);
@@ -174,10 +175,12 @@ let make_solver ~(name : string) (path : string) (options : string list) : onlin
   with Sys_error s -> failwith ("couldn't talk to solver, double-check path. Sys_error " ^ s)
 
 let close_solver solver =
+  Stats.log_proc_quit solver.s_pid;
+  let elapsed = Stats.get_elapsed solver.s_pid in
   Log.debug
     Fmt.(
       fun fmt () ->
-        pf fmt "Closing %s, log can be found in %a" solver.s_name
+        pf fmt "Closing %s (spent %.3fs), log can be found in %a" solver.s_name elapsed
           (styled (`Fg `Blue) string)
           solver.s_log_file);
   OC.output_string solver.s_inputc (Sexp.to_string (sexp_of_command mk_exit));
@@ -195,13 +198,13 @@ let call_solver solver commands =
       SExps []
 
 (** Create a process with a Z3 solver. *)
-let make_z3_solver () = make_solver ~name:"Z3" Utils.Config.z3_binary_path [ "-in"; "-smt2" ]
+let make_z3_solver () = make_solver ~name:"Z3-SMT" Utils.Config.z3_binary_path [ "-in"; "-smt2" ]
 
 (** Create a process with a CVC4 solver. *)
 let make_cvc_solver () =
   let cvc_path = Config.cvc_binary_path () in
   let using_cvc5 = Config.using_cvc5 () in
-  let name = if using_cvc5 then "CVC5" else "CVC4" in
+  let name = if using_cvc5 then "CVC5-SMT" else "CVC4-SMT" in
   let executable_name = if using_cvc5 then "cvc5" else "cvc4" in
   make_solver ~name cvc_path [ executable_name; "--lang=smt2.6"; "--incremental" ]
 
@@ -424,6 +427,7 @@ module Asyncs = struct
         s_log_outc = OC.create log_file;
       }
     in
+    Stats.log_solver_start solver.s_pid name;
     async_online_solvers := (pinfo#pid, solver) :: !async_online_solvers;
     (* The solver returned is bound to a task that can be cancelled. *)
     try
@@ -439,13 +443,13 @@ module Asyncs = struct
         task_r )
     with Sys_error s -> failwith ("couldn't talk to solver, double-check path. Sys_error " ^ s)
 
-  let make_z3_solver () = make_solver ~name:"Z3" Config.z3_binary_path [ "z3"; "-in"; "-smt2" ]
+  let make_z3_solver () = make_solver ~name:"Z3-SMT" Config.z3_binary_path [ "z3"; "-in"; "-smt2" ]
 
   (** Create a process with a CVC4 solver. *)
   let make_cvc_solver () =
     let cvc_path = Config.cvc_binary_path () in
     let using_cvc5 = Config.using_cvc5 () in
-    let name = if using_cvc5 then "CVC5" else "CVC4" in
+    let name = if using_cvc5 then "CVC5-SMT" else "CVC4-SMT" in
     let executable_name = if using_cvc5 then "cvc5" else "cvc4" in
     make_solver ~name cvc_path [ executable_name; "--lang=smt2.6"; "--incremental" ]
 
@@ -455,16 +459,19 @@ module Asyncs = struct
         match s.s_pinfo#state with
         | Lwt_process.Exited _ -> ()
         | Running ->
+            Stats.log_proc_quit s.s_pid;
             Log.debug_msg
               Fmt.(str "Terminating solver %s (PID : %i) (log: %s)" s.s_name s.s_pid s.s_log_file);
             s.s_pinfo#terminate)
 
   let close_solver (solver : solver) : unit t =
+    Stats.log_proc_quit solver.s_pid;
+    let elapsed = Stats.get_elapsed solver.s_pid in
     solver_verbose_pp_last_resp_count solver;
     Log.debug
       Fmt.(
         fun fmt () ->
-          pf fmt "Closing %s, log can be found in %a" solver.s_name
+          pf fmt "Closing %s (spent %.3fs), log can be found in %a" solver.s_name elapsed
             (styled (`Fg `Blue) string)
             solver.s_log_file);
     let%lwt _ = exec_command solver mk_exit in
@@ -495,13 +502,16 @@ module Asyncs = struct
 
   let smt_assert (s : solver) (term : smtTerm) : unit Lwt.t =
     let%lwt _ = exec_command s (mk_assert term) in
+    Stats.log_alive s.s_pid;
     return ()
 
   let spop (solver : solver) : unit Lwt.t =
+    Stats.log_alive solver.s_pid;
     let%lwt _ = exec_command solver (mk_pop 1) in
     return ()
 
   let spush (solver : solver) : unit Lwt.t =
+    Stats.log_alive solver.s_pid;
     let%lwt _ = exec_command solver (mk_push 1) in
     return ()
 

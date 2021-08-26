@@ -134,7 +134,7 @@ let check_solution ?(use_acegis = false) ~(p : psi_def) (lstate : refinement_loo
   let ctex_or_none = find_ctex 0 lstate.u_set in
   Solvers.close_solver solver;
   let elapsed = Unix.gettimeofday () -. start_time in
-  Config.verif_time := !Config.verif_time +. elapsed;
+  Stats.add_verif_time elapsed;
   Log.info (fun f () -> Fmt.(pf f "... finished in %3.4fs" elapsed));
   Config.verbose := verb;
   ctex_or_none
@@ -237,7 +237,7 @@ let bounded_check ?(use_concrete_ctex = false) ~(p : psi_def)
   in
   Solvers.close_solver solver;
   let elapsed = Unix.gettimeofday () -. start_time in
-  Config.verif_time := !Config.verif_time +. elapsed;
+  Stats.add_verif_time elapsed;
   Log.info (fun f () -> Fmt.(pf f "... finished in %3.4fs" elapsed));
   ctex_or_none
 

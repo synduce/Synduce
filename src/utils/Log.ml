@@ -52,7 +52,7 @@ let log_with_excerpt (frmt : Formatter.t) (ttext : string) (location : position 
   and start_line = _start.pos_lnum
   and end_lin = _end.pos_lnum in
   Fmt.(
-    pf frmt "@[<v 2>%s (%i:%i)-(%i:%i): %s@;%a@]" _start.pos_fname start_line start_col end_lin
+    pf frmt "@[<h 8>%s (%i:%i)-(%i:%i): %s@;%a@]" _start.pos_fname start_line start_col end_lin
       end_col (range ttext location) s x)
 
 let wrap (s : string) fmt () = string fmt s
@@ -64,7 +64,7 @@ let wrap2 f s1 t1 s2 t2 fmt () = pf fmt f s1 t1 s2 t2
 let wrapn fmt () = pf fmt
 
 let error (msg : Formatter.t -> unit -> unit) : unit =
-  pf Fmt.stdout "@[<hov 2>%a@;%a@]@." (styled (`Bg `Red) string) "[ERROR]" msg ()
+  pf Fmt.stdout "@[<h 8>%a@;%a@]@." (styled (`Bg `Red) string) "[ERROR]" msg ()
 
 let error_msg (msg : string) = error (fun fmt () -> pf fmt "%s" msg)
 
@@ -76,12 +76,12 @@ let loc_fatal_errmsg loc msg =
 
 let info (msg : Formatter.t -> unit -> unit) : unit =
   if !Config.info then
-    pf Fmt.stdout "@[<hov 4>%a@;%a@]@." (styled (`Bg `Blue) string) " INFO :" msg ()
+    pf Fmt.stdout "@[<h 8>%a@;%a@]@." (styled (`Bg `Blue) string) " INFO :" msg ()
   else ()
 
 let debug (msg : Formatter.t -> unit -> unit) : unit =
   if !Config.debug then
-    pf Fmt.stdout "@[<hov 2>%a@;%a@]@."
+    pf Fmt.stdout "@[<h 8>%a@;%a@]@."
       (styled (`Fg `Black) (styled (`Bg `Yellow) string))
       "!DEBUG!" msg ()
   else ()
@@ -96,7 +96,7 @@ let print_ok () =
 
 let verb msg =
   if !Config.verbose then
-    pf Fmt.stdout "@[<hov 2>%a@;%a@]@."
+    pf Fmt.stdout "@[<h 8>%a@;@[%a@]@]@."
       (styled (`Fg `Black) (styled (`Bg `Cyan) string))
       " VERB <" msg
   else fun _ -> ()
@@ -105,7 +105,7 @@ let verbose msg = if !Config.verbose then verb msg () else ()
 
 let verbose_msg msg =
   if !Config.verbose then
-    pf Fmt.stdout "@[<hov 2>%a@;%s@]@."
+    pf Fmt.stdout "@[<h 8>%a@;%s@]@."
       (styled (`Fg `Black) (styled (`Bg `Cyan) string))
       " VERB <" msg
   else ()

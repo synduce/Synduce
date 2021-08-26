@@ -9,7 +9,7 @@ open Option.Let_syntax
 let rec refinement_loop (p : psi_def) (lstate : refinement_loop_state) =
   Int.incr refinement_steps;
   (* Output status information before entering process. *)
-  let elapsed = Unix.gettimeofday () -. !Config.glob_start in
+  let elapsed = Stats.get_glob_elapsed () in
   Log.info
     Fmt.(
       fun frmt () ->
@@ -19,7 +19,7 @@ let rec refinement_loop (p : psi_def) (lstate : refinement_loop_state) =
           frmt !refinement_steps);
   (if not !Config.info then
    Fmt.(
-     pf stdout "%i,%3.3f,%3.3f,%i,%i@." !refinement_steps !Config.verif_time elapsed
+     pf stdout "%i,%3.3f,%3.3f,%i,%i@." !refinement_steps !Stats.verif_time elapsed
        (Set.length lstate.t_set) (Set.length lstate.u_set)));
   Log.debug_msg
     Fmt.(
@@ -234,9 +234,9 @@ let solve_problem (psi_comps : (string * string * string) option)
           (Set.elements target_f.psyntobjs) (list ~sep:sp RType.pp) args_t spec_fname repr_fname
           target_fname);
   (* Print reference function. *)
-  Log.info Fmt.(fun fmt () -> pf fmt "%a" PMRS.pp problem.psi_reference);
+  Log.info Fmt.(fun fmt () -> pf fmt "%a" (box PMRS.pp) problem.psi_reference);
   (* Print target recursion skeleton. *)
-  Log.info Fmt.(fun fmt () -> pf fmt "%a" PMRS.pp problem.psi_target);
+  Log.info Fmt.(fun fmt () -> pf fmt "%a" (box PMRS.pp) problem.psi_target);
   (* Print representation function. *)
   Log.info
     Fmt.(

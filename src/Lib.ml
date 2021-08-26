@@ -22,7 +22,9 @@ let reinit () =
   AState.reinit ();
   Term.Variable.clear ();
   Alpha.reinit ();
-  RType.reinit ()
+  RType.reinit ();
+  PMRS.reinit ();
+  Specifications.reinit ()
 
 let pp_problem_descr (fmt : Formatter.t) (prob : problem_descr) =
   pf fmt "> Target <@.";

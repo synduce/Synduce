@@ -50,19 +50,30 @@ module SygusSolver = struct
     | DryadSynth -> Config.dryadsynth_binary_path
     | EUSolver -> Config.eusolver_binary_path
 
+  let sname = function CVC -> "CVC-SyGuS" | DryadSynth -> "DryadSynth" | EUSolver -> "EUSolver"
+
   let print_options (frmt : Formatter.t) =
     Fmt.(list ~sep:sp (fun fmt opt -> pf fmt "--%s" opt) frmt)
 
-  let fetch_solution filename =
+  let fetch_solution pid filename =
     Log.debug_msg Fmt.(str "Fetching solution in %s" filename);
-    reponse_of_sexps (Sexp.input_sexps (Stdio.In_channel.create filename))
+    let r = reponse_of_sexps (Sexp.input_sexps (Stdio.In_channel.create filename)) in
+    Stats.log_proc_quit pid;
+    r
 
-  let exec_solver ?(which = !default_solver) ?(options = [])
+  let exec_solver ?(solver_kind = !default_solver) ?(options = [])
       ((inputfile, outputfile) : string * string) : solver_response option =
-    let command = shell Fmt.(str "%s %a %s" (binary_path which) print_options options inputfile) in
+    let pid_placeholder = Stats.pid_placeholder () in
+    let command =
+      shell Fmt.(str "%s %a %s" (binary_path solver_kind) print_options options inputfile)
+    in
     let out_fd = Unix.openfile outputfile [ Unix.O_RDWR; Unix.O_TRUNC; Unix.O_CREAT ] 0o644 in
-    match Lwt_main.run (exec ~stdout:(`FD_move out_fd) command) with
-    | Unix.WEXITED 0 -> Some (fetch_solution outputfile)
+    let main_t () =
+      Stats.log_solver_start pid_placeholder (sname solver_kind);
+      exec ~stdout:(`FD_move out_fd) command
+    in
+    match Lwt_main.run (main_t ()) with
+    | Unix.WEXITED 0 -> Some (fetch_solution pid_placeholder outputfile)
     | Unix.WEXITED i ->
         Log.error_msg Fmt.(str "Solver exited with code %i." i);
         None
@@ -73,17 +84,21 @@ module SygusSolver = struct
         Log.error_msg Fmt.(str "Solver stopped with code %i." i);
         None
 
-  let wrapped_solver_call ?(which = !default_solver) ?(options = [])
+  let wrapped_solver_call ?(solver_kind = !default_solver) ?(options = [])
       ((inputfile, outputfile) : string * string) : string * process_out =
-    let command = shell Fmt.(str "%s %a %s" (binary_path which) print_options options inputfile) in
+    let command =
+      shell Fmt.(str "%s %a %s" (binary_path solver_kind) print_options options inputfile)
+    in
     let out_fd = Unix.openfile outputfile [ Unix.O_RDWR; Unix.O_TRUNC; Unix.O_CREAT ] 0o644 in
-    (outputfile, open_process_out ~stdout:(`FD_move out_fd) command)
+    let po = open_process_out ~stdout:(`FD_move out_fd) command in
+    Stats.log_solver_start po#pid (sname solver_kind);
+    (outputfile, po)
 
   let exec_solver_parallel (filenames : (string * string) list) =
     let processes = List.map ~f:wrapped_solver_call filenames in
     let proc_status this otf =
       let sol =
-        try fetch_solution otf
+        try fetch_solution this#pid otf
         with Sys_error s ->
           Log.error_msg Fmt.(str "Sys_error (%a)" string s);
           RFail
@@ -94,7 +109,9 @@ module SygusSolver = struct
           ~f:(fun (_, proc) ->
             if not (equal this#pid proc#pid) then (
               proc#terminate;
-              Log.debug_msg Fmt.(str "Killed %a early" int proc#pid)))
+              Stats.log_proc_quit proc#pid;
+              Log.debug_msg
+                Fmt.(str "Killed %a early after %.3f s." int proc#pid (Stats.get_elapsed proc#pid))))
           processes;
         Some sol)
     in
@@ -106,7 +123,7 @@ module SygusSolver = struct
   let solve_commands (p : program) =
     let inputfile = mk_tmp_sl "in_" in
     let outputfile = mk_tmp_sl "out_" in
-    Log.debug_msg Fmt.(str "Solving %s -> %s." inputfile outputfile);
+    Log.debug_msg Fmt.(str "Solving %s -> %s" inputfile outputfile);
     commands_to_file p inputfile;
     exec_solver (inputfile, outputfile)
 end
