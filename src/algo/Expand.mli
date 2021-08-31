@@ -43,9 +43,22 @@ val is_mr_all : AState.psi_def -> Term.term -> bool
 
 val to_maximally_reducible : AState.psi_def -> Term.term -> Term.TermSet.t * Term.TermSet.t
 
-(* Helpers to structure bounded-checking processes. *)
 val lwt_expand_loop :
   int ref ->
   (Smtlib.Solvers.Asyncs.response -> Term.term -> Smtlib.Solvers.Asyncs.response) ->
   Term.TermSet.t Lwt.t ->
   Smtlib.Solvers.Asyncs.response
+(** [lwt_expand_loop] provides basic functionality for bounded checking.
+    [lwt_expand_loop steps f start] will run a bounded checking loop, starting with the term
+    set promise [start] and performing [!Lib.Config.num_expansions_check] steps, applying the
+    checking function [f] for each term obtained during the expansion of the term in the set
+    [start] into bounded terms.
+
+    If a check returns SAT, then the procedure returns [SmtLib.Unsat].
+
+    If every check returns UNSAT, then the procedure returns [SmtLib.Unknown], unless
+    [!Config.no_bounded_sat_as_unsat] is true, in which case it returns [SmtLib.Unsat].
+
+    If the procedure has explored all possible expansions of the terms in the input set,
+    then it returns UNSAT (all the check having returned UNSAT for all possible terms).
+*)

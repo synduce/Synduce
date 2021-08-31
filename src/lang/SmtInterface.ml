@@ -353,7 +353,7 @@ let constmap_of_s_exprs (starting_map : (string, term, String.comparator_witness
 let model_to_constmap (s : solver_response) =
   let empty_map = Map.empty (module String) in
   match s with
-  | Unknown | Unsat | Sat | Success -> empty_map
+  | Unsupported | Unknown | Unsat | Sat | Success -> empty_map
   | SExps s_exprs -> constmap_of_s_exprs empty_map s_exprs
   | Error _ -> failwith "Smt solver error"
 

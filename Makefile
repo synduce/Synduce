@@ -3,4 +3,4 @@ all:
 
 doc:
 	dune build @doc
-	cp -r _build/default/_doc/_html/* docs/
+	cp -rf _build/default/_doc/_html/* docs/

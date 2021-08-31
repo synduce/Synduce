@@ -198,6 +198,8 @@ let check_unrealizable (unknowns : VarSet.t) (eqns : equation_system) : unrealiz
 (*                            CLASSIFYING SPURIOUS COUNTEREXAMPLES                               *)
 (* ============================================================================================= *)
 
+(*               CLASSIFYING SPURIOUS COUNTEREXAMPLES - NOT IN REFERENCE IMAGE                   *)
+
 let check_image_sat ~p ctex : Solvers.Asyncs.response * int u =
   let open Solvers in
   let f_compose_r t =
@@ -207,6 +209,7 @@ let check_image_sat ~p ctex : Solvers.Asyncs.response * int u =
   (* Asynchronous solver task. *)
   let build_task (solver_instance, task_start) =
     let steps = ref 0 in
+    (* A single check for a bounded term. *)
     let t_check accum t =
       let term_eqs =
         List.map ctex.ctex_eqn.eelim ~f:(fun (_, elimv) ->
@@ -233,6 +236,7 @@ let check_image_sat ~p ctex : Solvers.Asyncs.response * int u =
     (* TODO : logic *)
     let%lwt () = Asyncs.set_logic solver_instance "LIA" in
     let%lwt () = Asyncs.load_min_max_defs solver_instance in
+    (* Run the bounded checking loop. *)
     let%lwt res =
       Expand.lwt_expand_loop steps t_check (return (TermSet.singleton ctex.ctex_eqn.eterm))
     in
@@ -279,11 +283,17 @@ let check_ctex_in_image ~(p : psi_def) (ctex : ctex) : ctex =
             p.psi_reference.pvar.vname)
       else if Solvers.is_sat resp then
         Fmt.(pf frmt "(%a) is in the image of %s." (box pp_ctex) ctex p.psi_reference.pvar.vname)
-      else Fmt.(pf frmt "(%a) is unknown." (box pp_ctex) ctex));
+      else
+        Fmt.(
+          pf frmt "I do not know whether (%a) is in the image of %s." (box pp_ctex) ctex
+            p.psi_reference.pvar.vname));
   match resp with
   | Sat -> { ctex with ctex_stat = Valid }
   | Unsat -> { ctex with ctex_stat = Spurious NotInReferenceImage }
   | _ -> ctex
+
+(* ============================================================================================= *)
+(*               CLASSIFYING SPURIOUS COUNTEREXAMPLES - DOES NOT SAT TINV                        *)
 
 let rec find_original_var_and_proj v (og, elimv) =
   match elimv.tkind with
@@ -468,7 +478,8 @@ let satisfies_tinv ~(p : psi_def) (tinv : PMRS.t) (ctex : ctex) : ctex =
         Fmt.(pf frmt "(%a)@;<1 4>does not satisfy \"%s\"." (box pp_ctex) ctex tinv.pvar.vname)
       else if Solvers.is_sat resp then
         Fmt.(pf frmt "(%a) satisfies %s." (box pp_ctex) ctex tinv.pvar.vname)
-      else Fmt.(pf frmt "%s-satisfiability of (%a) is unknown." tinv.pvar.vname (box pp_ctex) ctex));
+      else
+        Fmt.(pf frmt "I dot not know whether (%a) satisfies %s." (box pp_ctex) ctex tinv.pvar.vname));
   match resp with
   | Sat -> { ctex with ctex_stat = Valid }
   | Unsat -> { ctex with ctex_stat = Spurious ViolatesTargetRequires }
@@ -483,7 +494,8 @@ let classify_ctexs ~(p : psi_def) (ctexs : ctex list) : ctex list =
     let f (ctex : ctex) = satisfies_tinv ~p tinv ctex in
     List.map ~f ctexs
   in
-  match p.psi_tinv with Some tinv -> classify_with_tinv tinv | None -> ctexs
+  let classify_wrt_ref = List.map ~f:(check_ctex_in_image ~p) in
+  match p.psi_tinv with Some tinv -> classify_with_tinv tinv | None -> classify_wrt_ref ctexs
 
 let ctex_stat_for_lemma_synt ctex =
   match ctex.ctex_stat with

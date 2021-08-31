@@ -208,6 +208,9 @@ let bounded_check ?(use_concrete_ctex = false) ~(p : psi_def)
           | Unknown, _ ->
               Log.error_msg Fmt.(str "SMT solver returned unkown. The solution might be incorrect.");
               search_ctex tl
+          | Unsupported, _ ->
+              Log.error_msg Fmt.(str "SMT solver returned unsupported, which is unexpected.");
+              search_ctex tl
           | Success, _ ->
               (* Should not be a valid answer, but keep searching anyway. *) search_ctex tl)
     in

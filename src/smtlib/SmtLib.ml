@@ -695,12 +695,23 @@ let mk_pop i = Pop i
 let mk_push i = Push i
 
 (* Specific function declarations *)
+
+(** [mk_min_def] is the following SMT-LIB command:
+  {v
+  (define-function min ((x Int) (y Int)) Int (ite (<= x y) x y))
+  v}
+*)
 let mk_min_def =
   mk_fun_def "min"
     [ ("x", mk_int_sort); ("y", mk_int_sort) ]
     mk_int_sort
     (mk_ite (mk_le (mk_var "x") (mk_var "y")) (mk_var "x") (mk_var "y"))
 
+(** [mk_max_def] is the following SMT-LIB command:
+  {v
+  (define-function max ((x Int) (y Int)) Int (ite (>= x y) x y))
+  v}
+*)
 let mk_max_def =
   mk_fun_def "max"
     [ ("x", mk_int_sort); ("y", mk_int_sort) ]
@@ -744,11 +755,13 @@ let remove_duplicate_decls (s : String.t Hash_set.t) (decls : command list) =
 (* Reading solver responses *)
 type solver_response =
   | Error of string
-  | Sat
-  | Unsat
-  | Unknown
-  | Success
+  | Sat  (** The solver responded [sat] *)
+  | Unsat  (** The solver responded [unsat] *)
+  | Unknown  (** The solver responded  [unknown] *)
+  | Success  (** The solver responded [success] (the [:print-success] option is on) *)
+  | Unsupported  (** The solver reponded that the input is not supported. *)
   | SExps of Sexp.t list [@sexp.list]
+      (** Any other type of response is a list of S-Expressions, which can be interpreted later. *)
 [@@deriving_sexp]
 
 (* Parse solver reponses *)
@@ -767,5 +780,6 @@ let pp_solver_response f r =
   | Unsat -> Fmt.pf f "unsat"
   | Unknown -> Fmt.pf f "unknown"
   | Success -> Fmt.pf f "success"
+  | Unsupported -> Fmt.pf f "unsupported"
   | SExps sl -> Fmt.(pf f "%a" (list ~sep:sp Sexp.pp) sl)
   | Error s -> Fmt.(pf f "(error %s)" s)

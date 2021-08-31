@@ -3,6 +3,7 @@ module OC = Stdio.Out_channel
 module IC = Stdio.In_channel
 
 type solver_response = SmtLib.solver_response
+(** See {!SmtLib.solver_response}. *)
 
 val is_sat : solver_response -> bool
 
@@ -59,10 +60,12 @@ val spop : online_solver -> unit
 
 val spush : online_solver -> unit
 
+(** The {!Solvers.Asyncs} module provides an interface to run Smt solvers asynchronously. *)
 module Asyncs : sig
   open Lwt
 
   type response = solver_response t
+  (** An asynchronous solver response is simply a {!Smtlib.SmtLib.solver_response} in a Lwt promise. *)
 
   type solver = {
     s_name : string;
