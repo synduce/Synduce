@@ -1,3 +1,8 @@
+(** This module implements an interface to the SMT-LIB standard. Some parts of documentation
+  will refer to a specific section of the SMT-LIB standard available online
+   ({i http://smtlib.cs.uiowa.edu/papers/smt-lib-reference-v2.6-r2021-05-12.pdf}).
+*)
+
 open Base
 open Sexp
 open Option.Let_syntax
@@ -5,7 +10,11 @@ module OC = Stdio.Out_channel
 module IC = Stdio.In_channel
 
 type numeral = int
+(** The type of numbers. *)
 
+(** A SMT symbol is either a string identifier (e.g. [x]) or a quoted symbol (e.g. [| this|]).
+  See Section 3.1 of the SMT-LIB language standard.
+ *)
 type smtSymbol = SSimple of string | SQuoted of string
 
 let symb_equal s1 s2 =
@@ -16,20 +25,38 @@ let symb_equal s1 s2 =
 
 let str_of_symb s1 = match s1 with SSimple s -> s | SQuoted s -> "`" ^ s
 
+(** An SMT index is either a number or a symbol (Section 3.3). *)
 type smtIndex = INum of numeral | ISym of smtSymbol
 
-type smtIdentifier = Id of smtSymbol | IdC of smtSymbol * smtIndex list
+(** A SMT identifier is either a symbol or an indexed symbol (Section 3.3). *)
+type smtIdentifier =
+  | Id of smtSymbol
+  | IdC of smtSymbol * smtIndex list
+      (** For example, [(_ vector-add 4 5)] is an indexed identifier. *)
 
-type smtSort = SmtSort of smtIdentifier | Comp of smtIdentifier * smtSort list
+(** A SMT Sort (a type) is an identifier or a composite type. *)
+type smtSort =
+  | SmtSort of smtIdentifier
+      (** For example [SmtSort(IdC(SSimple("BitVec"), INum(3)))] is [(_ BitVec 3)]*)
+  | Comp of smtIdentifier * smtSort list
+      (** For example [Comp(Id(SSimple("Set")),SmtSort(Id(SSimple("Int"))))] is [(Set Int)]*)
 
 type smtSortedVar = smtSymbol * smtSort
+(** A SMT sorted var is a symbol associated with a sort. *)
 
+(** A qualified identifier is either a simple identifier [QI ...] or an identifier
+  qualified with a sort [QIas(x,y)] is [(as x y)].
+*)
 type smtQualIdentifier = QI of smtIdentifier | QIas of smtIdentifier * smtSort
 
+(** An SMT attribute that is either a string symbol or a symbol with a string value. *)
 type smtAttribute = ASymb of string | ASymbVal of string * string
 
+(** A SMT pattern is either a variable (a SMT symbol) or a constructor (a pair
+ of a constructor name with a lsit of arguments).  *)
 type smtPattern = Pat of smtSymbol | PatComp of smtSymbol * smtSymbol list
 
+(** The type of SMT special constants (Section 3.1). *)
 type smtSpecConstant =
   | SCNumeral of numeral
   | SCDecimal of numeral * int * numeral
