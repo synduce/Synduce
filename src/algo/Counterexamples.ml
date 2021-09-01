@@ -211,15 +211,20 @@ let check_image_sat ~p ctex : Solvers.Asyncs.response * int u =
     let steps = ref 0 in
     (* A single check for a bounded term. *)
     let t_check accum t =
+      (* Build equations of the form (f t) != (value of elimination var in model) *)
       let term_eqs =
         List.map ctex.ctex_eqn.eelim ~f:(fun (_, elimv) ->
-            smt_of_term (mk_bin Binop.Eq (f_compose_r t) (Eval.in_model ctex.ctex_model elimv)))
+            mk_bin Binop.Eq (f_compose_r t) (Eval.in_model ctex.ctex_model elimv))
       in
       let rec aux accum tlist =
-        let f binder t =
+        let f binder eqn =
           let%lwt _ = binder in
           let%lwt _ = Asyncs.spush solver_instance in
-          let%lwt _ = Asyncs.smt_assert solver_instance t in
+          let%lwt _ =
+            Asyncs.declare_all solver_instance
+              (SmtInterface.decls_of_vars (Analysis.free_variables eqn))
+          in
+          let%lwt _ = Asyncs.smt_assert solver_instance (smt_of_term eqn) in
           let%lwt res = Asyncs.check_sat solver_instance in
           let%lwt _ = Asyncs.spop solver_instance in
           return res
@@ -228,13 +233,17 @@ let check_image_sat ~p ctex : Solvers.Asyncs.response * int u =
         | [] -> accum
         | t0 :: tl -> (
             let%lwt accum' = f accum t0 in
-            match accum' with Sat -> return SmtLib.Sat | _ -> aux (return accum') tl)
+            match accum' with Unsat -> return SmtLib.Unsat | _ -> aux (return accum') tl)
       in
       aux accum term_eqs
+    in
+    let t_decl =
+      List.map ~f:snd (Lang.SmtInterface.declare_datatype_of_rtype (fst !AState._alpha))
     in
     let%lwt _ = task_start in
     (* TODO : logic *)
     let%lwt () = Asyncs.set_logic solver_instance "LIA" in
+    let%lwt () = Asyncs.declare_all solver_instance t_decl in
     let%lwt () = Asyncs.load_min_max_defs solver_instance in
     (* Run the bounded checking loop. *)
     let%lwt res =
@@ -243,15 +252,54 @@ let check_image_sat ~p ctex : Solvers.Asyncs.response * int u =
     let%lwt () = Asyncs.close_solver solver_instance in
     return res
   in
-  Asyncs.(cancellable_task (Asyncs.make_cvc_solver ()) build_task)
+  Asyncs.(cancellable_task (Asyncs.make_z3_solver ()) build_task)
 
 let check_image_unsat ~p ctex : Solvers.Asyncs.response * int u =
   let open Solvers in
-  let _ = (p, ctex) in
-  let build_task (solver_instance, task_start) =
-    let _ = solver_instance in
+  let build_task (solver, task_start) =
     let%lwt _ = task_start in
-    return SmtLib.Unknown
+    let%lwt () = Asyncs.set_logic solver "ALL" in
+    let%lwt () = Asyncs.set_option solver "quant-ind" "true" in
+    let%lwt () =
+      if !Config.induction_proof_tlimit >= 0 then
+        Asyncs.set_option solver "tlimit" (Int.to_string !Config.induction_proof_tlimit)
+      else return ()
+    in
+    let%lwt () = Asyncs.load_min_max_defs solver in
+    (* Declare Tinv, repr and reference functions. *)
+    let%lwt () =
+      Lwt_list.iter_p
+        (fun x ->
+          let%lwt _ = Asyncs.exec_command solver x in
+          return ())
+        (smt_of_pmrs p.psi_reference @ if p.psi_repr_is_identity then [] else smt_of_pmrs p.psi_repr)
+    in
+    let f_compose_r t =
+      let repr_of_v = if p.psi_repr_is_identity then t else mk_app_v p.psi_repr.pvar [ t ] in
+      mk_app_v p.psi_reference.pvar (List.map ~f:mk_var p.psi_reference.pargs @ [ repr_of_v ])
+    in
+    let fv, formula =
+      (* Substitute recursion elimination by recursive calls. *)
+      let eqns =
+        List.concat_map
+          ~f:(fun (orig_rec_var, elimv) ->
+            match elimv.tkind with
+            | TTup comps ->
+                List.mapi comps ~f:(fun i t ->
+                    mk_bin Binop.Eq (Eval.in_model ctex.ctex_model t)
+                      (mk_sel (f_compose_r orig_rec_var) i))
+            | _ ->
+                [ mk_bin Binop.Eq (Eval.in_model ctex.ctex_model elimv) (f_compose_r orig_rec_var) ])
+          ctex.ctex_eqn.eelim
+      in
+      ( VarSet.union_list (List.map ctex.ctex_eqn.eelim ~f:(fun (x, _) -> Analysis.free_variables x)),
+        (* Assert that the variables have the values assigned by the model. *)
+        SmtLib.mk_assoc_and (List.map ~f:smt_of_term eqns) )
+    in
+    let%lwt _ = Asyncs.smt_assert solver (SmtLib.mk_exists (sorted_vars_of_vars fv) formula) in
+    let%lwt resp = Asyncs.check_sat solver in
+    let%lwt () = Asyncs.close_solver solver in
+    return resp
   in
   Asyncs.(cancellable_task (Asyncs.make_cvc_solver ()) build_task)
 
@@ -260,13 +308,14 @@ let check_image_unsat ~p ctex : Solvers.Asyncs.response * int u =
   model of [ctex] are in the image of (p.psi_reference o p.psi_repr).
 *)
 let check_ctex_in_image ~(p : psi_def) (ctex : ctex) : ctex =
+  Log.verbose_msg Fmt.(str "Checking whether ctex is in the image of function...");
   let resp =
     try
       Lwt_main.run
         ((* This call is expected to respond "unsat" when terminating. *)
-         let pr1, resolver1 = check_image_unsat ~p ctex in
+         let pr1, resolver1 = check_image_sat ~p ctex in
          (* This call is expected to respond "sat" when terminating. *)
-         let pr2, resolver2 = check_image_sat ~p ctex in
+         let pr2, resolver2 = check_image_unsat ~p ctex in
          Lwt.wakeup resolver2 1;
          Lwt.wakeup resolver1 1;
          (* The first call to return is kept, the other one is ignored. *)

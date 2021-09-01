@@ -363,7 +363,9 @@ open Lwt
 open Smtlib
 
 let lwt_expand_loop (counter : int ref)
-    (t_check : Solvers.Asyncs.response -> term -> Solvers.Asyncs.response) (u : TermSet.t Lwt.t) =
+    (t_check : Solvers.Asyncs.response -> term -> Solvers.Asyncs.response)
+    ?(r_stop = function SmtLib.Sat -> true | _ -> false) ?(r_complete = SmtLib.Unsat)
+    (u : TermSet.t Lwt.t) =
   let rec tlist_check accum terms =
     match terms with
     | [] -> accum
@@ -374,22 +376,21 @@ let lwt_expand_loop (counter : int ref)
   let rec aux u =
     let%lwt u = u in
     match (Set.min_elt u, !counter < !Config.num_expansions_check) with
-    | Some t0, true -> (
+    | Some t0, true ->
         let tset, u' = simple t0 in
         let%lwt check_result = tlist_check (return SmtLib.Unknown) (Set.elements tset) in
         counter := !counter + Set.length tset;
-        match check_result with
-        | SmtLib.Sat -> return SmtLib.Sat
-        | _ -> aux (return (Set.union (Set.remove u t0) u')))
+        if r_stop check_result then return check_result
+        else aux (return (Set.union (Set.remove u t0) u'))
     | None, true ->
         Log.verbose_msg "Bounded checking is complete.";
         (* All expansions have been checked. *)
-        return SmtLib.Unsat
+        return r_complete
     | _, false ->
         (* Check reached limit. *)
         if !Config.no_bounded_sat_as_unsat then
           (* Return Unsat, as if all terms had been checked. *)
-          return SmtLib.Unsat
+          return r_complete
         else (* Otherwise, it's unknown. *)
           return SmtLib.Unknown
   in
