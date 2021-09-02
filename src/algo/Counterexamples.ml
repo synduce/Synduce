@@ -545,9 +545,3 @@ let classify_ctexs ~(p : psi_def) (ctexs : ctex list) : ctex list =
   in
   let classify_wrt_ref = List.map ~f:(check_ctex_in_image ~p) in
   match p.psi_tinv with Some tinv -> classify_with_tinv tinv | None -> classify_wrt_ref ctexs
-
-let ctex_stat_for_lemma_synt ctex =
-  match ctex.ctex_stat with
-  | Valid -> `Fst ctex
-  | Spurious ViolatesTargetRequires -> `Snd ctex
-  | _ -> `Trd ctex

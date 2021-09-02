@@ -1009,6 +1009,18 @@ let rec lemma_refinement_loop (det : term_state_detail) ~(p : psi_def) : term_st
             Log.error_msg "Lemma verification is indeterminate.";
             None)
 
+let ctexs_for_lemma_synt ctex =
+  match ctex.ctex_stat with
+  | Valid -> `Fst ctex
+  | Spurious ViolatesTargetRequires -> `Snd ctex
+  | _ -> `Trd ctex
+
+let ctexs_for_ensures_synt ctex =
+  match ctex.ctex_stat with
+  | Valid -> `Fst ctex
+  | Spurious NotInReferenceImage -> `Snd ctex
+  | _ -> `Trd ctex
+
 let synthesize_lemmas ~(p : psi_def) synt_failure_info (lstate : refinement_loop_state) :
     (refinement_loop_state, solver_response) Result.t =
   (*
@@ -1023,15 +1035,21 @@ let synthesize_lemmas ~(p : psi_def) synt_failure_info (lstate : refinement_loop
     | _, Either.Second unrealizability_ctexs ->
         (* Forget about the specific association in pairs. *)
         let ctexs = List.concat_map unrealizability_ctexs ~f:(fun uc -> [ uc.ci; uc.cj ]) in
+        let classified_ctexs = classify_ctexs_opt ~p ctexs in
+        let ensures_positives, ensures_negatives, _ =
+          List.partition3_map ~f:ctexs_for_ensures_synt classified_ctexs
+        in
+        if List.length ensures_negatives > 0 then
+          ImagePredicates.synthesize ~p ensures_positives ensures_negatives;
         (* Classify in negative and positive cexs. *)
-        let positive_ctexs, negative_ctexs, _ =
-          List.partition3_map ~f:ctex_stat_for_lemma_synt (classify_ctexs_opt ~p ctexs)
+        let lemma_synt_positives, lemma_synt_negatives, _ =
+          List.partition3_map ~f:ctexs_for_lemma_synt classified_ctexs
         in
         let ts : term_state =
-          update_term_state_for_ctexs ~p lstate.term_state ~neg_ctexs:negative_ctexs
-            ~pos_ctexs:positive_ctexs
+          update_term_state_for_ctexs ~p lstate.term_state ~neg_ctexs:lemma_synt_negatives
+            ~pos_ctexs:lemma_synt_positives
         in
-        if List.is_empty negative_ctexs then (ts, false)
+        if List.is_empty lemma_synt_negatives then (ts, false)
         else
           Map.fold ts
             ~init:(Map.empty (module Terms), true)
