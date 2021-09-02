@@ -219,6 +219,8 @@ if __name__ == "__main__":
         "--generate-benchmarks", help="Generate SyGuS benchmarks.", action="store_true")
     aparser.add_argument(
         "--generate-solutions", help="Generate solutions in extras/solution.", action="store_true")
+    aparser.add_argument(
+        "--kick-the-tires", help="Run a subset of benchmarks.", action="store_true")
     args = aparser.parse_args()
 
     table_no = args.table
@@ -282,21 +284,19 @@ if __name__ == "__main__":
         algos = [["requation", ""]]
         optims = [["all", ""]]
 
-    if len(sys.argv) > 2:
-        if int(sys.argv[2]) == 0:
-            input_files = kick_the_tires_set
-        else:
-            if table_no == 2:
-                input_files = reduced_benchmark_set_table2
-            elif table_no == 3:
-                input_files = reduced_benchmark_set_table3
-            elif table_no == 4 or table_no == 5:
-                input_files = constraint_benchmarks
-            else:
-                input_files = kick_the_tires_set
-
+    if args.kick_the_tires:
+        input_files = kick_the_tires_set
     else:
-        input_files = benchmark_set
+        if table_no == 2:
+            input_files = reduced_benchmark_set_table2
+        elif table_no == 3:
+            input_files = reduced_benchmark_set_table3
+        elif table_no == 4 or table_no == 5:
+            input_files = constraint_benchmarks
+        elif run_test_only:
+            input_files = benchmark_set
+        else:
+            input_files = kick_the_tires_set
 
     for filename_with_opt in input_files:
         filename = filename_with_opt[0]
