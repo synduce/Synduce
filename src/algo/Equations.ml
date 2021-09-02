@@ -580,12 +580,14 @@ let split_solve partial_soln (unknowns : VarSet.t) (eqns : equation list) =
     let sl, u, e = List.fold (Set.elements unknowns) ~f ~init:([], VarSet.empty, eqns) in
     sl @ [ (u, e) ]
   in
-  let solve_eqn_aux prev_resp prev_sol u e =
-    if Set.length u > 0 then combine ~verb:true prev_sol (solve_eqns_proxy u e)
-    else (prev_resp, prev_sol)
+  let solve_eqn_aux (unknowns, equations) =
+    if Set.length unknowns > 0 then [ solve_eqns_proxy unknowns equations ] else []
   in
-  List.fold split_eqn_systems ~init:(RSuccess [], Either.First partial_soln)
-    ~f:(fun (prev_resp, prev_sol) (u, e) -> solve_eqn_aux prev_resp prev_sol u e)
+  (* First solve by mapping to subsystems. Will be done in parallel. *)
+  let solved = List.concat_map split_eqn_systems ~f:solve_eqn_aux in
+  (* Then combine the solutions. *)
+  List.fold solved ~init:(RSuccess [], Either.First partial_soln) ~f:(fun (_, prev_sol) r ->
+      combine prev_sol r)
 
 let solve_stratified (unknowns : VarSet.t) (eqns : equation list) =
   let psol, u, e =

@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 import os
 import sys
+import argparse
 
 # Timeout for all experiments.
 timeout_value = 240  # 4min timeout for the review
@@ -94,8 +95,8 @@ constraint_benchmarks = [
     ["constraints/bst/contains.ml", ""],
     ["constraints/bst/count_lt.ml", "-NB"],
     ["constraints/bst/most_frequent_v1.ml", ""],
-    ["constraints/bst/from_list/contains.ml", ""],
-    ["constraints/bst/from_list/max.ml", "-NB -n 100"],
+    ["constraints/bst/from_list_contains.ml", ""],
+    ["constraints/bst/from_list_max.ml", "-NB -n 100"],
     # balanced_tree
     ["constraints/balanced_tree/node_count.ml", "-N"],
     ["constraints/balanced_tree/height.ml", "-N"],
@@ -209,69 +210,93 @@ sys.stdout.flush()
 
 
 if __name__ == "__main__":
-    if len(sys.argv) > 1:
-        table_no = int(sys.argv[1])
-        if table_no == -1:
-            algos = [["requation", ""]]
-            optims = [["all", ""]]
+    aparser = argparse.ArgumentParser()
+    aparser.add_argument(
+        "-t", "--table", help="Table number that the script must generate data for.", type=int)
+    aparser.add_argument(
+        "--run", help="Run tests for all benchmarks.", action="store_true")
+    aparser.add_argument(
+        "--generate-benchmarks", help="Generate SyGuS benchmarks.", action="store_true")
+    aparser.add_argument(
+        "--generate-solutions", help="Generate solutions in extras/solution.", action="store_true")
+    aparser.add_argument(
+        "--kick-the-tires", help="Run a subset of benchmarks.", action="store_true")
+    args = aparser.parse_args()
 
-        elif table_no == 1:
-            # Table 1 : compare Synduce and Baseline
-            algos = [
-                    ["requation", "--no-gropt"],
-                    ["acegis", "--acegis --no-gropt"]
-            ]
-            optims = [["all", ""]]
-        elif table_no == 2:
-            # Table 2 : compare Synduce, Baseline and Concrete CEGIS
-            algos = [
-                    ["requation", "--no-gropt"],
-                    ["acegis", "--acegis --no-gropt"],
-                    ["ccegis", "--ccegis --no-gropt"]
-            ]
-            optims = [["all", ""]]
+    table_no = args.table
+    generate_solutions = args.generate_solutions
+    generate_benchmarks = args.generate_benchmarks
 
-        elif table_no == 3:
-            # Table 2 : compare Synduce, Baseline with optimizations on/off
-            algos = [
+    run_test_only = table_no == -1 or args.run
+
+    if run_test_only:
+
+        algos = [["requation", ""]]
+        optims = [["all", ""]]
+
+    # Table 1 / CAV 21 paper : compare Synduce and Baseline
+    elif table_no == 1:
+
+        algos = [
+                ["requation", "--no-gropt"],
+                ["acegis", "--acegis --no-gropt"]
+        ]
+        optims = [["all", ""]]
+
+    # Table 2 / CAV 21 paper : compare Synduce, Baseline and Concrete CEGIS
+    elif table_no == 2:
+
+        algos = [
                 ["requation", "--no-gropt"],
                 ["acegis", "--acegis --no-gropt"],
-            ]
+                ["ccegis", "--ccegis --no-gropt"]
+        ]
+        optims = [["all", ""]]
 
-            optims = [
-                ["all", ""],
-                ["ini", "-c --no-gropt"],
-                ["st", "-st --no-gropt"],
-                ["d", "--no-syndef --no-gropt"],
-                ["off", "-st --no-syndef --no-gropt"]
-            ]
-        elif table_no == 4:
-            algos = [["requation", ""]]
-            optims = [["all", ""]]
+    # Table 3 / CAV21 paper : compare Synduce, Baseline with optimizations on/off
+    elif table_no == 3:
+
+        algos = [
+            ["requation", "--no-gropt"],
+            ["acegis", "--acegis --no-gropt"],
+        ]
+
+        optims = [
+            ["all", ""],
+            ["ini", "-c --no-gropt"],
+            ["st", "-st --no-gropt"],
+            ["d", "--no-syndef --no-gropt"],
+            ["off", "-st --no-syndef --no-gropt"]
+        ]
+
+    # Table 4 / Test
+    elif table_no == 4:
+        algos = [["requation"]]
+        optims = [["all", ""]]
+
+    # Table 5 / Test with baseline comparison
+    elif table_no == 5:
+        algos = [["requation", "--cvc4"], ["acegis", "--acegis --cvc4"]]
+        optims = [["all", ""]]
+
+    # No table - just run the base algorithm.
     else:
-        print(
-            "Usage:python3 test.py TABLE_NO [USE_REDUCED_SET]\n\
-            \tRun the experiments to generate data for table TABLE_NO (1, 2, or 3) or -1 for running tests.\n\
-            \tIf an additional argument is provided, only a reduced set of benchmarks is run.\n\
-            \t\tUSE_REDUCED_SET=0 kick-the-tire benchmarks set\n\
-            \t\tUSE_REDUCE_SET != 0 reduced set of benchmarks\n")
-        exit()
+        algos = [["requation", ""]]
+        optims = [["all", ""]]
 
-    if len(sys.argv) > 2:
-        if int(sys.argv[2]) == 0:
-            input_files = kick_the_tires_set
+    if args.kick_the_tires:
+        input_files = kick_the_tires_set
+    else:
+        if table_no == 2:
+            input_files = reduced_benchmark_set_table2
+        elif table_no == 3:
+            input_files = reduced_benchmark_set_table3
+        elif table_no == 4 or table_no == 5:
+            input_files = constraint_benchmarks
+        elif run_test_only:
+            input_files = benchmark_set
         else:
-            if table_no == 2:
-                input_files = reduced_benchmark_set_table2
-            elif table_no == 3:
-                input_files = reduced_benchmark_set_table3
-            elif table_no == 4:
-                input_files = constraint_benchmarks
-            else:
-                input_files = kick_the_tires_set
-
-    else:
-        input_files = benchmark_set
+            input_files = kick_the_tires_set
 
     for filename_with_opt in input_files:
         filename = filename_with_opt[0]
@@ -279,22 +304,27 @@ if __name__ == "__main__":
         extra_opt = filename_with_opt[1]
         for algo in algos:
             for optim in optims:
-                print("B:%s,%s+%s" % (filename, algo[0], optim[0]))
-                sys.stdout.flush()
-                if table_no > 0:
+                # Benchmark generation optional
+                gen_opt = ""
+                if generate_benchmarks:
                     if not os.path.exists(os.path.dirname("test/tmp_benchmarks/%s" % filename)):
                         os.makedirs(os.path.dirname(
                             "test/tmp_benchmarks/%s" % filename))
-                    os.system("%s %s %s -i %s %s %s --generate-benchmarks=\"test/tmp_benchmarks\"" %
-                              (timeout, exec_path, algo[1], optim[1], extra_opt,
-                               os.path.realpath(os.path.join("benchmarks", filename))))
-                else:
+                    gen_opt = "--generate-benchmarks=\"test/tmp_benchmarks\""
+                # Optional solution generation
+                soln_file_opt = ""
+                if generate_solutions:
                     if not os.path.exists(os.path.dirname("extras/solutions/%s" % filename)):
                         os.makedirs(os.path.dirname(
                             "extras/solutions/%s" % filename))
-                    os.system("%s %s %s -i %s %s %s -o %s" %
-                              (timeout, exec_path, algo[1], optim[1], extra_opt,
-                               os.path.realpath(os.path.join(
-                                   "benchmarks", filename)),
-                               "extras/solutions/%s/" % category
-                               ))
+                    soln_file_opt = "-o extras/solutions/%s/" % category
+
+                # Print benchmark name, algorithm used and optimization options.
+                print("B:%s,%s+%s" % (filename, algo[0], optim[0]))
+                sys.stdout.flush()
+
+                os.system("%s %s %s -i %s %s %s %s %s" %
+                          (timeout, exec_path, algo[1], optim[1], extra_opt,
+                           os.path.realpath(os.path.join(
+                               "benchmarks", filename)),
+                           soln_file_opt, gen_opt))
