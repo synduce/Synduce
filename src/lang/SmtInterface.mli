@@ -26,6 +26,9 @@ val smt_of_pmrs : PMRS.t -> SmtLib.command list
 
 val mk_def_fun_command : string -> (string * RType.t) list -> RType.t -> term -> SmtLib.command
 
+val declare_datatype_of_rtype : RType.t -> (SmtLib.smtSymbol list * SmtLib.command) list
+(** Generate a datatype declaration from a type. *)
+
 val mk_assert : SmtLib.smtTerm -> SmtLib.command
 
 val term_of_smt :

@@ -353,7 +353,7 @@ let constmap_of_s_exprs (starting_map : (string, term, String.comparator_witness
 let model_to_constmap (s : solver_response) =
   let empty_map = Map.empty (module String) in
   match s with
-  | Unknown | Unsat | Sat | Success -> empty_map
+  | Unsupported | Unknown | Unsat | Sat | Success -> empty_map
   | SExps s_exprs -> constmap_of_s_exprs empty_map s_exprs
   | Error _ -> failwith "Smt solver error"
 
@@ -544,13 +544,5 @@ let smt_of_pmrs (pmrs : PMRS.t) : command list =
   let deps = PMRS.depends pmrs in
   let sort_decls_of_deps, decls_of_deps = List.unzip (List.map ~f:_smt_of_pmrs deps) in
   let sort_decls, main_decl = _smt_of_pmrs pmrs in
-  let datatype_decls =
-    (* List.map ~f:snd
-       (List.dedup_and_sort
-          ~compare:(fun (sorts, _) (sorts', _) ->
-            List.compare
-              (fun a b -> String.compare (string_of_smtSymbol a) (string_of_smtSymbol b))
-              sorts sorts') *)
-    List.map ~f:snd (List.concat sort_decls_of_deps @ sort_decls)
-  in
+  let datatype_decls = List.map ~f:snd (List.concat sort_decls_of_deps @ sort_decls) in
   datatype_decls @ List.concat decls_of_deps @ main_decl

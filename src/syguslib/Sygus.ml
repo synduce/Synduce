@@ -588,7 +588,7 @@ let is_setter_command (c : SyCommand.t) =
 (**
    A SyGuS input is not well-formed if it specifies a list of commands that do not meet the restrictions given
    in this section regarding their order. The order is specified by the following regular pattern:
-   ```({set logic command})? ({setter commands})∗({other sygus_commands})∗```
+   ```(set logic command)? (setter commands)∗(other sygus_commands)∗```
 *)
 let is_well_formed (p : program) : bool =
   let setter_then_other l =

@@ -640,6 +640,9 @@ let preprocess_detuple (unknowns : VarSet.t) (eqns : equation list) : preprocess
   in
   { pre_unknowns; pre_equations; pre_postprocessing }
 
+(** Preprocessing action that transforms constraints with conditionals into sets of constraints
+  where conditions have been moved in the precondition of the constraint.
+*)
 let preprocess_deconstruct_if (unknowns : VarSet.t) (eqns : equation list) :
     preprocessing_action_result =
   let and_opt precond t =

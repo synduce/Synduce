@@ -170,3 +170,6 @@ the first rule should be the type of a function from input type of the PMRS to o
 # Evaluation
 The folder `extras/cav21` contains scripts and a readme to reproduce the results presented in the CAV21 paper.
 Please move the scripts to the root folder before executing them.
+
+# Documentation
+The documentation for the library in the `dev` branch is [here](https://victornicolet.github.io/Synduce/Synduce/index.html).

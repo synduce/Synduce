@@ -187,7 +187,7 @@ and d_decl_kind =
   | DSubModuleDefinition of
       d_attribute list * d_qualified_name * d_qualified_name option * d_toplevel list
       (** DSubModuleDefinition(attributes, name, refname, declarations)  is the submodule definition
-      "module" attributes name (refines refname) { declarations }
+      "module" attributes name (refines refname) \{ declarations \}
       *)
   | DSubModuleImport of bool * d_qualified_name
       (** DSubModuleImport(false, qname) is "import qname".
