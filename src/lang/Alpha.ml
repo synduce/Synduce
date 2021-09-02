@@ -43,10 +43,12 @@ let fresh ?(s = "x") () : string =
       s
 
 let mk_with_id (i : int) (s : string) (f : int -> 'a) : 'a =
-  if i > 0 then f i
+  if i > 0 then (
+    Hashtbl.add_multi _NAMES ~key:s ~data:i;
+    f i)
   else
     let id = new_id () in
     match Hashtbl.add _IDS ~key:id ~data:s with
     | _ ->
-        ();
+        Hashtbl.add_multi _NAMES ~key:s ~data:i;
         f id
