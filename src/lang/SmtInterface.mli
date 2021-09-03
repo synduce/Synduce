@@ -45,9 +45,9 @@ val model_to_constmap : SmtLib.solver_response -> term_model
       through (get-model).
 *)
 
-val model_to_subst : VarSet.t -> SmtLib.solver_response -> (term * term) list
-(** Translate a solver response (a Smtlib.Solvers.solver_response) to a term substitution list.
-      Returns an empty list if the response is not a SExps (a list of s-expressions) that defines a
+val model_to_varmap : VarSet.t -> SmtLib.solver_response -> term VarMap.t
+(** Translate a solver response (a Smtlib.Solvers.solver_response) to a map from variable to term.
+      Returns an empty map if the response is not a SExps (a list of s-expressions) that defines a
       model obtained through (get-model).
 *)
 

@@ -1,4 +1,3 @@
-open Base
 open Term
 
 val simplify : term -> term
@@ -7,4 +6,4 @@ val simplify : term -> term
     a constant.
 *)
 
-val in_model : (int, term, Int.comparator_witness) Map.t -> term -> term
+val in_model : term VarMap.t -> term -> term

@@ -105,10 +105,10 @@ type ctex_stat =
 
 type ctex = {
   ctex_eqn : equation;  (** The equation the counterexample relates to. *)
-  ctex_vars : VarSet.t;  (** The variables appearing in the model. *)
-  ctex_model : (int, term, Int.comparator_witness) Map.t;
-      (** The model of the counterexample, mapping variable ids to terms. The terms should be
-        constants.*)
+  ctex_vars : VarSet.t;  (** The variables in the model.*)
+  ctex_model : term VarMap.t;
+      (** The model of the counterexample, mapping variables to terms. The terms should be
+        constants. *)
   ctex_stat : ctex_stat;  (** The spuriousness status of the counterexample. *)
 }
 (** A counterexample related to an equation and some info on the validity of the counterexample.
@@ -183,9 +183,7 @@ let pp_equation (f : Formatter.t) (eqn : equation) =
 let pp_ctex (f : Formatter.t) (ctex : ctex) : unit =
   let pp_model frmt model =
     (* Print as comma-separated list of variable -> term *)
-    Fmt.(list ~sep:comma (pair ~sep:Utils.rightarrow (option Variable.pp) pp_term))
-      frmt
-      (List.map ~f:(fun (vid, t) -> (VarSet.find_by_id ctex.ctex_vars vid, t)) (Map.to_alist model))
+    Fmt.(list ~sep:comma (pair ~sep:Utils.rightarrow Variable.pp pp_term)) frmt (Map.to_alist model)
   in
   Fmt.pf f "@[M = [%a]@]@;@[for %a@]@;@[with elim. %a@]" pp_model ctex.ctex_model pp_term
     ctex.ctex_eqn.eterm pp_subs ctex.ctex_eqn.eelim

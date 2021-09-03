@@ -18,33 +18,25 @@ type unrealizability_ctex = { i : int; j : int; ci : ctex; cj : ctex }
 let pp_unrealizability_ctex (frmt : Formatter.t) (uc : unrealizability_ctex) : unit =
   let pp_model frmt model =
     (* Print as comma-separated list of variable -> term *)
-    Fmt.(
-      list ~sep:comma
-        (pair ~sep:Utils.rightarrow (option ~none:(fun fmt () -> pf fmt "?") Variable.pp) pp_term))
-      frmt
-      (List.map
-         ~f:(fun (vid, t) -> (VarSet.find_by_id uc.ci.ctex_vars vid, t))
-         (Map.to_alist model))
+    Fmt.(list ~sep:comma (pair ~sep:Utils.rightarrow Variable.pp pp_term)) frmt (Map.to_alist model)
   in
   Fmt.(
     pf frmt "@[M<%i> = [%a]@]@;@[M'<%i> = [%a]@]" uc.i pp_model uc.ci.ctex_model uc.j pp_model
       uc.cj.ctex_model)
 
 let reinterpret_model (m0i, m0j') var_subst =
-  List.fold var_subst
-    ~init:(Map.empty (module Int), Map.empty (module Int))
-    ~f:(fun (m, m') (v, v') ->
+  List.fold var_subst ~init:(VarMap.empty, VarMap.empty) ~f:(fun (m, m') (v, v') ->
       let primed_name = v'.vname in
       Variable.free v';
       match Map.find m0i v.vname with
       | Some data -> (
-          let new_m = Map.set m ~key:v.vid ~data in
+          let new_m = Map.set m ~key:v ~data in
           match Map.find m0j' primed_name with
-          | Some data -> (new_m, Map.set m' ~key:v.vid ~data)
+          | Some data -> (new_m, Map.set m' ~key:v ~data)
           | None -> (new_m, m'))
       | None -> (
           match Map.find m0j' primed_name with
-          | Some data -> (m, Map.set m' ~key:v.vid ~data)
+          | Some data -> (m, Map.set m' ~key:v ~data)
           | None -> (m, m')))
 
 let unrealizability_ctex_of_constmap (i, j) (eqn_i, eqn_j) (vseti, vsetj) var_subst model =
@@ -55,10 +47,10 @@ let unrealizability_ctex_of_constmap (i, j) (eqn_i, eqn_j) (vseti, vsetj) var_su
   let m_i, m_j = reinterpret_model (m0i, m0j) var_subst in
   let vset = Set.union vseti vsetj in
   let ctex_i : ctex =
-    { ctex_eqn = eqn_i; ctex_vars = vset; ctex_model = m_i; ctex_stat = Unknown }
+    { ctex_eqn = eqn_i; ctex_model = m_i; ctex_vars = vset; ctex_stat = Unknown }
   in
   let ctex_j : ctex =
-    { ctex_eqn = eqn_j; ctex_vars = vset; ctex_model = m_j; ctex_stat = Unknown }
+    { ctex_eqn = eqn_j; ctex_model = m_j; ctex_vars = vset; ctex_stat = Unknown }
   in
   { i; j; ci = ctex_i; cj = ctex_j }
 
@@ -357,7 +349,7 @@ let rec find_original_var_and_proj v (og, elimv) =
 
 let mk_model_sat_asserts ctex f_o_r instantiate =
   let f v =
-    let v_val = Map.find_exn ctex.ctex_model v.vid in
+    let v_val = Map.find_exn ctex.ctex_model v in
     match List.find_map ~f:(find_original_var_and_proj v) ctex.ctex_eqn.eelim with
     | Some (original_recursion_var, proj) -> (
         match original_recursion_var.tkind with
@@ -375,7 +367,7 @@ let mk_model_sat_asserts ctex f_o_r instantiate =
             SmtLib.mk_true)
     | None -> smt_of_term (mk_bin Binop.Eq (mk_var v) v_val)
   in
-  List.map ~f (Set.elements ctex.ctex_vars)
+  List.map ~f (Map.keys ctex.ctex_model)
 
 (** [check_tinv_unsat ~p tinv c] checks whether the counterexample [c] satisfies the predicate
   [tinv] in the synthesis problem [p]. The function returns a promise of a solver response and

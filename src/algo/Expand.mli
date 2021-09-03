@@ -43,20 +43,20 @@ val is_mr_all : AState.psi_def -> Term.term -> bool
 
 val to_maximally_reducible : AState.psi_def -> Term.term -> Term.TermSet.t * Term.TermSet.t
 
-val lwt_expand_loop :
+val expand_loop :
   int ref ->
-  (Smtlib.Solvers.Asyncs.response -> Term.term -> Smtlib.Solvers.Asyncs.response) ->
+  (Smtlib.Solvers.solver_response -> Term.term -> Smtlib.Solvers.solver_response) ->
   ?r_stop:(Smtlib.SmtLib.solver_response -> bool) ->
   ?r_complete:Smtlib.SmtLib.solver_response ->
-  Term.TermSet.t Lwt.t ->
-  Smtlib.Solvers.Asyncs.response
-(** [lwt_expand_loop] provides basic functionality for bounded checking.
-    [lwt_expand_loop steps f start] will run a bounded checking loop, starting with the term
-    set promise [start] and performing [!Lib.Config.num_expansions_check] steps, applying the
+  Term.TermSet.t ->
+  Smtlib.Solvers.solver_response
+(** [expand_loop] provides basic functionality for bounded checking.
+    [expand_loop steps f start] will run a bounded checking loop, starting with the term
+    set [start] and performing [!Lib.Config.num_expansions_check] steps, applying the
     checking function [f] for each term obtained during the expansion of the term in the set
     [start] into bounded terms.
 
-    If a check returns and answer for which [r_stop] is true, then the function returns
+    If a check returns an answer for which [r_stop] is true, then the function returns
     this answer. By default [r_stop] checks whether the answer is [SmtLib.Sat].
 
     If every check returns UNSAT, then the procedure returns [SmtLib.Unknown], unless
@@ -70,4 +70,16 @@ val lwt_expand_loop :
     @param r_stop is a function that returns true whenever the loop should stop, given
     the solver response to a call to f.
     @param r_complete is the answer that should be given if all the
+*)
+
+val lwt_expand_loop :
+  int ref ->
+  (Smtlib.Solvers.Asyncs.response -> Term.term -> Smtlib.Solvers.Asyncs.response) ->
+  ?r_stop:(Smtlib.SmtLib.solver_response -> bool) ->
+  ?r_complete:Smtlib.SmtLib.solver_response ->
+  Term.TermSet.t Lwt.t ->
+  Smtlib.Solvers.Asyncs.response
+(** [lwt_expand_loop] provides the same functionality as [expand_loop], but the solver
+    calls are threaded arount a lwt promise. Use [lwt_expand_loop] in place of [expand_loop]
+    when you want to run concurrent solver instances.
 *)

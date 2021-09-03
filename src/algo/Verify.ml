@@ -260,7 +260,9 @@ let invert (recf : PMRS.t) (c : Constant.t) : term list option =
       let sol =
         match Solvers.check_sat solver with
         | Sat ->
-            let model_as_subst = model_to_subst vars (Solvers.get_model solver) in
+            let model_as_subst =
+              VarMap.to_subst (model_to_varmap vars (Solvers.get_model solver))
+            in
             Continue_or_stop.Stop (Some (Reduce.reduce_term (substitution model_as_subst t)))
         | _ -> Continue_or_stop.Continue accum
       in

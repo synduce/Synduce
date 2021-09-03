@@ -357,12 +357,12 @@ let model_to_constmap (s : solver_response) =
   | SExps s_exprs -> constmap_of_s_exprs empty_map s_exprs
   | Error _ -> failwith "Smt solver error"
 
-let model_to_subst (ctx : VarSet.t) (s : solver_response) =
+let model_to_varmap (ctx : VarSet.t) (s : solver_response) : term VarMap.t =
   let map = Map.to_alist (model_to_constmap s) in
-  let f (vname, t) =
-    match VarSet.find_by_name ctx vname with Some v -> [ (Term.mk_var v, t) ] | None -> []
+  let f imap (vname, t) =
+    match VarSet.find_by_name ctx vname with Some v -> Map.set imap ~key:v ~data:t | None -> imap
   in
-  List.concat_map ~f map
+  List.fold_left ~init:VarMap.empty ~f map
 
 (** Given a term model, request additional models from the solver from the point where
     the current model was obtained. Simply calls (get-model) multiple times, asserting

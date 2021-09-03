@@ -316,7 +316,7 @@ let ctex_model_to_args ~(p : psi_def) (det : term_state_detail)
           | None ->
               failwith
                 (Fmt.str "Failed to extract argument list from ctex model (%s unknown)." name)
-          | Some v -> v.vid)
+          | Some v -> v)
       with
       | None -> failwith "Failed to extract argument list from ctex model."
       | Some t -> sygus_of_term t)
@@ -522,11 +522,8 @@ let smt_of_disallow_ctex_values (det : term_state_detail) : S.smtTerm =
               (Map.fold
                  ~f:(fun ~key ~data acc ->
                    let var =
-                     match VarSet.find_by_id ctex.ctex_vars key with
-                     | None -> failwith "Something went wrong."
-                     | Some v ->
-                         let subs = subs_from_elim_to_elim det.recurs_elim ctex.ctex_eqn.eelim in
-                         Term.substitution subs (mk_var v)
+                     let subs = subs_from_elim_to_elim det.recurs_elim ctex.ctex_eqn.eelim in
+                     Term.substitution subs (mk_var key)
                    in
                    S.mk_eq (Smt.smt_of_term var) (Smt.smt_of_term data) :: acc)
                  ~init:[] ctex.ctex_model)))
@@ -820,7 +817,7 @@ let placeholder_ctex (det : term_state_detail) : ctex =
         erhs = det.term;
       };
     ctex_vars = VarSet.of_list det.scalar_vars;
-    ctex_model = Map.empty (module Int);
+    ctex_model = VarMap.empty;
     ctex_stat = Unknown;
   }
 
@@ -839,14 +836,13 @@ let parse_positive_example_solver_model response (det : term_state_detail) =
         ({
            (placeholder_ctex det) with
            ctex_model =
-             Map.fold
-               ~init:(Map.empty (module Int))
+             Map.fold ~init:VarMap.empty
                ~f:(fun ~key ~data acc ->
                  match VarSet.find_by_name (VarSet.of_list det.scalar_vars) key with
                  | None ->
                      Log.info (fun f () -> Fmt.(pf f "Could not find by name %s" key));
                      acc
-                 | Some var -> Map.set ~data acc ~key:var.vid)
+                 | Some var -> Map.set ~data acc ~key:var)
                m;
          }
           : ctex);
@@ -868,8 +864,7 @@ let parse_interactive_positive_example (det : term_state_detail) (input : string
     {
       (placeholder_ctex det) with
       ctex_model =
-        List.fold
-          ~init:(Map.empty (module Int))
+        List.fold ~init:VarMap.empty
           ~f:(fun acc s_ ->
             let s = Str.split (Str.regexp " *= *") s_ in
             if not (equal (List.length s) 2) then acc
@@ -878,7 +873,7 @@ let parse_interactive_positive_example (det : term_state_detail) (input : string
               let data = mk_const (CInt (Int.of_string (trim (List.nth_exn s 1)))) in
               match VarSet.find_by_name (VarSet.of_list det.scalar_vars) key with
               | None -> acc
-              | Some var -> Map.set ~data acc ~key:var.vid)
+              | Some var -> Map.set ~data acc ~key:var)
           (Str.split (Str.regexp " *, *") input);
     }
 

@@ -58,6 +58,6 @@ let simplify t =
   in
   until_stable 0 t
 
-let in_model (imap : (int, term, Int.comparator_witness) Map.t) (t : term) =
-  let remap _ t = match t.tkind with TVar v -> Map.find imap v.vid | _ -> None in
+let in_model (vmap : term VarMap.t) (t : term) =
+  let remap _ t = match t.tkind with TVar v -> Map.find vmap v | _ -> None in
   fst (Term.infer_type (simplify (transform ~case:remap t)))
