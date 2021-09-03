@@ -12,6 +12,48 @@ open Utils
 (*                               CHECKING UNREALIZABILITY                                        *)
 (* ============================================================================================= *)
 
+let smt_unsatisfiability_check (unknowns : VarSet.t) (eqns : equation list) : unit =
+  let free_vars =
+    let f fvs eqn =
+      let precond, lhs, rhs = (eqn.eprecond, eqn.elhs, eqn.erhs) in
+      let set' =
+        VarSet.union_list
+          [
+            Analysis.free_variables lhs;
+            Analysis.free_variables rhs;
+            Option.value_map precond ~f:Analysis.free_variables ~default:VarSet.empty;
+          ]
+      in
+      Set.union fvs set'
+    in
+    let fvs = List.fold eqns ~f ~init:VarSet.empty in
+    Set.diff fvs unknowns
+  in
+  let constraint_of_eqns =
+    let eqns_constraints =
+      let f eqn =
+        let lhs = smt_of_term eqn.elhs in
+        let rhs = smt_of_term eqn.erhs in
+        let pre = Option.map ~f:smt_of_term eqn.eprecond in
+        match pre with
+        | Some precondition -> SmtLib.(mk_or (mk_not precondition) (mk_eq lhs rhs))
+        | None -> SmtLib.mk_eq lhs rhs
+      in
+      List.map ~f eqns
+    in
+    SmtLib.(mk_forall (sorted_vars_of_vars free_vars) (mk_assoc_and eqns_constraints))
+  in
+  let z3 = Solvers.make_z3_solver () in
+  Solvers.set_logic z3 "UFLIA";
+  Solvers.declare_all z3 (decls_of_vars unknowns);
+  Solvers.smt_assert z3 constraint_of_eqns;
+  Log.debug
+    Fmt.(
+      fun fmt () ->
+        pf fmt "Z3 query answer for unsatisfiability of synthesis problem: %a"
+          Solvers.pp_solver_response (Solvers.check_sat z3));
+  Solvers.close_solver z3
+
 type unrealizability_ctex = { i : int; j : int; ci : ctex; cj : ctex }
 (** A counterexample to realizability is a pair of models: a pair of maps from variable ids to terms. *)
 

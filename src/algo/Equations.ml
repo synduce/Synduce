@@ -517,6 +517,8 @@ let solve_eqns (unknowns : VarSet.t) (eqns : equation list) :
     | [] -> aux_solve false ()
     | _ as ctexs ->
         if !Config.generate_benchmarks then ignore (aux_solve true ());
+        if !Config.check_unrealizable_smt_unsatisfiable then
+          Counterexamples.smt_unsatisfiability_check unknowns eqns;
         (RInfeasible, Either.Second ctexs))
   else aux_solve false ()
 
