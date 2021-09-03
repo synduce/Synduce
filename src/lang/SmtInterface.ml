@@ -394,13 +394,22 @@ let request_different_models (model : term_model) (num_models : int)
 (* ============================================================================================= *)
 (*                           COMMANDS                                                            *)
 (* ============================================================================================= *)
+let maybe_decl_of_tuple_type (t : RType.t) =
+  match t with TTup tl -> [ snd (decl_of_tup_type tl) ] | _ -> []
 
 let decls_of_vars (vars : VarSet.t) =
   let f v =
     let t = Variable.vtype_or_new v in
-    let sort = sort_of_rtype t in
-    (match t with TTup tl -> [ snd (decl_of_tup_type tl) ] | _ -> [])
-    @ [ DeclareConst (SSimple v.vname, sort) ]
+    match t with
+    | RType.TFun _ ->
+        let intypes, outtypes = RType.fun_typ_unpack t in
+        let in_sorts = List.map ~f:sort_of_rtype intypes in
+        let out_sort = sort_of_rtype outtypes in
+        List.concat_map ~f:maybe_decl_of_tuple_type (outtypes :: intypes)
+        @ [ DeclareFun (mk_symb v.vname, in_sorts, out_sort) ]
+    | _ ->
+        let sort = sort_of_rtype t in
+        maybe_decl_of_tuple_type t @ [ DeclareConst (mk_symb v.vname, sort) ]
   in
   List.concat_map ~f (Set.elements vars)
 

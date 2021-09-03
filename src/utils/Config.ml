@@ -62,6 +62,11 @@ let interactive_check_lemma = ref false
 *)
 let check_unrealizable = ref true
 
+(** Check whether a synthesis problem is unrealizable by checking whether the problem with
+second-order quantification is unrealizable, using a SMT solver (Z3 by default).
+*)
+let check_unrealizable_smt_unsatisfiable = ref false
+
 (**
   Attempt to lift the function if there is no solution.
 *)
