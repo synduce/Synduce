@@ -1,8 +1,56 @@
 open Base
 open Term
-open Smtlib.SmtLib
+open Smtlib
+open SmtLib
 open Utils
 open Option.Let_syntax
+
+module Stats : Solvers.Statistics = Utils.Stats
+
+module SmtLog : Solvers.Logger = struct
+  let verb = Log.verbose
+
+  let debug = Log.debug
+
+  let error = Log.error
+
+  let log_queries = !Config.smt_log_queries
+
+  let log_file = !Config.smt_solver_log_file
+
+  let verbose = !Config.smt_solve_verbose
+end
+
+module AsyncSmt = struct
+  module S = Solvers.Asyncs (SmtLog) (Stats)
+  include S
+
+  (** Create a process with a Z3 solver. *)
+  let make_z3_solver () =
+    make_solver ~name:"Z3-SMT" Utils.Config.z3_binary_path [ "z3"; "-in"; "-smt2" ]
+
+  (** Create a process with a CVC4 solver. *)
+  let make_cvc_solver () =
+    let cvc_path = Config.cvc_binary_path () in
+    let using_cvc5 = Config.using_cvc5 () in
+    let name = if using_cvc5 then "CVC5-SMT" else "CVC4-SMT" in
+    let executable_name = if using_cvc5 then "cvc5" else "cvc4" in
+    make_solver ~name cvc_path [ executable_name; "--lang=smt2.6"; "--incremental" ]
+end
+
+module SyncSmt = struct
+  module S = Solvers.Synchronous (SmtLog) (Stats)
+  include S
+
+  let make_z3_solver () = make_solver ~name:"Z3-SMT" Config.z3_binary_path [ "-in"; "-smt2" ]
+
+  (** Create a process with a CVC4 solver. *)
+  let make_cvc_solver () =
+    let cvc_path = Config.cvc_binary_path () in
+    let using_cvc5 = Config.using_cvc5 () in
+    let name = if using_cvc5 then "CVC5-SMT" else "CVC4-SMT" in
+    make_solver ~name cvc_path [ "--lang=smt2.6"; "--incremental" ]
+end
 
 let string_of_smtSymbol (s : smtSymbol) : string =
   match s with SSimple s -> s | SQuoted s -> "'" ^ s
@@ -370,8 +418,8 @@ let model_to_varmap (ctx : VarSet.t) (s : solver_response) : term VarMap.t =
     call.
 *)
 let request_different_models (model : term_model) (num_models : int)
-    (solver : Smtlib.Solvers.online_solver) =
-  let open Smtlib.Solvers in
+    (solver : SyncSmt.online_solver) =
+  let open SyncSmt in
   let rec req_loop model i models =
     (* Assert all variables different. *)
     List.iter

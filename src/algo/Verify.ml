@@ -33,14 +33,14 @@ let constr_eqn (eqn : equation) =
 
 let check_eqn solver has_sat eqn =
   let formula = SmtLib.mk_not eqn in
-  Solvers.spush solver;
-  Solvers.smt_assert solver formula;
+  SyncSmt.spush solver;
+  SyncSmt.smt_assert solver formula;
   let x =
-    match Solvers.check_sat solver with
+    match SyncSmt.check_sat solver with
     | Sat -> Continue_or_stop.Stop true
     | _ -> Continue_or_stop.Continue has_sat
   in
-  Solvers.spop solver;
+  SyncSmt.spop solver;
   x
 
 (* During verification, some terms that have partially bounded might lack the lemmas that ensure
@@ -76,8 +76,8 @@ let check_solution ?(use_acegis = false) ~(p : psi_def) (lstate : refinement_loo
   let target_inst = Lang.Reduce.instantiate_with_solution p.psi_target soln in
   let free_vars = VarSet.empty in
   let init_vardecls = decls_of_vars free_vars in
-  let solver = Solvers.make_z3_solver () in
-  Solvers.load_min_max_defs solver;
+  let solver = SyncSmt.make_z3_solver () in
+  SyncSmt.load_min_max_defs solver;
   let expand_and_check i (t0 : term) =
     let t_set, u_set = Expand.to_maximally_reducible p t0 in
     let t_set, tmp_lstate = partial_bounding_checker ~p lstate t_set in
@@ -90,14 +90,14 @@ let check_solution ?(use_acegis = false) ~(p : psi_def) (lstate : refinement_loo
       in
       let smt_eqns = List.map sys_eqns ~f:constr_eqn in
       (* Solver calls. *)
-      Solvers.spush solver;
+      SyncSmt.spush solver;
       (* Declare all the new variables used in the system of equations. *)
-      Solvers.declare_all solver
+      SyncSmt.declare_all solver
         (decls_of_vars (Set.diff (Equations.free_vars_of_equations sys_eqns) free_vars));
       let has_ctex =
         List.fold_until ~finish:(fun x -> x) ~init:false ~f:(check_eqn solver) smt_eqns
       in
-      Solvers.spop solver;
+      SyncSmt.spop solver;
       (* Result of solver calls. *)
       if has_ctex then (true, t_set, u_set, i + 1)
       else (false, TermSet.empty, u_set, i + num_terms_to_check))
@@ -127,12 +127,12 @@ let check_solution ?(use_acegis = false) ~(p : psi_def) (lstate : refinement_loo
             find_ctex num_checks elts
   in
   (* Declare all variables *)
-  Solvers.declare_all solver init_vardecls;
+  SyncSmt.declare_all solver init_vardecls;
   (match find_ctex 0 lstate.t_set with
   | Some _ -> failwith "Synthesizer and solver disagree on solution. That's unexpected!"
   | None -> ());
   let ctex_or_none = find_ctex 0 lstate.u_set in
-  Solvers.close_solver solver;
+  SyncSmt.close_solver solver;
   let elapsed = Unix.gettimeofday () -. start_time in
   Stats.add_verif_time elapsed;
   Log.info (fun f () -> Fmt.(pf f "... finished in %3.4fs" elapsed));
@@ -145,14 +145,14 @@ let check_solution ?(use_acegis = false) ~(p : psi_def) (lstate : refinement_loo
 
 let bounded_check_eqn ?(use_concrete_ctex = false) solver eqn =
   let formula = SmtLib.mk_not eqn in
-  Solvers.spush solver;
-  Solvers.smt_assert solver formula;
-  let x = Solvers.check_sat solver in
+  SyncSmt.spush solver;
+  SyncSmt.smt_assert solver formula;
+  let x = SyncSmt.check_sat solver in
   let model =
-    if use_concrete_ctex then match x with Sat -> Some (Solvers.get_model solver) | _ -> None
+    if use_concrete_ctex then match x with Sat -> Some (SyncSmt.get_model solver) | _ -> None
     else None
   in
-  Solvers.spop solver;
+  SyncSmt.spop solver;
   (x, model)
 
 (* Perform a bounded check of the solution *)
@@ -163,8 +163,8 @@ let bounded_check ?(use_concrete_ctex = false) ~(p : psi_def)
   let target_inst = Lang.Reduce.instantiate_with_solution p.psi_target soln in
   let free_vars = VarSet.empty in
   let init_vardecls = decls_of_vars free_vars in
-  let solver = Solvers.make_z3_solver () in
-  Solvers.load_min_max_defs solver;
+  let solver = SyncSmt.make_z3_solver () in
+  SyncSmt.load_min_max_defs solver;
   let check term =
     let sys_eqns, _ =
       Equations.make ~force_replace_off:true
@@ -181,8 +181,8 @@ let bounded_check ?(use_concrete_ctex = false) ~(p : psi_def)
       in
       Set.diff (List.fold ~f ~init:VarSet.empty sys_eqns) free_vars
     in
-    Solvers.declare_all solver init_vardecls;
-    Solvers.declare_all solver (decls_of_vars new_free_vars);
+    SyncSmt.declare_all solver init_vardecls;
+    SyncSmt.declare_all solver (decls_of_vars new_free_vars);
     let rec search_ctex _eqns =
       match _eqns with
       | [] -> None
@@ -238,7 +238,7 @@ let bounded_check ?(use_concrete_ctex = false) ~(p : psi_def)
         | Some ctex -> Continue_or_stop.Stop (Some ctex)
         | None -> Continue_or_stop.Continue None)
   in
-  Solvers.close_solver solver;
+  SyncSmt.close_solver solver;
   let elapsed = Unix.gettimeofday () -. start_time in
   Stats.add_verif_time elapsed;
   Log.info (fun f () -> Fmt.(pf f "... finished in %3.4fs" elapsed));
@@ -254,19 +254,19 @@ let invert (recf : PMRS.t) (c : Constant.t) : term list option =
       let vars = Analysis.free_variables t in
       let f_t = Reduce.reduce_pmrs recf t in
       let f_t_eq_c = mk_bin Eq f_t (mk_const c) in
-      Solvers.spush solver;
-      Solvers.declare_all solver (SmtInterface.decls_of_vars vars);
-      Solvers.smt_assert solver (smt_of_term f_t_eq_c);
+      SyncSmt.spush solver;
+      SyncSmt.declare_all solver (SmtInterface.decls_of_vars vars);
+      SyncSmt.smt_assert solver (smt_of_term f_t_eq_c);
       let sol =
-        match Solvers.check_sat solver with
+        match SyncSmt.check_sat solver with
         | Sat ->
             let model_as_subst =
-              VarMap.to_subst (model_to_varmap vars (Solvers.get_model solver))
+              VarMap.to_subst (model_to_varmap vars (SyncSmt.get_model solver))
             in
             Continue_or_stop.Stop (Some (Reduce.reduce_term (substitution model_as_subst t)))
         | _ -> Continue_or_stop.Continue accum
       in
-      Solvers.spop solver;
+      SyncSmt.spop solver;
       sol
     in
     Set.fold_until ~init:None ~finish:(fun x -> x) ~f terms
@@ -274,7 +274,7 @@ let invert (recf : PMRS.t) (c : Constant.t) : term list option =
   match recf.pinput_typ with
   | [ typ1 ] ->
       let x1 = Variable.mk ~t:(Some typ1) (Alpha.fresh ()) in
-      let solver = Solvers.make_z3_solver () in
+      let solver = SyncSmt.make_z3_solver () in
       let rec expand_loop u =
         match Set.min_elt u with
         | Some t0 -> (
@@ -285,7 +285,7 @@ let invert (recf : PMRS.t) (c : Constant.t) : term list option =
         | None -> None
       in
       let res = expand_loop (TermSet.singleton (mk_var x1)) in
-      Solvers.close_solver solver;
+      SyncSmt.close_solver solver;
       Option.map ~f:(fun x -> [ x ]) res
   | _ ->
       Log.error_msg "rec_inverse: only PMRS with a single input argument supported for now.";

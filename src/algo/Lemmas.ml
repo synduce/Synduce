@@ -430,35 +430,35 @@ let smt_of_lemma_validity ~(p : psi_def) lemma (det : term_state_detail) =
 let set_up_bounded_lemma_solver_async det solver ~(p : psi_def) lemma_candidate =
   ignore p;
   ignore lemma_candidate;
-  let open Solvers in
-  let%lwt () = Asyncs.set_logic solver "LIA" in
-  let%lwt () = Asyncs.set_option solver "produce-models" "true" in
-  let%lwt () = Asyncs.set_option solver "incremental" "true" in
+  let%lwt () = Smt.AsyncSmt.set_logic solver "LIA" in
+  let%lwt () = Smt.AsyncSmt.set_option solver "produce-models" "true" in
+  let%lwt () = Smt.AsyncSmt.set_option solver "incremental" "true" in
   let%lwt () =
     if !Config.induction_proof_tlimit >= 0 then
-      Asyncs.set_option solver "tlimit" (Int.to_string !Config.induction_proof_tlimit)
+      Smt.AsyncSmt.set_option solver "tlimit" (Int.to_string !Config.induction_proof_tlimit)
     else return ()
   in
-  let%lwt () = Asyncs.load_min_max_defs solver in
-  let%lwt () = Asyncs.declare_all solver (Smt.decls_of_vars (VarSet.of_list det.scalar_vars)) in
+  let%lwt () = Smt.AsyncSmt.load_min_max_defs solver in
+  let%lwt () =
+    Smt.AsyncSmt.declare_all solver (Smt.decls_of_vars (VarSet.of_list det.scalar_vars))
+  in
   return ()
 
 let set_up_lemma_solver_async solver ~(p : psi_def) lemma_candidate =
-  let open Solvers in
-  let%lwt () = Asyncs.set_logic solver "ALL" in
-  let%lwt () = Asyncs.set_option solver "quant-ind" "true" in
-  let%lwt () = Asyncs.set_option solver "produce-models" "true" in
-  let%lwt () = Asyncs.set_option solver "incremental" "true" in
+  let%lwt () = Smt.AsyncSmt.set_logic solver "ALL" in
+  let%lwt () = Smt.AsyncSmt.set_option solver "quant-ind" "true" in
+  let%lwt () = Smt.AsyncSmt.set_option solver "produce-models" "true" in
+  let%lwt () = Smt.AsyncSmt.set_option solver "incremental" "true" in
   let%lwt () =
     if !Config.induction_proof_tlimit >= 0 then
-      Asyncs.set_option solver "tlimit" (Int.to_string !Config.induction_proof_tlimit)
+      Smt.AsyncSmt.set_option solver "tlimit" (Int.to_string !Config.induction_proof_tlimit)
     else return ()
   in
-  let%lwt () = Asyncs.load_min_max_defs solver in
+  let%lwt () = Smt.AsyncSmt.load_min_max_defs solver in
   let%lwt () =
     Lwt_list.iter_p
       (fun x ->
-        let%lwt _ = Asyncs.exec_command solver x in
+        let%lwt _ = Smt.AsyncSmt.exec_command solver x in
         return ())
       ((match p.psi_tinv with None -> [] | Some tinv -> Smt.smt_of_pmrs tinv)
       @ (if p.psi_repr_is_identity then Smt.smt_of_pmrs p.psi_reference
@@ -478,15 +478,15 @@ let set_up_lemma_solver_async solver ~(p : psi_def) lemma_candidate =
   return ()
 
 let set_up_lemma_solver solver ~(p : psi_def) lemma_candidate =
-  Solvers.set_logic solver "ALL";
-  Solvers.set_option solver "quant-ind" "true";
-  Solvers.set_option solver "produce-models" "true";
-  Solvers.set_option solver "incremental" "true";
+  Smt.SyncSmt.set_logic solver "ALL";
+  Smt.SyncSmt.set_option solver "quant-ind" "true";
+  Smt.SyncSmt.set_option solver "produce-models" "true";
+  Smt.SyncSmt.set_option solver "incremental" "true";
   if !Config.induction_proof_tlimit >= 0 then
-    Solvers.set_option solver "tlimit" (Int.to_string !Config.induction_proof_tlimit);
-  Solvers.load_min_max_defs solver;
+    Smt.SyncSmt.set_option solver "tlimit" (Int.to_string !Config.induction_proof_tlimit);
+  Smt.SyncSmt.load_min_max_defs solver;
   List.iter
-    ~f:(fun x -> ignore (Solvers.exec_command solver x))
+    ~f:(fun x -> ignore (Smt.SyncSmt.exec_command solver x))
     ((match p.psi_tinv with None -> [] | Some tinv -> Smt.smt_of_pmrs tinv)
     @ (if p.psi_repr_is_identity then Smt.smt_of_pmrs p.psi_reference
       else Smt.smt_of_pmrs p.psi_reference @ Smt.smt_of_pmrs p.psi_repr)
@@ -531,49 +531,55 @@ let smt_of_disallow_ctex_values (det : term_state_detail) : S.smtTerm =
 
 let set_up_to_get_model solver ~(p : psi_def) lemma (det : term_state_detail) =
   (* Step 1. Declare vars for term, and assert that term satisfies tinv. *)
-  Solvers.declare_all solver (Smt.decls_of_vars (Analysis.free_variables det.term));
-  ignore (Solvers.exec_command solver (S.mk_assert (smt_of_tinv_app ~p det)));
+  Smt.SyncSmt.declare_all solver (Smt.decls_of_vars (Analysis.free_variables det.term));
+  ignore (Smt.SyncSmt.exec_command solver (S.mk_assert (smt_of_tinv_app ~p det)));
   (* Step 2. Declare scalars (vars for recursion elimination & spec param) and their constraints (preconds & recurs elim eqns) *)
-  Solvers.declare_all solver (Smt.decls_of_vars (VarSet.of_list det.scalar_vars));
-  ignore (Solvers.exec_command solver (S.mk_assert (smt_of_recurs_elim_eqns det.recurs_elim ~p)));
+  Smt.SyncSmt.declare_all solver (Smt.decls_of_vars (VarSet.of_list det.scalar_vars));
+  ignore
+    (Smt.SyncSmt.exec_command solver (S.mk_assert (smt_of_recurs_elim_eqns det.recurs_elim ~p)));
   (match det.current_preconds with
   | None -> ()
-  | Some pre -> ignore (Solvers.exec_command solver (S.mk_assert (Smt.smt_of_term pre))));
+  | Some pre -> ignore (Smt.SyncSmt.exec_command solver (S.mk_assert (Smt.smt_of_term pre))));
   (* Step 3. Disallow repeated positive examples. *)
   if List.length det.positive_ctexs > 0 then
-    ignore (Solvers.exec_command solver (S.mk_assert (smt_of_disallow_ctex_values det)));
+    ignore (Smt.SyncSmt.exec_command solver (S.mk_assert (smt_of_disallow_ctex_values det)));
   (* Step 4. Assert that lemma candidate is false. *)
-  ignore (Solvers.exec_command solver (S.mk_assert (S.mk_not (smt_of_lemma_app lemma))))
+  ignore (Smt.SyncSmt.exec_command solver (S.mk_assert (S.mk_not (smt_of_lemma_app lemma))))
 
 let set_up_to_get_model_async solver ~(p : psi_def) lemma (det : term_state_detail) =
-  let open Solvers in
   (* Step 1. Declare vars for term, and assert that term satisfies tinv. *)
-  let%lwt () = Asyncs.declare_all solver (Smt.decls_of_vars (Analysis.free_variables det.term)) in
-  let%lwt _ = Asyncs.exec_command solver (S.mk_assert (smt_of_tinv_app ~p det)) in
+  let%lwt () =
+    Smt.AsyncSmt.declare_all solver (Smt.decls_of_vars (Analysis.free_variables det.term))
+  in
+  let%lwt _ = Smt.AsyncSmt.exec_command solver (S.mk_assert (smt_of_tinv_app ~p det)) in
   (* Step 2. Declare scalars (vars for recursion elimination & spec param) and their constraints (preconds & recurs elim eqns) *)
-  let%lwt () = Asyncs.declare_all solver (Smt.decls_of_vars (VarSet.of_list det.scalar_vars)) in
+  let%lwt () =
+    Smt.AsyncSmt.declare_all solver (Smt.decls_of_vars (VarSet.of_list det.scalar_vars))
+  in
   let%lwt _ =
-    Asyncs.exec_command solver (S.mk_assert (smt_of_recurs_elim_eqns det.recurs_elim ~p))
+    Smt.AsyncSmt.exec_command solver (S.mk_assert (smt_of_recurs_elim_eqns det.recurs_elim ~p))
   in
   let%lwt () =
     match det.current_preconds with
     | None -> return ()
     | Some pre ->
-        let%lwt _ = Asyncs.exec_command solver (S.mk_assert (Smt.smt_of_term pre)) in
+        let%lwt _ = Smt.AsyncSmt.exec_command solver (S.mk_assert (Smt.smt_of_term pre)) in
         return ()
   in
   (* Step 3. Disallow repeated positive examples. *)
   let%lwt () =
     if List.length det.positive_ctexs > 0 then
-      let%lwt _ = Asyncs.exec_command solver (S.mk_assert (smt_of_disallow_ctex_values det)) in
+      let%lwt _ =
+        Smt.AsyncSmt.exec_command solver (S.mk_assert (smt_of_disallow_ctex_values det))
+      in
       return ()
     else return ()
   in
   (* Step 4. Assert that lemma candidate is false. *)
-  Asyncs.exec_command solver (S.mk_assert (S.mk_not (smt_of_lemma_app lemma)))
+  Smt.AsyncSmt.exec_command solver (S.mk_assert (S.mk_not (smt_of_lemma_app lemma)))
 
 let bounded_check solver ~(p : psi_def) lemma_candidate (det : term_state_detail) :
-    Solvers.solver_response * Solvers.solver_response option =
+    Smt.SyncSmt.solver_response * Smt.SyncSmt.solver_response option =
   set_up_to_get_model solver ~p lemma_candidate det;
   let steps = ref 0 in
   let rec check_bounded_sol terms =
@@ -581,22 +587,24 @@ let bounded_check solver ~(p : psi_def) lemma_candidate (det : term_state_detail
       let rec_instantation =
         Option.value ~default:VarMap.empty (Analysis.matches t ~pattern:det.term)
       in
-      Solvers.spush solver;
+      Smt.SyncSmt.spush solver;
       Map.iteri
         ~f:(fun ~key ~data ->
           (* Declare variables in term `data` *)
-          Solvers.declare_all solver (Smt.decls_of_vars (Analysis.free_variables data));
+          Smt.SyncSmt.declare_all solver (Smt.decls_of_vars (Analysis.free_variables data));
           (* Assert that `key` variable is equal to `data` term *)
           ignore
-            (Solvers.exec_command solver
+            (Smt.SyncSmt.exec_command solver
                (S.mk_assert (S.mk_eq (S.mk_var key.vname) (Smt.smt_of_term data)))))
         rec_instantation;
-      let resp = Solvers.check_sat solver in
+      let resp = Smt.SyncSmt.check_sat solver in
       (* Note that I am getting a model after check-sat unknown response. This may not halt.  *)
       let result =
-        match resp with SmtLib.Sat | SmtLib.Unknown -> Some (Solvers.get_model solver) | _ -> None
+        match resp with
+        | SmtLib.Sat | SmtLib.Unknown -> Some (Smt.SyncSmt.get_model solver)
+        | _ -> None
       in
-      Solvers.spop solver;
+      Smt.SyncSmt.spop solver;
       (resp, result)
     in
     match terms with
@@ -648,8 +656,7 @@ let mk_model_sat_asserts det f_o_r instantiate =
   List.map ~f det.scalar_vars
 
 let verify_lemma_bounded ~(p : psi_def) (det : term_state_detail) lemma_candidate :
-    Solvers.Asyncs.response * int Lwt.u =
-  let open Solvers in
+    Smt.AsyncSmt.response * int Lwt.u =
   let task (solver, starter) =
     let%lwt _ = starter in
     let%lwt _ = set_up_bounded_lemma_solver_async det solver ~p lemma_candidate in
@@ -678,17 +685,17 @@ let verify_lemma_bounded ~(p : psi_def) (det : term_state_detail) lemma_candidat
           Option.to_list (Option.map ~f:(fun t -> substitution subs t) det.current_preconds)
         in
         let model_sat = mk_model_sat_asserts det f_compose_r (Map.find rec_instantation) in
-        let%lwt () = Asyncs.spush solver in
+        let%lwt () = Smt.AsyncSmt.spush solver in
         (* Assert that preconditions hold and map original term's recurs elim variables to the variables that they reduce to for this concrete term. *)
         let%lwt _ =
-          Asyncs.declare_all solver
+          Smt.AsyncSmt.declare_all solver
             (Smt.decls_of_vars
                (List.fold ~init:VarSet.empty
                   ~f:(fun acc t -> Set.union acc (Analysis.free_variables t))
                   (preconds @ Map.data rec_instantation)))
         in
         let%lwt () =
-          Asyncs.smt_assert solver
+          Smt.AsyncSmt.smt_assert solver
             (SmtLib.mk_assoc_and (List.map ~f:Smt.smt_of_term preconds @ model_sat))
         in
         (* Assert that TInv is true for this concrete term t *)
@@ -698,28 +705,28 @@ let verify_lemma_bounded ~(p : psi_def) (det : term_state_detail) lemma_candidat
           | Some tinv ->
               let tinv_t = Reduce.reduce_pmrs tinv t in
               let%lwt _ =
-                Asyncs.declare_all solver (Smt.decls_of_vars (Analysis.free_variables tinv_t))
+                Smt.AsyncSmt.declare_all solver (Smt.decls_of_vars (Analysis.free_variables tinv_t))
               in
-              let%lwt _ = Asyncs.smt_assert solver (Smt.smt_of_term tinv_t) in
+              let%lwt _ = Smt.AsyncSmt.smt_assert solver (Smt.smt_of_term tinv_t) in
 
               return ()
         in
         (* Assert that lemma is false for this concrete term t  *)
         let _, _, lemma = lemma_candidate in
         let%lwt _ =
-          Asyncs.exec_command solver
+          Smt.AsyncSmt.exec_command solver
             (S.mk_assert (S.mk_not (Smt.smt_of_term (substitution subs lemma))))
         in
-        let%lwt resp = Asyncs.check_sat solver in
+        let%lwt resp = Smt.AsyncSmt.check_sat solver in
         (* Note that I am getting a model after check-sat unknown response. This may not halt.  *)
         let%lwt result =
           match resp with
           | SmtLib.Sat | SmtLib.Unknown ->
-              let%lwt model = Asyncs.get_model solver in
+              let%lwt model = Smt.AsyncSmt.get_model solver in
               return (Some model)
           | _ -> return None
         in
-        let%lwt () = Asyncs.spop solver in
+        let%lwt () = Smt.AsyncSmt.spop solver in
         return (resp, result)
       in
       match terms with
@@ -755,36 +762,37 @@ let verify_lemma_bounded ~(p : psi_def) (det : term_state_detail) lemma_candidat
     let%lwt res = expand_loop (TermSet.singleton det.term) in
     return res
   in
-  Asyncs.(cancellable_task (make_cvc_solver ()) task)
+  Smt.AsyncSmt.(cancellable_task (make_cvc_solver ()) task)
 
 let verify_lemma_unbounded ~(p : psi_def) (det : term_state_detail) lemma_candidate :
-    Solvers.Asyncs.response * int Lwt.u =
-  let open Solvers in
+    Smt.AsyncSmt.response * int Lwt.u =
   let build_task (cvc4_instance, task_start) =
     let%lwt _ = task_start in
     let%lwt () = set_up_lemma_solver_async cvc4_instance ~p lemma_candidate in
     let%lwt () =
       (Lwt_list.iter_p (fun x ->
-           let%lwt _ = Asyncs.exec_command cvc4_instance x in
+           let%lwt _ = Smt.AsyncSmt.exec_command cvc4_instance x in
            return ()))
         (smt_of_lemma_validity ~p lemma_candidate det)
     in
-    let%lwt resp = Asyncs.check_sat cvc4_instance in
+    let%lwt resp = Smt.AsyncSmt.check_sat cvc4_instance in
     let%lwt final_response =
       match resp with
       | Sat | Unknown -> (
           let%lwt _ = set_up_to_get_model_async cvc4_instance ~p lemma_candidate det in
-          let%lwt resp' = Asyncs.check_sat cvc4_instance in
-          match resp' with Sat | Unknown -> Asyncs.get_model cvc4_instance | _ -> return resp')
+          let%lwt resp' = Smt.AsyncSmt.check_sat cvc4_instance in
+          match resp' with
+          | Sat | Unknown -> Smt.AsyncSmt.get_model cvc4_instance
+          | _ -> return resp')
       | _ -> return resp
     in
-    let%lwt () = Asyncs.close_solver cvc4_instance in
+    let%lwt () = Smt.AsyncSmt.close_solver cvc4_instance in
     Log.debug_msg "Unbounded lemma verification is complete.";
     return final_response
   in
-  Asyncs.(cancellable_task (Asyncs.make_cvc_solver ()) build_task)
+  Smt.AsyncSmt.(cancellable_task (Smt.AsyncSmt.make_cvc_solver ()) build_task)
 
-let verify_lemma_candidate ~(p : psi_def) (det : term_state_detail) : Solvers.solver_response =
+let verify_lemma_candidate ~(p : psi_def) (det : term_state_detail) : Smt.SyncSmt.solver_response =
   match det.lemma_candidate with
   | None -> failwith "Cannot verify lemma candidate; there is none."
   | Some lemma_candidate ->
@@ -849,12 +857,12 @@ let parse_positive_example_solver_model response (det : term_state_detail) =
       ]
   | _ -> failwith "Parse model failure: Positive example cannot be found during lemma refinement."
 
-let get_positive_examples (solver : Solvers.online_solver) (det : term_state_detail) ~(p : psi_def)
-    (lemma : symbol * variable list * term) : ctex list =
+let get_positive_examples (solver : Smt.SyncSmt.online_solver) (det : term_state_detail)
+    ~(p : psi_def) (lemma : symbol * variable list * term) : ctex list =
   Log.verbose (fun f () -> Fmt.(pf f "Searching for a positive example."));
   set_up_to_get_model solver ~p lemma det;
-  match Solvers.check_sat solver with
-  | Sat | Unknown -> parse_positive_example_solver_model (Solvers.get_model solver) det
+  match Smt.SyncSmt.check_sat solver with
+  | Sat | Unknown -> parse_positive_example_solver_model (Smt.SyncSmt.get_model solver) det
   | _ -> failwith "Check sat failure: Positive example cannot be found during lemma refinement."
 
 let trim (s : string) = Str.global_replace (Str.regexp "[\r\n\t ]") "" s

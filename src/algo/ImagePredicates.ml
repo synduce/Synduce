@@ -5,6 +5,7 @@ open Term
 open Utils
 open Smtlib
 open SmtInterface
+module Solvers = SyncSmt
 
 let _NUM_POSIIVE_EXAMPLES_ = 30
 

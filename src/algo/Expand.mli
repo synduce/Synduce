@@ -1,5 +1,6 @@
 open Lang
 open Base
+open SmtInterface
 
 val mk_recursion_elimination_term : AState.psi_def -> (Term.term * Term.term) option
 
@@ -45,11 +46,11 @@ val to_maximally_reducible : AState.psi_def -> Term.term -> Term.TermSet.t * Ter
 
 val expand_loop :
   int ref ->
-  (Smtlib.Solvers.solver_response -> Term.term -> Smtlib.Solvers.solver_response) ->
-  ?r_stop:(Smtlib.SmtLib.solver_response -> bool) ->
-  ?r_complete:Smtlib.SmtLib.solver_response ->
+  (SyncSmt.solver_response -> Term.term -> SyncSmt.solver_response) ->
+  ?r_stop:(SyncSmt.solver_response -> bool) ->
+  ?r_complete:SyncSmt.solver_response ->
   Term.TermSet.t ->
-  Smtlib.Solvers.solver_response
+  SyncSmt.solver_response
 (** [expand_loop] provides basic functionality for bounded checking.
     [expand_loop steps f start] will run a bounded checking loop, starting with the term
     set [start] and performing [!Lib.Config.num_expansions_check] steps, applying the
@@ -74,11 +75,11 @@ val expand_loop :
 
 val lwt_expand_loop :
   int ref ->
-  (Smtlib.Solvers.Asyncs.response -> Term.term -> Smtlib.Solvers.Asyncs.response) ->
+  (AsyncSmt.response -> Term.term -> AsyncSmt.response) ->
   ?r_stop:(Smtlib.SmtLib.solver_response -> bool) ->
   ?r_complete:Smtlib.SmtLib.solver_response ->
   Term.TermSet.t Lwt.t ->
-  Smtlib.Solvers.Asyncs.response
+  AsyncSmt.response
 (** [lwt_expand_loop] provides the same functionality as [expand_loop], but the solver
     calls are threaded arount a lwt promise. Use [lwt_expand_loop] in place of [expand_loop]
     when you want to run concurrent solver instances.
