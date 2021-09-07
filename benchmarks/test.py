@@ -94,6 +94,7 @@ constraint_benchmarks = [
     # bst
     ["constraints/bst/contains.ml", ""],
     ["constraints/bst/count_lt.ml", "-NB"],
+    ["constraints/bst/count_between.ml", "-NB --cvc4"],
     ["constraints/bst/most_frequent_v1.ml", ""],
     ["constraints/bst/from_list_contains.ml", ""],
     ["constraints/bst/from_list_max.ml", "-NB -n 100"],
@@ -188,6 +189,7 @@ base_benchmark_set = [
     ["sort_list/sumgtz.ml", ""],
     ["numbers/int_nat_twosum.ml", ""],
     ["numbers/int_nat_toint.ml", ""],
+    ["terms/height.ml", ""]
 ]
 
 lifting_benchmarks = [

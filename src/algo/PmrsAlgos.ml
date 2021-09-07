@@ -15,8 +15,11 @@ let rec refinement_loop (p : psi_def) (lstate : refinement_loop_state) =
       fun frmt () ->
         (styled
            (`Fg `Black)
-           (styled (`Bg (`Hi `Green)) (fun frmt i -> pf frmt "\t\t Refinement step %i. " i)))
-          frmt !refinement_steps);
+           (styled
+              (`Bg (`Hi `Green))
+              (fun frmt (i, j) -> pf frmt "\t\t Refinement step %i - %i " i j)))
+          frmt
+          (!refinement_steps, !secondary_refinement_steps));
   (if not !Config.info then
    Fmt.(
      pf stdout "%i,%3.3f,%3.3f,%i,%i@." !refinement_steps !Stats.verif_time elapsed
@@ -50,6 +53,7 @@ let rec refinement_loop (p : psi_def) (lstate : refinement_loop_state) =
                 Fmt.(
                   pf frmt "@[<hov 2>Counterexample terms:@;@[<hov 2>%a@]" (list ~sep:comma pp_term)
                     (Set.elements (Set.diff t_set lstate.t_set))));
+            secondary_refinement_steps := 0;
             (* Continue looping with the new sets. *)
             refinement_loop p { lstate with t_set; u_set; lifting }
         | None ->
@@ -62,11 +66,15 @@ let rec refinement_loop (p : psi_def) (lstate : refinement_loop_state) =
                 Error RFail)
   | _ as synt_failure_info -> (
       match Lemmas.synthesize_lemmas ~p synt_failure_info lstate with
-      | Ok new_lstate -> refinement_loop p new_lstate
+      | Ok new_lstate ->
+          Int.decr refinement_steps;
+          Int.incr secondary_refinement_steps;
+          refinement_loop p new_lstate
       | Error synt_failure when !Config.attempt_lifting -> (
           match Lifting.scalar ~p lstate synt_failure with
           | Ok (p', lstate') ->
               Int.decr refinement_steps;
+              Int.incr secondary_refinement_steps;
               Lifting.msg_lifting ();
               refinement_loop p' lstate'
           | Error r' -> Error r')
