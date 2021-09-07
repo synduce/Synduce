@@ -127,14 +127,15 @@ let mk_f_compose_r_main ~(p : psi_def) (t : term) : term =
 
 let term_detail_to_lemma ~(p : psi_def) (det : term_state_detail) : term option =
   let subst =
-    List.map
+    List.concat_map
       ~f:(fun (t1, t2) ->
         let frt1 = mk_f_compose_r_main ~p t1 in
-        (t2, frt1))
+        match t2.tkind with
+        | TTup t2s -> List.mapi t2s ~f:(fun i t2_i -> (t2_i, mk_sel frt1 i))
+        | _ -> [ (t2, frt1) ])
       det.recurs_elim
   in
   let f lem = Term.substitution subst lem in
-  (* let f _lem = Term.mk_const CTrue in *)
   let result = T.mk_assoc Binop.And (List.map ~f det.lemmas) in
   match result with None -> result | Some _ -> result
 
@@ -166,10 +167,12 @@ let create_or_update_term_state_for_ctex ~(p : psi_def) (is_pos_ctex : bool) (ts
                     (match ctex.ctex_eqn.eprecond with
                     | None -> None
                     | Some pre ->
-                        Some
-                          (substitution
-                             (subs_from_elim_to_elim det.recurs_elim ctex.ctex_eqn.eelim)
-                             pre));
+                        let pre' =
+                          substitution
+                            (subs_from_elim_to_elim det.recurs_elim ctex.ctex_eqn.eelim)
+                            pre
+                        in
+                        Some pre');
                   negative_ctexs = ctex :: det.negative_ctexs;
                   positive_ctexs = [];
                 })
