@@ -1,6 +1,6 @@
 (library
  (name smtlib)
- (public_name Synduce.Lib.SmtLib)
- (libraries core utils fmt stdio lwt lwt.unix)
+ (public_name Synduce.SmtLib)
+ (libraries core fmt stdio lwt lwt.unix)
  (preprocess
   (pps ppx_let lwt_ppx)))

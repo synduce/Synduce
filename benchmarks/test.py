@@ -97,6 +97,7 @@ constraint_benchmarks = [
     ["constraints/bst/most_frequent_v1.ml", ""],
     ["constraints/bst/from_list_contains.ml", ""],
     ["constraints/bst/from_list_max.ml", "-NB -n 100"],
+    ["constraints/bst/sum_gt_by_key.ml", "-NB -n 100"],
     # balanced_tree
     ["constraints/balanced_tree/node_count.ml", "-N"],
     ["constraints/balanced_tree/height.ml", "-N"],

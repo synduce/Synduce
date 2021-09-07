@@ -361,9 +361,10 @@ let to_maximally_reducible (p : psi_def) (t0 : term) : TermSet.t * TermSet.t =
 (* ============================================================================================= *)
 open Lwt
 open Smtlib
+open SmtInterface
 
 let expand_loop (counter : int ref)
-    (t_check : Solvers.solver_response -> term -> Solvers.solver_response)
+    (t_check : SyncSmt.solver_response -> term -> SyncSmt.solver_response)
     ?(r_stop = function SmtLib.Sat -> true | _ -> false) ?(r_complete = SmtLib.Unsat)
     (u : TermSet.t) =
   let rec tlist_check accum terms =
@@ -394,8 +395,7 @@ let expand_loop (counter : int ref)
   in
   aux u
 
-let lwt_expand_loop (counter : int ref)
-    (t_check : Solvers.Asyncs.response -> term -> Solvers.Asyncs.response)
+let lwt_expand_loop (counter : int ref) (t_check : AsyncSmt.response -> term -> AsyncSmt.response)
     ?(r_stop = function SmtLib.Sat -> true | _ -> false) ?(r_complete = SmtLib.Unsat)
     (u : TermSet.t Lwt.t) =
   let rec tlist_check accum terms =

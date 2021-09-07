@@ -5,6 +5,7 @@ open Term
 open Utils
 open Smtlib
 open SmtInterface
+module Solvers = SyncSmt
 
 let _NUM_POSIIVE_EXAMPLES_ = 30
 
@@ -56,7 +57,7 @@ let gen_pmrs_positive_examples (p : PMRS.t) =
     resp
   in
   let _ =
-    Expand.expand_loop iterations (* Stop at 15 examples. *)
+    Expand.expand_loop iterations (* Stop at _NUM_POSITIVES_EXAMEPLES_ examples. *)
       ~r_stop:(fun _ -> !iterations > _NUM_POSIIVE_EXAMPLES_)
       mk_ex
       (TermSet.singleton (mk_var (Variable.mk ~t:(Some ref_typ_out) (Alpha.fresh ()))))

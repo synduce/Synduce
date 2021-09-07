@@ -124,6 +124,9 @@ let target y t =
   g t
   [@@requires is_bst]
 ```
+When a `requires` is specified on the function to be synthesized (the target function), then
+the tool effectively solves the problem '∀ x : Θ. T_inv(x) ⇒ target(x) = spec(repr(x))` where
+`T_inv` is the function given to the requires clause.
 
 ### Functions with additional parameters
 
