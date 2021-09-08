@@ -111,7 +111,7 @@ let constraint_of_neg (id : int) ~(p : psi_def) (ctex : ctex) : command =
 let constraint_of_pos (id : int) (term : term) : command =
   CConstraint (SyApp (IdSimple (make_ensures_name id), [ sygus_of_term term ]))
 
-let synthesize ~(p : psi_def) (positives : ctex list) (negatives : ctex list) =
+let synthesize ~(p : psi_def) (positives : ctex list) (negatives : ctex list) : term option =
   let _ = p in
   let _ = (positives, negatives) in
   Log.debug_msg "Synthesize predicates..";
@@ -141,4 +141,6 @@ let synthesize ~(p : psi_def) (positives : ctex list) (negatives : ctex list) =
     handle_ensures_synth_response (Syguslib.Solvers.SygusSolver.solve_commands commands) var
   with
   | None -> None
-  | Some solns -> List.nth solns 0
+  | Some solns ->
+      let _, _, body = List.nth_exn solns 0 in
+      Some (mk_fun [ FPatVar var ] body)
