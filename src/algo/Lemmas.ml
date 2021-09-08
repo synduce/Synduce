@@ -923,7 +923,6 @@ let synthesize_new_lemma ~(p : psi_def) (det : term_state_detail) :
         | Some pre ->
             pf f "Synthesizing a new lemma candidate for term %a[%a] with precondition %a" pp_term
               det.term pp_subs det.recurs_elim pp_term pre));
-  (* TODO: How to choose logic? *)
   let lem_id = 0 in
   let synth_objs, params, logic = synthfun_of_ctex ~p det lem_id in
   let neg_constraints =
@@ -1046,7 +1045,7 @@ let synthesize_lemmas ~(p : psi_def) synt_failure_info (lstate : refinement_loop
           List.partition3_map ~f:ctexs_for_ensures_synt classified_ctexs
         in
         if List.length ensures_negatives > 0 then
-          ImagePredicates.synthesize ~p ensures_positives ensures_negatives;
+          ignore (ImagePredicates.synthesize ~p ensures_positives ensures_negatives);
         (* Classify in negative and positive cexs. *)
         let lemma_synt_positives, lemma_synt_negatives, _ =
           List.partition3_map ~f:ctexs_for_lemma_synt classified_ctexs
