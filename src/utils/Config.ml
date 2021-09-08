@@ -190,7 +190,7 @@ let simplify_eqns = ref true
 let optimize_grammars = ref false
 
 (** When printing a system of equations, put a limit on how many equations are printed. *)
-let pp_eqn_count = ref 10
+let pp_eqn_count = ref 20
 
 (* ============================================================================================= *)
 (*                  BOUNDED EXPANSIONS / VERIFICATION / REWIRTING PARAMETERS                     *)

@@ -110,8 +110,6 @@ let skeleton_match ~unknowns (e1 : term) (e2 : term) =
         | TVar v2 -> Option.both (Map.find args1 v1) (Map.find args2 v2)
         | _ -> None
       in
-      (* Map.iteri subs ~f:(fun ~key ~data ->
-          Fmt.(pf stdout "%a ~~> %a@." Variable.pp key pp_term data)); *)
       all_or_none (List.map ~f (Map.to_alist subs))
   | None ->
       (* Fmt.(pf stdout "No match@."); *)

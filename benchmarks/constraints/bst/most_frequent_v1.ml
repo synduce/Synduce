@@ -1,7 +1,7 @@
 (* Non-empty lists type. *)
 type list = Elt of int | Cons of int * list
 
-(* Inductive type for prositive integers. *)
+(* Inductive type for positive integers. *)
 type pos = One | S of pos
 
 (* A binary search tree with integer keys and positive natural numbers as values. *)

@@ -101,10 +101,8 @@ let check_solution ?(use_acegis = false) ~(p : psi_def) (lstate : refinement_loo
       (* Result of solver calls. *)
       if has_ctex then (true, t_set, u_set, i + 1)
       else (false, TermSet.empty, u_set, i + num_terms_to_check))
-    else (
-      (* set is empty *)
-      Log.debug_msg Fmt.(str "Checked all terms.");
-      (false, TermSet.empty, u_set, i))
+    else ((* set is empty *)
+          false, TermSet.empty, u_set, i)
   in
   let rec find_ctex num_checks terms_to_expand =
     Log.verbose_msg Fmt.(str "Check %i." num_checks);
