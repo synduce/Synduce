@@ -39,4 +39,5 @@ let mgt (prog : PMRS.t) : TermSet.t =
 (* Start the algorith from a variable. *)
 
 let most_general_terms (prog : PMRS.t) : TermSet.t =
-  if Set.is_empty prog.psyntobjs then TermSet.empty else mgt prog
+  let ts = if Set.is_empty prog.psyntobjs then TermSet.empty else mgt prog in
+  ts
