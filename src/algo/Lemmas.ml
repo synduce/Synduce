@@ -1076,17 +1076,27 @@ let synthesize_lemmas ~(p : psi_def) synt_failure_info (lstate : refinement_loop
           let maybe_pred = ImagePredicates.synthesize ~p ensures_positives ensures_negatives in
           match maybe_pred with
           | None -> (lstate.term_state, false)
-          | Some pred ->
-              (* Specifications.set_ensures p.psi_reference.pvar pred; *)
-              (* (lstate.term_state, true) *)
-              Log.debug_msg Fmt.(str "Ensures predicate is: %a" pp_term pred);
-              let fst_ctex = List.nth_exn ensures_negatives 0 in
-              let ts : term_state =
-                update_term_state_for_ctexs ~p lstate.term_state ~neg_ctexs:ensures_negatives
-                  ~pos_ctexs:ensures_positives
-              in
-              let term_state = add_ensures_to_term_state ~p pred fst_ctex.ctex_eqn.eelim ts in
-              (term_state, true))
+          | Some ensures ->
+              (match Specifications.get_ensures p.psi_reference.pmain_symb with
+              | None -> Specifications.set_ensures p.psi_reference.pmain_symb ensures
+              | Some old_ensures ->
+                  let var : variable =
+                    Variable.mk ~t:(Some p.psi_reference.poutput_typ) (Alpha.fresh ())
+                  in
+                  Specifications.set_ensures p.psi_reference.pmain_symb
+                    (mk_fun [ FPatVar var ]
+                       (mk_bin Binop.And
+                          (mk_app old_ensures [ mk_var var ])
+                          (mk_app ensures [ mk_var var ]))));
+              (lstate.term_state, true)
+          (* Log.debug_msg Fmt.(str "Ensures predicate is: %a" pp_term pred);
+             let fst_ctex = List.nth_exn ensures_negatives 0 in
+             let ts : term_state =
+               update_term_state_for_ctexs ~p lstate.term_state ~neg_ctexs:ensures_negatives
+                 ~pos_ctexs:ensures_positives
+             in
+             let term_state = add_ensures_to_term_state ~p pred fst_ctex.ctex_eqn.eelim ts in
+             (term_state, true)) *))
         else
           (* Classify in negative and positive cexs. *)
           let lemma_synt_positives, lemma_synt_negatives, _ =

@@ -56,7 +56,7 @@ let subst_recursive_calls (p : psi_def) (tl : term list) : (term * term) list * 
       | None -> failwith "Cannot make recursion elimination for this problem."
     in
     let invariant =
-      Option.map (second !AState._alpha) ~f:(fun inv ->
+      Option.map (Specifications.get_ensures p.psi_reference.pmain_symb) ~f:(fun inv ->
           first (infer_type (Reduce.reduce_term (mk_app inv [ scalar_term_f ]))))
     in
     ( substs
