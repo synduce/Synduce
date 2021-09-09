@@ -2,6 +2,7 @@
  (name codegen)
  (public_name Synduce.Lib.Codegen)
  (libraries
+  algo
   base
   compiler-libs
   fmt

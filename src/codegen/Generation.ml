@@ -1,9 +1,8 @@
-open Codegen.Dafny
+open Commons
+open Dafny
 open Lang.Term
 open Lang.RType
-let prob_file = "benchmarks/list/sum.ml"
-let out_file = "test/generated.dfy"
-
+open Algo.AState
 
 let rec convert_tkind (t : type_term) : d_domain_type =
   match t.tkind with
@@ -194,19 +193,6 @@ let gen_target (s : Algo.AState.soln option) =
       List.map aux sol.soln_implems
   | None -> []
 
-let sum, soln = Lib.solve_file prob_file
-
-(* Assumption is that the main function is always the first one *)
-let repr_name = (List.hd sum.pd_repr).f_var.vname
-
-let spec_name = (List.hd sum.pd_reference).f_var.vname
-
-let target_name = (List.hd sum.pd_target).f_var.vname
-
-let tau_decl = get_typ_decl !Algo.AState._tau
-
-let theta_decl = get_typ_decl !Algo.AState._theta
-
 let is_identity (args : variable list) (fbody : term) =
   if List.length args != 1 then false else term_equal (mk_var (List.nth args 0)) fbody
 
@@ -217,40 +203,6 @@ let gen_match (v : term) (expansions : term list) (cases : d_body list) =
     let match_term = DTerm v in
     DBlock
       [ DMatch (match_term, List.map2 (fun t case -> (pattern_of_term t, case)) expansions cases) ]
-
-let toplevel =
-  let new_target =
-    let aux (t : function_descr) =
-      let fv = Lang.Analysis.free_variables t.f_body in
-      let const_subs : (term * term) list =
-        match soln with
-        | Some soln ->
-            List.concat
-              (List.map
-                 (fun (name, _, body) ->
-                   match VarSet.find_by_name fv name with
-                   | Some var -> [ (mk_var var, body) ]
-                   | None -> [])
-                 (List.filter (fun (_, args, _) -> List.length args = 0) soln.soln_implems))
-        | None -> []
-      in
-      let id_subs : term =
-        match soln with
-        | Some soln ->
-            List.fold_left
-              (fun term (name, _, _) ->
-                match VarSet.find_by_name fv name with
-                | Some var -> Lang.Analysis.replace_id_calls ~func:var term
-                | None -> term)
-              t.f_body
-              (List.filter (fun (_, args, body) -> is_identity args body) soln.soln_implems)
-        | None -> t.f_body
-      in
-      { t with f_body = substitution const_subs id_subs }
-    in
-    List.map aux sum.pd_target
-  in
-  List.map gen_func_descr (sum.pd_repr @ sum.pd_reference @ new_target)
 
 let _MAX_LEMMA_ID = ref 0
 
@@ -314,49 +266,6 @@ let rec cartesian_prod terms =
 
 let rec has_dup = function [] -> false | hd :: tl -> List.mem hd tl || has_dup tl
 
-let add_case_lemma (case : term) =
-  let args = VarSet.elements (Lang.Analysis.free_variables case) in
-  let signature = mk_method_sig (List.map get_var_sig args) in
-  let lhs =
-    mk_app_v (List.hd sum.pd_reference).f_var [ mk_app_v (List.hd sum.pd_repr).f_var [ case ] ]
-  in
-  let rhs = mk_app (mk_var (Variable.mk target_name)) [ case ] in
-  let spec = mk_simple_spec ~ensures:[ mk_bin Binop.Eq lhs rhs ] ~requires:[] DSpecMethod in
-  let name = Fmt.str "lemma%d" (new_lemma_id ()) in
-  let body =
-    match case.tkind with
-    | TData (_, params) ->
-        gen_nested_match
-          (List.filter (fun param -> not (Lang.Analysis.is_norec param)) params)
-          (fun cases ->
-            let lhs_sub = substitution cases lhs in
-            let rhs_sub = substitution cases rhs in
-            let lhs_calc = List.map (fun x -> DStmt (DTerm x)) (Lang.Reduce.calc_term lhs_sub) in
-            let last_term = List.hd (List.rev (Lang.Reduce.calc_term lhs_sub)) in
-            let lemma_opts =
-              List.map
-                (fun arg ->
-                  let arg_type = Variable.vtype_or_new arg in
-                  get_all_terms_of_type last_term arg_type [])
-                args
-            in
-            let prod = cartesian_prod lemma_opts in
-            let filtered_prod =
-              List.filter
-                (fun (p : term list) ->
-                  not
-                    (has_dup p
-                    || List.fold_left (fun acc (_, case) -> acc || List.mem case p) false cases))
-                prod
-            in
-            let new_lemmas =
-              List.map (fun args -> DStmt (DTerm (mk_app_v (Variable.mk name) args))) filtered_prod
-            in
-            new_lemmas @ [ DCalc (lhs_calc @ [ DStmt (DTerm rhs_sub) ]) ])
-    | _ -> failwith "Unexpected match case type"
-  in
-  (mk_toplevel (mk_lemma name signature spec body), name)
-
 let skeleton : d_toplevel list ref = ref []
 
 let add_toplevel (n : d_toplevel) = skeleton := !skeleton @ [ n ]
@@ -405,11 +314,56 @@ let add_min_max =
   add_toplevel max_func;
   add_toplevel min_func
 
+let add_case_lemma ~(pd : problem_descr) ~(target_name : string) (case : term) =
+  let args = VarSet.elements (Lang.Analysis.free_variables case) in
+  let signature = mk_method_sig (List.map get_var_sig args) in
+  let lhs =
+    mk_app_v (List.hd pd.pd_reference).f_var [ mk_app_v (List.hd pd.pd_repr).f_var [ case ] ]
+  in
+  let rhs = mk_app (mk_var (Variable.mk target_name)) [ case ] in
+  let spec = mk_simple_spec ~ensures:[ mk_bin Binop.Eq lhs rhs ] ~requires:[] DSpecMethod in
+  let name = Fmt.str "lemma%d" (new_lemma_id ()) in
+  let body =
+    match case.tkind with
+    | TData (_, params) ->
+        gen_nested_match
+          (List.filter (fun param -> not (Lang.Analysis.is_norec param)) params)
+          (fun cases ->
+            let lhs_sub = substitution cases lhs in
+            let rhs_sub = substitution cases rhs in
+            let lhs_calc = List.map (fun x -> DStmt (DTerm x)) (Lang.Reduce.calc_term lhs_sub) in
+            let last_term = List.hd (List.rev (Lang.Reduce.calc_term lhs_sub)) in
+            let lemma_opts =
+              List.map
+                (fun arg ->
+                  let arg_type = Variable.vtype_or_new arg in
+                  get_all_terms_of_type last_term arg_type [])
+                args
+            in
+            let prod = cartesian_prod lemma_opts in
+            let filtered_prod =
+              List.filter
+                (fun (p : term list) ->
+                  not
+                    (has_dup p
+                    || List.fold_left (fun acc (_, case) -> acc || List.mem case p) false cases))
+                prod
+            in
+            let new_lemmas =
+              List.map (fun args -> DStmt (DTerm (mk_app_v (Variable.mk name) args))) filtered_prod
+            in
+            new_lemmas @ [ DCalc (lhs_calc @ [ DStmt (DTerm rhs_sub) ]) ])
+    | _ -> failwith "Unexpected match case type"
+  in
+  (mk_toplevel (mk_lemma name signature spec body), name)
 
+let get_num_params = function
+  | DDatatypeDecl (_, _, params, _) -> List.length params
+  | _ -> failwith "Can't get params from a non-datatype declaration."
 
 (* Uncomment for termination template *)
 
-(* let add_depth_f =
+let add_depth_f () =
   let v = mk_var (Variable.mk ~t:(Some !Algo.AState._theta) "x") in
   let expansions = Lang.Analysis.expand_once v in
   let case_bodies =
@@ -424,7 +378,6 @@ let add_min_max =
             (mk_var (Variable.mk (Lang.Alpha.fresh ~s:"hdepth" ())))
             (List.map (fun var -> mk_app (mk_var (Variable.mk "depth")) [ var ]) (get_recur cur))
         else mk_var (Variable.mk (Lang.Alpha.fresh ())))
-      (* (Lang.Alpha.fresh ~s:"f" (), get_recur cur) *)
       expansions
   in
   let depth_f =
@@ -479,12 +432,13 @@ let add_min_max =
       (List.filter (fun (_, case) -> is_recur_case case) (List.combine case_bodies expansions))
   in
   List.iter add_toplevel helper_functions;
-  add_toplevel depth_f *)
+  add_toplevel depth_f
 
-let correctness_lemma : d_toplevel =
+let correctness_lemma ~(pd : problem_descr) ~(target_name : string) ~(spec_name : string)
+    ~(repr_name : string) : d_toplevel =
   let theta_type =
     (* We grab the type from the target function to ensure that parametrization matches *)
-    let target_descr = List.hd sum.pd_target in
+    let target_descr = List.hd pd.pd_target in
     let rec f arg =
       match arg with
       | PatVar variable -> FPatVar variable
@@ -518,7 +472,7 @@ let correctness_lemma : d_toplevel =
       (List.map
          (fun t ->
            if is_recur_case t then (
-             let new_lemma, lemma_name = add_case_lemma t in
+             let new_lemma, lemma_name = add_case_lemma ~pd ~target_name t in
              add_toplevel new_lemma;
              match t.tkind with
              | TData (_, params) -> DStmt (DTerm (mk_app (mk_var (Variable.mk lemma_name)) params))
@@ -529,19 +483,62 @@ let correctness_lemma : d_toplevel =
   let body = match_theta in
   mk_toplevel (mk_lemma "correctness_lemma" signature spec body)
 
-let get_num_params = function
-  | DDatatypeDecl (_, _, params, _) -> List.length params
-  | _ -> failwith "Can't get params from a non-datatype declaration."
-
-let incl_decl =
+let incl_decl ~(theta_decl : d_toplevel) ~(tau_decl : d_toplevel) : d_toplevel list =
   (* If tau and theta are the same type, prioritize one based on the number of parameters *)
   if get_t_name !Algo.AState._tau = get_t_name !Algo.AState._theta then
     if get_num_params tau_decl.dt_kind >= get_num_params theta_decl.dt_kind then [ tau_decl ]
     else [ theta_decl ]
   else [ tau_decl; theta_decl ]
 
-let proof_skeleton = incl_decl @ toplevel @ gen_target soln @ !skeleton @ [ correctness_lemma ]
+(* ============================================================================================= *)
+(*                                    MAIN ENTRY POINT : GENERATING THE DAFNY PROOF SKETCH       *)
+(* ============================================================================================= *)
 
-let ref_program : d_program = { dp_includes = []; dp_topdecls = proof_skeleton };;
-
-Utils.Log.to_file out_file (fun fmt () -> Fmt.pf fmt "%a" pp_d_program ref_program)
+(**   *)
+let gen_proof (pd, soln) (out_file : string) =
+  (* Assumption is that the main function is always the first one *)
+  let repr_name = (List.hd pd.pd_repr).f_var.vname in
+  let spec_name = (List.hd pd.pd_reference).f_var.vname in
+  let target_name = (List.hd pd.pd_target).f_var.vname in
+  let tau_decl = get_typ_decl !Algo.AState._tau in
+  let theta_decl = get_typ_decl !Algo.AState._theta in
+  let toplevel =
+    let new_target =
+      let aux (t : function_descr) =
+        let fv = Lang.Analysis.free_variables t.f_body in
+        let const_subs : (term * term) list =
+          match soln with
+          | Some soln ->
+              List.concat
+                (List.map
+                   (fun (name, _, body) ->
+                     match VarSet.find_by_name fv name with
+                     | Some var -> [ (mk_var var, body) ]
+                     | None -> [])
+                   (List.filter (fun (_, args, _) -> List.length args = 0) soln.soln_implems))
+          | None -> []
+        in
+        let id_subs : term =
+          match soln with
+          | Some soln ->
+              List.fold_left
+                (fun term (name, _, _) ->
+                  match VarSet.find_by_name fv name with
+                  | Some var -> Lang.Analysis.replace_id_calls ~func:var term
+                  | None -> term)
+                t.f_body
+                (List.filter (fun (_, args, body) -> is_identity args body) soln.soln_implems)
+          | None -> t.f_body
+        in
+        { t with f_body = substitution const_subs id_subs }
+      in
+      List.map aux pd.pd_target
+    in
+    List.map gen_func_descr (pd.pd_repr @ pd.pd_reference @ new_target)
+  in
+  let proof_skeleton =
+    incl_decl ~tau_decl ~theta_decl @ toplevel @ gen_target soln @ !skeleton
+    @ [ correctness_lemma ~pd ~target_name ~repr_name ~spec_name ]
+  in
+  let ref_program : d_program = { dp_includes = []; dp_topdecls = proof_skeleton } in
+  Utils.Log.to_file out_file (fun fmt () -> Fmt.pf fmt "%a" pp_d_program ref_program)

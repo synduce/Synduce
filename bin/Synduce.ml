@@ -3,7 +3,7 @@ open Base
 open Getopt
 open Fmt
 open Parsers
-module Config = Lib.Utils.Config
+open Utils
 
 let parse_only = ref false
 
@@ -54,6 +54,7 @@ let print_usage () =
     \       --show-vars                 Print variables and their types at the end.\n\
     \       --generate-benchmarks=DIR   Save SyGuS problems in DIR, including problems that are \
      provably unrealizable.\n\
+    \       --generate-proof=FILE       Save a Dafny proof skeleton in file (experimental).\n\
     \       --check-smt-unrealizable    Check unrealizability using a SMT query directly.\n\
     \     -> Try:\n\
      ./Synduce benchmarks/list/mps.ml@.";
@@ -86,6 +87,7 @@ let options =
     ('\000', "check-smt-unrealizable", set Config.check_unrealizable_smt_unsatisfiable true, None);
     ('\000', "fuzzing", None, Some Config.set_fuzzing_count);
     ('\000', "generate-benchmarks", None, Some Config.set_benchmark_generation_dir);
+    ('\000', "generate-proof", None, Some Config.set_proof_output_file);
     ('\000', "parse-only", set parse_only true, None);
     ('\000', "no-gropt", set Config.optimize_grammars false, None);
     ('\000', "no-lifting", set Config.attempt_lifting false, None);
@@ -97,6 +99,35 @@ let options =
     ('\000', "ind-tlimit", None, Some Config.set_induction_proof_tlimit);
     ('\000', "use-dryadsynth", set Syguslib.Solvers.SygusSolver.default_solver DryadSynth, None);
   ]
+
+let on_success ~(is_ocaml_syntax : bool) (source_filename : string ref) (pb : Algo.AState.psi_def)
+    (soln : Algo.AState.soln) : unit =
+  let elapsed = Stats.get_glob_elapsed () in
+  let verif_ratio = 100.0 *. (!Stats.verif_time /. elapsed) in
+  Log.verbose Stats.print_solvers_summary;
+  Log.info
+    Fmt.(
+      fun frmt () ->
+        pf frmt "Solution found in %4.4fs (%3.1f%% verifying):@.%a@]" elapsed verif_ratio
+          (box (Algo.AState.pp_soln ~use_ocaml_syntax:is_ocaml_syntax))
+          soln);
+  (* If output specified, write the solution in file. *)
+  (match Config.get_output_file !source_filename with
+  | Some out_file ->
+      Utils.Log.to_file out_file (fun frmt () ->
+          (box (Algo.AState.pp_soln ~use_ocaml_syntax:is_ocaml_syntax)) frmt soln)
+  | None -> ());
+  (* If specified, output a Dafny proof skeleton. *)
+  if !Config.generate_proof then
+    Codegen.(
+      Generation.gen_proof
+        (Commons.problem_descr_of_psi_def pb, Some soln)
+        !Config.proof_generation_file)
+  else ();
+  (* If no info required, output timing information. *)
+  if not !Config.info then (
+    Fmt.(pf stdout "%i,%.4f,%.4f@." !Algo.AState.refinement_steps !Stats.verif_time elapsed);
+    Fmt.(pf stdout "success@."))
 
 let main () =
   let filename = ref None in
@@ -123,28 +154,8 @@ let main () =
       raise e
   in
   if !parse_only then Caml.exit 1;
-  let open Lib.Utils in
   (match Algo.PmrsAlgos.solve_problem psi_comps all_pmrs with
-  | _, Ok target ->
-      let elapsed = Stats.get_glob_elapsed () in
-      let verif_ratio = 100.0 *. (!Stats.verif_time /. elapsed) in
-      Log.verbose Stats.print_solvers_summary;
-      Log.info
-        Fmt.(
-          fun frmt () ->
-            pf frmt "Solution found in %4.4fs (%3.1f%% verifying):@.%a@]" elapsed verif_ratio
-              (box (Algo.AState.pp_soln ~use_ocaml_syntax:is_ocaml_syntax))
-              target);
-      (* If output specified, write the solution in file. *)
-      (match Config.get_output_file !filename with
-      | Some out_file ->
-          Utils.Log.to_file out_file (fun frmt () ->
-              (box (Algo.AState.pp_soln ~use_ocaml_syntax:is_ocaml_syntax)) frmt target)
-      | None -> ());
-      (* If no info required, output timing information. *)
-      if not !Config.info then (
-        Fmt.(pf stdout "%i,%.4f,%.4f@." !Algo.AState.refinement_steps !Stats.verif_time elapsed);
-        Fmt.(pf stdout "success@."))
+  | pb, Ok soln -> on_success ~is_ocaml_syntax filename pb soln
   | _, Error _ -> Utils.Log.error_msg "No solution found.");
   if !Config.show_vars then Term.Variable.print_summary stdout ()
 ;;
