@@ -20,7 +20,9 @@ let rep_func : d_toplevel =
 
 let f_func : d_toplevel =
   let tree_type = mk_named_type "tree" in
-  let signature = mk_func_sig ~returns:(None, [ mk_int_type ]) [ ("s", mk_int_type); ("t", tree_type) ] in
+  let signature =
+    mk_func_sig ~returns:(None, [ mk_int_type ]) [ ("s", mk_int_type); ("t", tree_type) ]
+  in
   let spec =
     mk_simple_spec ~decreases:[ mk_var (Variable.mk "t") ] ~ensures:[] ~requires:[] DSpecFunction
   in
@@ -115,6 +117,6 @@ let example_program : d_program =
     dp_topdecls =
       [ tree_datatype_decl; rep_func; f_func; spec_func; target_func; sum_lemma; correctness_lemma ];
   }
-
 ;;
+
 Fmt.(pf stdout "%a" pp_d_program example_program)
