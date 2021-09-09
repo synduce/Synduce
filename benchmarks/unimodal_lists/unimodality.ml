@@ -19,26 +19,22 @@ and aux l = function
   | USplit (x, a, b, y) -> aux (Cons (a, Cons (b, aux l y))) x
 
 (* Invariant: unimodal list *)
-let rec is_unimodal_list = function Nil -> true | Cons (x, l) -> aux_up x l
+let rec is_unimodal_ulist l = is_unimodal_list (r l)
+
+and is_unimodal_list = function Nil -> true | Cons (x, l) -> aux_up x l
 
 and aux_up pr = function Nil -> true | Cons (x, l) -> if pr <= x then aux_up x l else aux_down x l
 
 and aux_down pr = function Nil -> true | Cons (x, l) -> pr >= x && aux_down x l
 
+(* This is just a sum to test the tool on accepting the unimodal list specification. *)
 let rec f = function Nil -> 0 | Cons (hd, tl) -> hd + f tl
 
-(*
-  Testing a not-so-natural specification.
-  Here we test first whether  at a node, the labels are zero, and if that
-  is the case use a function that only takes as input the two recursive calls.
-  This makes the synthesis times much longer.
-*)
 let rec g = function
   | UNil -> [%synt s0]
   | UElt a -> [%synt f0] a
   | USplit (x, a, b, y) -> [%synt join] a b (g x) (g y)
-  [@@requires is_unimodal_list]
+  [@@requires is_unimodal_ulist]
 ;;
 
 assert (g = r @@ f)
-(* No solution: there is a clear hint that we need a lifting !! *)

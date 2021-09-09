@@ -1,0 +1,5 @@
+(set-logic DTLIA)
+(synth-fun s0 ((x48 Int)) Int ((Ix Int) (Ic Int))
+ ((Ix Int (Ic x48 (- Ix) (+ Ix Ix))) (Ic Int ((Constant Int)))))
+(constraint (or (not true) (= 0 (s0 1))))
+(check-synth)

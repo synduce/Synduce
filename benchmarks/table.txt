@@ -1,0 +1,53 @@
+... Class......| ... Benchmark..| N  | B  |  Synduce             |  Baseline            
+ ---------------------------------------------------------------------------------------
+               |                | N  | B  | time   | #st | Tlast | time   | #st | Tlast 
+ ---------------------------------------------------------------------------------------
+        .......| min ...........| no | no | 0.07   | 2   | 0.06  | 0.01   | 1   |   0.00
+ Sorted .......| max ...........| no | no | 0.07   | 2   | 0.06  | 0.01   | 1   |   0.00
+ List   .......| count elt. < ..| no | no | 0.06   | 2   | 0.04  | 0.62   | 2   |   0.03
+        .......| index of elt ..| no | no | 1.82   | 2   | 0.11  | -      | 3   |   1.83
+ ---------------------------------------------------------------------------------------
+ Constant .....| index of elt. .| no | no | 2.30   | 2   | 0.13  | 1.60   | 2   |   0.01
+  List    .....| contains elt  .| no | no | 2.80   | 2   | 0.12  | 2.17   | 2   |   0.01
+ ---------------------------------------------------------------------------------------
+           ....| parity of 1st..| no | no | 0.10   | 2   | 0.07  | -      | 79  |  20.94
+  List of  ....| parity of last.| no | no | 0.09   | 2   | 0.06  | -      | 79  |  21.20
+   even    ....| first odd elt..| no | no | 0.27   | 3   | 0.23  | 0.04   | 1   |   0.00
+  numbers  ....| parity of sum .| no | no | 0.04   | 1   | 0.00  | 0.03   | 1   |   0.00
+ ---------------------------------------------------------------------------------------
+  Tree of Even | parity of max .| no | no | 0.20   | 1   | 0.00  | 0.06   | 1   |   0.00
+  Numbers  ....| parity of sum..| yes| yes| 1.07   | 4   | 1.03  | 0.04   | 1   |   0.00
+ ---------------------------------------------------------------------------------------
+          .....| contains elt. .| no | no | 0.21   | 2   | 0.19  | 1.76   | 2   |   0.03
+  Binary  .....| # elts. < .....| yes| yes| 0.61   | 2   | 0.59  | -      | 3   |   0.13
+Search.........|  most frequent | no | no | 7.00   | 6   | 2.12  | -      | 10  | 157.55
+  Tree    .....| of list ∋......| no | no | 11.79  | 2   | 4.54  | 0.56   | 2   |   0.03
+          .....| of list max ...| yes| yes| 2.98   | 3   | 2.75  | 0.11   | 2   |   0.02
+ ---------------------------------------------------------------------------------------
+ Balanced .....| node count.....| yes| no | 0.40   | 2   | 0.37  | 0.06   | 3   |   0.03
+  Tree    .....| height.........| yes| no | 0.19   | 2   | 0.17  | 0.06   | 3   |   0.03
+          .....| height (v2)  ..| yes| yes| 1.47   | 2   | 0.72  | 0.83   | 3   |   0.07
+ ---------------------------------------------------------------------------------------
+             ..| tree size......| yes| yes| 1.52   | 2   | 1.50  | -      | 238 |  15.93
+  Tree       ..| constant.......| no | no | 0.01   | 1   | 0.00  | -      | 236 |  17.19
+ Memoizing   ..|  contains elt. | yes| yes| 1.59   | 4   | 1.56  | 7.67   | 2   |   0.03
+ Information ..| count <........| yes| yes| 30.36  | 3   | 30.31 | -      | 100 |   2.74
+             ..| sum of elts >..| yes| yes| 3.09   | 4   | 2.60  | 212.05 | 2   |   0.03
+ ---------------------------------------------------------------------------------------
+ Empty Subtree.|  contains elt..| yes| no | 0.50   | 2   | 0.13  | -      | 3   |   0.73
+ ---------------------------------------------------------------------------------------
+              .|  # elt. = (v2) | yes| yes| 0.43   | 2   | 0.41  | 0.06   | 2   |   0.02
+  Association .|  # elt. =      | no | no | 0.07   | 2   | 0.05  | 0.04   | 2   |   0.02
+   List       .| sums...........| no | no | 0.07   | 2   | 0.05  | 0.04   | 2   |   0.02
+              .| most frequent..| no | no | 5.26   | 3   | 0.43  | 217.56 | 5   |   0.17
+ ---------------------------------------------------------------------------------------
+ Program AST ..|  type check  ..| yes| no | 0.71   | 1   | 0.01  | 0.04   | 2   |   0.03
+ ---------------------------------------------------------------------------------------
+TABLE X: 
+Experimental Results. Benchmarks are grouped by categories introduced in Section 6.1.
+ #st indicates the number of refinement rounds. 
+  Tlast is the elapsed time before the last call to the SyGuS solver in the last refinement
+  step before timeout.
+All times are in seconds. A '-' indicates timeout (4 min) or memory out (> 4Gb).
+The N column indicates whether bounded checking was required to classify counterexamples, 
+ and the B column bounded checking for proving lemmas correct.

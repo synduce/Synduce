@@ -3,6 +3,9 @@ open Base
 val get_ids : unit -> (int, string) Hashtbl.t
 (** Get a reference to the table of ids mapping integers ids to names.  *)
 
+val reinit : unit -> unit
+(** Reinitialize all state values in the name. *)
+
 val new_id : unit -> int
 (** Returns a fresh, unused id. *)
 

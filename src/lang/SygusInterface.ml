@@ -51,6 +51,28 @@ and dec_parametric t args =
   | t -> sort_of_rtype t
 (* Not really parametric? *)
 
+(* ======= LOGIC HELPERS ======= *)
+
+let requires_dt_theory (t : RType.t) =
+  let rec aux t =
+    let open RType in
+    match t with
+    | TTup _ -> true
+    | TInt | TBool | TChar | TString | TVar _ -> false
+    | TFun (a, b) -> aux a || aux b
+    | TParam (tl, t) -> List.exists ~f:aux tl || aux t
+    | TNamed _ -> is_datatype t
+  in
+  aux t
+
+let logic_of_operators (opset : OpSet.t) : string =
+  if Set.for_all opset ~f:Operator.is_lia then "LIA" else "NIA"
+
+let dt_extend_base_logic (base_logic : string) : string = "DT" ^ base_logic
+(* TODO : Z3 has other names like DT_LIA instead of DTLIA? *)
+
+(* ======= TERM CONVERSION  ======= *)
+
 let sygus_term_of_const (c : Constant.t) : sygus_term =
   match c with
   | Constant.CInt i ->
@@ -157,8 +179,27 @@ let rec term_of_sygus (env : (string, variable, String.comparator_witness) Map.t
   | SyExists (_, _) -> failwith "Sygus: exists-terms not supported."
   | SyForall (_, _) -> failwith "Sygus: forall-terms not supported."
   (* TODO: add let-conversion. *)
-  | SyLet (_, _) -> failwith "Sygus: let-terms not supported. TODO: add let-conversion."
+  | SyLet (syg_bindings, syg_term) -> let_bindings_of_sygus env syg_bindings syg_term
   | _ -> failwith "Sygus term not supported."
+
+and let_bindings_of_sygus (env : (string, variable, String.comparator_witness) Map.t)
+    (bindings : binding list) (body : sygus_term) =
+  let f (bsymb, bterm) =
+    (* Create a fresh name and then replace every occurence of the original symbol
+       by the new symbol.
+    *)
+    let varname = Alpha.fresh ~s:bsymb () in
+    let bterm' = rename [ (bsymb, varname) ] bterm in
+    let var = Variable.mk varname in
+    ((bsymb, var), (var, term_of_sygus (Map.set env ~key:varname ~data:var) bterm'))
+  in
+  let subs, t_bindings = List.unzip (List.map ~f bindings) in
+  let env' =
+    List.fold ~f:(fun env (_, var) -> Map.set env ~key:var.vname ~data:var) ~init:env subs
+  in
+  Reduce.reduce_term
+    (mk_let t_bindings
+       (term_of_sygus env' (rename (List.map ~f:(fun (s, var) -> (s, var.vname)) subs) body)))
 
 (* ============================================================================================= *)
 (*                           COMMANDS                                                            *)

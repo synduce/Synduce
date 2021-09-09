@@ -9,17 +9,20 @@ open Option.Let_syntax
 let rec refinement_loop (p : psi_def) (lstate : refinement_loop_state) =
   Int.incr refinement_steps;
   (* Output status information before entering process. *)
-  let elapsed = Unix.gettimeofday () -. !Config.glob_start in
+  let elapsed = Stats.get_glob_elapsed () in
   Log.info
     Fmt.(
       fun frmt () ->
         (styled
            (`Fg `Black)
-           (styled (`Bg (`Hi `Green)) (fun frmt i -> pf frmt "\t\t Refinement step %i. " i)))
-          frmt !refinement_steps);
+           (styled
+              (`Bg (`Hi `Green))
+              (fun frmt (i, j) -> pf frmt "\t\t Refinement step %i - %i " i j)))
+          frmt
+          (!refinement_steps, !secondary_refinement_steps));
   (if not !Config.info then
    Fmt.(
-     pf stdout "%i,%3.3f,%3.3f,%i,%i@." !refinement_steps !Config.verif_time elapsed
+     pf stdout "%i,%3.3f,%3.3f,%i,%i@." !refinement_steps !Stats.verif_time elapsed
        (Set.length lstate.t_set) (Set.length lstate.u_set)));
   Log.debug_msg
     Fmt.(
@@ -50,6 +53,7 @@ let rec refinement_loop (p : psi_def) (lstate : refinement_loop_state) =
                 Fmt.(
                   pf frmt "@[<hov 2>Counterexample terms:@;@[<hov 2>%a@]" (list ~sep:comma pp_term)
                     (Set.elements (Set.diff t_set lstate.t_set))));
+            secondary_refinement_steps := 0;
             (* Continue looping with the new sets. *)
             refinement_loop p { lstate with t_set; u_set; lifting }
         | None ->
@@ -62,11 +66,15 @@ let rec refinement_loop (p : psi_def) (lstate : refinement_loop_state) =
                 Error RFail)
   | _ as synt_failure_info -> (
       match Lemmas.synthesize_lemmas ~p synt_failure_info lstate with
-      | Ok new_lstate -> refinement_loop p new_lstate
+      | Ok new_lstate ->
+          Int.decr refinement_steps;
+          Int.incr secondary_refinement_steps;
+          refinement_loop p new_lstate
       | Error synt_failure when !Config.attempt_lifting -> (
           match Lifting.scalar ~p lstate synt_failure with
           | Ok (p', lstate') ->
               Int.decr refinement_steps;
+              Int.incr secondary_refinement_steps;
               Lifting.msg_lifting ();
               refinement_loop p' lstate'
           | Error r' -> Error r')
@@ -234,9 +242,9 @@ let solve_problem (psi_comps : (string * string * string) option)
           (Set.elements target_f.psyntobjs) (list ~sep:sp RType.pp) args_t spec_fname repr_fname
           target_fname);
   (* Print reference function. *)
-  Log.info Fmt.(fun fmt () -> pf fmt "%a" PMRS.pp problem.psi_reference);
+  Log.info Fmt.(fun fmt () -> pf fmt "%a" (box PMRS.pp) problem.psi_reference);
   (* Print target recursion skeleton. *)
-  Log.info Fmt.(fun fmt () -> pf fmt "%a" PMRS.pp problem.psi_target);
+  Log.info Fmt.(fun fmt () -> pf fmt "%a" (box PMRS.pp) problem.psi_target);
   (* Print representation function. *)
   Log.info
     Fmt.(
@@ -253,7 +261,7 @@ let solve_problem (psi_comps : (string * string * string) option)
   (* Set global information. *)
   AState._tau := tau;
   AState._theta := theta;
-  AState._alpha := (t_out, Specifications.get_ensures reference_f.pvar);
+  AState._alpha := t_out;
   AState._span := List.length (Analysis.terms_of_max_depth 1 theta);
   AState.refinement_steps := 0;
   (* Solve the problem. *)

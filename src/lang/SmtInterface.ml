@@ -1,8 +1,56 @@
 open Base
 open Term
-open Smtlib.SmtLib
+open Smtlib
+open SmtLib
 open Utils
 open Option.Let_syntax
+
+module Stats : Solvers.Statistics = Utils.Stats
+
+module SmtLog : Solvers.Logger = struct
+  let verb = Log.verbose
+
+  let debug = Log.debug
+
+  let error = Log.error
+
+  let log_queries = !Config.smt_log_queries
+
+  let log_file = !Config.smt_solver_log_file
+
+  let verbose = !Config.smt_solve_verbose
+end
+
+module AsyncSmt = struct
+  module S = Solvers.Asyncs (SmtLog) (Stats)
+  include S
+
+  (** Create a process with a Z3 solver. *)
+  let make_z3_solver () =
+    make_solver ~name:"Z3-SMT" Utils.Config.z3_binary_path [ "z3"; "-in"; "-smt2" ]
+
+  (** Create a process with a CVC4 solver. *)
+  let make_cvc_solver () =
+    let cvc_path = Config.cvc_binary_path () in
+    let using_cvc5 = Config.using_cvc5 () in
+    let name = if using_cvc5 then "CVC5-SMT" else "CVC4-SMT" in
+    let executable_name = if using_cvc5 then "cvc5" else "cvc4" in
+    make_solver ~name cvc_path [ executable_name; "--lang=smt2.6"; "--incremental" ]
+end
+
+module SyncSmt = struct
+  module S = Solvers.Synchronous (SmtLog) (Stats)
+  include S
+
+  let make_z3_solver () = make_solver ~name:"Z3-SMT" Config.z3_binary_path [ "-in"; "-smt2" ]
+
+  (** Create a process with a CVC4 solver. *)
+  let make_cvc_solver () =
+    let cvc_path = Config.cvc_binary_path () in
+    let using_cvc5 = Config.using_cvc5 () in
+    let name = if using_cvc5 then "CVC5-SMT" else "CVC4-SMT" in
+    make_solver ~name cvc_path [ "--lang=smt2.6"; "--incremental" ]
+end
 
 let string_of_smtSymbol (s : smtSymbol) : string =
   match s with SSimple s -> s | SQuoted s -> "'" ^ s
@@ -353,16 +401,16 @@ let constmap_of_s_exprs (starting_map : (string, term, String.comparator_witness
 let model_to_constmap (s : solver_response) =
   let empty_map = Map.empty (module String) in
   match s with
-  | Unknown | Unsat | Sat | Success -> empty_map
+  | Unsupported | Unknown | Unsat | Sat | Success -> empty_map
   | SExps s_exprs -> constmap_of_s_exprs empty_map s_exprs
   | Error _ -> failwith "Smt solver error"
 
-let model_to_subst (ctx : VarSet.t) (s : solver_response) =
+let model_to_varmap (ctx : VarSet.t) (s : solver_response) : term VarMap.t =
   let map = Map.to_alist (model_to_constmap s) in
-  let f (vname, t) =
-    match VarSet.find_by_name ctx vname with Some v -> [ (Term.mk_var v, t) ] | None -> []
+  let f imap (vname, t) =
+    match VarSet.find_by_name ctx vname with Some v -> Map.set imap ~key:v ~data:t | None -> imap
   in
-  List.concat_map ~f map
+  List.fold_left ~init:VarMap.empty ~f map
 
 (** Given a term model, request additional models from the solver from the point where
     the current model was obtained. Simply calls (get-model) multiple times, asserting
@@ -370,8 +418,8 @@ let model_to_subst (ctx : VarSet.t) (s : solver_response) =
     call.
 *)
 let request_different_models (model : term_model) (num_models : int)
-    (solver : Smtlib.Solvers.online_solver) =
-  let open Smtlib.Solvers in
+    (solver : SyncSmt.online_solver) =
+  let open SyncSmt in
   let rec req_loop model i models =
     (* Assert all variables different. *)
     List.iter
@@ -394,13 +442,22 @@ let request_different_models (model : term_model) (num_models : int)
 (* ============================================================================================= *)
 (*                           COMMANDS                                                            *)
 (* ============================================================================================= *)
+let maybe_decl_of_tuple_type (t : RType.t) =
+  match t with TTup tl -> [ snd (decl_of_tup_type tl) ] | _ -> []
 
 let decls_of_vars (vars : VarSet.t) =
   let f v =
     let t = Variable.vtype_or_new v in
-    let sort = sort_of_rtype t in
-    (match t with TTup tl -> [ snd (decl_of_tup_type tl) ] | _ -> [])
-    @ [ DeclareConst (SSimple v.vname, sort) ]
+    match t with
+    | RType.TFun _ ->
+        let intypes, outtypes = RType.fun_typ_unpack t in
+        let in_sorts = List.map ~f:sort_of_rtype intypes in
+        let out_sort = sort_of_rtype outtypes in
+        List.concat_map ~f:maybe_decl_of_tuple_type (outtypes :: intypes)
+        @ [ DeclareFun (mk_symb v.vname, in_sorts, out_sort) ]
+    | _ ->
+        let sort = sort_of_rtype t in
+        maybe_decl_of_tuple_type t @ [ DeclareConst (mk_symb v.vname, sort) ]
   in
   List.concat_map ~f (Set.elements vars)
 
@@ -544,13 +601,5 @@ let smt_of_pmrs (pmrs : PMRS.t) : command list =
   let deps = PMRS.depends pmrs in
   let sort_decls_of_deps, decls_of_deps = List.unzip (List.map ~f:_smt_of_pmrs deps) in
   let sort_decls, main_decl = _smt_of_pmrs pmrs in
-  let datatype_decls =
-    (* List.map ~f:snd
-       (List.dedup_and_sort
-          ~compare:(fun (sorts, _) (sorts', _) ->
-            List.compare
-              (fun a b -> String.compare (string_of_smtSymbol a) (string_of_smtSymbol b))
-              sorts sorts') *)
-    List.map ~f:snd (List.concat sort_decls_of_deps @ sort_decls)
-  in
+  let datatype_decls = List.map ~f:snd (List.concat sort_decls_of_deps @ sort_decls) in
   datatype_decls @ List.concat decls_of_deps @ main_decl

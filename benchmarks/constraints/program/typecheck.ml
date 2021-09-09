@@ -55,9 +55,7 @@ and no_bool_binop = function
 and no_bool_unop = function Minus -> true | Not -> false
 
 (* Reference function does simplistic type checking *)
-let rec spec = function
-  | Program a -> aux_list a
-  | EmptyProgram -> 1
+let rec spec = function Program a -> aux_list a | EmptyProgram -> 1
   [@@ensures fun x -> x = 0 || x = 1]
 
 and aux_list = function
@@ -120,7 +118,5 @@ and aux_type_unop = function Minus -> 2 | Not -> 1
 and aux_type_const = function ConstantBool b -> 1 | ConstantInt i -> 2
 
 (* Target function should synthesize constant `1` because all expressions are either int or bool and programs without bool constants or operators thus may not have type errors *)
-let rec target = function
-  | Program a -> [%synt s0]
-  | EmptyProgram -> [%synt s1]
+let rec target = function Program a -> [%synt s0] | EmptyProgram -> [%synt s1]
   [@@requires no_bool]

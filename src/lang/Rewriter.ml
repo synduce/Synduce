@@ -378,9 +378,9 @@ module Expression = struct
   let to_term e : term option =
     let rec f e =
       match e with
-      | ETrue -> Some (mk_const Constant.CTrue)
-      | EFalse -> Some (mk_const Constant.CFalse)
-      | EInt i -> Some (mk_const (Constant.CInt i))
+      | ETrue -> Some (Terms.bool true)
+      | EFalse -> Some (Terms.bool false)
+      | EInt i -> Some (Terms.int i)
       | EVar i ->
           let%map v = get_var i in
           mk_var v

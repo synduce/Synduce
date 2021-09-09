@@ -1,0 +1,31 @@
+{0 Synduce Library }
+{1 Basic Functionality }
+The {!module-Lib} library provides some basic functionality for Synduce to be used as a library.
+
+{1 Main Algorithms }
+The {!module-Algo} library contains the main algorithmic components of Synduce.
+The entry point of this library is the module:
+
+{1 Code Generation }
+The {!module-Codegen} library contains all the code generators of Synduce. The current version
+only generates sketches of Dafny proofs.
+
+{1 Internal Representations }
+{!module-Lang} contains the main internal representation definitions and interfaces with SMT-LIB
+and SyGuS components. Some program analysis algorithms are also implemented in Lang, but those
+algorithms should be reusable for other synthesis problems and not only the ones of Synduce.
+
+{1 Front End }
+{!module-Parsers} provides the front-end functionality of Synduce.
+
+{1 SmtLib Interface }
+{!module-Smtlib} provides an implementation to interact with SMT-LIB compliant solvers. The internal
+representation interfaces with this implementation through {!module-Lang.SmtInterface}.
+
+{1 SyGuS Interface }
+{!module-Syguslib} provides an implementation to interact with SyGuS solvers. The internal
+representation interfaces with this implementation through {!module-Lang.SygusInterface}.
+
+{1 Utils and Configuration }
+{!module-Utils} contains mainly utility functions. The module {!module-Utils.Config} contains
+configuration settings that can be set by the user.

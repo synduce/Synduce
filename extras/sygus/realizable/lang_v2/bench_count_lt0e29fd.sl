@@ -1,0 +1,8 @@
+(set-logic DTLIA)
+(synth-fun c0 () Int ((Ix Int) (Ic Int))
+ ((Ix Int (Ic (- Ix) (+ Ix Ix))) (Ic Int ((Constant Int)))))
+(declare-var a Int)
+(declare-var i Int)
+(declare-var i33 Int)
+(constraint (or (not (and (or (not (not (< i a))) (= i33 0)) (not (< i a)))) (= i33 c0)))
+(check-synth)

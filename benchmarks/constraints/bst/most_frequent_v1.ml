@@ -1,7 +1,7 @@
 (* Non-empty lists type. *)
 type list = Elt of int | Cons of int * list
 
-(* Inductive type for prositive integers. *)
+(* Inductive type for positive integers. *)
 type pos = One | S of pos
 
 (* A binary search tree with integer keys and positive natural numbers as values. *)
@@ -41,4 +41,4 @@ let rec target = function
   | Node (hd_key, l, r) -> [%synt join] hd_key (target l) (target r)
   [@@requires is_imap]
 
-and int_of = function S n -> 1 + int_of n | One -> 1
+and int_of = function S n -> [%synt int_succ] (int_of n) | One -> [%synt int_base]

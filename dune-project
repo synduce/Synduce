@@ -2,7 +2,7 @@
 
 (name Synduce)
 
-(version 0.1)
+(version 0.2)
 
 (license MIT)
 
@@ -42,6 +42,8 @@
    (>= 2.0.0))
   (menhir
    (>= 20200624))
+  (odoc
+   (>= 1.5.0))
   (parsexp
    (>= v0.14.0))
   (ppx_let

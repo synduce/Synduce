@@ -8,6 +8,11 @@ let _NAMES = Hashtbl.create (module String) ~size:100
 
 let _MAX_ID = ref 0
 
+let reinit () =
+  _MAX_ID := 0;
+  Hashtbl.clear _IDS;
+  Hashtbl.clear _NAMES
+
 let new_id () =
   let i = !_MAX_ID in
   _MAX_ID := !_MAX_ID + 1;
@@ -38,10 +43,12 @@ let fresh ?(s = "x") () : string =
       s
 
 let mk_with_id (i : int) (s : string) (f : int -> 'a) : 'a =
-  if i > 0 then f i
+  if i > 0 then (
+    Hashtbl.add_multi _NAMES ~key:s ~data:i;
+    f i)
   else
     let id = new_id () in
     match Hashtbl.add _IDS ~key:id ~data:s with
     | _ ->
-        ();
+        Hashtbl.add_multi _NAMES ~key:s ~data:i;
         f id

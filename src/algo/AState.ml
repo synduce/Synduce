@@ -48,12 +48,21 @@ let _theta = ref RType.TInt
     optional term that represents the additional predicate on the output of the reference function.
     The term is assumed to define a function (fun (free variables of term) -> term).
 *)
-let _alpha : (RType.t * Term.term option) ref = ref (RType.TInt, None)
+let _alpha : RType.t ref = ref RType.TInt
 
 (** Not useful for now. *)
 let _span = ref 1
 
 let refinement_steps = ref 0
+
+let secondary_refinement_steps = ref 0
+
+let reinit () =
+  _span := 1;
+  refinement_steps := 0;
+  _alpha := RType.TInt;
+  _tau := RType.TInt;
+  _theta := RType.TInt
 
 (* ============================================================================================= *)
 (*       Types for intermediate representations of solutions, lemmas, counterexamples, etc.      *)
@@ -81,14 +90,30 @@ type equation = {
   Represents an equational constraint.
 *)
 
+type spurious_cause =
+  | ViolatesTargetRequires
+  | NotInReferenceImage
+      (** A counterexample can be spurious either because it wiolates the target's requires or
+  because some values assigned to recursion elimination variables are not in the reference
+  function's image.
+*)
+
+type ctex_stat =
+  | Valid
+  | Spurious of spurious_cause
+  | Unknown  (**
+  A counterexample is either valid, or spurious with some reason, or unknown.
+*)
+
 type ctex = {
   ctex_eqn : equation;  (** The equation the counterexample relates to. *)
-  ctex_vars : VarSet.t;  (** The variables appearing in the model. *)
-  ctex_model : (int, term, Int.comparator_witness) Map.t;
-      (** The model of the counterexample, mapping variable ids to terms. The terms should be
-        constants.*)
+  ctex_vars : VarSet.t;  (** The variables in the model.*)
+  ctex_model : term VarMap.t;
+      (** The model of the counterexample, mapping variables to terms. The terms should be
+        constants. *)
+  ctex_stat : ctex_stat;  (** The spuriousness status of the counterexample. *)
 }
-(** A counterexample related to an equation.
+(** A counterexample related to an equation and some info on the validity of the counterexample.
 *)
 
 type equation_system = equation list
@@ -160,9 +185,7 @@ let pp_equation (f : Formatter.t) (eqn : equation) =
 let pp_ctex (f : Formatter.t) (ctex : ctex) : unit =
   let pp_model frmt model =
     (* Print as comma-separated list of variable -> term *)
-    Fmt.(list ~sep:comma (pair ~sep:Utils.rightarrow (option Variable.pp) pp_term))
-      frmt
-      (List.map ~f:(fun (vid, t) -> (VarSet.find_by_id ctex.ctex_vars vid, t)) (Map.to_alist model))
+    Fmt.(list ~sep:comma (pair ~sep:Utils.rightarrow Variable.pp pp_term)) frmt (Map.to_alist model)
   in
   Fmt.pf f "@[M = [%a]@]@;@[for %a@]@;@[with elim. %a@]" pp_model ctex.ctex_model pp_term
     ctex.ctex_eqn.eterm pp_subs ctex.ctex_eqn.eelim

@@ -1,0 +1,7 @@
+(set-logic DTNIA)
+(synth-fun f0 () Int ((Ix Int) (Ic Int))
+ ((Ix Int (Ic (- Ix) (+ Ix Ix))) (Ic Int ((Constant Int)))))
+(declare-var p Int)
+(declare-var p4 Int)
+(constraint (or (not (and (= (mod p 2) 0) (= (mod p4 2) 0))) (= (mod (+ p p4) 2) f0)))
+(check-synth)

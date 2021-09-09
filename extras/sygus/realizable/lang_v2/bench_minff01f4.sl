@@ -1,0 +1,8 @@
+(set-logic DTLIA)
+(define-fun min ((x Int) (y Int)) Int (ite (<= x y) x y))
+(synth-fun xi_1 ((x35 Int)) Int ((Ix Int) (Ic Int))
+ ((Ix Int (Ic x35 (- Ix) (+ Ix Ix) (min Ix Ix))) (Ic Int ((Constant Int)))))
+(declare-var i Int)
+(declare-var i35 Int)
+(constraint (or (not (= i (min i i35))) (= (min i i35) (xi_1 i))))
+(check-synth)

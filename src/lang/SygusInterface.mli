@@ -16,6 +16,22 @@ val sort_of_rtype : RType.t -> Sygus.sygus_sort
     type does not matter, and it can be soundly replaced by Int.
  *)
 
+val requires_dt_theory : RType.t -> bool
+(**
+    Returns true if the type argument requires the logic to include datatypes to reason about
+    objects of that type.
+ *)
+
+val logic_of_operators : OpSet.t -> string
+(**
+    Returns a string corresponding to the logic that allows to reason about all the operators
+    in the set. Does not include the "DT" prefix required for reasoning about datatypes (see [requires_dt_theory]).
+ *)
+
+val dt_extend_base_logic : string -> string
+(** Extend the base logic provided as a string to the same logic with datatypes.
+*)
+
 val sygus_of_term : term -> Sygus.sygus_term
 (**
     Translates a term to a sygus term.

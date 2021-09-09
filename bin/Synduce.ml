@@ -54,7 +54,8 @@ let print_usage () =
     \       --show-vars                 Print variables and their types at the end.\n\
     \       --generate-benchmarks=DIR   Save SyGuS problems in DIR, including problems that are \
      provably unrealizable.\n\
-     -> Try:\n\
+    \       --check-smt-unrealizable    Check unrealizability using a SMT query directly.\n\
+    \     -> Try:\n\
      ./Synduce benchmarks/list/mps.ml@.";
   Caml.exit 0
 
@@ -82,6 +83,7 @@ let options =
     ('\000', "acegis", set Config.use_acegis true, None);
     ('\000', "ccegis", set Config.use_ccegis true, None);
     ('\000', "cvc4", set Config.use_cvc4 true, None);
+    ('\000', "check-smt-unrealizable", set Config.check_unrealizable_smt_unsatisfiable true, None);
     ('\000', "fuzzing", None, Some Config.set_fuzzing_count);
     ('\000', "generate-benchmarks", None, Some Config.set_benchmark_generation_dir);
     ('\000', "parse-only", set parse_only true, None);
@@ -109,8 +111,7 @@ let main () =
         (if Config.using_cvc5 () then "Using CVC5 ✔" else "Using CVC4. Please install CVC5.")
   | EUSolver -> failwith "EUSolver unsupported."
   | DryadSynth -> Syguslib.Sygus.use_v1 := true);
-  let start_time = Unix.gettimeofday () in
-  Config.glob_start := start_time;
+  Lib.Utils.Stats.glob_start ();
   (* Parse input file. *)
   let is_ocaml_syntax = Caml.Filename.check_suffix !filename ".ml" in
   let prog, psi_comps = if is_ocaml_syntax then parse_ocaml !filename else parse_pmrs !filename in
@@ -122,11 +123,13 @@ let main () =
       raise e
   in
   if !parse_only then Caml.exit 1;
+  let open Lib.Utils in
   (match Algo.PmrsAlgos.solve_problem psi_comps all_pmrs with
   | _, Ok target ->
-      let elapsed = Unix.gettimeofday () -. start_time in
-      let verif_ratio = 100.0 *. (!Config.verif_time /. elapsed) in
-      Utils.Log.info
+      let elapsed = Stats.get_glob_elapsed () in
+      let verif_ratio = 100.0 *. (!Stats.verif_time /. elapsed) in
+      Log.verbose Stats.print_solvers_summary;
+      Log.info
         Fmt.(
           fun frmt () ->
             pf frmt "Solution found in %4.4fs (%3.1f%% verifying):@.%a@]" elapsed verif_ratio
@@ -140,7 +143,7 @@ let main () =
       | None -> ());
       (* If no info required, output timing information. *)
       if not !Config.info then (
-        Fmt.(pf stdout "%i,%.4f,%.4f@." !Algo.AState.refinement_steps !Config.verif_time elapsed);
+        Fmt.(pf stdout "%i,%.4f,%.4f@." !Algo.AState.refinement_steps !Stats.verif_time elapsed);
         Fmt.(pf stdout "success@."))
   | _, Error _ -> Utils.Log.error_msg "No solution found.");
   if !Config.show_vars then Term.Variable.print_summary stdout ()

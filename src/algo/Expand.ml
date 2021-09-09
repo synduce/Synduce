@@ -22,7 +22,7 @@ let identify_rcalls (p : psi_def) (lam : variable) (t : term) : VarSet.t =
 
 let mk_recursion_elimination_term (p : psi_def) : (term * term) option =
   let _, g_out = RType.fun_typ_unpack (Variable.vtype_or_new p.psi_target.pvar)
-  and f_out = fst !AState._alpha in
+  and f_out = !AState._alpha in
   if Result.is_ok (RType.unify_one g_out f_out) then
     let term = mk_composite_base_type f_out in
     Some (term, term)
@@ -56,7 +56,7 @@ let subst_recursive_calls (p : psi_def) (tl : term list) : (term * term) list * 
       | None -> failwith "Cannot make recursion elimination for this problem."
     in
     let invariant =
-      Option.map (second !AState._alpha) ~f:(fun inv ->
+      Option.map (Specifications.get_ensures p.psi_reference.pvar) ~f:(fun inv ->
           first (infer_type (Reduce.reduce_term (mk_app inv [ scalar_term_f ]))))
     in
     ( substs
@@ -355,3 +355,75 @@ let to_maximally_reducible (p : psi_def) (t0 : term) : TermSet.t * TermSet.t =
   in
   let l1, l2 = List.fold tset0 ~f ~init:([], uset0) in
   (TermSet.of_list l1, TermSet.of_list l2)
+
+(* ============================================================================================= *)
+(*                                   EXPAND TERM UTILS                                           *)
+(* ============================================================================================= *)
+open Lwt
+open Smtlib
+open SmtInterface
+
+let expand_loop (counter : int ref)
+    (t_check : SyncSmt.solver_response -> term -> SyncSmt.solver_response)
+    ?(r_stop = function SmtLib.Sat -> true | _ -> false) ?(r_complete = SmtLib.Unsat)
+    (u : TermSet.t) =
+  let rec tlist_check accum terms =
+    match terms with
+    | [] -> accum
+    | t0 :: tl -> (
+        let accum' = t_check accum t0 in
+        match accum' with Sat -> SmtLib.Sat | _ -> tlist_check accum' tl)
+  in
+  let rec aux u =
+    match (Set.min_elt u, !counter < !Config.num_expansions_check) with
+    | Some t0, true ->
+        let tset, u' = simple t0 in
+        let check_result = tlist_check SmtLib.Unknown (Set.elements tset) in
+        counter := !counter + Set.length tset;
+        if r_stop check_result then check_result else aux (Set.union (Set.remove u t0) u')
+    | None, true ->
+        Log.verbose_msg "Bounded checking is complete.";
+        (* All expansions have been checked. *)
+        r_complete
+    | _, false ->
+        (* Check reached limit. *)
+        if !Config.no_bounded_sat_as_unsat then
+          (* Return Unsat, as if all terms had been checked. *)
+          r_complete
+        else (* Otherwise, it's unknown. *)
+          SmtLib.Unknown
+  in
+  aux u
+
+let lwt_expand_loop (counter : int ref) (t_check : AsyncSmt.response -> term -> AsyncSmt.response)
+    ?(r_stop = function SmtLib.Sat -> true | _ -> false) ?(r_complete = SmtLib.Unsat)
+    (u : TermSet.t Lwt.t) =
+  let rec tlist_check accum terms =
+    match terms with
+    | [] -> accum
+    | t0 :: tl -> (
+        let%lwt accum' = t_check accum t0 in
+        match accum' with Sat -> return SmtLib.Sat | _ -> tlist_check (return accum') tl)
+  in
+  let rec aux u =
+    let%lwt u = u in
+    match (Set.min_elt u, !counter < !Config.num_expansions_check) with
+    | Some t0, true ->
+        let tset, u' = simple t0 in
+        let%lwt check_result = tlist_check (return SmtLib.Unknown) (Set.elements tset) in
+        counter := !counter + Set.length tset;
+        if r_stop check_result then return check_result
+        else aux (return (Set.union (Set.remove u t0) u'))
+    | None, true ->
+        Log.verbose_msg "Bounded checking is complete.";
+        (* All expansions have been checked. *)
+        return r_complete
+    | _, false ->
+        (* Check reached limit. *)
+        if !Config.no_bounded_sat_as_unsat then
+          (* Return Unsat, as if all terms had been checked. *)
+          return r_complete
+        else (* Otherwise, it's unknown. *)
+          return SmtLib.Unknown
+  in
+  aux u

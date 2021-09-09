@@ -588,7 +588,7 @@ let is_setter_command (c : SyCommand.t) =
 (**
    A SyGuS input is not well-formed if it specifies a list of commands that do not meet the restrictions given
    in this section regarding their order. The order is specified by the following regular pattern:
-   ```({set logic command})? ({setter commands})∗({other sygus_commands})∗```
+   ```(set logic command)? (setter commands)∗(other sygus_commands)∗```
 *)
 let is_well_formed (p : program) : bool =
   let setter_then_other l =
@@ -612,3 +612,33 @@ let max_definition =
 
 let min_definition =
   SyCommand.of_sexp (Sexp.of_string "(define-fun min ((x Int) (y Int)) Int (ite (<= x y) x y))")
+
+(* ============================================================================================= *)
+(*                       TRANSFORMERS                                                            *)
+(* ============================================================================================= *)
+let rec rename (subs : (symbol * symbol) list) (t : sygus_term) : sygus_term =
+  match t with
+  | SyId (IdSimple s) -> (
+      match List.Assoc.find ~equal:String.equal subs s with
+      | Some s' -> SyId (IdSimple s')
+      | None -> t)
+  | SyApp (IdSimple f, args) -> (
+      let args' = List.map ~f:(rename subs) args in
+      match List.Assoc.find ~equal:String.equal subs f with
+      | Some f' -> SyApp (IdSimple f', args')
+      | None -> SyApp (IdSimple f, args'))
+  | SyApp (f, args) -> SyApp (f, List.map ~f:(rename subs) args)
+  | SyExists (vars, body) ->
+      let subs' = List.filter ~f:(fun (l, _) -> List.Assoc.mem ~equal:String.equal vars l) subs in
+      SyExists (vars, rename subs' body)
+  | SyForall (vars, body) ->
+      let subs' = List.filter ~f:(fun (l, _) -> List.Assoc.mem ~equal:String.equal vars l) subs in
+      SyForall (vars, rename subs' body)
+  | SyLit _ | SyId _ -> t
+  | SyLet (bindings, body) ->
+      let bindings' = List.map ~f:(fun (varname, body) -> (varname, rename subs body)) bindings in
+      let subs' =
+        List.filter ~f:(fun (l, _) -> List.Assoc.mem ~equal:String.equal bindings l) subs
+      in
+      let body' = rename subs' body in
+      SyLet (bindings', body')

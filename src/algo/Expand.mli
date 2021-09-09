@@ -1,5 +1,6 @@
 open Lang
 open Base
+open SmtInterface
 
 val mk_recursion_elimination_term : AState.psi_def -> (Term.term * Term.term) option
 
@@ -42,3 +43,44 @@ val is_mr : AState.psi_def -> PMRS.t -> Term.term -> Term.VarSet.t -> bool
 val is_mr_all : AState.psi_def -> Term.term -> bool
 
 val to_maximally_reducible : AState.psi_def -> Term.term -> Term.TermSet.t * Term.TermSet.t
+
+val expand_loop :
+  int ref ->
+  (SyncSmt.solver_response -> Term.term -> SyncSmt.solver_response) ->
+  ?r_stop:(SyncSmt.solver_response -> bool) ->
+  ?r_complete:SyncSmt.solver_response ->
+  Term.TermSet.t ->
+  SyncSmt.solver_response
+(** [expand_loop] provides basic functionality for bounded checking.
+    [expand_loop steps f start] will run a bounded checking loop, starting with the term
+    set [start] and performing [!Lib.Config.num_expansions_check] steps, applying the
+    checking function [f] for each term obtained during the expansion of the term in the set
+    [start] into bounded terms.
+
+    If a check returns an answer for which [r_stop] is true, then the function returns
+    this answer. By default [r_stop] checks whether the answer is [SmtLib.Sat].
+
+    If every check returns UNSAT, then the procedure returns [SmtLib.Unknown], unless
+    [!Config.no_bounded_sat_as_unsat] is true, in which case it returns [r_complete].
+    By default, [r_complete] is [SmtLib.Unsat].
+
+    If the procedure has explored all possible expansions of the terms in the input set,
+    then it returns [r_complete] (all the check having returned UNSAT for all
+    possible terms).
+
+    @param r_stop is a function that returns true whenever the loop should stop, given
+    the solver response to a call to f.
+    @param r_complete is the answer that should be given if all the
+*)
+
+val lwt_expand_loop :
+  int ref ->
+  (AsyncSmt.response -> Term.term -> AsyncSmt.response) ->
+  ?r_stop:(Smtlib.SmtLib.solver_response -> bool) ->
+  ?r_complete:Smtlib.SmtLib.solver_response ->
+  Term.TermSet.t Lwt.t ->
+  AsyncSmt.response
+(** [lwt_expand_loop] provides the same functionality as [expand_loop], but the solver
+    calls are threaded arount a lwt promise. Use [lwt_expand_loop] in place of [expand_loop]
+    when you want to run concurrent solver instances.
+*)

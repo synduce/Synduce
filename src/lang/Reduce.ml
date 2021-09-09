@@ -11,7 +11,7 @@ let until_irreducible (f : term -> term * bool) (t0 : term) : term =
     let t', reduced = f t in
     if reduced && !steps < _MAX then apply_until_irreducible t' else t'
   in
-  apply_until_irreducible t0
+  apply_until_irreducible (fst (f t0))
 
 let steps_until_irreducible (f : term -> term * bool) (t0 : term) : term list =
   let steps = ref 0 in
@@ -116,50 +116,62 @@ let rule_lookup prules (f : variable) (fargs : term list) : term list =
   reduce_term reduces a term using only the lambda-calculus
 *)
 let rec reduce_term (t : term) : term =
-  let case f t =
-    match t.tkind with
-    | TApp (func, args) -> (
-        let func' = f func in
-        let args' = List.map ~f args in
-        match resolve_func func' with
-        | FRFun (fpatterns, body) -> (
-            match Analysis.subst_args fpatterns args' with
-            | Some subst -> Some (substitution subst body)
-            | None -> None)
-        | FRPmrs pm -> (
-            match args' with
-            | [ tp ] -> Some (f (reduce_pmrs pm tp))
-            | _ -> None (* PMRS are defined only with one argument for now. *))
-        | FRNonT p -> Some (pmrs_until_irreducible p (mk_app func' args'))
-        | FRUnknown -> None)
-    | TFun ([], body) -> Some (f body)
-    | TIte (c, tt, tf) -> (
-        match c.tkind with
-        (* Resolve constants *)
-        | TConst Constant.CFalse -> Some (f tf)
-        | TConst Constant.CTrue -> Some (f tt)
-        (* Distribute ite on tuples *)
-        | _ -> (
-            match (tt.tkind, tf.tkind) with
-            | TTup tlt, TTup tlf -> (
-                match List.zip tlt tlf with
-                | Ok zip -> Some (mk_tup (List.map zip ~f:(fun (tt', tf') -> mk_ite c tt' tf')))
-                | Unequal_lengths -> None)
-            | _, _ -> None))
-    | TSel (t, i) -> (
-        match f t with { tkind = TTup tl; _ } -> Some (List.nth_exn tl i) | _ -> None)
-    | TMatch (t, cases) -> (
-        match
-          List.filter_opt
-            (List.map
-               ~f:(fun (p, t') -> Option.map ~f:(fun m -> (m, t')) (Analysis.matches_pattern t p))
-               cases)
-        with
-        | [] -> None
-        | (subst_map, rhs_t) :: _ -> Some (substitution (VarMap.to_subst subst_map) rhs_t))
-    | TBox _ | TVar _ | TFun _ | TTup _ | TBin _ | TUn _ | TConst _ | TData _ -> None
+  let one_step t =
+    let rstep = ref false in
+    let case f t =
+      let x =
+        match t.tkind with
+        | TApp (func, args) -> (
+            let func' = f func in
+            let args' = List.map ~f args in
+            match resolve_func func' with
+            | FRFun (fpatterns, body) -> (
+                match Analysis.subst_args fpatterns args' with
+                | Some subst -> Some (substitution subst body)
+                | None -> None)
+            | FRPmrs pm -> (
+                match args' with
+                | [ tp ] -> Some (f (reduce_pmrs pm tp))
+                | _ -> None (* PMRS are defined only with one argument for now. *))
+            | FRNonT p -> Some (pmrs_until_irreducible p (mk_app func' args'))
+            | FRUnknown -> None)
+        | TFun ([], body) -> Some (f body)
+        | TIte (c, tt, tf) -> (
+            match c.tkind with
+            (* Resolve constants *)
+            | TConst Constant.CFalse -> Some (f tf)
+            | TConst Constant.CTrue -> Some (f tt)
+            (* Distribute ite on tuples *)
+            | _ -> (
+                match (tt.tkind, tf.tkind) with
+                | TTup tlt, TTup tlf -> (
+                    match List.zip tlt tlf with
+                    | Ok zip -> Some (mk_tup (List.map zip ~f:(fun (tt', tf') -> mk_ite c tt' tf')))
+                    | Unequal_lengths -> None)
+                | _, _ -> None))
+        | TSel (t, i) -> (
+            match f t with { tkind = TTup tl; _ } -> Some (List.nth_exn tl i) | _ -> None)
+        | TMatch (t, cases) -> (
+            match
+              List.filter_opt
+                (List.map
+                   ~f:(fun (p, t') ->
+                     Option.map ~f:(fun m -> (m, t')) (Analysis.matches_pattern t p))
+                   cases)
+            with
+            | [] -> None
+            | (subst_map, rhs_t) :: _ -> Some (substitution (VarMap.to_subst subst_map) rhs_t))
+        | TBox _ | TVar _ | TFun _ | TTup _ | TBin _ | TUn _ | TConst _ | TData _ -> None
+      in
+      match x with
+      | Some x ->
+          rstep := true;
+          Some x
+      | None -> None
+    in
+    (transform ~case t, !rstep)
   in
-  transform ~case t
+  until_irreducible one_step t
 
 and pmrs_until_irreducible (prog : PMRS.t) (input : term) =
   let one_step t0 =

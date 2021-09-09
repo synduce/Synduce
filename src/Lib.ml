@@ -15,6 +15,17 @@ type problem_descr = {
   pd_repr : Term.function_descr list;
 }
 
+(** Use [reinit] to reinitialize all the global variables used in Synduce when solving
+  multiple problems.
+*)
+let reinit () =
+  AState.reinit ();
+  Term.Variable.clear ();
+  Alpha.reinit ();
+  RType.reinit ();
+  PMRS.reinit ();
+  Specifications.reinit ()
+
 let pp_problem_descr (fmt : Formatter.t) (prob : problem_descr) =
   pf fmt "> Target <@.";
   pf fmt "@[<v>%a@]@." (list ~sep:cut (box Term.pp_function_descr)) prob.pd_target;

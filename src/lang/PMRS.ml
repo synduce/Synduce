@@ -18,9 +18,11 @@ type top_function = variable * variable list * term
 type t = {
   pvar : Variable.t;
       (**
-    The main function symbol.
+    The main function symbol, storing general information about the PMRS.
     The specification associated to the PMRS may be found using:
     [get_spec pvar]
+    The type of the PMRS (the main function of the group of mutually recursive
+    functions) is stored as the type of pvar.
   *)
   pinput_typ : RType.t list;
       (**
@@ -71,6 +73,10 @@ let lhs (nt, args, pat, rhs) =
   let t, _ = infer_type (mk_app ~pos:rhs.tpos (mk_var nt) all_args) in
   t
 
+let reinit () =
+  Hashtbl.clear _globals;
+  Hashtbl.clear _nonterminals
+
 (* ============================================================================================= *)
 (*                                 PRETTY PRINTING                                               *)
 (* ============================================================================================= *)
@@ -93,9 +99,9 @@ let pp (frmt : Formatter.t) (pmrs : t) : unit =
       pmrs.prules
   in
   Fmt.(
-    pf frmt "%s⟨%a⟩(%a): %a -> %a@;%a@;= @;@[<v 2>{@;%a@;}@]" pmrs.pvar.vname VarSet.pp_var_names
-      pmrs.psyntobjs (list ~sep:comma Variable.pp) pmrs.pargs (list ~sep:comma RType.pp)
-      pmrs.pinput_typ RType.pp pmrs.poutput_typ
+    pf frmt "@[<hov> %s⟨%a⟩(%a): %a -> %a@;%a@;= @;@[<v 2>{@;%a@;}@]@]" pmrs.pvar.vname
+      VarSet.pp_var_names pmrs.psyntobjs (list ~sep:comma Variable.pp) pmrs.pargs
+      (list ~sep:comma RType.pp) pmrs.pinput_typ RType.pp pmrs.poutput_typ
       (option (box pp_spec))
       (Specifications.get_spec pmrs.pvar)
       pp_rules ())
@@ -490,3 +496,6 @@ let depends (p : t) : t list =
   List.dedup_and_sort
     ~compare:(fun p1 p2 -> String.compare p1.pvar.vname p2.pvar.vname)
     (List.concat_map ~f (Map.data p.prules))
+
+(** Returns the output type of a PMRS. *)
+let output_type (p : t) : RType.t = snd (RType.fun_typ_unpack (Variable.vtype_or_new p.pvar))

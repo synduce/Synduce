@@ -62,6 +62,11 @@ let interactive_check_lemma = ref false
 *)
 let check_unrealizable = ref true
 
+(** Check whether a synthesis problem is unrealizable by checking whether the problem with
+second-order quantification is unrealizable, using a SMT solver (Z3 by default).
+*)
+let check_unrealizable_smt_unsatisfiable = ref false
+
 (**
   Attempt to lift the function if there is no solution.
 *)
@@ -75,16 +80,6 @@ let no_bounded_sat_as_unsat = ref false
 let bounded_lemma_check = ref false
 
 (* ============================================================================================= *)
-(*                                GLOBAL TIMING INFO                                             *)
-(* ============================================================================================= *)
-
-(* Start time. *)
-let glob_start = ref 0.0
-
-(** Total elapsed time spent in verification of solutions.  *)
-let verif_time = ref 0.0
-
-(* ============================================================================================= *)
 (*                                STORAGE AND BINARY PATHS                                       *)
 (* ============================================================================================= *)
 
@@ -96,7 +91,7 @@ let base s = Caml.Filename.concat root_folder s
 
 (* Set to true to force using cvc4 even if cvc5 is available. *)
 (* There are still bugs with CVC5, leave true for now. *)
-let use_cvc4 = ref true
+let use_cvc4 = ref false
 
 let cvc4_binary_path = try Some (FileUtil.which "cvc4") with _ -> None
 
@@ -195,7 +190,7 @@ let simplify_eqns = ref true
 let optimize_grammars = ref false
 
 (** When printing a system of equations, put a limit on how many equations are printed. *)
-let pp_eqn_count = ref 10
+let pp_eqn_count = ref 20
 
 (* ============================================================================================= *)
 (*                  BOUNDED EXPANSIONS / VERIFICATION / REWIRTING PARAMETERS                     *)

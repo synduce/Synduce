@@ -13,22 +13,6 @@ type grammar_parameters = {
 
 type grammar_guess = GBin of Binop.t | GUn of Unop.t | GIte | GNonGuessable
 
-let operators_of (t : term) : OpSet.t =
-  let init = OpSet.empty in
-  let join = Set.union in
-  let case f x =
-    match x.tkind with
-    | TBin (op, t1, t2) -> Some (join (OpSet.singleton (Binary op)) (join (f t1) (f t2)))
-    | TUn (op, t1) -> Some (join (OpSet.singleton (Unary op)) (f t1))
-    | _ -> None
-  in
-  reduce ~init ~join ~case t
-
-let logic_of_operator (opset : OpSet.t) : string =
-  if Set.for_all opset ~f:Operator.is_lia then "DTLIA" else "DTNIA"
-
-(* TODO : for now only alternative is non-linear arithmetic *)
-
 let int_sort = SId (IdSimple "Int")
 
 let bool_sort = SId (IdSimple "Bool")
@@ -145,7 +129,7 @@ let int_parametric ?(guess = None) (params : grammar_parameters) =
       in
       preamble @ main_grammar
 
-let bool_parametric ?(guess = None) (params : grammar_parameters) =
+let bool_parametric ?(guess = None) ?(special_const_prod = true) (params : grammar_parameters) =
   let has_ints =
     List.exists params.g_locals ~f:(fun (_, s) ->
         match s with SId (IdSimple "Int") -> true | _ -> false)
@@ -165,11 +149,8 @@ let bool_parametric ?(guess = None) (params : grammar_parameters) =
           ]
         @
         if has_ints then
-          [
-            GTerm (SyApp (IdSimple "=", [ ix; ic ]));
-            GTerm (SyApp (IdSimple "=", [ ix; ix ]));
-            GTerm (SyApp (IdSimple ">", [ ix; ix ]));
-          ]
+          (if special_const_prod then [ GTerm (SyApp (IdSimple "=", [ ix; ic ])) ] else [])
+          @ [ GTerm (SyApp (IdSimple "=", [ ix; ix ])); GTerm (SyApp (IdSimple ">", [ ix; ix ])) ]
         else [] );
     ]
   in
@@ -181,7 +162,7 @@ let bool_parametric ?(guess = None) (params : grammar_parameters) =
               match s with SId (IdSimple "Int") -> Some (GTerm t) | _ -> None)
         @ [ GTerm (SyApp (IdSimple "-", [ ix ])) ]
         @ [ GTerm (SyApp (IdSimple "+", [ ix; ix ])) ]
-        @ [ GTerm (SyApp (IdSimple "+", [ ix; ic ])) ]
+        @ (if special_const_prod then [ GTerm (SyApp (IdSimple "+", [ ix; ic ])) ] else [])
         @ (if Set.mem params.g_opset (Binary Min) then
            [ GTerm (SyApp (IdSimple "min", [ ix; ix ])) ]
           else [])
@@ -269,8 +250,8 @@ let rec project ((v, s) : sorted_var) =
 and tuple_sel i projs =
   List.map projs ~f:(fun (t, s) -> (SyApp (IdIndexed ("tupSel", [ INum i ]), [ t ]), s))
 
-let generate_grammar ?(guess = None) ?(bools = false) (opset : OpSet.t) (args : sorted_var list)
-    (ret_sort : sygus_sort) =
+let generate_grammar ?(guess = None) ?(bools = false) ?(special_const_prod = true) (opset : OpSet.t)
+    (args : sorted_var list) (ret_sort : sygus_sort) =
   let locals_of_scalar_type = List.concat (List.map ~f:project args) in
   let params =
     {
@@ -284,7 +265,7 @@ let generate_grammar ?(guess = None) ?(bools = false) (opset : OpSet.t) (args : 
   in
   match ret_sort with
   | SId (IdSimple "Int") -> Some (int_parametric ~guess params)
-  | SId (IdSimple "Bool") -> Some (bool_parametric ~guess params)
+  | SId (IdSimple "Bool") -> Some (bool_parametric ~guess ~special_const_prod params)
   (* Ignore guess if it's a tuple that needs to be generated. *)
   | SApp (IdSimple "Tuple", sorts) -> Some (tuple_grammar_constr params sorts)
   | _ -> None

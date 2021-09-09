@@ -4,6 +4,8 @@ open Utils
 
 let _tid = ref 0
 
+let _tvar_idx = ref 0
+
 type ident = string
 
 (** Used for type declarations*)
@@ -54,8 +56,6 @@ type t =
   | TParam of t list * t
   | TVar of int
 
-let _tvar_idx = ref 0
-
 let get_fresh_tvar () =
   Int.incr _tvar_idx;
   TVar !_tvar_idx
@@ -92,11 +92,19 @@ let rec pp (frmt : Formatter.t) (typ : t) =
         | _ -> Fmt.(pf frmt "(%a) %a" (list ~sep:comma pp) alpha pp t'))
     | TVar i -> Fmt.(pf frmt "param%i" i)
 
+(**
+  [fun_type_unpack t] uncurries the type [t] as a function. Returns a pair of
+  a list (the type of the arguments of the function) and a type (the output
+  type of the function). If t is not a function type, then ([],t) is returned.
+*)
 let fun_typ_unpack (t : t) : t list * t =
   let rec aux pre = function TFun (a, b) -> aux (pre @ [ a ]) b | _ as _t -> (pre, _t) in
   let targs, tout = aux [] t in
   (targs, tout)
 
+(** [fun_typ_pack args t] construct the type of a function args -> t:
+    for example [fun_typ_pack [t1;t2] t_out] is [TFun(t1, TFun(t2, tout))].
+*)
 let rec fun_typ_pack (targs : t list) (tout : t) =
   match (List.last targs, List.drop_last targs) with
   | Some elt, Some pre -> fun_typ_pack pre (TFun (elt, tout))
@@ -145,6 +153,13 @@ let dump_types (frmt : Formatter.t) () =
   in
   Fmt.(pf frmt "@[Variants:@]@.");
   Hashtbl.iteri _variants ~f:f_v
+
+let reinit () =
+  Hashtbl.clear _variant_to_tname;
+  Hashtbl.clear _tname_to_variants;
+  Hashtbl.clear _variants;
+  _tid := 0;
+  _tvar_idx := 0
 
 (* ============================================================================================= *)
 
@@ -418,6 +433,8 @@ let is_recursive =
     | l -> if List.exists l ~f:is_recursive_variant then Some true else None
   in
   reduce ~case ~init:false ~join:( || )
+
+let is_datatype t = List.length (get_variants t) > 0
 
 let rec is_user_defined t =
   match t with

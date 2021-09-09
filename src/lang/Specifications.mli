@@ -1,6 +1,10 @@
 type spec = { ensures : Term.term option; requires : Term.term option }
 
+val reinit : unit -> unit
+(** Reinitialize the state of the specifiications. *)
+
 val empty_spec : spec
+(** An empty spec with no ensures clause and no requires clause. *)
 
 val get_ensures : Term.variable -> Term.term option
 

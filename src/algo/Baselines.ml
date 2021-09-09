@@ -11,11 +11,11 @@ open Syguslib.Sygus
 
 let rec acegis_loop (p : psi_def) (t_set : TermSet.t) =
   Int.incr refinement_steps;
-  let elapsed = Unix.gettimeofday () -. !Config.glob_start in
+  let elapsed = Stats.get_glob_elapsed () in
   Log.info (fun frmt () -> Fmt.pf frmt "Refinement step %i." !refinement_steps);
   (if not !Config.info then
    Fmt.(
-     pf stdout "%i,%3.3f,%3.3f,%i,0@." !refinement_steps !Config.verif_time elapsed
+     pf stdout "%i,%3.3f,%3.3f,%i,0@." !refinement_steps !Stats.verif_time elapsed
        (Set.length t_set)));
   Log.debug_msg Fmt.(str "<ACEGIS> Start refinement loop with %i terms in T." (Set.length t_set));
 
@@ -63,11 +63,11 @@ let algo_acegis (p : psi_def) =
 
 let rec ccegis_loop (p : psi_def) (t_set : TermSet.t) =
   Int.incr refinement_steps;
-  let elapsed = Unix.gettimeofday () -. !Config.glob_start in
+  let elapsed = Stats.get_glob_elapsed () in
   Log.info (fun frmt () -> Fmt.pf frmt "Refinement step %i." !refinement_steps);
   (if not !Config.info then
    Fmt.(
-     pf stdout "%i,%3.3f,%3.3f,%i,0@." !refinement_steps !Config.verif_time elapsed
+     pf stdout "%i,%3.3f,%3.3f,%i,0@." !refinement_steps (Stats.get_glob_elapsed ()) elapsed
        (Set.length t_set)));
   Log.debug_msg Fmt.(str "<CCEGIS> Start refinement loop with %i terms in T." (Set.length t_set));
   (* Start of the algorithm. *)
