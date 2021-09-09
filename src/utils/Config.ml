@@ -138,6 +138,14 @@ let new_benchmark_file ?(hint = "") suffix =
     ("bench_" ^ hint ^ !problem_name)
     suffix
 
+let generate_proof = ref false
+
+let proof_generation_file = ref ""
+
+let set_proof_output_file (s : string) =
+  generate_proof := true;
+  proof_generation_file := s
+
 (* ============================================================================================= *)
 (*                  SYSTEM OF EQUATIONS OPTIMIZATION FLAGS                                       *)
 (* ============================================================================================= *)

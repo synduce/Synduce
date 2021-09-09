@@ -13,14 +13,16 @@ let tree_datatype_decl : d_toplevel =
 
 let rep_func : d_toplevel =
   let tree_type = mk_named_type "tree" in
-  let signature = mk_func_sig ~returns:[ tree_type ] [ ("t", tree_type) ] in
+  let signature = mk_func_sig ~returns:(None, [ tree_type ]) [ ("t", tree_type) ] in
   let spec = mk_simple_spec ~ensures:[] ~requires:[] DSpecFunction in
   let body = Body "t" in
   mk_toplevel (mk_func "rep" signature spec body)
 
 let f_func : d_toplevel =
   let tree_type = mk_named_type "tree" in
-  let signature = mk_func_sig ~returns:[ mk_int_type ] [ ("s", mk_int_type); ("t", tree_type) ] in
+  let signature =
+    mk_func_sig ~returns:(None, [ mk_int_type ]) [ ("s", mk_int_type); ("t", tree_type) ]
+  in
   let spec =
     mk_simple_spec ~decreases:[ mk_var (Variable.mk "t") ] ~ensures:[] ~requires:[] DSpecFunction
   in
@@ -36,14 +38,14 @@ let f_func : d_toplevel =
 
 let target_func : d_toplevel =
   let tree_type = mk_named_type "tree" in
-  let signature = mk_func_sig ~returns:[ mk_int_type ] [ ("t", tree_type) ] in
+  let signature = mk_func_sig ~returns:(None, [ mk_int_type ]) [ ("t", tree_type) ] in
   let spec = mk_simple_spec ~ensures:[] ~requires:[] DSpecFunction in
   let body = Body "match t\n  case nil => 0\n  case node(a, l, r)=> a + target(l) + target(r)" in
   mk_toplevel (mk_func "target" signature spec body)
 
 let spec_func : d_toplevel =
   let tree_type = mk_named_type "tree" in
-  let signature = mk_func_sig ~returns:[ mk_int_type ] [ ("t", tree_type) ] in
+  let signature = mk_func_sig ~returns:(None, [ mk_int_type ]) [ ("t", tree_type) ] in
   let spec =
     mk_simple_spec ~decreases:[ mk_var (Variable.mk "t") ] ~ensures:[] ~requires:[] DSpecFunction
   in
@@ -115,6 +117,6 @@ let example_program : d_program =
     dp_topdecls =
       [ tree_datatype_decl; rep_func; f_func; spec_func; target_func; sum_lemma; correctness_lemma ];
   }
-
 ;;
+
 Fmt.(pf stdout "%a" pp_d_program example_program)
