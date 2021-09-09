@@ -22,7 +22,7 @@ let identify_rcalls (p : psi_def) (lam : variable) (t : term) : VarSet.t =
 
 let mk_recursion_elimination_term (p : psi_def) : (term * term) option =
   let _, g_out = RType.fun_typ_unpack (Variable.vtype_or_new p.psi_target.pvar)
-  and f_out = fst !AState._alpha in
+  and f_out = !AState._alpha in
   if Result.is_ok (RType.unify_one g_out f_out) then
     let term = mk_composite_base_type f_out in
     Some (term, term)
@@ -56,7 +56,7 @@ let subst_recursive_calls (p : psi_def) (tl : term list) : (term * term) list * 
       | None -> failwith "Cannot make recursion elimination for this problem."
     in
     let invariant =
-      Option.map (second !AState._alpha) ~f:(fun inv ->
+      Option.map (Specifications.get_ensures p.psi_reference.pvar) ~f:(fun inv ->
           first (infer_type (Reduce.reduce_term (mk_app inv [ scalar_term_f ]))))
     in
     ( substs

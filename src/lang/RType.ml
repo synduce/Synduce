@@ -92,11 +92,19 @@ let rec pp (frmt : Formatter.t) (typ : t) =
         | _ -> Fmt.(pf frmt "(%a) %a" (list ~sep:comma pp) alpha pp t'))
     | TVar i -> Fmt.(pf frmt "param%i" i)
 
+(**
+  [fun_type_unpack t] uncurries the type [t] as a function. Returns a pair of
+  a list (the type of the arguments of the function) and a type (the output
+  type of the function). If t is not a function type, then ([],t) is returned.
+*)
 let fun_typ_unpack (t : t) : t list * t =
   let rec aux pre = function TFun (a, b) -> aux (pre @ [ a ]) b | _ as _t -> (pre, _t) in
   let targs, tout = aux [] t in
   (targs, tout)
 
+(** [fun_typ_pack args t] construct the type of a function args -> t:
+    for example [fun_typ_pack [t1;t2] t_out] is [TFun(t1, TFun(t2, tout))].
+*)
 let rec fun_typ_pack (targs : t list) (tout : t) =
   match (List.last targs, List.drop_last targs) with
   | Some elt, Some pre -> fun_typ_pack pre (TFun (elt, tout))
