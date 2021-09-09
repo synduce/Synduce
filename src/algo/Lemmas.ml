@@ -428,21 +428,6 @@ let smt_of_lemma_validity ~(p : psi_def) lemma (det : term_state_detail) =
   let if_then = smt_of_lemma_app lemma in
   [ S.mk_assert (S.mk_not (S.mk_forall quants (S.mk_or (S.mk_not if_condition) if_then))) ]
 
-let set_up_bounded_lemma_solver det solver =
-  let%lwt () = Smt.AsyncSmt.set_logic solver "LIA" in
-  let%lwt () = Smt.AsyncSmt.set_option solver "produce-models" "true" in
-  let%lwt () = Smt.AsyncSmt.set_option solver "incremental" "true" in
-  let%lwt () =
-    if !Config.induction_proof_tlimit >= 0 then
-      Smt.AsyncSmt.set_option solver "tlimit" (Int.to_string !Config.induction_proof_tlimit)
-    else return ()
-  in
-  let%lwt () = Smt.AsyncSmt.load_min_max_defs solver in
-  let%lwt () =
-    Smt.AsyncSmt.declare_all solver (Smt.decls_of_vars (VarSet.of_list det.scalar_vars))
-  in
-  return ()
-
 let set_up_lemma_solver solver ~(p : psi_def) lemma_candidate =
   let%lwt () = Smt.AsyncSmt.set_logic solver "ALL" in
   let%lwt () = Smt.AsyncSmt.set_option solver "quant-ind" "true" in
@@ -473,6 +458,20 @@ let set_up_lemma_solver solver ~(p : psi_def) lemma_candidate =
                 RType.TBool body);
         ])
   in
+  return ()
+
+let set_up_bounded_solver (logic : string) (vars : VarSet.t) solver =
+  let%lwt () = SmtInterface.AsyncSmt.set_logic solver logic in
+  let%lwt () = SmtInterface.AsyncSmt.set_option solver "produce-models" "true" in
+  let%lwt () = SmtInterface.AsyncSmt.set_option solver "incremental" "true" in
+  let%lwt () =
+    if !Config.induction_proof_tlimit >= 0 then
+      SmtInterface.AsyncSmt.set_option solver "tlimit"
+        (Int.to_string !Config.induction_proof_tlimit)
+    else return ()
+  in
+  let%lwt () = SmtInterface.AsyncSmt.load_min_max_defs solver in
+  let%lwt () = SmtInterface.AsyncSmt.declare_all solver (SmtInterface.decls_of_vars vars) in
   return ()
 
 let classify_ctexs_opt ~(p : psi_def) ctexs : ctex list =
@@ -563,7 +562,7 @@ let verify_lemma_bounded ~(p : psi_def) (det : term_state_detail) lemma_candidat
     Smt.AsyncSmt.response * int Lwt.u =
   let task (solver, starter) =
     let%lwt _ = starter in
-    let%lwt _ = set_up_bounded_lemma_solver det solver in
+    let%lwt _ = set_up_bounded_solver "LIA" (VarSet.of_list det.scalar_vars) solver in
     let steps = ref 0 in
     let rec check_bounded_sol accum terms =
       let f accum t =
