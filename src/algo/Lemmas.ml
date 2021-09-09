@@ -136,8 +136,7 @@ let term_detail_to_lemma ~(p : psi_def) (det : term_state_detail) : term option 
       det.recurs_elim
   in
   let f lem = Term.substitution subst lem in
-  let result = T.mk_assoc Binop.And (List.map ~f det.lemmas) in
-  match result with None -> result | Some _ -> result
+  T.mk_assoc Binop.And (List.map ~f det.lemmas)
 
 let empty_term_state : term_state = Map.empty (module Terms)
 
@@ -430,9 +429,7 @@ let smt_of_lemma_validity ~(p : psi_def) lemma (det : term_state_detail) =
   let if_then = smt_of_lemma_app lemma in
   [ S.mk_assert (S.mk_not (S.mk_forall quants (S.mk_or (S.mk_not if_condition) if_then))) ]
 
-let set_up_bounded_lemma_solver_async det solver ~(p : psi_def) lemma_candidate =
-  ignore p;
-  ignore lemma_candidate;
+let set_up_bounded_lemma_solver_async det solver =
   let%lwt () = Smt.AsyncSmt.set_logic solver "LIA" in
   let%lwt () = Smt.AsyncSmt.set_option solver "produce-models" "true" in
   let%lwt () = Smt.AsyncSmt.set_option solver "incremental" "true" in
@@ -662,7 +659,7 @@ let verify_lemma_bounded ~(p : psi_def) (det : term_state_detail) lemma_candidat
     Smt.AsyncSmt.response * int Lwt.u =
   let task (solver, starter) =
     let%lwt _ = starter in
-    let%lwt _ = set_up_bounded_lemma_solver_async det solver ~p lemma_candidate in
+    let%lwt _ = set_up_bounded_lemma_solver_async det solver in
     let steps = ref 0 in
     let rec check_bounded_sol accum terms =
       let f accum t =
@@ -923,7 +920,6 @@ let synthesize_new_lemma ~(p : psi_def) (det : term_state_detail) :
         | Some pre ->
             pf f "Synthesizing a new lemma candidate for term %a[%a] with precondition %a" pp_term
               det.term pp_subs det.recurs_elim pp_term pre));
-  (* TODO: How to choose logic? *)
   let lem_id = 0 in
   let synth_objs, params, logic = synthfun_of_ctex ~p det lem_id in
   let neg_constraints =
@@ -1027,6 +1023,37 @@ let ctexs_for_ensures_synt ctex =
   | Spurious NotInReferenceImage -> `Snd ctex
   | _ -> `Trd ctex
 
+let add_ensures_to_term_state_detail ~(p : psi_def) (det : term_state_detail)
+    (_ctex_elim : (term * term) list) (ensures : term) : term_state_detail =
+  let new_ensures =
+    List.map det.recurs_elim ~f:(fun (t, _) ->
+        let f_compose_r t_ =
+          let repr_of_v = if p.psi_repr_is_identity then t_ else Reduce.reduce_pmrs p.psi_repr t_ in
+          Reduce.reduce_term (Reduce.reduce_pmrs p.psi_reference repr_of_v)
+        in
+        Reduce.reduce_term (mk_app ensures [ f_compose_r t ]))
+  in
+  let new_det = { det with lemmas = new_ensures @ det.lemmas } in
+  (match term_detail_to_lemma ~p new_det with
+  | None -> Log.debug_msg Fmt.(str "No lemma after adding ensures")
+  | Some lemma -> Log.debug_msg Fmt.(str "Here is lemma after adding ensures: %a" pp_term lemma));
+  new_det
+
+let add_ensures_to_term_state ~(p : psi_def) (ensures : term) (ctex_elim : (term * term) list)
+    (ts : term_state) : term_state =
+  Map.fold ts
+    ~init:(Map.empty (module Terms))
+    ~f:(fun ~key ~data:det acc ->
+      let new_det = add_ensures_to_term_state_detail ~p det ctex_elim ensures in
+      Map.add_exn ~key ~data:new_det acc)
+
+(* let lemma =
+            match det.current_preconds with
+            | None -> lemma_term
+            | Some pre -> mk_bin Binop.Or (mk_un Unop.Not pre) lemma_term
+          in
+          Some { det with lemma_candidate = None; lemmas = lemma :: det.lemmas } *)
+
 let synthesize_lemmas ~(p : psi_def) synt_failure_info (lstate : refinement_loop_state) :
     (refinement_loop_state, solver_response) Result.t =
   (*
@@ -1045,26 +1072,50 @@ let synthesize_lemmas ~(p : psi_def) synt_failure_info (lstate : refinement_loop
         let ensures_positives, ensures_negatives, _ =
           List.partition3_map ~f:ctexs_for_ensures_synt classified_ctexs
         in
-        if List.length ensures_negatives > 0 then
-          ImagePredicates.synthesize ~p ensures_positives ensures_negatives;
-        (* Classify in negative and positive cexs. *)
-        let lemma_synt_positives, lemma_synt_negatives, _ =
-          List.partition3_map ~f:ctexs_for_lemma_synt classified_ctexs
-        in
-        let ts : term_state =
-          update_term_state_for_ctexs ~p lstate.term_state ~neg_ctexs:lemma_synt_negatives
-            ~pos_ctexs:lemma_synt_positives
-        in
-        if List.is_empty lemma_synt_negatives then (ts, false)
+        if List.length ensures_negatives > 0 then (
+          let maybe_pred = ImagePredicates.synthesize ~p ensures_positives ensures_negatives in
+          match maybe_pred with
+          | None -> (lstate.term_state, false)
+          | Some ensures ->
+              (match Specifications.get_ensures p.psi_reference.pmain_symb with
+              | None -> Specifications.set_ensures p.psi_reference.pmain_symb ensures
+              | Some old_ensures ->
+                  let var : variable =
+                    Variable.mk ~t:(Some p.psi_reference.poutput_typ) (Alpha.fresh ())
+                  in
+                  Specifications.set_ensures p.psi_reference.pmain_symb
+                    (mk_fun [ FPatVar var ]
+                       (mk_bin Binop.And
+                          (mk_app old_ensures [ mk_var var ])
+                          (mk_app ensures [ mk_var var ]))));
+              (lstate.term_state, true)
+          (* Log.debug_msg Fmt.(str "Ensures predicate is: %a" pp_term pred);
+             let fst_ctex = List.nth_exn ensures_negatives 0 in
+             let ts : term_state =
+               update_term_state_for_ctexs ~p lstate.term_state ~neg_ctexs:ensures_negatives
+                 ~pos_ctexs:ensures_positives
+             in
+             let term_state = add_ensures_to_term_state ~p pred fst_ctex.ctex_eqn.eelim ts in
+             (term_state, true)) *))
         else
-          Map.fold ts
-            ~init:(Map.empty (module Terms), true)
-            ~f:(fun ~key ~data:det (acc, status) ->
-              if not status then (acc, status)
-              else
-                match lemma_refinement_loop det ~p with
-                | None -> (acc, false)
-                | Some det -> (Map.add_exn ~key ~data:det acc, status))
+          (* Classify in negative and positive cexs. *)
+          let lemma_synt_positives, lemma_synt_negatives, _ =
+            List.partition3_map ~f:ctexs_for_lemma_synt classified_ctexs
+          in
+          let ts : term_state =
+            update_term_state_for_ctexs ~p lstate.term_state ~neg_ctexs:lemma_synt_negatives
+              ~pos_ctexs:lemma_synt_positives
+          in
+          if List.is_empty lemma_synt_negatives then (ts, false)
+          else
+            Map.fold ts
+              ~init:(Map.empty (module Terms), true)
+              ~f:(fun ~key ~data:det (acc, status) ->
+                if not status then (acc, status)
+                else
+                  match lemma_refinement_loop det ~p with
+                  | None -> (acc, false)
+                  | Some det -> (Map.add_exn ~key ~data:det acc, status))
     | _ -> failwith "There is no synt_failure_info in synthesize_lemmas."
   in
   if

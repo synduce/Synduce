@@ -6,6 +6,8 @@ open Utils
 open Smtlib
 open SmtInterface
 module Solvers = SyncSmt
+open Syguslib.Sygus
+open SygusInterface
 
 let _NUM_POSIIVE_EXAMPLES_ = 30
 
@@ -65,7 +67,51 @@ let gen_pmrs_positive_examples (p : PMRS.t) =
   Solvers.close_solver z3;
   get_positive_examples p.pvar
 
-let synthesize ~(p : psi_def) (positives : ctex list) (negatives : ctex list) =
+let handle_ensures_synth_response (resp : solver_response option) (var : variable) =
+  let parse_synth_fun (fname, _fargs, _, fbody) =
+    let body, _ = infer_type (term_of_sygus (VarSet.to_env (VarSet.of_list [ var ])) fbody) in
+    (fname, [], body)
+  in
+  match resp with
+  | Some (RSuccess resps) ->
+      let soln = List.map ~f:parse_synth_fun resps in
+      (* let _ = List.iter ~f:(fun (s, vs, t) -> log_soln s vs t) soln in *)
+      Some soln
+  | Some RInfeasible | Some RFail | Some RUnknown | None -> None
+
+let make_ensures_name (id : int) = "ensures_" ^ Int.to_string id
+
+let synthfun_ensures ~(p : psi_def) (id : int) : command * variable * string =
+  let var = Variable.mk ~t:(Some p.psi_reference.poutput_typ) (Alpha.fresh ()) in
+  let params = [ (var.vname, sort_of_rtype p.psi_reference.poutput_typ) ] in
+  let ret_sort = sort_of_rtype RType.TBool in
+  let opset =
+    List.fold ~init:OpSet.empty
+      ~f:(fun acc func -> Set.union acc (Analysis.operators_of func.f_body))
+      (PMRS.func_of_pmrs p.psi_reference @ PMRS.func_of_pmrs p.psi_repr
+      @ match p.psi_tinv with None -> [] | Some pmrs -> PMRS.func_of_pmrs pmrs)
+  in
+  (* OpSet.of_list [ Binary Binop.Mod ] in *)
+  let grammar = Grammars.generate_grammar ~guess:None ~bools:true opset params ret_sort in
+  let logic = dt_extend_base_logic (logic_of_operators opset) in
+  (CSynthFun (make_ensures_name id, params, ret_sort, grammar), var, logic)
+
+let constraint_of_neg (id : int) ~(p : psi_def) (ctex : ctex) : command =
+  ignore p;
+  let params =
+    List.concat_map
+      ~f:(fun (_, elimv) -> [ Eval.in_model ctex.ctex_model elimv ])
+      ctex.ctex_eqn.eelim
+  in
+  CConstraint
+    (SyApp
+       ( IdSimple "not",
+         [ SyApp (IdSimple (make_ensures_name id), List.map ~f:sygus_of_term params) ] ))
+
+let constraint_of_pos (id : int) (term : term) : command =
+  CConstraint (SyApp (IdSimple (make_ensures_name id), [ sygus_of_term term ]))
+
+let synthesize ~(p : psi_def) (positives : ctex list) (negatives : ctex list) : term option =
   let _ = p in
   let _ = (positives, negatives) in
   Log.debug_msg "Synthesize predicates..";
@@ -81,4 +127,20 @@ let synthesize ~(p : psi_def) (positives : ctex list) (negatives : ctex list) =
     Fmt.(
       fun fmt () ->
         pf fmt "These examples are in the image of %s:@;%a" p.psi_reference.pvar.vname
-          (list ~sep:comma pp_term) positives)
+          (list ~sep:comma pp_term) positives);
+  let id = 0 in
+  let synth_objs, var, logic = synthfun_ensures ~p id in
+  let neg_constraints = List.map ~f:(constraint_of_neg id ~p) negatives in
+  let pos_constraints = List.map ~f:(constraint_of_pos id) positives in
+  let extra_defs = [ max_definition; min_definition ] in
+  let commands =
+    CSetLogic logic
+    :: (extra_defs @ [ synth_objs ] @ neg_constraints @ pos_constraints @ [ CCheckSynth ])
+  in
+  match
+    handle_ensures_synth_response (Syguslib.Solvers.SygusSolver.solve_commands commands) var
+  with
+  | None -> None
+  | Some solns ->
+      let _, _, body = List.nth_exn solns 0 in
+      Some (mk_fun [ FPatVar var ] body)
