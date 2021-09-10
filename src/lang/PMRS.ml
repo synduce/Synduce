@@ -10,17 +10,37 @@ open Option.Let_syntax
 (* ============================================================================================= *)
 
 type pattern = string * term list
+(**
+  A pattern in a PMRS rewrite rule is limited to matching
+  terms of the form "Constructor_name(arguments)" where each argument is a term,
+  and the Constructor_name is the name of a valid datatype constructor.
+*)
 
 type rewrite_rule = variable * variable list * pattern option * term
+(**
+  A PMRS rewrite rule [(v, args, pattern, rhs)] is the rewrite rule
+  v(args,pattern) -> rhs.
+  [v] which is a non-terminal (a recursive function in the OCaml code),
+  [args] is a possibly empty list of arguments,
+  [pattern] is an optional pattern,
+  [rhs] is the production of the rule.
+*)
 
 type top_function = variable * variable list * term
+(**
+  A toplevel function is a triple of a variable (the variable representing
+  the function itself), a list of variables (the arguments of the function) and
+  a term (the body of the function).
+*)
 
 type t = {
   pvar : Variable.t;
       (**
-    The main function symbol.
+    The main function symbol, storing general information about the PMRS.
     The specification associated to the PMRS may be found using:
     [get_spec pvar]
+    The type of the PMRS (the main function of the group of mutually recursive
+    functions) is stored as the type of pvar.
   *)
   pinput_typ : RType.t list;
       (**
@@ -38,16 +58,20 @@ type t = {
 
 (* Type shortcuts *)
 type 'a xresult = ('a, (string * Sexp.t) list) Result.t
+(** A result type with error messages in the form of title x s-expression. *)
 
 type 'a sresult = ('a, (string * term) list) Result.t
+(** A result type with error messages in the form of title x term. *)
 
 type variables = variable Map.M(String).t
+(** The type for maps from variable name to variable.  *)
 
 (** Table of all the PMRS in the file, indexed by the function
     variable id.
 *)
 let _globals : (int, t) Hashtbl.t = Hashtbl.create (module Int)
 
+(** Find a PMRS by name. The name of a PMRS is the name of its pvar.  *)
 let find_by_name (pmrs_name : string) : variable option =
   let matches = Hashtbl.filter ~f:(fun p -> String.(p.pvar.vname = pmrs_name)) _globals in
   Option.map ~f:(fun (_, p) -> p.pvar) (Hashtbl.choose matches)
@@ -57,12 +81,17 @@ let find_by_name (pmrs_name : string) : variable option =
 *)
 let _nonterminals : (int, t) Hashtbl.t = Hashtbl.create (module Int)
 
+(** Find a non-terminal (represented by a variable) from its name. *)
 let find_nonterminal_by_name (name : string) : variable option =
   let r = ref None in
   Hashtbl.iter _nonterminals ~f:(fun t ->
       match VarSet.find_by_name t.pnon_terminals name with Some x -> r := Some x | None -> ());
   !r
 
+(**
+  Generate the term that corresponds to the left hand side of a rewrite rule in
+  a PMRS.
+*)
 let lhs (nt, args, pat, rhs) =
   let all_args =
     let args = List.map ~f:mk_var args in
@@ -71,6 +100,7 @@ let lhs (nt, args, pat, rhs) =
   let t, _ = infer_type (mk_app ~pos:rhs.tpos (mk_var nt) all_args) in
   t
 
+(** Reinitialize tables of PMRS and nonterminals. *)
 let reinit () =
   Hashtbl.clear _globals;
   Hashtbl.clear _nonterminals
@@ -104,6 +134,9 @@ let pp (frmt : Formatter.t) (pmrs : t) : unit =
       (Specifications.get_spec pmrs.pvar)
       pp_rules ())
 
+(**
+  Pretty-print a PMRS as a set of OCaml functions.
+*)
 let pp_ocaml (frmt : Formatter.t) (pmrs : t) : unit =
   let print_caml_def (frmt : Formatter.t) (nt, args, cases) =
     let pp_case f (opat, rhs) =
@@ -177,7 +210,8 @@ let pp_ocaml (frmt : Formatter.t) (pmrs : t) : unit =
 (* ============================================================================================= *)
 (*                             BASIC PROPERTIES AND TYPE INFERENCE                               *)
 (* ============================================================================================= *)
-(* Update the order of the pmrs. *)
+
+(** Update the order of the pmrs. *)
 let update_order (p : t) : t =
   let order =
     let f ~key:_ ~data:(_, args, p, _) m =
@@ -187,6 +221,7 @@ let update_order (p : t) : t =
   in
   { p with porder = order }
 
+(** Clear the type information stored in the different components of the PMRS. *)
 let clear_pmrs_types (prog : t) : t =
   let f_rule ~key:_ ~data:(nt, args, pat, body) : _ =
     List.iter ~f:Variable.clear_type args;
@@ -471,7 +506,9 @@ let inverted_rule_lookup ?(boundvars = VarSet.empty) rules (func : term) (args :
   in
   Map.filter_map ~f:filter rules
 
-(** Apply a substitution to all the right hand side of the PMRS rules. *)
+(**
+  Apply a substitution to all the right hand side of the PMRS rules.
+*)
 let subst_rule_rhs ~(p : t) (substs : (term * term) list) =
   let rules' =
     let f (nt, args, pat, body) =
@@ -494,3 +531,10 @@ let depends (p : t) : t list =
   List.dedup_and_sort
     ~compare:(fun p1 p2 -> String.compare p1.pvar.vname p2.pvar.vname)
     (List.concat_map ~f (Map.data p.prules))
+
+(**
+  Updates and returns the output type of a PMRS.
+*)
+let update_output_type (p : t) : t =
+  let ot = snd (RType.fun_typ_unpack (Variable.vtype_or_new p.pvar)) in
+  { p with poutput_typ = ot }

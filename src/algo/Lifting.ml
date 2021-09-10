@@ -34,7 +34,7 @@ let empty_lifting = { tmap = LiftingMap.empty }
 
 let is_empty_lifting lifting = LiftingMap.is_empty lifting.tmap
 
-let alpha_component_count () = match fst !_alpha with RType.TTup tl -> List.length tl | _ -> 1
+let alpha_component_count () = match !_alpha with RType.TTup tl -> List.length tl | _ -> 1
 
 let decompose_t (p : psi_def) (t : term) : (int * term) option =
   let g = p.psi_target.pmain_symb in
@@ -58,6 +58,9 @@ let recompose_t (p : psi_def) (t : term) (i : int) : term =
 let get_mapped_value ~(p : psi_def) (l : lifting) (t : term) =
   Option.(decompose_t p t >>= LiftingMap.get l.tmap)
 
+(**
+  Interactively add an expression for the lifting.
+*)
 let interactive_add_lifting_expression ~p (l : lifting) (a : term) (i : int) : lifting * term option
     =
   let env = VarSet.to_env (Analysis.free_variables a) in
@@ -88,9 +91,13 @@ let replace_boxed_expressions ~(p : psi_def) (l : lifting) =
   let case _ t = match t.tkind with TBox t' -> get_mapped_value ~p l t' | _ -> None in
   transform ~case
 
-let has_real_lifting (p : psi_def) : bool =
+(** A problem definition is lifted if the ouput type of the target recursion skeleton
+  is different from the output type of the reference function (which is unchanged
+  and stored in AState._alpha)
+*)
+let is_lifted (p : psi_def) : bool =
   let _, tout = RType.fun_typ_unpack (Variable.vtype_or_new p.psi_target.pvar) in
-  not (Result.is_ok (RType.unify_one tout (fst !_alpha)))
+  not (Result.is_ok (RType.unify_one tout !_alpha))
 
 let lift_count (p : psi_def) : int =
   let _, tout = RType.fun_typ_unpack (Variable.vtype_or_new p.psi_target.pvar) in
@@ -104,10 +111,10 @@ let lift_count (p : psi_def) : int =
   Return a projection function that can be symbolically evaluated.
 *)
 let proj_to_non_lifting (p : psi_def) : term option =
-  if not (has_real_lifting p) then None
+  if not (is_lifted p) then None
   else
     let _, tout = RType.fun_typ_unpack (Variable.vtype_or_new p.psi_target.pvar) in
-    match (tout, fst !_alpha) with
+    match (tout, !_alpha) with
     | TTup tl_lift, TTup tl' ->
         let args = List.map ~f:(fun t -> Variable.mk (Alpha.fresh ~s:"x" ()) ~t:(Some t)) tl_lift in
         let tuple_pattern = FPatTup (List.map ~f:(fun v -> FPatVar v) args) in
@@ -139,10 +146,10 @@ let is_proj_function (p : psi_def) (t : term) : bool =
     i, ..., i+n are the components of the lifting.
 *)
 let proj_to_lifting (p : psi_def) : (term -> term) option =
-  if not (has_real_lifting p) then None
+  if not (is_lifted p) then None
   else
     let _, tout = RType.fun_typ_unpack (Variable.vtype_or_new p.psi_target.pvar) in
-    match (tout, fst !_alpha) with
+    match (tout, !_alpha) with
     | TTup tl_lift, TTup tl' ->
         let n = List.length tl' in
         Some
@@ -172,10 +179,10 @@ let proj_to_lifting (p : psi_def) : (term -> term) option =
   of the function in [oringal_part] and the components of the lifting only in [lifting_part]
 *)
 let compose_parts (p : psi_def) : term option =
-  if not (has_real_lifting p) then None
+  if not (is_lifted p) then None
   else
     let _, tout = RType.fun_typ_unpack (Variable.vtype_or_new p.psi_target.pvar) in
-    match (tout, fst !_alpha) with
+    match (tout, !_alpha) with
     | TTup tl_lift, TTup tl' ->
         let args = List.map ~f:(fun t -> Variable.mk (Alpha.fresh ~s:"x" ()) ~t:(Some t)) tl_lift in
         let n = List.length tl' in
@@ -206,6 +213,7 @@ let ith_type (p : psi_def) (i : int) : RType.t option =
 (*                      LIFTING FUNCTIONS                                                        *)
 (* ============================================================================================= *)
 
+(** [apply_lifting ~p l] *)
 let apply_lifting ~(p : psi_def) (l : RType.t list) : psi_def =
   (* Type inference on p.target to update types *)
   let target' =
@@ -290,7 +298,7 @@ let deduce_lifting_expressions ~p (lif : lifting) (lemma : term option) (lhs : t
 let scalar ~(p : psi_def) (l : refinement_loop_state) _synt_failure_info :
     (psi_def * refinement_loop_state, solver_response) Result.t =
   (*
-    This function will perform the scalar lifting and call the loop continuation
+    This function will perform the scalar lifting and continue the refinement loop
     with the lifted problem.
   *)
   let p' = apply_lifting ~p [ RType.TInt ] in

@@ -1263,6 +1263,65 @@ module Terms = struct
 
   let substs_of_alist (alist : (variable * term) list) : (term * term) list =
     List.map ~f:(fun (a, b) -> (mk_var a, b)) alist
+
+  (* Term building shortcuts. *)
+
+  (** Create a term equal to the addition two terms. *)
+  let ( + ) : t -> t -> t = mk_bin Binop.Plus
+
+  (** Create a term equal to the substraction of two terms. *)
+  let ( - ) : t -> t -> t = mk_bin Binop.Minus
+
+  (** Create a term equal to the multiplication two terms. *)
+  let ( * ) : t -> t -> t = mk_bin Binop.Times
+
+  (** Create a term equal to the division two terms. *)
+  let ( / ) : t -> t -> t = mk_bin Binop.Div
+
+  (** Create a term equal to the disjunction of two terms. *)
+  let ( || ) : t -> t -> t = mk_bin Binop.Or
+
+  (** Create a term equal to the conjuction of two terms. *)
+  let ( && ) : t -> t -> t = mk_bin Binop.And
+
+  (** Create a term equal to the > comparison of two terms. *)
+  let ( > ) : t -> t -> t = mk_bin Binop.Gt
+
+  (** Create a term equal to the >= comparison of two terms. *)
+  let ( >= ) : t -> t -> t = mk_bin Binop.Ge
+
+  (** Create a term equal to the <= comparison of two terms. *)
+  let ( <= ) : t -> t -> t = mk_bin Binop.Le
+
+  (** Create a term equal to the < comparison of two terms. *)
+  let ( < ) : t -> t -> t = mk_bin Binop.Lt
+
+  (** Create a term equal to the equality of two terms. *)
+  let ( == ) : t -> t -> t = mk_bin Binop.Eq
+
+  (** Create a term equal to the max of two terms. *)
+  let max : t -> t -> t = mk_bin Binop.Max
+
+  (** Create a term equal to the min of two terms. *)
+  let min : t -> t -> t = mk_bin Binop.Min
+
+  (** Create an integer constant term. *)
+  let int (i : int) : t = mk_const (Constant.of_int i)
+
+  (** Create a boolean constant term. *)
+  let bool (b : bool) : t = mk_const (Constant.of_bool b)
+
+  (** Create an if-then-else term. *)
+  let ite : t -> t -> t -> t = mk_ite
+
+  (** Create a term from a variable.  *)
+  let ( ~^ ) : variable -> t = mk_var
+
+  (**
+    Infers the type of the term, and returns the term with the correct types
+    assigned.
+  *)
+  let typed (te : t) : t = fst (infer_type te)
 end
 
 module TermSet = struct

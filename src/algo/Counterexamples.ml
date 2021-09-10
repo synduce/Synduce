@@ -269,9 +269,7 @@ let check_image_sat ~p ctex : AsyncSmt.response * int u =
       in
       aux accum term_eqs
     in
-    let t_decl =
-      List.map ~f:snd (Lang.SmtInterface.declare_datatype_of_rtype (fst !AState._alpha))
-    in
+    let t_decl = List.map ~f:snd (Lang.SmtInterface.declare_datatype_of_rtype !AState._alpha) in
     let%lwt _ = task_start in
     (* TODO : logic *)
     let%lwt () = AsyncSmt.set_logic solver_instance "LIA" in

@@ -261,7 +261,7 @@ let solve_problem (psi_comps : (string * string * string) option)
   (* Set global information. *)
   AState._tau := tau;
   AState._theta := theta;
-  AState._alpha := (t_out, Specifications.get_ensures reference_f.pvar);
+  AState._alpha := t_out;
   AState._span := List.length (Analysis.terms_of_max_depth 1 theta);
   AState.refinement_steps := 0;
   (* Solve the problem. *)

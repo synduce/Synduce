@@ -48,7 +48,7 @@ let _theta = ref RType.TInt
     optional term that represents the additional predicate on the output of the reference function.
     The term is assumed to define a function (fun (free variables of term) -> term).
 *)
-let _alpha : (RType.t * Term.term option) ref = ref (RType.TInt, None)
+let _alpha : RType.t ref = ref RType.TInt
 
 (** Not useful for now. *)
 let _span = ref 1
@@ -60,7 +60,7 @@ let secondary_refinement_steps = ref 0
 let reinit () =
   _span := 1;
   refinement_steps := 0;
-  _alpha := (RType.TInt, None);
+  _alpha := RType.TInt;
   _tau := RType.TInt;
   _theta := RType.TInt
 

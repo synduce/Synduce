@@ -12,7 +12,7 @@ open Base
 let soln_descr filename =
   let sum, soln = Lib.solve_file filename in
   let eqns = Lib.get_lemma_hints () in
-  Lib.pp_problem_descr Fmt.stdout sum;
+  Codegen.Commons.pp_problem_descr Fmt.stdout sum;
   (match soln with Some s -> Algo.AState.pp_soln ~use_ocaml_syntax:true Fmt.stdout s | None -> ());
   List.iter ~f:(fun eqn -> pf Fmt.stdout "%a@." Algo.AState.pp_equation eqn) eqns;
   Fmt.(pf stdout "=== EXPAND ===@.");

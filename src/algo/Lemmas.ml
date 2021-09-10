@@ -960,13 +960,13 @@ let synthesize_lemmas ~(p : psi_def) synt_failure_info (lstate : refinement_loop
           match maybe_pred with
           | None -> (lstate.term_state, false)
           | Some ensures ->
-              (match Specifications.get_ensures p.psi_reference.pmain_symb with
-              | None -> Specifications.set_ensures p.psi_reference.pmain_symb ensures
+              (match Specifications.get_ensures p.psi_reference.pvar with
+              | None -> Specifications.set_ensures p.psi_reference.pvar ensures
               | Some old_ensures ->
                   let var : variable =
                     Variable.mk ~t:(Some p.psi_reference.poutput_typ) (Alpha.fresh ())
                   in
-                  Specifications.set_ensures p.psi_reference.pmain_symb
+                  Specifications.set_ensures p.psi_reference.pvar
                     (mk_fun [ FPatVar var ]
                        (mk_bin Binop.And
                           (mk_app old_ensures [ mk_var var ])

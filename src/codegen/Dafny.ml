@@ -97,7 +97,15 @@ type d_datatype_constr_decl = {
  *)
 
 (* Function and method bodies. *)
-type d_body = Body of string
+type d_body =
+  | Body of string  (** A string body for hardcoded parts. *)
+  | DMatch of d_body * (Term.pattern * d_body) list  (** A pattern matching construct. *)
+  | DTerm of Term.term  (** A wrapper for a term. *)
+  | DBlock of d_body list  (** A block of d_body in braces, each separeted by semicolon. *)
+  | DAssert of Term.term  (** Assert(term) *)
+  | DCalc of d_body list  (** Calc statement. *)
+  | DAssign of Term.term * d_body  (** Assign statement.  *)
+  | DStmt of d_body  (** A body statement with a semicolon after it*)
 
 (* Specs *)
 type d_clause = Term.term
@@ -167,7 +175,7 @@ type d_function_signature = {
   dfsig_params : d_generic_param list;  (** The optional signature parameters. *)
   dfsig_ktype : d_domain_type option;  (** Optional, for "least" and "greatest" lemmas. *)
   dfsig_formals : d_ident_type list;  (** The formal arguments of the method. *)
-  dfsig_return : d_domain_type list;  (** The return type of the function. *)
+  dfsig_return : string option * d_domain_type list;  (** The return type of the function. *)
 }
 
 (** Class members are functions, constant fields and methods. *)
@@ -306,6 +314,14 @@ let rec pp_d_term (frmt : Formatter.t) (x : Term.term) =
           pf frmt "@[<hov 2>(%a@;%a@;%a)@]" pp_d_term t1
             (fun f _ -> Fmt.string f "==")
             op pp_d_term t2
+      | Term.Binop.Le ->
+          pf frmt "@[<hov 2>(%a@;%a@;%a)@]" pp_d_term t1
+            (fun f _ -> Fmt.string f "<=")
+            op pp_d_term t2
+      | Term.Binop.Ge ->
+          pf frmt "@[<hov 2>(%a@;%a@;%a)@]" pp_d_term t1
+            (fun f _ -> Fmt.string f ">=")
+            op pp_d_term t2
       | _ -> pf frmt "@[<hov 2>%a@;%a@;%a@]" pp_d_term t1 Term.Binop.pp op pp_d_term t2)
   | TUn (op, t1) -> pf frmt "@[<hov 2>%a@;%a@]" Term.Unop.pp op pp_d_term t1
   | TIte (c, t1, t2) -> pf frmt "@[<hov 2>%a@;?@;%a@;:@;%a@]" pp_d_term c pp_d_term t1 pp_d_term t2
@@ -313,8 +329,6 @@ let rec pp_d_term (frmt : Formatter.t) (x : Term.term) =
   | TSel (t, i) -> pf frmt "@[<hov 2>%a.%i@]" pp_d_term t i
   | TFun (args, body) ->
       pf frmt "@[<hov 2>((%a) => %a)@]" (list ~sep:comma Term.pp_fpattern) args pp_d_term body
-      (* Todo: check if a separate pp_fpattern function needs to be written *)
-      (* Also todo: This needs to be rewritten to support Dafny lambda expressions*)
   | TApp (func, args) -> pf frmt "@[<hov 2>%a(%a)@]" pp_d_term func (list ~sep:comma pp_d_term) args
   | TData (cstr, args) ->
       if List.length args = 0 then pf frmt "%a" (styled (`Fg `Green) string) cstr
@@ -382,8 +396,29 @@ let pp_d_spec (fmt : Formatter.t) (spec : d_spec) : unit =
       list ~sep:sp (pp_clause "decreases") fmt spec.dspec_decreases;
       list ~sep:sp (pp_clause "modifies") fmt spec.dspec_modifies
 
-let pp_d_body (fmt : Formatter.t) (body : d_body) : unit =
-  match body with Body content -> pf fmt "@[<v>{@;<1 2>@[<hov 2>%a@]@;}@]" (box string) content
+let rec pp_d_body (fmt : Formatter.t) (body : d_body) : unit =
+  match body with
+  | Body content -> pf fmt "@[<v>{@;<1 2>@[<hov 2>%a@]@;}@]" (box string) content
+  | DMatch (t, cases) ->
+      let pp_d_match_case (frmt : Formatter.t) ((pat, body) : Term.pattern * d_body) =
+        pf frmt "@[<hov 2> case %a =>@;%a@]" Term.pp_pattern pat pp_d_body body
+      in
+      pf fmt "@[<v>match @[%a@]@;<1 1>@[<v>%a@]@]" pp_d_body t
+        (* 30 spaces should be enough to force a new line. *)
+        (list ~sep:(fun fmt () -> pf fmt "@;<30 0>") pp_d_match_case)
+        cases
+  | DTerm t -> pp_d_term fmt t
+  | DBlock stmts ->
+      pf fmt "@[<v>{@;<1 2>@[<hov 2>%a@;}@]"
+        (list ~sep:(fun fmt () -> pf fmt "@;<100 0>") pp_d_body)
+        stmts
+  | DAssert asserted -> pf fmt "@[assert(%a)@]" pp_d_term asserted
+  | DCalc stmts ->
+      pf fmt "@[<v 2>calc == {@;@[<v>%a@]@;}@]"
+        (list ~sep:(fun fmt () -> pf fmt "@;<100 0>") pp_d_body)
+        stmts
+  | DAssign (x, e) -> pf fmt "@[<hov 2>var %a:=%a@]" pp_d_term x pp_d_body e
+  | DStmt st -> pf fmt "@[<hov 2>%a;@]" pp_d_body st
 
 let pp_d_generic_param (fmt : Formatter.t) ((_vo, t) : d_generic_param) =
   (* Just print the type for now, we don't need the variance. *)
@@ -406,9 +441,15 @@ let pp_d_function_signature (fmt : Formatter.t) (dsig : d_function_signature) : 
   (match dsig.dfsig_params with
   | [] -> ()
   | _ -> pf fmt "<%a>" (list ~sep:comma pp_d_generic_param) dsig.dfsig_params);
-  pf fmt "(%a)@;: %a" (list ~sep:comma pp_d_ident_type) dsig.dfsig_formals
-    (list ~sep:comma pp_d_domain_type)
-    dsig.dfsig_return
+  match dsig.dfsig_return with
+  | Some name, returns ->
+      pf fmt "(%a)@;: (%s: (%a))" (list ~sep:comma pp_d_ident_type) dsig.dfsig_formals name
+        (list ~sep:comma pp_d_domain_type)
+        returns
+  | None, returns ->
+      pf fmt "(%a)@;: (%a)" (list ~sep:comma pp_d_ident_type) dsig.dfsig_formals
+        (list ~sep:comma pp_d_domain_type)
+        returns
 
 let pp_d_method_kind (fmt : Formatter.t) (dmk : d_method_kind) : unit =
   match dmk with
@@ -557,6 +598,6 @@ let mk_func ?(attrs = []) (func_name : string) (signature : d_function_signature
   let func_decl = DClassFunction (func_name, DFkFunction false, attrs, signature, spec, body) in
   DClassMemberDecl (DDmNone, func_decl)
 
-let mk_func_sig ?(params = []) ?(ktype = None) ?(returns = []) (formals : d_ident_type list) :
-    d_function_signature =
+let mk_func_sig ?(params = []) ?(ktype = None) ?(returns = (None, [])) (formals : d_ident_type list)
+    : d_function_signature =
   { dfsig_params = params; dfsig_ktype = ktype; dfsig_formals = formals; dfsig_return = returns }

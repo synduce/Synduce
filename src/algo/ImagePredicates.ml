@@ -27,12 +27,12 @@ let get_positive_examples (f : Variable.t) : term list =
 let gen_pmrs_positive_examples (p : PMRS.t) =
   let ref_typ_out = List.last_exn p.pinput_typ in
   let reference t = Reduce.reduce_term (Reduce.reduce_pmrs p t) in
-  let out_term = mk_composite_base_type (fst !_alpha) in
+  let out_term = mk_composite_base_type !_alpha in
   let atoms = Analysis.free_variables out_term in
   let iterations = ref 0 in
   let z3 = Solvers.make_z3_solver () in
   Solvers.load_min_max_defs z3;
-  Solvers.declare_all z3 (List.map ~f:snd (SmtInterface.declare_datatype_of_rtype (fst !_alpha)));
+  Solvers.declare_all z3 (List.map ~f:snd (SmtInterface.declare_datatype_of_rtype !_alpha));
   Solvers.declare_all z3 (decls_of_vars atoms);
   let mk_ex _ t =
     let t' = reference t in
