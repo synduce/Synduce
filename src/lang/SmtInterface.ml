@@ -341,21 +341,24 @@ let rec term_of_smt (env : (string, variable, String.comparator_witness) Map.t) 
   | SmtTSpecConst l -> mk_const (constant_of_smtConst l)
   | SmtTApp (QIas (Id (SSimple s), _), args) | SmtTApp (QI (Id (SSimple s)), args) -> (
       let args' = List.map ~f:(term_of_smt env) args in
-      match id_kind_of_s env s with
-      | ICstr c -> mk_data c args'
-      | IVar v -> mk_app (Term.mk_var v) args'
-      | IBinop op -> (
-          match args' with
-          | [ t1; t2 ] -> mk_bin op t1 t2
-          | [ t1 ] when Operator.(equal (Binary op) (Binary Minus)) -> mk_un Unop.Neg t1
-          | _ -> failwith Fmt.(str "Smt: %a operator with more than two arguments." Binop.pp op))
-      | IUnop op -> (
-          match args' with
-          | [ t1 ] -> mk_un op t1
-          | _ -> failwith "Smt: a unary operator with more than one argument.")
-      | IBool true -> mk_const Constant.CTrue
-      | IBool false -> mk_const Constant.CFalse
-      | INotDef -> failwith Fmt.(str "Smt: Undefined variable: %s" s))
+      (* The line below is a hack! Make a real fix *)
+      if String.(equal s "mkTuple_int_int") then mk_tup args'
+      else
+        match id_kind_of_s env s with
+        | ICstr c -> mk_data c args'
+        | IVar v -> mk_app (Term.mk_var v) args'
+        | IBinop op -> (
+            match args' with
+            | [ t1; t2 ] -> mk_bin op t1 t2
+            | [ t1 ] when Operator.(equal (Binary op) (Binary Minus)) -> mk_un Unop.Neg t1
+            | _ -> failwith Fmt.(str "Smt: %a operator with more than two arguments." Binop.pp op))
+        | IUnop op -> (
+            match args' with
+            | [ t1 ] -> mk_un op t1
+            | _ -> failwith "Smt: a unary operator with more than one argument.")
+        | IBool true -> mk_const Constant.CTrue
+        | IBool false -> mk_const Constant.CFalse
+        | INotDef -> failwith Fmt.(str "Smt: Undefined variable: %s" s))
   | SmtTExists (_, _) -> failwith "Smt: exists-terms not supported."
   | SmtTForall (_, _) -> failwith "Smt: forall-terms not supported."
   | SmtTLet (_, _) -> failwith "Smt: let-terms not supported."

@@ -133,11 +133,18 @@ let smt_of_ensures_validity ~(p : psi_def) (ensures : term) =
   [ S.mk_assert (S.mk_not (S.mk_forall quants ensures_app)) ]
 
 let set_up_to_get_ensures_model solver ~(p : psi_def) (ensures : term) =
-  let var = Variable.mk "x" ~t:(Some p.psi_reference.poutput_typ) in
+  let t = List.last_exn p.psi_repr.pinput_typ in
+  let var = Variable.mk "t" ~t:(Some t) in
+  let f_compose_r t =
+    let repr_of_v = if p.psi_repr_is_identity then t else Reduce.reduce_pmrs p.psi_repr t in
+    Reduce.reduce_term (Reduce.reduce_pmrs p.psi_reference repr_of_v)
+  in
   let%lwt () =
     SmtInterface.AsyncSmt.declare_all solver (SmtInterface.decls_of_vars (VarSet.singleton var))
   in
-  let ensures_app = SmtInterface.smt_of_term (mk_app ensures [ mk_var var ]) in
+  let ensures_app =
+    SmtInterface.smt_of_term (mk_app ensures [ f_compose_r (mk_var (Variable.mk "t" ~t:(Some t))) ])
+  in
   SmtInterface.AsyncSmt.exec_command solver (S.mk_assert (S.mk_not ensures_app))
 
 let handle_ensures_synth_response (resp : solver_response option) (var : variable) =
@@ -237,7 +244,7 @@ let verify_ensures_unbounded ~(p : psi_def) (ensures : term) :
   in
   SmtInterface.AsyncSmt.(cancellable_task (SmtInterface.AsyncSmt.make_cvc_solver ()) build_task)
 
-let verify_ensures_bounded ~(p : psi_def) (ensures : term) :
+let verify_ensures_bounded ~(p : psi_def) (ensures : term) (var : variable) :
     SmtInterface.AsyncSmt.response * int Lwt.u =
   let base_term = mk_var (Variable.mk "t" ~t:(Some (List.last_exn p.psi_repr.pinput_typ))) in
   let task (solver, starter) =
@@ -247,11 +254,31 @@ let verify_ensures_bounded ~(p : psi_def) (ensures : term) :
     let rec check_bounded_sol accum terms =
       let f accum t =
         let%lwt _ = accum in
+        let rec_instantation =
+          Option.value ~default:VarMap.empty (Analysis.matches t ~pattern:base_term)
+        in
         let f_compose_r t =
           let repr_of_v = if p.psi_repr_is_identity then t else Reduce.reduce_pmrs p.psi_repr t in
           Reduce.reduce_term (Reduce.reduce_pmrs p.psi_reference repr_of_v)
         in
+        let%lwt _ =
+          SmtInterface.AsyncSmt.declare_all solver
+            (SmtInterface.decls_of_vars (VarSet.singleton var))
+        in
         let%lwt () = SmtInterface.AsyncSmt.spush solver in
+        let%lwt _ =
+          SmtInterface.AsyncSmt.declare_all solver
+            (SmtInterface.decls_of_vars
+               (VarSet.of_list
+                  (List.concat_map
+                     ~f:(fun t -> Set.to_list (Analysis.free_variables t))
+                     (Map.data rec_instantation))))
+        in
+        let instance_equals =
+          smt_of_term
+            (Reduce.reduce_term (mk_bin Binop.Eq (mk_var var) (Reduce.reduce_term (f_compose_r t))))
+        in
+        let%lwt _ = SmtInterface.AsyncSmt.smt_assert solver instance_equals in
         (* Assert that TInv is true for this concrete term t *)
         let%lwt _ =
           match p.psi_tinv with
@@ -272,10 +299,10 @@ let verify_ensures_bounded ~(p : psi_def) (ensures : term) :
         let ensures_reduc =
           Reduce.reduce_term (mk_app ensures [ Reduce.reduce_term (f_compose_r t) ])
         in
-        let%lwt _ =
-          SmtInterface.AsyncSmt.declare_all solver
-            (SmtInterface.decls_of_vars (Analysis.free_variables ensures_reduc))
-        in
+        (* let%lwt _ =
+             SmtInterface.AsyncSmt.declare_all solver
+               (SmtInterface.decls_of_vars (Analysis.free_variables ensures_reduc))
+           in *)
         let%lwt _ =
           SmtInterface.AsyncSmt.exec_command solver
             (S.mk_assert (S.mk_not (SmtInterface.smt_of_term ensures_reduc)))
@@ -327,7 +354,7 @@ let verify_ensures_bounded ~(p : psi_def) (ensures : term) :
   in
   SmtInterface.AsyncSmt.(cancellable_task (make_cvc_solver ()) task)
 
-let verify_ensures_candidate ~(p : psi_def) (maybe_ensures : term option) :
+let verify_ensures_candidate ~(p : psi_def) (maybe_ensures : term option) (var : variable) :
     SmtInterface.SyncSmt.solver_response =
   match maybe_ensures with
   | None -> failwith "Cannot verify ensures candidate; there is none."
@@ -336,7 +363,7 @@ let verify_ensures_candidate ~(p : psi_def) (maybe_ensures : term option) :
       let resp =
         try
           Lwt_main.run
-            (let pr1, resolver1 = verify_ensures_bounded ~p ensures in
+            (let pr1, resolver1 = verify_ensures_bounded ~p ensures var in
              let pr2, resolver2 = verify_ensures_unbounded ~p ensures in
              Lwt.wakeup resolver2 1;
              Lwt.wakeup resolver1 1;
@@ -353,15 +380,24 @@ let handle_ensures_verif_response (response : S.solver_response) (ensures : term
   match response with
   | Unsat ->
       Log.verbose (fun f () -> Fmt.(pf f "This ensures has been proven correct."));
-      Log.info (fun frmt () -> Fmt.pf frmt "Ensures is %a" pp_term ensures)
-  | SmtLib.SExps _x ->
+      Log.info (fun frmt () -> Fmt.pf frmt "Ensures is %a" pp_term ensures);
+      (true, None)
+  | SmtLib.SExps x ->
       Log.verbose (fun f () ->
-          Fmt.(pf f "This ensures has not been proven correct. Refining ensures..."))
-  | Sat -> Log.error_msg "Ensures verification returned Sat, which is weird."
-  | Unknown -> Log.error_msg "Ensures verification returned Unknown."
-  | _ -> Log.error_msg "Ensures verification is indeterminate."
+          Fmt.(pf f "This ensures has not been proven correct. Refining ensures..."));
+      (false, Some x)
+  | Sat ->
+      Log.error_msg "Ensures verification returned Sat, which is weird.";
+      (false, None)
+  | Unknown ->
+      Log.error_msg "Ensures verification returned Unknown.";
+      (false, None)
+  | _ ->
+      Log.error_msg "Ensures verification is indeterminate.";
+      (false, None)
 
-let synthesize ~(p : psi_def) (positives : ctex list) (negatives : ctex list) : term option =
+let rec synthesize ~(p : psi_def) (positives : ctex list) (negatives : ctex list)
+    (prev_positives : term list) : term option =
   let _ = p in
   let _ = (positives, negatives) in
   Log.debug_msg "Synthesize predicates..";
@@ -372,16 +408,21 @@ let synthesize ~(p : psi_def) (positives : ctex list) (negatives : ctex list) : 
           Fmt.(str "%a should not be in the image of %s" pp_term tval p.psi_reference.pvar.vname))
   in
   List.iter ~f:vals negatives;
-  let positives = gen_pmrs_positive_examples p.psi_reference in
+
+  let new_positives =
+    match prev_positives with
+    | [] -> gen_pmrs_positive_examples p.psi_reference
+    | _ -> prev_positives
+  in
   Log.debug
     Fmt.(
       fun fmt () ->
         pf fmt "These examples are in the image of %s:@;%a" p.psi_reference.pvar.vname
-          (list ~sep:comma pp_term) positives);
+          (list ~sep:comma pp_term) new_positives);
   let id = 0 in
   let synth_objs, var, logic = synthfun_ensures ~p id in
   let neg_constraints = List.map ~f:(constraint_of_neg id ~p) negatives in
-  let pos_constraints = List.map ~f:(constraint_of_pos id) positives in
+  let pos_constraints = List.map ~f:(constraint_of_pos id) new_positives in
   let extra_defs = [ max_definition; min_definition ] in
   let commands =
     CSetLogic logic
@@ -391,8 +432,22 @@ let synthesize ~(p : psi_def) (positives : ctex list) (negatives : ctex list) : 
     handle_ensures_synth_response (Syguslib.Solvers.SygusSolver.solve_commands commands) var
   with
   | None -> None
-  | Some solns ->
+  | Some solns -> (
       let _, _, body = List.nth_exn solns 0 in
       let ensures = mk_fun [ FPatVar var ] body in
-      handle_ensures_verif_response (verify_ensures_candidate ~p (Some ensures)) ensures;
-      Some ensures
+      Log.debug_msg Fmt.(str "Ensures candidate is %a" pp_term ensures);
+      let var = Variable.mk ~t:(Some p.psi_reference.poutput_typ) (Alpha.fresh ()) in
+      match
+        handle_ensures_verif_response (verify_ensures_candidate ~p (Some ensures) var) ensures
+      with
+      | true, _ -> Some ensures
+      | false, Some sexprs -> (
+          let result = Map.find (SmtInterface.model_to_constmap (SmtLib.SExps sexprs)) var.vname in
+          match result with
+          | None ->
+              Log.debug_msg "No model found; cannot refine ensures.";
+              None
+          | Some r ->
+              Log.debug_msg Fmt.(str "The counterexample to the ensures candidate is %a" pp_term r);
+              synthesize ~p positives negatives (r :: new_positives))
+      | false, _ -> None)

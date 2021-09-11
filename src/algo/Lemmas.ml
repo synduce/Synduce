@@ -956,7 +956,7 @@ let synthesize_lemmas ~(p : psi_def) synt_failure_info (lstate : refinement_loop
           List.partition3_map ~f:ctexs_for_ensures_synt classified_ctexs
         in
         if List.length ensures_negatives > 0 then (
-          let maybe_pred = ImagePredicates.synthesize ~p ensures_positives ensures_negatives in
+          let maybe_pred = ImagePredicates.synthesize ~p ensures_positives ensures_negatives [] in
           match maybe_pred with
           | None -> (lstate.term_state, false)
           | Some ensures ->
