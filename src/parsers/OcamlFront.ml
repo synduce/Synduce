@@ -4,8 +4,69 @@ open Parsetree
 open Utils
 open Front
 open Lang.RType
+open Getopt
 
 let psi_comps : (string * string * string) option ref = ref None
+
+(* ============================================================================================= *)
+(*                 IN-FILE OPTION PARSING                                                        *)
+(* ============================================================================================= *)
+
+(** A different set of options that can be configured from the file.
+*)
+let file_options =
+  [
+    ('u', "no-check-unrealizable", set Config.check_unrealizable false, None);
+    ('I', "interactive", set Config.interactive_lemmas true, None);
+    ('J', "interactive-lifting", set Config.interactive_lifting true, None);
+    ('L', "interactive-loop", set Config.interactive_lemmas_loop true, None);
+    ('n', "verification", None, Some Config.set_num_expansions_check);
+    ('N', "no-sat-as-unsat", set Config.no_bounded_sat_as_unsat true, None);
+    ('B', "bounded-lemma-check", set Config.bounded_lemma_check true, None);
+    ('s', "no-splitting", set Config.split_solve_on false, None);
+    ('t', "no-detupling", set Config.detupling_on false, None);
+    ('X', "classify-ctex", set Config.classify_ctex true, None);
+    ('C', "interactive-check-lemma", set Config.interactive_check_lemma true, None);
+    ('\000', "check-smt-unrealizable", set Config.check_unrealizable_smt_unsatisfiable true, None);
+    ('\000', "fuzzing", None, Some Config.set_fuzzing_count);
+    ('\000', "generate-benchmarks", None, Some Config.set_benchmark_generation_dir);
+    ('\000', "generate-proof", None, Some Config.set_proof_output_file);
+    ('\000', "no-gropt", set Config.optimize_grammars false, None);
+    ('\000', "no-lifting", set Config.attempt_lifting false, None);
+    ('\000', "no-simplify", set Config.simplify_eqns false, None);
+    ('\000', "no-syndef", set Config.use_syntactic_definitions false, None);
+    (* Background solver parameters *)
+    ('\000', "ind-tlimit", None, Some Config.set_induction_proof_tlimit);
+  ]
+
+let option_parse (vals : string list) =
+  Log.debug_msg Fmt.(str "Option given: %a." (list ~sep:comma string) vals);
+  Getopt.parse file_options (fun _ -> ()) (Array.of_list vals) 0 (List.length vals - 1)
+
+(** [parse_option option] parses a string that defines a setting in Synduce. *)
+let parse_option (setting : attribute) =
+  let analyze_parts value =
+    let value = Str.(global_replace (regexp "\"") "" value) in
+    let parts = Str.(split (regexp "[ ]+")) value in
+    (*     Log.debug_msg Fmt.(str "Option given: %a." (list ~sep:comma string) parts); *)
+    match parts with
+    | option_keyword :: option_args ->
+        if String.equal option_keyword "@synduce" then option_parse option_args else ()
+    | _ -> ()
+  in
+  match setting.attr_payload with
+  | PStr [ str_attr ] -> (
+      match str_attr.pstr_desc with
+      | Pstr_eval (e, _) ->
+          let value = Fmt.str "%a" Pprintast.expression e in
+          (*           Fmt.(pf stdout "VALUE: %s@." value); *)
+          analyze_parts value
+      | _ -> ())
+  | _ -> ()
+
+(* ============================================================================================= *)
+(*                                                                                               *)
+(* ============================================================================================= *)
 
 let read_sig filename =
   Location.input_name := filename;
@@ -348,6 +409,10 @@ let parse_ocaml (filename : string) =
   let definitions = read_sig filename in
   let per_def def =
     match def.pstr_desc with
+    (* Toplevel attributes can be used to set some options *)
+    | Pstr_attribute attribute ->
+        parse_option attribute;
+        []
     | Pstr_type (rec_flag, ps_type_decls) ->
         (* match type definitions. *)
         type_definitions rec_flag ps_type_decls

@@ -1,3 +1,7 @@
+(** @synduce --no-lifting -n 10 -NB *)
+
+(* When using args in comments, they must be separated by at least one line from the declarations. *)
+
 type arithop = APlus | AMinus | AGt
 
 type boolop = BNot | BAnd | BOr | BEq
@@ -88,6 +92,7 @@ let rec target = function
   | Var i -> [%synt var]
   | CInt i -> [%synt const]
   | CBool b -> [%synt boolconst]
+  [@@requires well_formed_term]
 
 and bcount = function
   | Plus -> [%synt f_op_plus]
@@ -97,4 +102,3 @@ and bcount = function
   | Gt -> [%synt f_op_gt]
   | Eq -> [%synt f_op_eq]
   | Not -> [%synt f_op_not]
-  [@@requires well_formed_term]

@@ -355,18 +355,40 @@ let solve_syntactic_definitions (unknowns : VarSet.t) (eqns : equation list) =
     let new_args, subst = List.unzip pre_subst in
     (new_args, Reduce.reduce_term (substitution (List.concat subst) lhs))
   in
+  (* Find syntactic definiitons, and check there is no conflict between definitions. *)
   let full_defs, other_eqns =
-    let f eqn =
+    let f (defs, other_eqns) eqn =
       match (eqn.eprecond, eqn.erhs.tkind) with
-      | _, TApp ({ tkind = TVar x; _ }, args) when Set.mem unknowns x && ok_rhs_args args -> (
+      | _, TApp ({ tkind = TVar unknown; _ }, args)
+        when Set.mem unknowns unknown && ok_rhs_args args -> (
           match ok_lhs_args eqn.elhs args with
           | Some argv ->
               let lam_args, lam_body = mk_lam eqn.elhs argv in
-              Either.First (x, (lam_args, lam_body))
-          | None -> Either.Second eqn)
-      | _ -> Either.Second eqn
+              (Map.add_multi defs ~key:unknown ~data:(lam_args, lam_body, eqn), other_eqns)
+          | None -> (defs, eqn :: other_eqns))
+      | _ -> (defs, eqn :: other_eqns)
     in
-    List.partition_map ~f eqns
+    let possible_defs, others = List.fold ~init:(Map.empty (module Variable), []) ~f eqns in
+    let validated_defs, others' =
+      List.partition_map (Map.to_alist possible_defs) ~f:(fun (unknown, exprs) ->
+          match exprs with
+          | [] -> Either.Second []
+          | [ (lam_args, lam_body, _) ] -> Either.First (unknown, (lam_args, lam_body))
+          | (lam_args1, lam_body1, _) :: tl ->
+              (* Check that all syntactic definitions agree *)
+              let all_equal =
+                List.for_all tl ~f:(fun (lam_args2, lam_body2, _) ->
+                    (* Check (fun args2 -> body2) args1 = body1 *)
+                    Terms.equal lam_body1
+                      (Reduce.reduce_term
+                         (mk_app
+                            (mk_fun (List.map ~f:(fun v -> FPatVar v) lam_args2) lam_body2)
+                            (List.map ~f:mk_var lam_args1))))
+              in
+              if all_equal then Either.First (unknown, (lam_args1, lam_body1))
+              else Either.Second (List.map ~f:(fun (_, _, eqn) -> eqn) exprs))
+    in
+    (validated_defs, List.rev others @ List.concat others')
   in
   let resolved = VarSet.of_list (List.map ~f:Utils.first full_defs) in
   let new_eqns =

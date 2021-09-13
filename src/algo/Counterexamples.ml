@@ -100,28 +100,26 @@ let unrealizability_ctex_of_constmap (i, j) (eqn_i, eqn_j) (vseti, vsetj) var_su
 let skeleton_match ~unknowns (e1 : term) (e2 : term) =
   let args1, e1' = Analysis.skeletize ~functions:unknowns e1
   and args2, e2' = Analysis.skeletize ~functions:unknowns e2 in
-  (* Fmt.(pf stdout "1: %a => %a@." pp_term e1 pp_term e1');
-     Fmt.(pf stdout "2: %a => %a@." pp_term e2 pp_term e2'); *)
   match Analysis.matches ~boundvars:unknowns ~pattern:e1' e2' with
   | Some subs ->
       let f (v1, packedv) =
-        (* Fmt.(pf stdout "%a ~ %a?@." Variable.pp v1 pp_term packedv); *)
         match packedv.tkind with
         | TVar v2 -> Option.both (Map.find args1 v1) (Map.find args2 v2)
         | _ -> None
       in
       all_or_none (List.map ~f (Map.to_alist subs))
-  | None ->
-      (* Fmt.(pf stdout "No match@."); *)
-      None
+  | None -> None
 
 let components_of_unrealizability ~unknowns (eqn1 : equation) (eqn2 : equation) :
     ((term * term) list * (term * term)) option =
   match skeleton_match ~unknowns eqn1.erhs eqn2.erhs with
   | Some args_1_2 -> Some (args_1_2, (eqn1.elhs, eqn2.elhs))
   | None ->
-      Log.debug_msg Fmt.(str "Unrealizability check: %a is not in normal form." pp_term eqn1.erhs);
-      None
+      if Terms.equal eqn1.erhs eqn2.erhs then Some ([], (eqn1.elhs, eqn2.erhs))
+      else (
+        Log.verbose_msg
+          Fmt.(str "Unrealizability check: %a is not in normal form." pp_term eqn1.erhs);
+        None)
 
 (** Check if system of equations defines a functionally realizable synthesis problem.
   If any equation defines an unsolvable problem, an unrealizability_ctex is added to the
