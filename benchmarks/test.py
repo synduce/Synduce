@@ -9,8 +9,8 @@ timeout_value = 240  # 4min timeout for the review
 memout_value = 8000 * (2 ** 10)  # 4GB memory limit
 
 if sys.platform.startswith('linux'):
-    timeout = ("./extras/timeout/timeout -t %i -m %i --no-info-on-success" %
-               (timeout_value, memout_value))
+    timeout = ("./extras/timeout/timeout -t %i --no-info-on-success" %
+               (timeout_value))
 elif sys.platform.startswith('darwin'):
     timeout = ("timelimit -t%i" % timeout_value)
 else:
@@ -241,8 +241,8 @@ if __name__ == "__main__":
     elif table_no == 1:
 
         algos = [
-                ["requation", "--no-gropt"],
-                ["acegis", "--acegis --no-gropt"]
+            ["requation", "--no-gropt"],
+            ["acegis", "--acegis --no-gropt"]
         ]
         optims = [["all", ""]]
 
@@ -250,9 +250,9 @@ if __name__ == "__main__":
     elif table_no == 2:
 
         algos = [
-                ["requation", "--no-gropt"],
-                ["acegis", "--acegis --no-gropt"],
-                ["ccegis", "--ccegis --no-gropt"]
+            ["requation", "--no-gropt"],
+            ["acegis", "--acegis --no-gropt"],
+            ["ccegis", "--ccegis --no-gropt"]
         ]
         optims = [["all", ""]]
 
