@@ -986,7 +986,9 @@ let synthesize_lemmas ~(p : psi_def) synt_failure_info (lstate : refinement_loop
             Map.fold ts
               ~init:(Map.empty (module Terms), true)
               ~f:(fun ~key ~data:det (acc, status) ->
-                if not status then (acc, status)
+                if Analysis.is_bounded det.term then (acc, true)
+                  (* Skip lemma synth for bounded terms. *)
+                else if not status then (acc, status)
                 else
                   match lemma_refinement_loop det ~p with
                   | None -> (acc, false)
