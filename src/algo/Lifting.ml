@@ -187,7 +187,12 @@ let compose_parts (p : psi_def) : term option =
         let args = List.map ~f:(fun t -> Variable.mk (Alpha.fresh ~s:"x" ()) ~t:(Some t)) tl_lift in
         let n = List.length tl' in
         let tuple_pattern_orig = FPatTup (List.map ~f:(fun v -> FPatVar v) (List.take args n)) in
-        let tuple_pattern_lifting = FPatTup (List.map ~f:(fun v -> FPatVar v) (List.drop args n)) in
+        let tuple_pattern_lifting =
+          match List.drop args n with
+          | [ x ] -> FPatVar x
+          | _ :: _ as l -> FPatTup (List.map ~f:(fun v -> FPatVar v) l)
+          | _ -> failwith "Impossible."
+        in
         let tup_all = mk_tup (List.map ~f:mk_var args) in
         Some (mk_fun [ tuple_pattern_orig; tuple_pattern_lifting ] tup_all)
     | TTup tl_lift, _ ->
@@ -213,33 +218,35 @@ let ith_type (p : psi_def) (i : int) : RType.t option =
 (*                      LIFTING FUNCTIONS                                                        *)
 (* ============================================================================================= *)
 
-(** [apply_lifting ~p l] *)
+(**
+  [apply_lifting ~p l] lifts [p.psi_target] by extending the output with [l].
+*)
 let apply_lifting ~(p : psi_def) (l : RType.t list) : psi_def =
   (* Type inference on p.target to update types *)
   let target' =
-    let new_out_type, _new_target_type =
+    let new_out_type =
       let open RType in
-      match Variable.vtype_or_new p.psi_target.PMRS.pvar with
-      | TFun (t_in, TTup old_ts) ->
-          let tout = TTup (old_ts @ l) in
-          (tout, RType.TFun (t_in, tout))
-      | TFun (t_in, t_out) ->
-          let tout = TTup (t_out :: l) in
-          (TFun (t_in, tout), tout)
-      | _ -> failwith "Type of target recursion skeleton should be a function."
+      match snd (fun_typ_unpack (Variable.vtype_or_new p.psi_target.PMRS.pvar)) with
+      | TTup old_ts -> TTup (old_ts @ l)
+      | t_out -> TTup (t_out :: l)
     in
     let target' = PMRS.infer_pmrs_types (PMRS.clear_pmrs_types p.psi_target) in
     let free_theta = PMRS.extract_rec_input_typ target' in
     (* Update the input type, w.r.t to the the theta stored. *)
     PMRS.unify_one_with_update (free_theta, !_theta);
     (* Update the output type. *)
-    (match RType.unify_one (Variable.vtype_or_new target'.pmain_symb) new_out_type with
+    (match
+       RType.unify_one
+         (snd (RType.fun_typ_unpack (Variable.vtype_or_new target'.pmain_symb)))
+         new_out_type
+     with
     | Ok subs -> Variable.update_var_types (RType.mkv subs)
     | Error e ->
         Log.error_msg Fmt.(str "Error: %a" Sexp.pp_hum e);
         Log.error_msg "Failed to unify output types in lifting.");
     PMRS.infer_pmrs_types target'
   in
+  (* ⚠️ !TODO! : updates all the "ensures" *)
   Log.debug (fun ft () -> Fmt.(pf ft "@[After lifting:@;%a@]" (box PMRS.pp) target'));
   { p with psi_target = target'; psi_lifting = p.psi_lifting @ l }
 

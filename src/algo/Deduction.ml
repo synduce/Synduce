@@ -154,6 +154,10 @@ module Solver = struct
               Log.error_msg "Failed to deduce lifting.";
               [])
       | _ ->
-          Log.error_msg "Term is not a function-free expression, cannot deduce.";
+          Log.error_msg
+            (Fmt.str "Term {%a} %a is not a function-free expression, cannot deduce."
+               (list ~sep:comma pp_term)
+               (List.map ~f:Reduce.reduce_term flat_args)
+               pp_term res_side);
           []
 end

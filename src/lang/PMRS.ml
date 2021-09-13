@@ -221,7 +221,13 @@ let update_order (p : t) : t =
   in
   { p with porder = order }
 
-(** Clear the type information stored in the different components of the PMRS. *)
+(** Clear the type information stored in the different components of the PMRS.
+  Clears the type information of:
+  - the local variables in each rule of the PMRS.
+  - the pvar of the PMRS,
+  - the pmain_symb of the PMRS,
+  - the unknowns in the PMRS.
+*)
 let clear_pmrs_types (prog : t) : t =
   let f_rule ~key:_ ~data:(nt, args, pat, body) : _ =
     List.iter ~f:Variable.clear_type args;

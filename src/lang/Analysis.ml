@@ -90,7 +90,6 @@ let subst_args (fpatterns : fpattern list) (args : term list) : (term * term) li
         match List.zip pl tl with Ok ptl -> List.concat (List.map ~f ptl) | _ -> failwith "no sub")
     | _ -> failwith "no sub"
   in
-
   match List.zip fpatterns args with
   | Ok l -> ( try Some (List.concat (List.map ~f l)) with _ -> None)
   | _ -> None
