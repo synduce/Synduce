@@ -215,7 +215,7 @@ sys.stdout.flush()
 if __name__ == "__main__":
     aparser = argparse.ArgumentParser()
     aparser.add_argument(
-        "-t", "--table", help="Table number that the script must generate data for.", type=int)
+        "-t", "--table", help="Table number that the script must generate data for.", type=int, default=-1)
     aparser.add_argument(
         "--run", help="Run tests for all benchmarks.", action="store_true")
     aparser.add_argument(
@@ -286,6 +286,8 @@ if __name__ == "__main__":
     else:
         algos = [["requation", ""]]
         optims = [["all", ""]]
+
+    # Benchmark set selection.
 
     if args.kick_the_tires:
         input_files = kick_the_tires_set

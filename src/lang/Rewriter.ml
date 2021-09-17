@@ -334,6 +334,11 @@ module Expression = struct
         ~case:(fun _ e -> match e with EVar i -> Some ~$i | _ -> None)
         e)
 
+  (** [alpha_equal e1 e2] returns true if [equal e1 e2] up to variable renaming. *)
+  let alpha_equal (e1 : t) (e2 : t) : bool =
+    let _ = (e1, e2) in
+    failwith "TODO: Not implemented."
+
   let of_term t0 : t option =
     let rec f t =
       match t.tkind with
@@ -500,6 +505,7 @@ module Expression = struct
     in
     rewrite_until_stable rule e
 
+  (** Get the identity element of a given operator.*)
   let get_id_const (op : Operator.t) : t option =
     match op with
     | Binary Plus | Unary Neg | Binary Minus -> Some (mk_e_int 0)
@@ -510,6 +516,7 @@ module Expression = struct
     | Binary Or -> Some mk_e_false
     | _ -> None
 
+  (** Get a constant of a given type (implemented fo TInt and TBool). *)
   let get_ty_const (typ : RType.t) : t =
     RType.(match typ with TInt -> mk_e_int 0 | TBool -> mk_e_true | _ -> mk_e_int 0)
 end
@@ -626,7 +633,9 @@ let rewrite_with_lemma (lemma : t) : t -> t list =
     let r e =
       let open Operator in
       match e with
+      (* a >= x : a -> max a x *)
       | EOp (Binary Ge, [ a; EInt x ]) -> [ (a, mk_e_assoc (Binary Max) [ a; EInt x ]) ]
+      (* a <= x : a -> min a x *)
       | EOp (Binary Le, [ a; EInt x ]) -> [ (a, mk_e_assoc (Binary Min) [ a; EInt x ]) ]
       | _ -> []
     in

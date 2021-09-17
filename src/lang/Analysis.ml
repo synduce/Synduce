@@ -94,6 +94,9 @@ let subst_args (fpatterns : fpattern list) (args : term list) : (term * term) li
   | Ok l -> ( try Some (List.concat (List.map ~f l)) with _ -> None)
   | _ -> None
 
+(** [replace_calls_to functions t] replaces all calls to functions in [functions]
+  by a fresh variable.
+ *)
 let replace_calls_to (funcs : VarSet.t) : term -> term =
   let case _ t =
     match t.tkind with
@@ -102,28 +105,6 @@ let replace_calls_to (funcs : VarSet.t) : term -> term =
     | _ -> None
   in
   transform ~case
-
-let apply_projections (projs : (int, variable list, Int.comparator_witness) Map.t) (t : term) : term
-    =
-  let pack xlist args =
-    List.map xlist ~f:(fun newx -> first (infer_type (mk_app (mk_var newx) args)))
-  in
-  let case f t0 =
-    match t0.tkind with
-    | TApp ({ tkind = TVar x; _ }, args) -> (
-        match Map.find projs x.vid with
-        | Some xlist ->
-            let args' = List.map ~f args in
-            let projected = pack xlist args' in
-            Some (mk_tup projected)
-        | None -> None)
-    | TVar x -> (
-        match Map.find projs x.vid with
-        | Some components -> Some (mk_tup (List.map ~f:mk_var components))
-        | None -> None)
-    | _ -> None
-  in
-  transform ~case t
 
 let replace_id_calls ~(func : variable) (t : term) : term =
   (* Collect the arguments of the calls (func x) *)

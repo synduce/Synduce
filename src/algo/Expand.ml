@@ -24,17 +24,19 @@ let mk_recursion_elimination_term (p : psi_def) : (term * term) option =
   let _, g_out = RType.fun_typ_unpack (Variable.vtype_or_new p.psi_target.pvar)
   and f_out = !AState._alpha in
   if Result.is_ok (RType.unify_one g_out f_out) then
+    (* No lifting present. *)
     let term = mk_composite_base_type f_out in
     Some (term, term)
   else
+    (* Lifting present. *)
     match (g_out, f_out) with
     | TTup tl_lift, TTup tl' ->
-        let args = List.map ~f:mk_composite_base_type tl_lift in
+        let args = List.map ~f:(mk_composite_base_type ~prefix:"_elim_") tl_lift in
         let tuple_g = mk_tup args in
         let tuple_f = mk_tup (List.take args (List.length tl')) in
         Some (tuple_f, tuple_g)
     | TTup (_ :: _ as tl_lift), _ ->
-        let args = List.map ~f:mk_composite_base_type tl_lift in
+        let args = List.map ~f:(mk_composite_base_type ~prefix:"_elim_") tl_lift in
         let tuple_g = mk_tup args in
         Some (List.hd_exn args, tuple_g)
     | _ -> None

@@ -398,8 +398,6 @@ let handle_ensures_verif_response (response : S.solver_response) (ensures : term
 
 let rec synthesize ~(p : psi_def) (positives : ctex list) (negatives : ctex list)
     (prev_positives : term list) : term option =
-  let _ = p in
-  let _ = (positives, negatives) in
   Log.debug_msg "Synthesize predicates..";
   let vals ctex =
     List.iter ctex.ctex_eqn.eelim ~f:(fun (_, elimv) ->
@@ -434,8 +432,8 @@ let rec synthesize ~(p : psi_def) (positives : ctex list) (negatives : ctex list
   | None -> None
   | Some solns -> (
       let _, _, body = List.nth_exn solns 0 in
-      let ensures = mk_fun [ FPatVar var ] body in
-      Log.debug_msg Fmt.(str "Ensures candidate is %a" pp_term ensures);
+      let ensures = mk_fun [ FPatVar var ] (Eval.simplify body) in
+      Log.debug_msg Fmt.(str "Ensures candidate is %a." pp_term ensures);
       let var = Variable.mk ~t:(Some p.psi_reference.poutput_typ) (Alpha.fresh ()) in
       match
         handle_ensures_verif_response (verify_ensures_candidate ~p (Some ensures) var) ensures

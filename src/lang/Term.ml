@@ -627,15 +627,15 @@ let fpat_sub_all fp1s fp2s =
 
 let sexp_of_term (_ : term) = Sexp.Atom "TODO"
 
-let rec mk_composite_base_type (t : RType.t) : term =
+let rec mk_composite_base_type ?(prefix = "") (t : RType.t) : term =
   match t with
-  | RType.TInt -> mk_var (Variable.mk ~t:(Some t) (Alpha.fresh ~s:"i" ()))
-  | RType.TBool -> mk_var (Variable.mk ~t:(Some t) (Alpha.fresh ~s:"b" ()))
-  | RType.TString -> mk_var (Variable.mk ~t:(Some t) (Alpha.fresh ~s:"s" ()))
-  | RType.TChar -> mk_var (Variable.mk ~t:(Some t) (Alpha.fresh ~s:"c" ()))
+  | RType.TInt -> mk_var (Variable.mk ~t:(Some t) (Alpha.fresh ~s:(prefix ^ "i") ()))
+  | RType.TBool -> mk_var (Variable.mk ~t:(Some t) (Alpha.fresh ~s:(prefix ^ "b") ()))
+  | RType.TString -> mk_var (Variable.mk ~t:(Some t) (Alpha.fresh ~s:(prefix ^ "s") ()))
+  | RType.TChar -> mk_var (Variable.mk ~t:(Some t) (Alpha.fresh ~s:(prefix ^ "c") ()))
   | RType.TTup tl -> mk_tup (List.map ~f:mk_composite_base_type tl)
-  | RType.TNamed _ -> mk_var (Variable.mk ~t:(Some t) (Alpha.fresh ~s:"l" ()))
-  | _ -> mk_var (Variable.mk ~t:(Some t) (Alpha.fresh ~s:"p" ()))
+  | RType.TNamed _ -> mk_var (Variable.mk ~t:(Some t) (Alpha.fresh ~s:(prefix ^ "l") ()))
+  | _ -> mk_var (Variable.mk ~t:(Some t) (Alpha.fresh ~s:(prefix ^ "p") ()))
 (* | RType.TFun (_, _) | RType.TParam (_, _) | RType.TVar _ ->
     failwith Fmt.(str "mk_composite_base_type: %a is not a base type." RType.pp t) *)
 
@@ -1310,6 +1310,9 @@ module Terms = struct
 
   (** Create a boolean constant term. *)
   let bool (b : bool) : t = mk_const (Constant.of_bool b)
+
+  (** Create a negation of a term. *)
+  let ( ~! ) (t : term) : t = mk_un Unop.Not t
 
   (** Create an if-then-else term. *)
   let ite : t -> t -> t -> t = mk_ite

@@ -24,6 +24,6 @@ and dec l = function
   | CNil -> repr l
   | Single a -> Cons (a, repr l)
   | Concat (x, y) -> dec (Concat (y, l)) x
-
 ;;
+
 assert (target = repr @@ f)

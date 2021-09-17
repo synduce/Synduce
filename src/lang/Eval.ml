@@ -41,10 +41,25 @@ let simplify t =
         | TConst Constant.CTrue, _ -> t2
         | TConst Constant.CFalse, _ | _, TConst Constant.CFalse -> mk_const Constant.CFalse
         | _, _ -> t)
+    (* t1 = t2 *)
     | TBin (Binop.Eq, t1, t2) -> (
         match (t1.tkind, t2.tkind) with
         | TConst (Constant.CInt i1), TConst (Constant.CInt i2) ->
             if i1 = i2 then mk_const Constant.CTrue else mk_const Constant.CFalse
+        | tc, TBin (Binop.Max, ta, tb) | TBin (Binop.Max, ta, tb), tc ->
+            let tc = { t1 with tkind = tc } in
+            if Terms.equal tc ta then (* ta = max ta tb -> ta >= tb *)
+              mk_bin Binop.Ge ta tb
+            else if Terms.equal tc tb then (* tb = max ta tb -> tb >= ta *)
+              mk_bin Binop.Ge tb ta
+            else t
+        | tc, TBin (Binop.Min, ta, tb) | TBin (Binop.Min, ta, tb), tc ->
+            let tc = { t1 with tkind = tc } in
+            if Terms.equal tc ta then (* ta = min ta tb -> tb >= ta *)
+              mk_bin Binop.Ge tb ta
+            else if Terms.equal tc tb then (* tb = min ta tb -> ta >= tb *)
+              mk_bin Binop.Ge ta tb
+            else t
         | _, _ -> if Terms.equal t1 t2 then mk_const Constant.CTrue else t)
     | TIte (cond, { tkind = TConst Constant.CTrue; _ }, { tkind = TConst Constant.CFalse; _ }) ->
         cond

@@ -441,15 +441,8 @@ let constraints_of_eqns (eqns : equation list) : command list =
   in
   let eqn_to_constraint (pre, lhs, rhs) =
     match pre with
-    | Some precondition ->
-        CConstraint
-          (SyApp
-             ( IdSimple "or",
-               [
-                 SyApp (IdSimple "not", [ sygus_of_term precondition ]);
-                 SyApp (IdSimple "=", [ sygus_of_term lhs; sygus_of_term rhs ]);
-               ] ))
-    | None -> CConstraint (SyApp (IdSimple "=", [ sygus_of_term lhs; sygus_of_term rhs ]))
+    | Some precondition -> CConstraint (sygus_of_term Terms.(~!precondition || lhs == rhs))
+    | None -> CConstraint (sygus_of_term Terms.(lhs == rhs))
   in
   List.map ~f:eqn_to_constraint detupled_equations
 
@@ -461,15 +454,17 @@ let solve_eqns (unknowns : VarSet.t) (eqns : equation list) :
         let precond, lhs, rhs = (eqn.eprecond, eqn.elhs, eqn.erhs) in
         let set' =
           VarSet.union_list
-            [
-              Analysis.free_variables lhs;
-              Analysis.free_variables rhs;
-              Option.value_map precond ~f:Analysis.free_variables ~default:VarSet.empty;
-            ]
+            Analysis.
+              [
+                free_variables lhs;
+                free_variables rhs;
+                Option.value_map precond ~f:free_variables ~default:VarSet.empty;
+              ]
         in
-        ( Set.union fvs set',
-          Set.union ops (Set.union (Analysis.operators_of lhs) (Analysis.operators_of rhs)),
-          hi || Analysis.has_ite lhs || Analysis.has_ite rhs )
+        Analysis.
+          ( Set.union fvs set',
+            Set.union ops (Set.union (operators_of lhs) (operators_of rhs)),
+            hi || has_ite lhs || has_ite rhs )
       in
       let fvs, ops, hi =
         List.fold eqns ~f ~init:(VarSet.empty, Set.empty (module Operator), false)
@@ -534,6 +529,7 @@ let solve_eqns (unknowns : VarSet.t) (eqns : equation list) :
     *)
     build_task gen_only ((), ())
   in
+  Log.debug_msg Fmt.(str "Solving for %a." VarSet.pp unknowns);
   if !Config.check_unrealizable then (
     match Counterexamples.check_unrealizable unknowns eqns with
     | [] -> aux_solve false ()
@@ -641,18 +637,19 @@ type preprocessing_action_result = {
     solver_response * (partial_soln, Counterexamples.unrealizability_ctex list) Either.t ->
     solver_response * (partial_soln, Counterexamples.unrealizability_ctex list) Either.t;
 }
-
 (** A preprocessing action should return a new system of equations,
    and optionally a new set of unknowns together with a postprocessing function. *)
 
+(** An empty preprocessing action. *)
 let preprocess_none u eqs =
   { pre_unknowns = u; pre_equations = eqs; pre_postprocessing = (fun x -> x) }
 
-(** Project unknowns that return tuple into a tuple of unknowns and change the equations
-    accordingly.
+(** Preprocessing action that projects each unknown returning a tuple into a tuple
+  of unknowns and change the equations accordingly.
+  Postprocessing consist of rebuilding the tuples.
 *)
 let preprocess_detuple (unknowns : VarSet.t) (eqns : equation list) : preprocessing_action_result =
-  let pre_unknowns, projections = proj_unknowns unknowns in
+  let pre_unknowns, projections = proj_functions unknowns in
   let pre_equations = proj_and_detuple_eqns projections eqns in
   let pre_postprocessing (resp, soln) =
     Either.(

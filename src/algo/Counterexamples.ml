@@ -97,7 +97,7 @@ let unrealizability_ctex_of_constmap (i, j) (eqn_i, eqn_j) (vseti, vsetj) var_su
   in
   { i; j; ci = ctex_i; cj = ctex_j }
 
-let skeleton_match ~unknowns (e1 : term) (e2 : term) =
+let skeleton_match ~unknowns (e1 : term) (e2 : term) : (term * term) list option =
   let args1, e1' = Analysis.skeletize ~functions:unknowns e1
   and args2, e2' = Analysis.skeletize ~functions:unknowns e2 in
   match Analysis.matches ~boundvars:unknowns ~pattern:e1' e2' with
@@ -118,7 +118,9 @@ let components_of_unrealizability ~unknowns (eqn1 : equation) (eqn2 : equation) 
       if Terms.equal eqn1.erhs eqn2.erhs then Some ([], (eqn1.elhs, eqn2.erhs))
       else (
         Log.verbose_msg
-          Fmt.(str "Unrealizability check: %a is not in normal form." pp_term eqn1.erhs);
+          Fmt.(
+            str "Unrealizability check: %a is not in normal form (no match with %a)" pp_term
+              eqn1.erhs pp_term eqn2.erhs);
         None)
 
 (** Check if system of equations defines a functionally realizable synthesis problem.

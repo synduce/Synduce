@@ -5,6 +5,12 @@ open Lang.Term
 open Syguslib.Sygus
 open Utils
 
+let next_lifing_type : RType.t list ref = ref [ RType.TInt ]
+
+(* ============================================================================================= *)
+(*                      LIFTING UTILS                                                            *)
+(* ============================================================================================= *)
+
 let msg_lifting () =
   Log.info
     Fmt.(
@@ -210,7 +216,13 @@ let compose_parts (p : psi_def) : term option =
         Log.error_msg "Ignoring type difference between ɑ and output of target.";
         None
 
-let ith_type (p : psi_def) (i : int) : RType.t option =
+(** [nth_output_type p n] eturn the nth type in the output type of the PMRS.
+    If the output type is a tuple, the nth element of the tuple is returned if it
+      exists, otherwise [None] is returned.
+    If the output type is not a tuple and [n] is not [0] then [None] is returned.
+      If [n = 0] then the output type is returned.
+ *)
+let nth_output_type (p : psi_def) (i : int) : RType.t option =
   let _, tout = RType.fun_typ_unpack (Variable.vtype_or_new p.psi_target.pvar) in
   match tout with RType.TTup tl -> List.nth tl i | _ -> if i = 0 then Some tout else None
 
@@ -271,8 +283,9 @@ let deduce_lifting_expressions ~p (lif : lifting) (lemma : term option) (lhs : t
              match LiftingMap.get lif.tmap (i, t) with
              | Some e -> ((recompose_t p t i, e), None)
              | None ->
-                 let typ_i = Option.value_exn (ith_type p i) in
-                 let x = Variable.mk (Alpha.fresh ~s:(Fmt.str "_L_%i" i) ()) ~t:(Some typ_i) in
+                 let x =
+                   Variable.mk (Alpha.fresh ~s:(Fmt.str "_L_%i" i) ()) ~t:(nth_output_type p i)
+                 in
                  ((recompose_t p t i, mk_var x), Some (x, (i, t)))))
     in
     let var_to_linput = List.filter_opt var_to_linput in
@@ -308,5 +321,5 @@ let scalar ~(p : psi_def) (l : refinement_loop_state) _synt_failure_info :
     This function will perform the scalar lifting and continue the refinement loop
     with the lifted problem.
   *)
-  let p' = apply_lifting ~p [ RType.TInt ] in
+  let p' = apply_lifting ~p !next_lifing_type in
   Ok (p', l)

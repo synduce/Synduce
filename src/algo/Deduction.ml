@@ -51,12 +51,98 @@ module Solver = struct
     | Some v -> (vid, Expression.get_ty_const (Variable.vtype_or_new v))
     | None -> (vid, Expression.get_ty_const RType.TInt)
 
+  type deduction_loop_state = {
+    expression : Expression.t;
+    free_boxes : (int * IS.t) list;
+    full_boxes : (int * Expression.t) list;
+    free_bound_exprs : Expression.t list;
+    queue : Expression.t list;
+  }
+
+  let deduction_loop ~(lemma : Expression.t option) (box_args : (int * IS.t) list)
+      (bound_args : Expression.t list) (expr : Expression.t) :
+      ( (int * Expression.t) list,
+        (* Return assignment from box id to expression. *)
+        deduction_loop_state )
+      (* Error returns information where the loop stopped. *)
+      Result.t =
+    let rec floop i (state : deduction_loop_state) =
+      let i' = i + 1 in
+      if i' > max_deduction_attempts then Error state
+      else if IS.(?.(Expression.free_variables state.expression)) then
+        (* The expression is a function of the bound arguments.
+           If there are unassigned boxes left, assign a constant.
+        *)
+        Ok (state.full_boxes @ List.map ~f:assign_const state.free_boxes)
+      else
+        match state.free_bound_exprs with
+        | hd :: tl -> (
+            Log.verbose
+              (Log.wrap2 "@[\t\tTry to %a %a.@]"
+                 (styled (`Bg `Magenta) string)
+                 "match" Expression.pp hd);
+            match match_as_subexpr ~lemma hd ~of_:state.expression with
+            | Some (id, res') ->
+                Log.verbose (fun fmt () ->
+                    pf fmt "@[\t\t[-> %i]✅  %a =@;%a <- (%a)@]" id Expression.pp state.expression
+                      Expression.pp res' Expression.pp hd);
+                floop i' { state with expression = res'; free_bound_exprs = tl }
+            | None ->
+                Log.verbose_msg "\t\t\t❌";
+                floop i' { state with free_bound_exprs = tl; queue = state.queue @ [ hd ] })
+        | [] -> (
+            match state.free_boxes with
+            | hd :: tl -> (
+                Log.verbose (fun fmt () ->
+                    pf fmt "@[\t\tTry to %a %a.@]@."
+                      (styled (`Bg `Cyan) string)
+                      "assign"
+                      (pair ~sep:comma Expression.pp_ivar Expression.pp_ivarset)
+                      hd);
+                match assign_match_box hd ~of_:state.expression with
+                | Some (res', (hd_id, hd_e)) ->
+                    Log.verbose (fun fmt () ->
+                        pf fmt "@[\t\t[-> %i]✅ %a =@;%a <- %a@]" hd_id Expression.pp
+                          state.expression Expression.pp res'
+                          (parens (pair ~sep:comma int Expression.pp))
+                          (hd_id, hd_e));
+                    floop i'
+                      {
+                        expression = res';
+                        free_boxes = tl;
+                        full_boxes = (hd_id, hd_e) :: state.full_boxes;
+                        free_bound_exprs = state.queue;
+                        queue = [];
+                      }
+                | None ->
+                    Log.verbose_msg "\t\t\t❌@.";
+                    floop i'
+                      {
+                        state with
+                        free_boxes = tl @ [ hd ];
+                        free_bound_exprs = state.queue;
+                        queue = [];
+                      })
+            | [] ->
+                floop i' { state with free_boxes = []; free_bound_exprs = state.queue; queue = [] })
+    in
+    floop 0
+      {
+        expression = expr;
+        free_boxes = box_args;
+        full_boxes = [];
+        free_bound_exprs = bound_args;
+        queue = [];
+      }
+
   let functionalize ~(args : Expression.t list) ~(lemma : Expression.t option) (res : Expression.t)
-      (boxes : (int * IS.t) list) : (int * Expression.t) list option =
+      (boxes : (int * IS.t) list) :
+      ((int * Expression.t) list, (int * Expression.t) list * Expression.t) Result.t =
     Log.verbose
       Fmt.(
-        Log.wrap2 "@[=== Solve Func. Equation: F %a = %a@]@." (list ~sep:sp Expression.pp) args
-          Expression.pp res);
+        Log.wrap2 "@[=== Solve Func. Equation:@;@[<h 2>@[F %a@] =@;@[%a@]@]@]@."
+          (list ~sep:sp (parens Expression.pp))
+          args Expression.pp res);
     let box_ids = IS.of_list (fst (List.unzip boxes)) in
     let box_args, bound_args =
       List.partition_map args ~f:(function
@@ -69,52 +155,23 @@ module Solver = struct
     Log.verbose
       (Log.wrap1 "\t@[Box args: %a@]" (list ~sep:comma (parens (pair ~sep:sp int IS.pp))) box_args);
     Log.verbose (Log.wrap1 "\t@[Bound args: %a@]" (list ~sep:comma Expression.pp) bound_args);
-    let rec floop i (unassigned_bs, assigned_bs) (unassigned_bound, _q) res =
-      let i' = i + 1 in
-      if i' > max_deduction_attempts then None
-      else if IS.(?.(Expression.free_variables res)) then
-        (* The expression is a function of the bound arguments.
-           If there are unassigned boxes left, assign a constant.
-        *)
-        Some (assigned_bs @ List.map ~f:assign_const unassigned_bs)
-      else
-        match unassigned_bound with
-        | hd :: tl -> (
-            Log.verbose
-              (Log.wrap2 "@[\t\tTry to %a %a.@]"
-                 (styled (`Bg `Magenta) string)
-                 "match" Expression.pp hd);
-            match match_as_subexpr ~lemma hd ~of_:res with
-            | Some (_, res') ->
-                Log.verbose (fun fmt () ->
-                    pf fmt "@[\t\t\t✅  %a =@;%a <- (%a)@]" Expression.pp res Expression.pp res'
-                      Expression.pp hd);
-                floop i' (unassigned_bs, assigned_bs) (tl, _q) res'
-            | None ->
-                Log.verbose_msg "\t\t\t❌";
-                floop i' (unassigned_bs, assigned_bs) (tl, _q @ [ hd ]) res)
-        | [] -> (
-            match unassigned_bs with
-            | hd :: tl -> (
-                Log.verbose (fun fmt () ->
-                    pf fmt "@[\t\tTry to %a %a.@]@."
-                      (styled (`Bg `Cyan) string)
-                      "assign"
-                      (pair ~sep:comma Expression.pp_ivar Expression.pp_ivarset)
-                      hd);
-                match assign_match_box hd ~of_:res with
-                | Some (res', hd_assignment) ->
-                    Log.verbose (fun fmt () ->
-                        pf fmt "@[\t\t\t✅ %a =@;%a <- %a@]" Expression.pp res Expression.pp res'
-                          (parens (pair ~sep:comma int Expression.pp))
-                          hd_assignment);
-                    floop i' (tl, assigned_bs @ [ hd_assignment ]) (_q, []) res'
-                | None ->
-                    Log.verbose_msg "\t\t\t❌@.";
-                    floop i' (tl @ [ hd ], assigned_bs) (_q, []) res)
-            | [] -> floop i' ([], assigned_bs) (_q, []) res)
+    match deduction_loop ~lemma box_args bound_args res with
+    | Ok x -> Ok x
+    | Error state -> Error (state.full_boxes, state.expression)
+
+  let resolve_box_bindings l =
+    let l' =
+      List.map l ~f:(fun (i, e) ->
+          Option.Let_syntax.(
+            let%bind v = Expression.get_var i in
+            let%bind e' = Expression.to_term e in
+            Some (v, e')))
     in
-    floop 0 (box_args, []) (bound_args, []) res
+    match all_or_none l' with
+    | Some l'' -> l''
+    | None ->
+        Log.error_msg "Failed to deduce lifting.";
+        []
 
   (** "solve" a functional equation.
     Converts the term equation into a functionalization problem with Expressions.
@@ -137,22 +194,13 @@ module Solver = struct
       match (expr_args_o, expr_res_o) with
       | Some args, Some expr_res -> (
           match functionalize ~lemma ~args expr_res ided_boxes with
-          | Some l -> (
-              let l' =
-                List.map l ~f:(fun (i, e) ->
-                    Option.Let_syntax.(
-                      let%bind v = Expression.get_var i in
-                      let%bind e' = Expression.to_term e in
-                      Some (v, e')))
-              in
-              match all_or_none l' with
-              | Some l'' -> l''
-              | None ->
-                  Log.error_msg "Failed to deduce lifting.";
-                  [])
-          | None ->
-              Log.error_msg "Failed to deduce lifting.";
-              [])
+          | Ok l -> resolve_box_bindings l
+          | Error (l, e_leftover) ->
+              Log.error
+                Fmt.(
+                  fun fmt () ->
+                    pf fmt "Failed to deduce lifting, remaining %a" Expression.pp e_leftover);
+              resolve_box_bindings l)
       | _ ->
           Log.error_msg
             (Fmt.str "Term {%a} %a is not a function-free expression, cannot deduce."
