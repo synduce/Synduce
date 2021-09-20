@@ -32,14 +32,19 @@ module IS : sig
   val singleton : elt -> (elt, Base.Int.comparator_witness) Base.Set.t
 
   val of_list : elt list -> (elt, Base.Int.comparator_witness) Base.Set.t
+  (** Make a set of integers from a list of integers. *)
 
   val ( + ) : ('a, 'b) Base.Set.t -> ('a, 'b) Base.Set.t -> ('a, 'b) Base.Set.t
+  (** Set union. *)
 
   val ( - ) : ('a, 'b) Base.Set.t -> ('a, 'b) Base.Set.t -> ('a, 'b) Base.Set.t
+  (** Set difference. *)
 
   val ( ^ ) : ('a, 'b) Base.Set.t -> ('a, 'b) Base.Set.t -> ('a, 'b) Base.Set.t
+  (**  Set intersection. *)
 
   val ( ?. ) : ('a, 'b) Base.Set.t -> bool
+  (** Set emptiness. *)
 
   val ( ~$ ) : elt -> (elt, Base.Int.comparator_witness) Base.Set.t
 

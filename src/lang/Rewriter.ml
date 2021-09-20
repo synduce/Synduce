@@ -16,6 +16,12 @@ let get_id_const (op : Binop.t) : term option =
 let is_id_int_const (op : Binop.t) (i : int) : bool =
   match (op, i) with Plus, 0 | Div, 1 | Minus, 0 | Times, 1 -> true | _ -> false
 
+let is_null_int_const (op : Binop.t) (i : int) : bool =
+  match (op, i) with Times, 0 -> true | _ -> false
+
+let is_null_bool_const (op : Binop.t) (b : bool) : bool =
+  match (op, b) with And, false | Or, true -> true | _ -> false
+
 let is_and op = Binop.(match op with And -> true | _ -> false)
 
 let is_or op = Binop.(match op with Or -> true | _ -> false)
@@ -133,8 +139,10 @@ module IS = struct
 
   let ( - ) = Set.diff
 
+  (** Set intersection. *)
   let ( ^ ) = Set.inter
 
+  (** Checks is a set is empty.*)
   let ( ?. ) x = Set.is_empty x
 
   let ( ~$ ) x = singleton x
@@ -435,8 +443,13 @@ module Expression = struct
                 match concrete with Some i' -> (symbs, Some (f i i')) | None -> (symbs, Some i))
             | _ -> (symbs @ [ arg ], concrete))
       in
-      let args' = match maybe_concrete with Some i -> symbs @ [ mk_e_int i ] | None -> symbs in
+      let args' =
+        match maybe_concrete with
+        | Some i -> if is_null_int_const op i then [ mk_e_int i ] else symbs @ [ mk_e_int i ]
+        | None -> symbs
+      in
       match
+        (* Filter out identity elements. *)
         List.filter
           ~f:(fun x -> match x with EInt i -> not (is_id_int_const op i) | _ -> true)
           args'
@@ -459,7 +472,11 @@ module Expression = struct
                 | None -> (symbs, Some false))
             | _ -> (symbs @ [ arg ], concrete))
       in
-      let args' = match maybe_concrete with Some b -> symbs @ [ mk_e_bool b ] | None -> symbs in
+      let args' =
+        match maybe_concrete with
+        | Some b -> if is_null_bool_const op b then [ mk_e_bool b ] else symbs @ [ mk_e_bool b ]
+        | None -> symbs
+      in
       match
         List.filter
           ~f:(fun x -> match x with ETrue -> is_and op | EFalse -> is_or op | _ -> true)
@@ -486,7 +503,7 @@ module Expression = struct
               | _ -> Some (mk_e_assoc op args)))
       | _ -> None
     in
-    transform tr e
+    rewrite_until_stable (transform tr) e
 
   (** Normalizing *)
   let normalize (e : t) : t =
@@ -526,18 +543,20 @@ open Expression
 let collect_common_factors (op : Operator.t) (args : t list) : (int * Operator.t option * t) list =
   let add_fac op_opt factors e =
     let added, factors' =
-      List.fold ~init:(false, [])
-        ~f:(fun (added, factors) (fac_count, fo, fac_expr) ->
+      (* Find a matching factor - if found, add it to existing factors. *)
+      List.fold factors ~init:(false, [])
+        ~f:(fun (added, factors) (fac_count, fac_op_option, fac_expr) ->
           if equal fac_expr e then
-            match (op_opt, fo) with
+            match (op_opt, fac_op_option) with
             | Some op, Some fo when Operator.equal op fo ->
                 (true, (fac_count + 1, Some fo, e) :: factors)
             | None, Some fo -> (added, (fac_count + 1, Some fo, e) :: factors)
             | Some op, None -> (true, (fac_count + 1, Some op, e) :: factors)
             | None, None -> (true, (fac_count + 1, None, e) :: factors)
-            | _ -> (added, (fac_count, fo, fac_expr) :: factors)
-          else (added, (fac_count, fo, fac_expr) :: factors))
-        factors
+            | _ -> (added, (fac_count, fac_op_option, fac_expr) :: factors)
+          else
+            (* List of factors unchanged. *)
+            (added, (fac_count, fac_op_option, fac_expr) :: factors))
     in
     if added then factors' else (1, op_opt, e) :: factors'
   in
@@ -550,6 +569,8 @@ let collect_common_factors (op : Operator.t) (args : t list) : (int * Operator.t
   List.fold ~f ~init:[] args
 
 let best_factor (factors : (int * Operator.t option * t) list) : (Operator.t option * t) option =
+  Fmt.(pf stdout "%i factors:@." (List.length factors));
+  List.iter ~f:Fmt.(fun (_, _, e) -> pf stdout "%a@." pp e) factors;
   match List.max_elt ~compare:(fun (i1, _, _) (i2, _, _) -> Int.compare i1 i2) factors with
   | Some (i, op, e) -> if i >= 2 then Some (op, e) else None
   | None -> None
@@ -592,9 +613,7 @@ let factorize (e : t) : t =
           let args' = List.map ~f args in
           let factors = collect_common_factors op args' in
           Option.map (best_factor factors) ~f:(fun (fac_op, fac_expr) ->
-              (* Fmt.(pf stdout "Best factor: %a@." pp fac_expr); *)
               let e = apply_factor op args' fac_op fac_expr in
-              (* Fmt.(pf stdout "E: %a@." pp e); *)
               e)
       | _ -> None
     in

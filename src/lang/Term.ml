@@ -754,7 +754,7 @@ let rewrite_with (f : term -> term) (t : term) =
       | TApp (func, args) -> TApp (aux func, List.map ~f:aux args)
       | TBin (op, t1, t2) -> TBin (op, aux t1, aux t2)
       | TBox _ -> tk (* Do not rewrite Tbox *)
-      | TConst _ -> tk
+      | TConst _ -> (f t0).tkind
       | TUn (op, t1) -> TUn (op, aux t1)
       | TVar _ -> tk
       | TIte (c, t1, t2) -> TIte (aux c, aux t1, aux t2)

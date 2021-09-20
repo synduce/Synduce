@@ -14,5 +14,5 @@ module Solver : sig
     lemma:Term.term option ->
     Term.term ->
     (Term.variable * Term.VarSet.t) list ->
-    (Term.variable * Term.term) list
+    (Term.variable * Term.term) list * Expression.t option
 end

@@ -227,6 +227,15 @@ let nth_output_type (p : psi_def) (i : int) : RType.t option =
   match tout with RType.TTup tl -> List.nth tl i | _ -> if i = 0 then Some tout else None
 
 (* ============================================================================================= *)
+(*                     HELPERS                                                                   *)
+(* ============================================================================================= *)
+let analyze_leftover (expr : Rewriter.Expression.t) : unit =
+  Fmt.(pf stdout "Analyzing leftover expression...@.");
+  let expr' = Rewriter.factorize expr in
+  Fmt.(pf stdout "->Expr %a@." Rewriter.Expression.pp expr');
+  Caml.exit (-1)
+
+(* ============================================================================================= *)
 (*                      LIFTING FUNCTIONS                                                        *)
 (* ============================================================================================= *)
 
@@ -262,33 +271,38 @@ let apply_lifting ~(p : psi_def) (l : RType.t list) : psi_def =
   Log.debug (fun ft () -> Fmt.(pf ft "@[After lifting:@;%a@]" (box PMRS.pp) target'));
   { p with psi_target = target'; psi_lifting = p.psi_lifting @ l }
 
-let deduce_lifting_expressions ~p (lif : lifting) (lemma : term option) (lhs : term) (rhs : term) :
-    lifting =
+let lift_interactive ~p lifting boxes =
+  List.fold ~init:lifting
+    ~f:(fun l (i, t) ->
+      match LiftingMap.get l.tmap (i, t) with
+      | Some _ -> l
+      | None -> fst (interactive_add_lifting_expression ~p l t i))
+    boxes
+
+let deduce_lifting_expressions ~p (lifting : lifting) (lemma : term option) (lhs : term)
+    (rhs : term) : lifting =
+  (* Put every recursive call to the lifting part into a "box" *)
   let boxes =
     reduce ~init:[]
       ~case:(fun _ t -> match decompose_t p t with Some (i, a) -> Some [ (i, a) ] | _ -> None)
       ~join:( @ ) rhs
   in
-  if !Config.interactive_lifting then
-    List.fold ~init:lif
-      ~f:(fun l (i, t) ->
-        match LiftingMap.get l.tmap (i, t) with
-        | Some _ -> l
-        | None -> fst (interactive_add_lifting_expression ~p l t i))
-      boxes
+  if !Config.interactive_lifting then lift_interactive ~p lifting boxes
   else
-    let subs, var_to_linput =
-      List.unzip
-        (List.map boxes ~f:(fun (i, t) ->
-             match LiftingMap.get lif.tmap (i, t) with
-             | Some e -> ((recompose_t p t i, e), None)
+    let subs, boxvar_to_linput =
+      (* Create fresh variables for boxes and a map from var id to box argument. *)
+      boxes
+      |> List.map ~f:(fun (i, box_input) ->
+             match LiftingMap.get lifting.tmap (i, box_input) with
+             | Some e -> ((recompose_t p box_input i, e), None)
              | None ->
                  let x =
                    Variable.mk (Alpha.fresh ~s:(Fmt.str "_L_%i" i) ()) ~t:(nth_output_type p i)
                  in
-                 ((recompose_t p t i, mk_var x), Some (x, (i, t)))))
+                 ((recompose_t p box_input i, mk_var x), Some (x, (i, box_input))))
+      |> List.unzip
     in
-    let var_to_linput = List.filter_opt var_to_linput in
+    let boxvar_to_linput = List.filter_opt boxvar_to_linput in
     let rec as_unknown_app t =
       match t.tkind with
       | TApp (f, [ arg ]) when is_proj_function p f -> as_unknown_app arg
@@ -296,17 +310,22 @@ let deduce_lifting_expressions ~p (lif : lifting) (lemma : term option) (lhs : t
           if Set.mem p.psi_target.psyntobjs f then Some args else None
       | _ -> None
     in
-    let rhs' = substitution subs rhs in
-    match as_unknown_app rhs' with
+    match rhs |> substitution subs |> as_unknown_app with
     | Some rhs_args ->
-        let var_to_lexpr =
-          Deduction.Solver.functional_equation ~func_side:rhs_args ~lemma lhs
-            (List.map ~f:(fun (x, (_, t)) -> (x, Analysis.free_variables t)) var_to_linput)
+        let var_to_lifting_expr, maybe_leftover_expr =
+          let f (x, (_, t)) =
+            (* A box completion might also use the parameters of the function. *)
+            (x, Set.union (Analysis.free_variables t) (VarSet.of_list p.psi_target.pargs))
+          in
+          boxvar_to_linput |> List.map ~f
+          |> Deduction.Solver.functional_equation ~func_side:rhs_args ~lemma lhs
         in
-        List.fold var_to_lexpr ~init:lif ~f:(fun l (v, t) ->
-            let i, t0 = List.Assoc.find_exn ~equal:Variable.equal var_to_linput v in
+
+        let _ = Option.map ~f:analyze_leftover maybe_leftover_expr in
+        List.fold var_to_lifting_expr ~init:lifting ~f:(fun l (v, t) ->
+            let i, t0 = List.Assoc.find_exn ~equal:Variable.equal boxvar_to_linput v in
             { tmap = LiftingMap.set l.tmap (i, t0) t })
-    | None -> lif
+    | None -> lifting
 
 (* ============================================================================================= *)
 (*                       MAIN ENTRY POINT                                                        *)

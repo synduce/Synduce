@@ -20,7 +20,7 @@ val rule_lookup :
     corresponding to apply `f args` applied. If no rule is matched, returns an empty list.
 *)
 
-val reduce_term : term -> term
+val reduce_term : ?unboxing:bool -> term -> term
 (** `reduce_term t` reduces the term `t` using lambda-calculus reduction rules.
     (let x = e in e' is equivalent to (λx.e') e).
     Function symbolds in applications are resolved by looking up functions in the

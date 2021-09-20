@@ -46,11 +46,6 @@ let assign_match_box ((bid, bargs) : int * IS.t) ~(of_ : Expression.t) :
 module Solver = struct
   let max_deduction_attempts = 10
 
-  let assign_const ((vid, _) : int * IS.t) : int * Expression.t =
-    match Expression.get_var vid with
-    | Some v -> (vid, Expression.get_ty_const (Variable.vtype_or_new v))
-    | None -> (vid, Expression.get_ty_const RType.TInt)
-
   type deduction_loop_state = {
     expression : Expression.t;
     free_boxes : (int * IS.t) list;
@@ -69,18 +64,18 @@ module Solver = struct
     let rec floop i (state : deduction_loop_state) =
       let i' = i + 1 in
       if i' > max_deduction_attempts then Error state
-      else if IS.(?.(Expression.free_variables state.expression)) then
+      else if IS.( ?. ) (Expression.free_variables state.expression) then
         (* The expression is a function of the bound arguments.
            If there are unassigned boxes left, assign a constant.
         *)
-        Ok (state.full_boxes @ List.map ~f:assign_const state.free_boxes)
+        Ok state.full_boxes
       else
         match state.free_bound_exprs with
         | hd :: tl -> (
             Log.verbose
               (Log.wrap2 "@[\t\tTry to %a %a.@]"
                  (styled (`Bg `Magenta) string)
-                 "match" Expression.pp hd);
+                 "match" Expression.pp (Expression.simplify hd));
             match match_as_subexpr ~lemma hd ~of_:state.expression with
             | Some (id, res') ->
                 Log.verbose (fun fmt () ->
@@ -170,14 +165,14 @@ module Solver = struct
     match all_or_none l' with
     | Some l'' -> l''
     | None ->
-        Log.error_msg "Failed to deduce lifting.";
+        Log.error_msg "Failed to deduce box value.";
         []
 
   (** "solve" a functional equation.
     Converts the term equation into a functionalization problem with Expressions.
     *)
   let functional_equation ~(func_side : term list) ~(lemma : term option) (res_side : term)
-      (boxes : (variable * VarSet.t) list) : (variable * term) list =
+      (boxes : (variable * VarSet.t) list) : (variable * term) list * Expression.t option =
     let flat_args =
       List.concat_map ~f:(fun t -> match t.tkind with TTup tl -> tl | _ -> [ t ]) func_side
     in
@@ -186,7 +181,7 @@ module Solver = struct
     in
     let lemma = Option.bind ~f:Expression.of_term lemma in
     (* No boxes : no lifting to compute. *)
-    if List.is_empty boxes then []
+    if List.is_empty boxes then ([], None)
     else
       let ided_boxes =
         List.map ~f:(fun (v, vas) -> (v.vid, IS.of_list (VarSet.vids_of_vs vas))) boxes
@@ -194,18 +189,19 @@ module Solver = struct
       match (expr_args_o, expr_res_o) with
       | Some args, Some expr_res -> (
           match functionalize ~lemma ~args expr_res ided_boxes with
-          | Ok l -> resolve_box_bindings l
+          | Ok l -> (resolve_box_bindings l, None)
           | Error (l, e_leftover) ->
               Log.error
                 Fmt.(
                   fun fmt () ->
-                    pf fmt "Failed to deduce lifting, remaining %a" Expression.pp e_leftover);
-              resolve_box_bindings l)
+                    pf fmt "@[Failed to solve functional equation remaining expression is:@;%a@]"
+                      Expression.pp e_leftover);
+              (resolve_box_bindings l, Some e_leftover))
       | _ ->
           Log.error_msg
             (Fmt.str "Term {%a} %a is not a function-free expression, cannot deduce."
                (list ~sep:comma pp_term)
                (List.map ~f:Reduce.reduce_term flat_args)
                pp_term res_side);
-          []
+          ([], None)
 end

@@ -1,3 +1,6 @@
+(** @synduce --cvc4 *)
+(* Use cvc4 on this benchmark. *)
+
 type 'a clist = CNil | Single of 'a | Concat of 'a clist * 'a clist
 
 type 'a list = Nil | Cons of 'a * 'a list

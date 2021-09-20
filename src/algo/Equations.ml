@@ -149,7 +149,7 @@ let make ?(force_replace_off = false) ~(p : psi_def) ~(term_state : term_state) 
   (* Substitution function: some substitution opportunities appear after a first pass of subsitution
      followed by a lambda-reduction.
   *)
-  let applic x = substitution all_subs (Reduce.reduce_term (substitution all_subs x)) in
+  let applic x = x |> substitution all_subs |> Reduce.reduce_term |> substitution all_subs in
   if Set.length invariants > 0 then
     Log.verbose
       Fmt.(
@@ -176,7 +176,6 @@ let make ?(force_replace_off = false) ~(p : psi_def) ~(term_state : term_state) 
       let eelim = filter_elims all_subs eterm in
       (* Get the precondition, from the lemmas in the term state, *)
       let precond = compute_preconds ~p ~term_state applic eterm in
-      (* Replace the boxed expressions of the lifting. *)
       let lifting' =
         let eprecond =
           match invar invariants lhs'' rhs'' with
@@ -186,7 +185,11 @@ let make ?(force_replace_off = false) ~(p : psi_def) ~(term_state : term_state) 
         in
         Lifting.deduce_lifting_expressions ~p lifting eprecond lhs'' rhs''
       in
-      let rhs'' = Lifting.replace_boxed_expressions ~p lifting' rhs' in
+      (* Replace the boxed expressions of the lifting. *)
+      let rhs'' =
+        rhs' |> Lifting.replace_boxed_expressions ~p lifting' |> Reduce.reduce_term ~unboxing:true
+      in
+
       (* If possible project equation of tuples into tuple of equations. *)
       let projs = projection_eqns lhs'' rhs'' in
       ( eqns_accum
@@ -213,12 +216,13 @@ let make ?(force_replace_off = false) ~(p : psi_def) ~(term_state : term_state) 
   (* Phase 2 of the equation generation.
      Generate the equations corresponding to the lifting constraints. *)
   let lifting_eqns =
-    let constraint_of_lift_expr ((i, t0), lft) =
+    let constraint_of_lift_expr ((i, t0), elhs) =
       let t0_rhs = compute_rhs p t0 in
       let erhs =
-        Lifting.replace_boxed_expressions ~p lifting (Reduce.reduce_term (mk_sel t0_rhs i))
+        mk_sel t0_rhs i |> Reduce.reduce_term
+        |> Lifting.replace_boxed_expressions ~p lifting
+        |> Reduce.reduce_term ~unboxing:true
       in
-      let elhs = lft in
       let precond = compute_preconds ~p ~term_state (fun x -> x) t0 in
       let eprecond =
         match invar invariants elhs erhs with

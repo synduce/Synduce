@@ -115,7 +115,7 @@ let rule_lookup prules (f : variable) (fargs : term list) : term list =
 (**
   reduce_term reduces a term using only the lambda-calculus
 *)
-let rec reduce_term (t : term) : term =
+let rec reduce_term ?(unboxing = false) (t : term) : term =
   let one_step t =
     let rstep = ref false in
     let case f t =
@@ -134,7 +134,7 @@ let rec reduce_term (t : term) : term =
                 | [ tp ] -> Some (f (reduce_pmrs pm tp))
                 | _ -> None (* PMRS are defined only with one argument for now. *))
             | FRNonT p -> Some (pmrs_until_irreducible p (mk_app func' args'))
-            | FRUnknown -> None)
+            | FRUnknown -> Some (mk_app func' args'))
         | TFun ([], body) -> Some (f body)
         | TIte (c, tt, tf) -> (
             match c.tkind with
@@ -161,7 +161,8 @@ let rec reduce_term (t : term) : term =
             with
             | [] -> None
             | (subst_map, rhs_t) :: _ -> Some (substitution (VarMap.to_subst subst_map) rhs_t))
-        | TBox _ | TVar _ | TFun _ | TTup _ | TBin _ | TUn _ | TConst _ | TData _ -> None
+        | TBox t -> if unboxing then Some t else None
+        | TFun _ | TVar _ | TTup _ | TBin _ | TUn _ | TConst _ | TData _ -> None
       in
       match x with
       | Some x ->
