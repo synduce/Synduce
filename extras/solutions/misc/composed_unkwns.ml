@@ -1,13 +1,13 @@
 
 let s0  = 0
 
-let f0 x = x
+let f0 x0 = x0
 
-let f2 x0 = x0
+let f2 x1 = x1
 
-let f1 x1 = x1
+let f1 x2 = x2
 
-let join x2 x3 = x3 + x2
+let join x3 x4 = x4 + x3
 
 let rec hsum =
   function CNil -> s0 | Single(a) -> f0 a

@@ -1,11 +1,11 @@
 
-let elit x = x
+let eor x4 x5 = x4 || x5
 
-let eneglit x0 = ¬ x0
+let eand x2 x3 = x2 && x3
 
-let eand x1 x2 = x1 && x2
+let eneglit x1 = ¬ x1
 
-let eor x3 x4 = x3 || x4
+let elit x0 = x0
 
 let rec eval2 =
   function NFLit(b) -> elit b | NFNegLit(b) -> eneglit b

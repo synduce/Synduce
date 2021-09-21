@@ -1,7 +1,7 @@
 
-let oplus (x3, x30) x4 = (x4 + x3, max 0 (x4 + x30))
+let oplus (x40, x41) x5 = (x40 + x5, x41 + (max x5 (- x41)))
 
-target⟨oplus⟩(l): int list -> (int * int)  = 
+ target⟨oplus⟩(l): int list -> (int * int)  = 
 {
   ‣ main l   ⟹  f (0, 0) l
     f s Nil  ⟹  s

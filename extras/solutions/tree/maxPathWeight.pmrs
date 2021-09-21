@@ -1,9 +1,9 @@
 
 let s0  = 0
 
-let join x5 x6 x7 = x5 + (max x6 x7)
+let join x6 x7 x8 = x6 + (max x7 x8)
 
-target⟨join, s0⟩(): int tree -> int  = 
+ target⟨join, s0⟩(): int tree -> int  = 
 {
   ‣ main t1   ⟹  h t1
     h  Nil  ⟹  s0

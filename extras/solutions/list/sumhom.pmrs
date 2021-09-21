@@ -1,11 +1,11 @@
 
 let s_0  = 0
 
-let f_0 x = x
+let f_0 x0 = x0
 
-let odot x0 x1 = x0 + x1
+let odot x1 x2 = x1 + x2
 
-target⟨odot, f_0, s_0⟩(): int clist -> int  = 
+ target⟨odot, f_0, s_0⟩(): int clist -> int  = 
 {
   ‣ target t   ⟹  h t
     h  CNil  ⟹  s_0

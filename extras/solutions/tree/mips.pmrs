@@ -1,10 +1,10 @@
 
-let join1 x5 (x6, x60) (x7, x70) =
-  (x5 + (x6 + x7), max x60 (x5 + (x6 + x70)))
+let join1 x6 (x70, x71) (x80, x81) =
+  (x6 + (x70 + x80), max x71 (x6 + (x70 + x81)))
 
 let s0  = (0, 0)
 
-target⟨join1, s0⟩(): int tree -> (int * int)  = 
+ target⟨join1, s0⟩(): int tree -> (int * int)  = 
 {
   ‣ main_mips t1   ⟹  mips t1
     mips  Nil  ⟹  s0

@@ -1,9 +1,9 @@
 
-let f0 x = x
+let join x1 x2 x3 = max (max x1 x2) (max x1 x3)
 
-let join x0 x1 x2 = max (max x0 x1) (max x0 x2)
+let f0 x0 = x0
 
-target⟨join, f0⟩(): int tree -> int  = 
+ target⟨join, f0⟩(): int tree -> int  = 
 {
   ‣ main t1   ⟹  h t1
     h  Leaf(x)  ⟹  f0 x

@@ -1,10 +1,10 @@
 
-let oplus x11 (x12, x120, x121) =
-  (x11 + x12, max x120 (x11 + x12), x11 + (max x121 (- x11)))
+let oplus x12 (x130, x131, x132) =
+  (x12 + x130, max x131 (x12 + x130), x12 + (max x132 (- x12)))
 
 let s0  = (0, 0, 0)
 
-target⟨oplus, s0⟩(l): int list -> (int * int * int)  = 
+ target⟨oplus, s0⟩(l): int list -> (int * int * int)  = 
 {
   ‣ g  Nil  ⟹  s0
   ‣ g  Cons(hd, tl)  ⟹  oplus hd (g tl)

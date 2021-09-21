@@ -499,12 +499,8 @@ let reponse_of_sexps (s : Sexp.t list) : solver_response =
                | None -> (
                    match Option.all (List.map ~f:one_command l) with
                    | Some defs -> Some (List.concat defs)
-                   | None ->
-                       Utils.Log.error_msg Fmt.(str "Failed to parse %a." Sexp.pp_hum cmd);
-                       None))
-           | Sexp.Atom s ->
-               Utils.Log.error_msg Fmt.(str "Sygus: received  %s, could not parse. Ignoring." s);
-               None)))
+                   | None -> None))
+           | Sexp.Atom _ -> None)))
   in
   match atomic_response s with Some r -> r | None -> success_response s
 

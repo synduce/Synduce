@@ -1,9 +1,9 @@
 
-let xi_0 x12 x13 = x13 = x12
+let xi_0 x13 x14 = x14 = x13
 
-let xi_2 x14 x15 x16 x17 = ((x15 = x14) || x17) || x16
+let xi_2 x15 x16 x17 x18 = ((x15 = x16) || x18) || x17
 
-let xi_1 x18 = x18
+let xi_1 x19 = x19
 
 let rec g =
   function Leaf(a) -> xi_0 x a

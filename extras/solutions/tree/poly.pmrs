@@ -1,10 +1,10 @@
 
-let join x7 x8 (x9, x90) (x10, x100) =
-  (x9 + (x90 × (x8 + (x7 × x10))), x7 × (x90 × x100))
+let join x8 x9 (x100, x101) (x110, x111) =
+  (x100 + (x101 × (x9 + (x8 × x110))), x8 × (x101 × x111))
 
 let s0  = (0, 1)
 
-target⟨join, s0⟩(poly_in): int tree -> (int * int)  = 
+ target⟨join, s0⟩(poly_in): int tree -> (int * int)  = 
 {
   ‣ main t1   ⟹  h t1
     h  Nil  ⟹  s0

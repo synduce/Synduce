@@ -1,9 +1,9 @@
 
-let join x3 x4 = x4 × x3
+let join x4 x5 = x5 × x4
 
-let j2 x5 x6 = x6 × x5
+let j2 x6 x7 = x7 × x6
 
-target⟨join, j2⟩(): int ptree -> int  = 
+ target⟨join, j2⟩(): int ptree -> int  = 
 {
   ‣ main  PNil  ⟹  1
   ‣ main  PNode(a, l)  ⟹  join a (sum l)

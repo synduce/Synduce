@@ -1,10 +1,10 @@
 
 let s0  = (0, 0)
 
-let join (x136, x1360) (x137, x1370) =
-  (max x136 (x1360 + x137), x1360 + x1370)
+let join (x1150, x1151) (x1160, x1161) =
+  (max (x1160 + x1151) x1150, x1161 + x1151)
 
-let f0 x140 = (max x140 0, x140)
+let f0 x113 = (max x113 0, x113)
 
 let rec hom =
   function CNil -> s0 | Single(a) -> f0 a

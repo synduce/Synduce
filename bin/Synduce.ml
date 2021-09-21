@@ -97,7 +97,6 @@ let options =
     ('\000', "use-bmc", set Config.use_bmc true, None);
     (* Background solver parameters *)
     ('\000', "ind-tlimit", None, Some Config.set_induction_proof_tlimit);
-    ('\000', "use-dryadsynth", set Syguslib.Solvers.SygusSolver.default_solver DryadSynth, None);
   ]
 
 let on_success ~(is_ocaml_syntax : bool) (source_filename : string ref) (pb : Algo.AState.psi_def)
@@ -136,7 +135,7 @@ let main () =
   Config.problem_name := Caml.Filename.basename (Caml.Filename.chop_extension !filename);
   set_style_renderer stdout `Ansi_tty;
   Caml.Format.set_margin 100;
-  (match !Syguslib.Solvers.SygusSolver.default_solver with
+  (match !SygusInterface.SygusSolver.default_solver with
   | CVC ->
       Utils.Log.debug_msg
         (if Config.using_cvc5 () then "Using CVC5 ✔" else "Using CVC4. Please install CVC5.")

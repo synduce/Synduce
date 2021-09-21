@@ -2,29 +2,87 @@ open Base
 open Sygus
 open Sexplib
 open Lwt_process
-open Utils
 module OC = Stdio.Out_channel
 module IC = Stdio.In_channel
+open Lwt.Syntax
 
 (* Logging utilities. *)
-let log_queries = ref true
 
-let solver_verbose = ref false
+(** Logger for the solvers. A solver might log error, debug and verbose messages.
+*)
+module type Logger = sig
+  val error : (Formatter.t -> unit -> unit) -> unit
 
-let err_msg s = Fmt.(pf stderr "[ERROR] %s" s)
+  val debug : (Formatter.t -> unit -> unit) -> unit
 
-let tmp_folder = ref "/tmp"
+  val verb : (Formatter.t -> unit -> unit) -> unit
 
-let log_file () = !tmp_folder ^ "log.sl"
+  val log_file : string
 
-let log_out = ref None
+  val verbose : bool
 
-let open_log () = log_out := Some (OC.create (log_file ()))
+  val log_queries : bool
+end
 
-let log c =
-  match !log_out with Some oc -> write_command oc c | None -> err_msg "Failed to open log file."
+(** An empty logging module that can be used to create silent solver instances.  *)
+module EmptyLog : Logger = struct
+  let error _ = ()
 
-type solver_instance = { pid : int; inputc : OC.t; outputc : IC.t; decls : String.t Hash_set.t }
+  let debug _ = ()
+
+  let verb _ = ()
+
+  let log_file = "tmp"
+
+  let verbose = false
+
+  let log_queries = false
+end
+
+(** A module signature to log satistics about solver usage. *)
+module type Statistics = sig
+  val log_proc_start : int -> unit
+
+  val log_solver_start : int -> string -> unit
+
+  val log_proc_restart : int -> unit
+
+  val log_alive : int -> unit
+
+  val log_proc_quit : ?status:int -> int -> unit
+
+  val get_elapsed : int -> float
+end
+
+module NoStat : Statistics = struct
+  let log_proc_start _ = ()
+
+  let log_solver_start _ _ = ()
+
+  let log_proc_restart _ = ()
+
+  let log_alive _ = ()
+
+  let log_proc_quit ?(status = 0) _ = ignore status
+
+  let get_elapsed _ = 0.
+end
+
+module type SolverSystemConfig = sig
+  val cvc_binary_path : unit -> string
+
+  val dryadsynth_binary_path : unit -> string
+
+  val eusolver_binary_path : unit -> string
+end
+
+type solver_instance = {
+  s_name : string;
+  s_pid : int;
+  s_input_file : string;
+  s_output_file : string;
+  s_process : process_out;
+}
 
 let online_solvers : (int * solver_instance) list ref = ref []
 
@@ -40,15 +98,15 @@ let commands_to_file (commands : program) (filename : string) =
       Fmt.(pf fout "@."));
   OC.close out_chan
 
-module SygusSolver = struct
+module SygusSolver (Stats : Statistics) (Log : Logger) (Config : SolverSystemConfig) = struct
   type t = CVC | DryadSynth | EUSolver
 
   let default_solver = ref CVC
 
   let binary_path = function
     | CVC -> Config.cvc_binary_path ()
-    | DryadSynth -> Config.dryadsynth_binary_path
-    | EUSolver -> Config.eusolver_binary_path
+    | DryadSynth -> Config.dryadsynth_binary_path ()
+    | EUSolver -> Config.eusolver_binary_path ()
 
   let sname = function CVC -> "CVC-SyGuS" | DryadSynth -> "DryadSynth" | EUSolver -> "EUSolver"
 
@@ -56,33 +114,62 @@ module SygusSolver = struct
     Fmt.(list ~sep:sp (fun fmt opt -> pf fmt "--%s" opt) frmt)
 
   let fetch_solution pid filename =
-    Log.debug_msg Fmt.(str "Fetching solution in %s" filename);
+    Log.debug Fmt.(fun fmt () -> pf fmt "Fetching solution in %s" filename);
     let r = reponse_of_sexps (Sexp.input_sexps (Stdio.In_channel.create filename)) in
     Stats.log_proc_quit pid;
     r
 
+  let solver_make_cancellable (s : solver_instance) (p : 'a Lwt.t) : unit =
+    (* IF task is cancelled, kill the solver.  *)
+    Lwt.on_cancel p (fun () ->
+        match s.s_process#state with
+        | Lwt_process.Exited _ -> ()
+        | Running ->
+            Stats.log_proc_quit s.s_process#pid;
+            Log.debug
+              Fmt.(
+                fun fmt () ->
+                  pf fmt "Terminating solver %s (PID : %i) (log: %s)" s.s_name s.s_pid
+                    s.s_output_file);
+            s.s_process#terminate)
+
   let exec_solver ?(solver_kind = !default_solver) ?(options = [])
-      ((inputfile, outputfile) : string * string) : solver_response option =
-    let pid_placeholder = Stats.pid_placeholder () in
+      ((inputfile, outputfile) : string * string) :
+      solver_instance * solver_response option Lwt.t * int Lwt.u =
     let command =
       shell Fmt.(str "%s %a %s" (binary_path solver_kind) print_options options inputfile)
     in
     let out_fd = Unix.openfile outputfile [ Unix.O_RDWR; Unix.O_TRUNC; Unix.O_CREAT ] 0o644 in
-    let main_t () =
-      Stats.log_solver_start pid_placeholder (sname solver_kind);
-      exec ~stdout:(`FD_move out_fd) command
+    let process = open_process_out ~stdout:(`FD_move out_fd) command in
+    let solver =
+      {
+        s_name = sname solver_kind;
+        s_pid = process#pid;
+        s_output_file = outputfile;
+        s_input_file = inputfile;
+        s_process = process;
+      }
     in
-    match Lwt_main.run (main_t ()) with
-    | Unix.WEXITED 0 -> Some (fetch_solution pid_placeholder outputfile)
-    | Unix.WEXITED i ->
-        Log.error_msg Fmt.(str "Solver exited with code %i." i);
-        None
-    | Unix.WSIGNALED i ->
-        Log.error_msg Fmt.(str "Solver signaled with code %i." i);
-        None (* TODO error messages. *)
-    | Unix.WSTOPPED i ->
-        Log.error_msg Fmt.(str "Solver stopped with code %i." i);
-        None
+    Stats.log_solver_start solver.s_pid solver.s_name;
+    try
+      let t, r = Lwt.task () in
+
+      ( solver,
+        Lwt.bind t (fun _ ->
+            let* status = process#status in
+            match status with
+            | Unix.WEXITED 0 -> Lwt.return (Some (fetch_solution solver.s_pid outputfile))
+            | Unix.WEXITED i ->
+                Log.error Fmt.(fun fmt () -> pf fmt "Solver exited with code %i." i);
+                Lwt.return None
+            | Unix.WSIGNALED i ->
+                Log.error Fmt.(fun fmt () -> pf fmt "Solver signaled with code %i." i);
+                Lwt.return None (* TODO error messages. *)
+            | Unix.WSTOPPED i ->
+                Log.error Fmt.(fun fmt () -> pf fmt "Solver stopped with code %i." i);
+                Lwt.return None),
+        r )
+    with Sys_error s -> failwith ("couldn't talk to solver, double-check path. Sys_error " ^ s)
 
   let wrapped_solver_call ?(solver_kind = !default_solver) ?(options = [])
       ((inputfile, outputfile) : string * string) : string * process_out =
@@ -94,36 +181,12 @@ module SygusSolver = struct
     Stats.log_solver_start po#pid (sname solver_kind);
     (outputfile, po)
 
-  let exec_solver_parallel (filenames : (string * string) list) =
-    let processes = List.map ~f:wrapped_solver_call filenames in
-    let proc_status this otf =
-      let sol =
-        try fetch_solution this#pid otf
-        with Sys_error s ->
-          Log.error_msg Fmt.(str "Sys_error (%a)" string s);
-          RFail
-      in
-      if is_infeasible sol || is_failed sol then None
-      else (
-        List.iter
-          ~f:(fun (_, proc) ->
-            if not (equal this#pid proc#pid) then (
-              proc#terminate;
-              Stats.log_proc_quit proc#pid;
-              Log.debug_msg
-                Fmt.(str "Killed %a early after %.3f s." int proc#pid (Stats.get_elapsed proc#pid))))
-          processes;
-        Some sol)
-    in
-    let cp =
-      List.map processes ~f:(fun (otf, proc) -> Lwt.map (fun _ -> proc_status proc otf) proc#status)
-    in
-    Lwt_main.run (Lwt.all cp)
-
-  let solve_commands (p : program) =
+  let solve_commands (p : program) : solver_response option Lwt.t * int Lwt.u =
     let inputfile = mk_tmp_sl "in_" in
     let outputfile = mk_tmp_sl "out_" in
-    Log.debug_msg Fmt.(str "Solving %s -> %s" inputfile outputfile);
+    Log.debug Fmt.(fun fmt () -> pf fmt "Solving %s -> %s" inputfile outputfile);
     commands_to_file p inputfile;
-    exec_solver (inputfile, outputfile)
+    let s, t, r = exec_solver (inputfile, outputfile) in
+    solver_make_cancellable s t;
+    (t, r)
 end

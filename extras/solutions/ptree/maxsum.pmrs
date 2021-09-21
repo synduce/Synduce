@@ -1,11 +1,11 @@
 
-let f0 x6 = x6
+let f0 x7 = x7
 
-let join1 x7 x8 x9 = max x7 (x8 + x9)
+let join1 x8 x9 x10 = max x8 (x9 + x10)
 
-let join2 x10 x11 x12 = x10 + (x11 + x12)
+let join2 x11 x12 x13 = x11 + (x12 + x13)
 
-target⟨join1, join2, f0⟩(): int tree -> int  = 
+ target⟨join1, join2, f0⟩(): int tree -> int  = 
 {
   ‣ main  TElt(a)  ⟹  f0 a
   ‣ main  TNode(a, l, r)  ⟹  join1 a (main l) (aux r)

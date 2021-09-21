@@ -452,85 +452,76 @@ let constraints_of_eqns (eqns : equation list) : command list =
   List.map ~f:eqn_to_constraint detupled_equations
 
 let aux_solve (gen_only : bool) (unknowns : VarSet.t) (eqns : equation list) =
-  let build_task gen_only (_cvc4_instance, _task_starter) =
-    let free_vars, all_operators, has_ite =
-      let f (fvs, ops, hi) eqn =
-        let precond, lhs, rhs = (eqn.eprecond, eqn.elhs, eqn.erhs) in
-        let set' =
-          VarSet.union_list
-            Analysis.
-              [
-                free_variables lhs;
-                free_variables rhs;
-                Option.value_map precond ~f:free_variables ~default:VarSet.empty;
-              ]
-        in
-        Analysis.
-          ( Set.union fvs set',
-            Set.union ops (Set.union (operators_of lhs) (operators_of rhs)),
-            hi || has_ite lhs || has_ite rhs )
+  let free_vars, all_operators, has_ite =
+    let f (fvs, ops, hi) eqn =
+      let precond, lhs, rhs = (eqn.eprecond, eqn.elhs, eqn.erhs) in
+      let set' =
+        VarSet.union_list
+          Analysis.
+            [
+              free_variables lhs;
+              free_variables rhs;
+              Option.value_map precond ~f:free_variables ~default:VarSet.empty;
+            ]
       in
-      let fvs, ops, hi =
-        List.fold eqns ~f ~init:(VarSet.empty, Set.empty (module Operator), false)
-      in
-      (Set.diff fvs unknowns, ops, hi)
+      Analysis.
+        ( Set.union fvs set',
+          Set.union ops (Set.union (operators_of lhs) (operators_of rhs)),
+          hi || has_ite lhs || has_ite rhs )
     in
-    (* Prepare commands *)
-    let logic =
-      let base_logic = logic_of_operators all_operators in
-      let needs_dt =
-        List.exists
-          ~f:(fun v -> requires_dt_theory (Variable.vtype_or_new v))
-          (Set.elements free_vars @ Set.elements unknowns)
-      in
-      if needs_dt then dt_extend_base_logic base_logic else base_logic
-    in
-    let synth_objs = synthfuns_of_unknowns ~bools:has_ite ~eqns ~ops:all_operators unknowns in
-    let set_logic = CSetLogic logic in
-    let sort_decls = declare_sorts_of_vars free_vars in
-    let var_decls = List.map ~f:declaration_of_var (Set.elements free_vars) in
-    let constraints = constraints_of_eqns eqns in
-    let extra_defs =
-      (if Set.mem all_operators (Binary Max) then [ max_definition ] else [])
-      @ if Set.mem all_operators (Binary Min) then [ min_definition ] else []
-    in
-    let commands =
-      set_logic :: (extra_defs @ sort_decls @ synth_objs @ var_decls @ constraints @ [ CCheckSynth ])
-    in
-    (* Call the solver. *)
-    let handle_response (resp : solver_response) =
-      let parse_synth_fun (fname, fargs, _, fbody) =
-        let args =
-          let f (varname, sort) = Variable.mk ~t:(rtype_of_sort sort) varname in
-          List.map ~f fargs
-        in
-        let local_vars = VarSet.of_list args in
-        let body, _ = infer_type (term_of_sygus (VarSet.to_env local_vars) fbody) in
-        (fname, args, body)
-      in
-      match resp with
-      | RSuccess resps ->
-          let soln = List.map ~f:parse_synth_fun resps in
-          (resp, Either.First soln)
-      | RInfeasible -> (RInfeasible, Either.Second [])
-      | RFail -> (RFail, Either.Second [])
-      | RUnknown -> (RUnknown, Either.Second [])
-    in
-    if !Config.generate_benchmarks then
-      Syguslib.Solvers.commands_to_file commands
-        (* Assuming gen_only true only for unrealizable problems. *)
-        (Config.new_benchmark_file ~hint:(if gen_only then "unrealizable_" else "") ".sl");
-    if not gen_only then
-      match Syguslib.Solvers.SygusSolver.solve_commands commands with
-      | Some resp -> handle_response resp
-      | None -> (RFail, Either.Second [])
-    else (RFail, Either.Second [])
+    let fvs, ops, hi = List.fold eqns ~f ~init:(VarSet.empty, Set.empty (module Operator), false) in
+    (Set.diff fvs unknowns, ops, hi)
   in
-  (* TODO: parallel solving with LIA < NIA < optims. < etc. ... *)
-  (* Example of failure because non-linear arith is not used:
-     benchmarks/numbers/int_nat_twomul.ml
-  *)
-  build_task gen_only ((), ())
+  (* Prepare commands *)
+  let logic =
+    let base_logic = logic_of_operators all_operators in
+    let needs_dt =
+      List.exists
+        ~f:(fun v -> requires_dt_theory (Variable.vtype_or_new v))
+        (Set.elements free_vars @ Set.elements unknowns)
+    in
+    if needs_dt then dt_extend_base_logic base_logic else base_logic
+  in
+  let synth_objs = synthfuns_of_unknowns ~bools:has_ite ~eqns ~ops:all_operators unknowns in
+  let set_logic = CSetLogic logic in
+  let sort_decls = declare_sorts_of_vars free_vars in
+  let var_decls = List.map ~f:declaration_of_var (Set.elements free_vars) in
+  let constraints = constraints_of_eqns eqns in
+  let extra_defs =
+    (if Set.mem all_operators (Binary Max) then [ max_definition ] else [])
+    @ if Set.mem all_operators (Binary Min) then [ min_definition ] else []
+  in
+  let commands =
+    set_logic :: (extra_defs @ sort_decls @ synth_objs @ var_decls @ constraints @ [ CCheckSynth ])
+  in
+  (* Call the solver. *)
+  let handle_response (resp : solver_response) =
+    let parse_synth_fun (fname, fargs, _, fbody) =
+      let args =
+        let f (varname, sort) = Variable.mk ~t:(rtype_of_sort sort) varname in
+        List.map ~f fargs
+      in
+      let local_vars = VarSet.of_list args in
+      let body, _ = infer_type (term_of_sygus (VarSet.to_env local_vars) fbody) in
+      (fname, args, body)
+    in
+    match resp with
+    | RSuccess resps ->
+        let soln = List.map ~f:parse_synth_fun resps in
+        (resp, Either.First soln)
+    | RInfeasible -> (RInfeasible, Either.Second [])
+    | RFail -> (RFail, Either.Second [])
+    | RUnknown -> (RUnknown, Either.Second [])
+  in
+  if !Config.generate_benchmarks then
+    Syguslib.Solvers.commands_to_file commands
+      (* Assuming gen_only true only for unrealizable problems. *)
+      (Config.new_benchmark_file ~hint:(if gen_only then "unrealizable_" else "") ".sl");
+  (* Call the solver on the generated file. *)
+  if not gen_only then
+    let t, r = SygusInterface.SygusSolver.solve_commands commands in
+    (Lwt.map (function Some resp -> handle_response resp | None -> (RFail, Either.Second [])) t, r)
+  else Lwt.task () |> fun (_, r) -> (Lwt.return (RFail, Either.Second []), r)
 
 let solve_eqns (unknowns : VarSet.t) (eqns : equation list) :
     solver_response * (partial_soln, Counterexamples.unrealizability_ctex list) Either.t =
@@ -553,7 +544,10 @@ let solve_eqns (unknowns : VarSet.t) (eqns : equation list) :
           let* () = Lwt_unix.sleep !Config.wait_parallel_tlimit in
           Lwt.return (RFail, Either.Second []));
       (* Task 2 : solving system of equations. *)
-      (fun () -> Lwt.return (aux_solve false unknowns eqns));
+      (fun () ->
+        let t, r = aux_solve false unknowns eqns in
+        Lwt.wakeup r 0;
+        t);
     ]
   in
   Log.debug_msg Fmt.(str "Solving for %a." VarSet.pp unknowns);

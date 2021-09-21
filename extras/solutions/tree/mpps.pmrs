@@ -1,12 +1,12 @@
 
-let join1 x25 (x26, x260) (x27, x270) =
-  (x25 + (x26 + x27), x25 + (max x260 (max (- x25) (x26 + x270))))
+let join1 x26 (x270, x271) (x280, x281) =
+  (x26 + (x270 + x280), x26 + (max x271 (max (- x26) (x270 + x281))))
 
-let f0 x23 = (x23, max 0 x23)
+let f0 x24 = (x24, max 0 x24)
 
 let s0  = (0, 0)
 
-target⟨join1, f0, s0⟩(): int tree -> (int * int)  = 
+ target⟨join1, f0, s0⟩(): int tree -> (int * int)  = 
 {
   ‣ main_mpps t1   ⟹  mpps t1
     mpps  Nil  ⟹  s0

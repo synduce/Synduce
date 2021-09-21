@@ -1,9 +1,9 @@
 
-let op x3 x4 = (- x3) + x4
+let op x4 x5 = (- x4) + x5
 
 let s0  = - 0
 
-let join x5 x6 = (- x5) + x6
+let join x6 x7 = (- x6) + x7
 
 let rec zipper_sum _x =
           match _x with Zip(a, b) -> join (rev_list_sum a) (list_sum b)

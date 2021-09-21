@@ -1,9 +1,9 @@
 
 let s0  = 0
 
-let oplus x1 x2 = x1 + x2
+let oplus x2 x3 = x2 + x3
 
-target⟨oplus, s0⟩(l): int list -> int  = 
+ target⟨oplus, s0⟩(l): int list -> int  = 
 {
   ‣ main l   ⟹  f s0 l
     f s Nil  ⟹  s

@@ -1,12 +1,12 @@
 
-let odot (x11, x110, x111) (x12, x120, x121) =
-  (x11 + x12, max x110 (x11 + x120), max x121 (x111 + x12))
+let odot (x120, x121, x122) (x130, x131, x132) =
+  (x120 + x130, max x121 (x120 + x131), max x132 (x122 + x130))
 
-let f0 x8 = (x8, max x8 0, max 0 x8)
+let f0 x9 = (x9, max x9 0, max 0 x9)
 
 let s0  = (0, 0, 0)
 
-target⟨odot, f0, s0⟩(): int clist -> (int * int * int)  = 
+ target⟨odot, f0, s0⟩(): int clist -> (int * int * int)  = 
 {
   ‣ main t   ⟹  h t
     h  CNil  ⟹  s0

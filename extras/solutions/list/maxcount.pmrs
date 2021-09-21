@@ -1,12 +1,12 @@
 
 let s_0  = 0
 
-let odot (x1, x10) (x2, x20) =
-  (max x1 x2, x1 = x2 ? x20 + x10 : x2 > x1 ? x20 : x10)
+let odot (x20, x21) (x30, x31) =
+  (max x20 x30, x20 = x30 ? x31 + x21 : x30 > x20 ? x31 : x21)
 
-let f_0 x = (x, 1)
+let f_0 x0 = (x0, 1)
 
-target⟨odot, f_0, s_0⟩(l): int clist -> (int * int)  = 
+ target⟨odot, f_0, s_0⟩(l): int clist -> (int * int)  = 
 {
   ‣ h  Single(a)  ⟹  f_0 a
   ‣ h  Concat(x, y)  ⟹  odot (h x) (h y)

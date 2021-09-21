@@ -1,9 +1,9 @@
 
-let s0 x4 = false
+let s0 x5 = false
 
-let odot x5 x6 x7 x8 = ((x5 = x6) || x7) || x8
+let odot x6 x7 x8 x9 = ((x6 = x7) || x8) || x9
 
-target⟨odot, s0⟩(x): int tree -> bool  = 
+ target⟨odot, s0⟩(x): int tree -> bool  = 
 {
   ‣ search_tree  Empty  ⟹  s0 x
   ‣ search_tree  Node(a, l, r)  ⟹ 

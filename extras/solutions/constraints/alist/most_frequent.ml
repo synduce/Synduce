@@ -1,8 +1,8 @@
 
-let s0 x19 x20 = (x20, x19)
+let s0 x20 x21 = (x21, x20)
 
-let join x23 x24 (x25, x250) =
-  (x24 > x25 ? x24 : x25, x24 > x25 ? x23 : x250)
+let join x24 x25 (x260, x261) =
+  (x25 > x260 ? x25 : x260, x25 > x260 ? x24 : x261)
 
 let rec target =
   function AElt(k, v) -> s0 k (int_of v)

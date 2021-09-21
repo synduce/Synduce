@@ -4,6 +4,35 @@ open Term
 open Option.Let_syntax
 open Utils
 
+(* Instantiate solver functor in interface. *)
+
+module SygusSolver =
+  Syguslib.Solvers.SygusSolver
+    (* Statistics collection config. *)
+    (Stats)
+    (* Logging config. *)
+    (struct
+      let error = Log.error
+
+      let debug = Log.debug
+
+      let verb = Log.verbose
+
+      let verbose = false
+
+      let log_queries = true
+
+      let log_file = Caml.Filename.temp_file "synt" ".sl"
+    end)
+    (* Solvers config. *)
+    (struct
+      let cvc_binary_path = Config.cvc_binary_path
+
+      let dryadsynth_binary_path () = Config.dryadsynth_binary_path
+
+      let eusolver_binary_path () = Config.eusolver_binary_path
+    end)
+
 let rec rtype_of_sort (s : sygus_sort) : RType.t option =
   match s with
   | SId (IdSimple sname) -> (

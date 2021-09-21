@@ -1,9 +1,9 @@
 
-let xi_0 x6 x7 = x7 < x6 ? 1 : 0
+let xi_1 x10 x11 = (1 + x10) + x11
 
-let xi_1 x8 x9 = (1 + x8) + x9
+let xi_0 x8 x9 = x9 < x8 ? 1 : 0
 
-let xi_2 x10 = x10
+let xi_2 x12 = x12
 
 let rec g =
   function Leaf(a) -> xi_0 x a

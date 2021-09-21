@@ -1,13 +1,15 @@
 
 let s0  = (false, 1)
 
-let joinl x (x0, x00) (x1, x10) =
-  (x0 ? x0 : (x % 2) = 1 ? true : x1, x0 ? x00 : (x % 2) = 1 ? x : x10)
+let joinl x0 (x10, x11) (x20, x21) =
+  (x10 ? x10 : (x0 % 2) = 1 ? true : x20,
+    x10 ? x11 : (x0 % 2) = 1 ? x0 : x21)
 
-let joinr x5 (x6, x60) (x7, x70) =
-  (x7 ? x7 : (x5 % 2) = 1 ? true : x6, x7 ? x70 : (x5 % 2) = 1 ? x5 : x60)
+let joinr x6 (x70, x71) (x80, x81) =
+  (x80 ? x80 : (x6 % 2) = 1 ? true : x70,
+    x80 ? x81 : (x6 % 2) = 1 ? x6 : x71)
 
-target⟨s0, joinl, joinr⟩(): int zipper -> (bool * int)  = 
+ target⟨s0, joinl, joinr⟩(): int zipper -> (bool * int)  = 
 {
   ‣ main  Top  ⟹  s0
   ‣ main  Zip(Left, a, child, z)  ⟹  joinl a (spec child) (main z)

@@ -1,10 +1,10 @@
 
-let join x17 (x18, x180) (x19, x190) =
-  (min x17 (min x18 x19), max x17 (max x180 x190))
+let join x18 (x190, x191) (x200, x201) =
+  (min x18 (min x190 x200), max x18 (max x191 x201))
 
-let f0 x15 = (x15, x15)
+let f0 x16 = (x16, x16)
 
-target⟨join, f0⟩(): int tree -> (int * int)  = 
+ target⟨join, f0⟩(): int tree -> (int * int)  = 
 {
   ‣ main t1   ⟹  h t1
     h  Leaf(x)  ⟹  f0 x

@@ -1,9 +1,10 @@
 
-let odot (x3, x30) (x4, x40) = (min x3 x4, min x30 (max x4 (min x3 x40)))
+let odot (x40, x41) (x50, x51) =
+  (min x40 x50, min x41 (max x50 (min x40 x51)))
 
-let f_0 x x0 = (min x x0, max x x0)
+let f_0 x0 x1 = (min x0 x1, max x0 x1)
 
-target⟨odot, f_0⟩(l): int clist -> (int * int)  = 
+ target⟨odot, f_0⟩(l): int clist -> (int * int)  = 
 {
   ‣ target t   ⟹  h t
     h  CTwo(a, b)  ⟹  f_0 a b

@@ -1,7 +1,8 @@
 
-let join x (x0, x00) (x1, x10) = (x, ((x0 < x) && (x < x1)) && (x00 && x10))
+let join x0 (x10, x11) (x20, x21) =
+  (x0, ((x10 < x0) && (x0 < x20)) && (x11 && x21))
 
-target⟨join⟩(): int tree -> (int * bool)  = 
+ target⟨join⟩(): int tree -> (int * bool)  = 
 {
   ‣ main t1   ⟹  h t1
     h  Leaf(a)  ⟹  (a, true)

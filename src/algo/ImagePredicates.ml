@@ -147,12 +147,17 @@ let set_up_to_get_ensures_model solver ~(p : psi_def) (ensures : term) =
   in
   SmtInterface.AsyncSmt.exec_command solver (S.mk_assert (S.mk_not ensures_app))
 
-let handle_ensures_synth_response (resp : solver_response option) (var : variable) =
+let handle_ensures_synth_response ((task, resolver) : solver_response option Lwt.t * int Lwt.u)
+    (var : variable) =
   let parse_synth_fun (fname, _fargs, _, fbody) =
     let body, _ = infer_type (term_of_sygus (VarSet.to_env (VarSet.of_list [ var ])) fbody) in
     (fname, [], body)
   in
-  match resp with
+  match
+    Lwt_main.run
+      (Lwt.wakeup resolver 0;
+       task)
+  with
   | Some (RSuccess resps) ->
       let soln = List.map ~f:parse_synth_fun resps in
       Some soln
@@ -426,9 +431,7 @@ let rec synthesize ~(p : psi_def) (positives : ctex list) (negatives : ctex list
     CSetLogic logic
     :: (extra_defs @ [ synth_objs ] @ neg_constraints @ pos_constraints @ [ CCheckSynth ])
   in
-  match
-    handle_ensures_synth_response (Syguslib.Solvers.SygusSolver.solve_commands commands) var
-  with
+  match handle_ensures_synth_response (SygusInterface.SygusSolver.solve_commands commands) var with
   | None -> None
   | Some solns -> (
       let _, _, body = List.nth_exn solns 0 in

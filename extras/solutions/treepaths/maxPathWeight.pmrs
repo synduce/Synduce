@@ -1,9 +1,7 @@
 
-let join x x0 x1 = x + (max x0 x1)
+let join x12 x13 x14 = x12 + (max x13 x14)
 
-let join x2 x3 x4 = x2 + (max x4 x3)
-
-target⟨join⟩(): int zipper -> int  = 
+ target⟨join⟩(): int zipper -> int  = 
 {
   ‣ main  Top  ⟹  0
   ‣ main  Zip(x, a, child, z)  ⟹  join a (spec child) (main z)

@@ -1,9 +1,9 @@
 
-let odot x (x0, x00) (x1, x10) = (x1 + (x0 × x10), x00 × x10)
+let odot x0 (x10, x11) (x20, x21) = (x20 + (x10 × x21), x11 × x21)
 
 let s0  = (0, 1)
 
-target⟨odot, s0⟩(x): int clist -> (int * int)  = 
+ target⟨odot, s0⟩(x): int clist -> (int * int)  = 
 {
   ‣ main t   ⟹  h t
     h  CNil  ⟹  s0

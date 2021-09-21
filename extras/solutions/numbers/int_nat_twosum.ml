@@ -1,9 +1,9 @@
 
-let sub1 x19 = (- 1) + x19
+let sub1 x20 = (- 1) + x20
 
-let add1 x20 = 1 + x20
+let add1 x21 = 1 + x21
 
-let add x21 x22 = (10 + x21) + x22
+let add x22 x23 = (10 + x22) + x23
 
 let c0  = - 5
 

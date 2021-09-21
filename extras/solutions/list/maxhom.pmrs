@@ -1,11 +1,11 @@
 
-let f_0 x = x
+let odot x1 x2 = max x1 x2
 
-let odot x0 x1 = max x0 x1
+let f_0 x0 = x0
 
 let s_0  = 0
 
-target⟨odot, f_0, s_0⟩(l): int clist -> int  = 
+ target⟨odot, f_0, s_0⟩(l): int clist -> int  = 
 {
   ‣ h  Single(a)  ⟹  f_0 a
   ‣ h  Concat(x, y)  ⟹  odot (h x) (h y)

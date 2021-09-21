@@ -341,14 +341,19 @@ let log_soln s vs t =
         (String.concat ~sep:" " (List.map ~f:(fun v -> v.vname) vs))
         pp_term t)
 
-let handle_lemma_synth_response (det : term_state_detail) (resp : solver_response option) =
+let handle_lemma_synth_response (det : term_state_detail)
+    ((task, resolver) : solver_response option Lwt.t * int Lwt.u) =
   let parse_synth_fun (fname, _fargs, _, fbody) =
     let body, _ =
       infer_type (term_of_sygus (VarSet.to_env (VarSet.of_list det.scalar_vars)) fbody)
     in
     (fname, det.scalar_vars, body)
   in
-  match resp with
+  match
+    Lwt_main.run
+      (Lwt.wakeup resolver 0;
+       task)
+  with
   | Some (RSuccess resps) ->
       let soln = List.map ~f:parse_synth_fun resps in
       let _ = List.iter ~f:(fun (s, vs, t) -> log_soln s vs t) soln in
@@ -828,7 +833,7 @@ let synthesize_new_lemma ~(p : psi_def) (det : term_state_detail) :
     CSetLogic logic
     :: (extra_defs @ [ synth_objs ] @ neg_constraints @ pos_constraints @ [ CCheckSynth ])
   in
-  match handle_lemma_synth_response det (Syguslib.Solvers.SygusSolver.solve_commands commands) with
+  match handle_lemma_synth_response det (SygusInterface.SygusSolver.solve_commands commands) with
   | None -> None
   | Some solns -> List.nth solns 0
 

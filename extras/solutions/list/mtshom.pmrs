@@ -1,11 +1,11 @@
 
-let join (x1, x10) (x2, x20) = (max x2 (x1 + x20), x10 + x20)
+let join (x20, x21) (x30, x31) = (max x30 (x20 + x31), x21 + x31)
 
 let s0  = (0, 0)
 
-let f0 x = (max 0 x, x)
+let f0 x0 = (max 0 x0, x0)
 
-target⟨join, s0, f0⟩(): int clist -> (int * int)  = 
+ target⟨join, s0, f0⟩(): int clist -> (int * int)  = 
 {
   ‣ main t   ⟹  h t
     h  CNil  ⟹  s0

@@ -1,9 +1,9 @@
 
-let s0 x117 x118 = x117 = x118
+let s0 x44 x45 = x44 = x45
 
-let f1 x119 x120 x121 x122 = (x119 = x120) || (x121 || x122)
+let f1 x46 x47 x48 x49 = (x46 = x47) || (x48 || x49)
 
-let c0 x123 x124 = x124 > x124
+let c0 x50 x51 = x51 > x50
 
 let rec g =
   function MLeaf(a) -> s0 x a

@@ -1,13 +1,13 @@
 
 let s0  = (0, 0)
 
-let joinl x11 (x12, x120) (x13, x130) =
-  (x11 + (x12 + x13), max x120 (x11 + (x12 + x130)))
+let joinl x12 (x130, x131) (x140, x141) =
+  (x12 + (x130 + x140), max x131 (x12 + (x130 + x141)))
 
-let joinr x17 (x18, x180) (x19, x190) =
-  (x17 + (x18 + x19), max x190 (x17 + (x180 + x19)))
+let joinr x18 (x190, x191) (x200, x201) =
+  (x18 + (x190 + x200), max x201 (x18 + (x191 + x200)))
 
-target⟨s0, joinl, joinr⟩(): int zipper -> (int * int)  = 
+ target⟨s0, joinl, joinr⟩(): int zipper -> (int * int)  = 
 {
   ‣ main  Top  ⟹  s0
   ‣ main  Zip(Left, a, child, z)  ⟹  joinl a (spec child) (main z)

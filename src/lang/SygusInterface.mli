@@ -2,6 +2,14 @@ open Base
 open Term
 open Syguslib
 
+module SygusSolver : sig
+  type t = CVC | DryadSynth | EUSolver
+
+  val solve_commands : Sygus.program -> Sygus.solver_response option Lwt.t * int Lwt.u
+
+  val default_solver : t ref
+end
+
 val rtype_of_sort : Sygus.sygus_sort -> RType.t option
 (**
     Translates a sygus sort to a type.

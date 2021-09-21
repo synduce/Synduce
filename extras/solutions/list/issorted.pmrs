@@ -1,8 +1,8 @@
 
-let odot (x1, x10, x11) (x2, x20, x21) =
-  (x1, x20, x11 && (x21 && (x2 > x10)))
+let odot (x20, x21, x22) (x30, x31, x32) =
+  (x20, x31, x22 && (x32 && (x30 > x21)))
 
-target⟨odot⟩(): int clist -> (int * int * bool)  = 
+ target⟨odot⟩(): int clist -> (int * int * bool)  = 
 {
   ‣ main t   ⟹  h t
     h  Single(a)  ⟹  (a, a, true)

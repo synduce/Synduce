@@ -1,10 +1,10 @@
 
-let odot x11 (x12, x120) (x13, x130) =
-  (x11 + (x12 + x13), max x120 (x12 + (max x130 (x11 + x13))))
+let odot x12 (x130, x131) (x140, x141) =
+  (x12 + (x130 + x140), max x131 (x130 + (max x141 (x12 + x140))))
 
 let s0  = (0, 0)
 
-target⟨odot, s0⟩(): int tree -> (int * int)  = 
+ target⟨odot, s0⟩(): int tree -> (int * int)  = 
 {
   ‣ search_tree  Empty  ⟹  s0
   ‣ search_tree  Node(a, l, r)  ⟹  odot a (search_tree l) (search_tree r)

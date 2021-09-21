@@ -1,11 +1,11 @@
 
 let s0  = 0
 
-let f0 x x0 = x = x0 ? 0 : 1
+let f0 x0 x1 = x0 = x1 ? 0 : 1
 
-let odot x1 x2 = x1 + x2
+let odot x2 x3 = x2 + x3
 
-target⟨odot, f0, s0⟩(l): int zipclist -> int  = 
+ target⟨odot, f0, s0⟩(l): int zipclist -> int  = 
 {
   ‣ target t   ⟹  h t
     h  CNil  ⟹  s0
