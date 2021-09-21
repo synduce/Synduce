@@ -530,19 +530,31 @@ let solve_eqns (unknowns : VarSet.t) (eqns : equation list) :
       (* Task 1 : checking unrelizability. *)
       (fun () ->
         if !Config.check_unrealizable then (
-          match Counterexamples.check_unrealizable unknowns eqns with
-          | [] ->
-              (* It not infeasible, sleep for timeout duration. *)
-              let* () = Lwt_unix.sleep !Config.wait_parallel_tlimit in
-              Lwt.return (RFail, Either.Second [])
-          | _ as ctexs ->
-              if !Config.generate_benchmarks then ignore (aux_solve false unknowns eqns);
-              if !Config.check_unrealizable_smt_unsatisfiable then
-                Counterexamples.smt_unsatisfiability_check unknowns eqns;
-              Lwt.return (RInfeasible, Either.Second ctexs))
+          let t, r = Counterexamples.check_unrealizable unknowns eqns in
+          let task =
+            let* ctexs = t in
+            match ctexs with
+            | [] ->
+                (* It not infeasible, sleep for timeout duration. *)
+                let* () = Lwt_unix.sleep !Config.wait_parallel_tlimit in
+                Lwt.return (RFail, Either.Second [])
+            | _ ->
+                if !Config.generate_benchmarks then ignore (aux_solve false unknowns eqns);
+                if !Config.check_unrealizable_smt_unsatisfiable then
+                  Counterexamples.smt_unsatisfiability_check unknowns eqns;
+                Lwt.return (RInfeasible, Either.Second ctexs)
+          in
+          Lwt.wakeup r 0;
+          task)
         else
-          let* () = Lwt_unix.sleep !Config.wait_parallel_tlimit in
-          Lwt.return (RFail, Either.Second []));
+          let t, r = Lwt.task () in
+          let task =
+            Lwt.bind t (fun _ ->
+                let* _ = Lwt_unix.sleep !Config.wait_parallel_tlimit in
+                Lwt.return (RFail, Either.Second []))
+          in
+          Lwt.wakeup r 0;
+          task);
       (* Task 2 : solving system of equations. *)
       (fun () ->
         let t, r = aux_solve false unknowns eqns in

@@ -7,6 +7,7 @@ open Projection
 open SmtInterface
 open Smtlib
 open Utils
+open Lwt.Syntax
 
 (* ============================================================================================= *)
 (*                               CHECKING UNREALIZABILITY                                        *)
@@ -123,109 +124,138 @@ let components_of_unrealizability ~unknowns (eqn1 : equation) (eqn2 : equation) 
               eqn1.erhs pp_term eqn2.erhs);
         None)
 
+let gen_info (eqn_i, eqn_j) unknowns =
+  let fv e =
+    VarSet.union_list
+      [
+        Analysis.free_variables e.elhs;
+        Analysis.free_variables e.erhs;
+        Option.value_map ~default:VarSet.empty ~f:Analysis.free_variables e.eprecond;
+      ]
+  in
+  let vseti = Set.diff (fv eqn_i) unknowns and vsetj = Set.diff (fv eqn_j) unknowns in
+  let var_subst = VarSet.prime vsetj in
+  let vsetj' = VarSet.of_list (List.map ~f:snd var_subst) in
+  let sub = List.map ~f:(fun (v, v') -> (mk_var v, mk_var v')) var_subst in
+  (vseti, vsetj, vsetj', sub, var_subst)
+
 (** Check if system of equations defines a functionally realizable synthesis problem.
   If any equation defines an unsolvable problem, an unrealizability_ctex is added to the
   list of counterexamples to be returned.
   If the returned list is empty, the problem may be solvable/realizable.
   If the returned list is not empty, the problem is not solvable / unrealizable.
 *)
-let check_unrealizable (unknowns : VarSet.t) (eqns : equation_system) : unrealizability_ctex list =
+let check_unrealizable (unknowns : VarSet.t) (eqns : equation_system) :
+    unrealizability_ctex list Lwt.t * int Lwt.u =
   Log.debug (fun f () -> Fmt.(pf f "Checking unrealizability..."));
   let start_time = Unix.gettimeofday () in
-  let solver = SyncSmt.make_z3_solver () in
-  SyncSmt.load_min_max_defs solver;
-  (* Main part of the check, applied to each equation in eqns. *)
-  let check_eqn_accum (ctexs : unrealizability_ctex list) ((i, eqn_i), (j, eqn_j)) =
-    let fv e =
-      VarSet.union_list
-        [
-          Analysis.free_variables e.elhs;
-          Analysis.free_variables e.erhs;
-          Option.value_map ~default:VarSet.empty ~f:Analysis.free_variables e.eprecond;
-        ]
+  let task (solver, binder) =
+    let* _ = binder in
+    let* _ = AsyncSmt.load_min_max_defs solver in
+    (* Main part of the check, applied to each equation in eqns. *)
+    let check_eqn_accum (ctexs : unrealizability_ctex list Lwt.t) ((i, eqn_i), (j, eqn_j)) =
+      let* ctexs = ctexs in
+      let vseti, vsetj, vsetj', sub, var_subst = gen_info (eqn_i, eqn_j) unknowns in
+
+      (* Extract the arguments of the rhs, if it is a proper skeleton. *)
+      match components_of_unrealizability ~unknowns eqn_i eqn_j with
+      | None -> return ctexs (* If we cannot match the expected structure, skip it. *)
+      | Some (rhs_args_ij, (lhs_i, lhs_j)) ->
+          let lhs_diff =
+            let projs = projection_eqns lhs_i (substitution sub lhs_j) in
+            List.map ~f:(fun (ei, ej) -> mk_un Not (mk_bin Eq ei ej)) projs
+          in
+          (* (push). *)
+          let* _ = AsyncSmt.spush solver in
+          (* Declare the variables. *)
+          let* _ = AsyncSmt.declare_all solver (decls_of_vars (Set.union vseti vsetj')) in
+          (* Assert preconditions, if they exist. *)
+          let* _ =
+            match eqn_i.eprecond with
+            | Some pre_i ->
+                let* _ =
+                  AsyncSmt.declare_all solver (decls_of_vars (Analysis.free_variables pre_i))
+                in
+                AsyncSmt.smt_assert solver (smt_of_term pre_i)
+            | None -> return ()
+          in
+          let* _ =
+            match eqn_j.eprecond with
+            | Some pre_j ->
+                let* _ =
+                  AsyncSmt.declare_all solver (decls_of_vars (Analysis.free_variables pre_j))
+                in
+                AsyncSmt.smt_assert solver (smt_of_term (substitution sub pre_j))
+            | None -> return ()
+          in
+          (* Assert that the lhs of i and j must be different. **)
+          let* _ =
+            Lwt_list.iter_s (fun eqn -> AsyncSmt.smt_assert solver (smt_of_term eqn)) lhs_diff
+          in
+          (* Assert that the rhs must be equal. *)
+          let* _ =
+            Lwt_list.iter_s
+              (fun (rhs_i_arg_term, rhs_j_arg_term) ->
+                let rhs_eqs = projection_eqns rhs_i_arg_term (substitution sub rhs_j_arg_term) in
+                Lwt_list.iter_s
+                  (fun (lhs, rhs) -> AsyncSmt.smt_assert solver (smt_of_term (mk_bin Eq lhs rhs)))
+                  rhs_eqs)
+              rhs_args_ij
+          in
+          (* Check sat and get model. *)
+          let* new_ctexs =
+            let* resp = AsyncSmt.check_sat solver in
+            match resp with
+            | Sat -> (
+                let* model_sexps = AsyncSmt.get_model solver in
+                match model_sexps with
+                | SExps s ->
+                    let model = model_to_constmap (SExps s) in
+                    (* Search for a few additional models. *)
+                    let* other_models =
+                      if !Config.fuzzing_count > 0 then
+                        request_different_models_async (return model) !Config.fuzzing_count solver
+                      else return []
+                    in
+                    let new_ctexs =
+                      List.map
+                        ~f:
+                          (unrealizability_ctex_of_constmap (i, j) (eqn_i, eqn_j) (vseti, vsetj)
+                             var_subst)
+                        (model :: other_models)
+                    in
+                    return (new_ctexs @ ctexs)
+                | _ -> return ctexs)
+            | _ -> return ctexs
+          in
+          let+ _ = AsyncSmt.spop solver in
+          new_ctexs
     in
-    let vseti = Set.diff (fv eqn_i) unknowns and vsetj = Set.diff (fv eqn_j) unknowns in
-    let var_subst = VarSet.prime vsetj in
-    let vsetj' = VarSet.of_list (List.map ~f:snd var_subst) in
-    let sub = List.map ~f:(fun (v, v') -> (mk_var v, mk_var v')) var_subst in
-    (* Extract the arguments of the rhs, if it is a proper skeleton. *)
-    match components_of_unrealizability ~unknowns eqn_i eqn_j with
-    | None -> ctexs (* If we cannot match the expected structure, skip it. *)
-    | Some (rhs_args_ij, (lhs_i, lhs_j)) ->
-        (* (push). *)
-        SyncSmt.spush solver;
-        (* Declare the variables. *)
-        SyncSmt.declare_all solver (decls_of_vars (Set.union vseti vsetj'));
-        (* Assert preconditions, if they exist. *)
-        (match eqn_i.eprecond with
-        | Some pre_i ->
-            SyncSmt.declare_all solver (decls_of_vars (Analysis.free_variables pre_i));
-            SyncSmt.smt_assert solver (smt_of_term pre_i)
-        | None -> ());
-        (match eqn_j.eprecond with
-        | Some pre_j ->
-            SyncSmt.declare_all solver (decls_of_vars (Analysis.free_variables pre_j));
-            SyncSmt.smt_assert solver (smt_of_term (substitution sub pre_j))
-        | None -> ());
-        (* Assert that the lhs of i and j must be different. **)
-        let lhs_diff =
-          let projs = projection_eqns lhs_i (substitution sub lhs_j) in
-          List.map ~f:(fun (ei, ej) -> mk_un Not (mk_bin Eq ei ej)) projs
-        in
-        List.iter lhs_diff ~f:(fun eqn -> SyncSmt.smt_assert solver (smt_of_term eqn));
-        (* Assert that the rhs must be equal. *)
-        List.iter rhs_args_ij ~f:(fun (rhs_i_arg_term, rhs_j_arg_term) ->
-            let rhs_eqs = projection_eqns rhs_i_arg_term (substitution sub rhs_j_arg_term) in
-            List.iter rhs_eqs ~f:(fun (lhs, rhs) ->
-                SyncSmt.smt_assert solver (smt_of_term (mk_bin Eq lhs rhs))));
-        (* Check sat and get model. *)
-        let new_ctexs =
-          match SyncSmt.check_sat solver with
-          | Sat -> (
-              match SyncSmt.get_model solver with
-              | SExps s ->
-                  let model = model_to_constmap (SExps s) in
-                  (* Search for a few additional models. *)
-                  let other_models =
-                    if !Config.fuzzing_count > 0 then
-                      request_different_models model !Config.fuzzing_count solver
-                    else []
-                  in
-                  let new_ctexs =
-                    List.map
-                      ~f:
-                        (unrealizability_ctex_of_constmap (i, j) (eqn_i, eqn_j) (vseti, vsetj)
-                           var_subst)
-                      (model :: other_models)
-                  in
-                  new_ctexs @ ctexs
-              | _ -> ctexs)
-          | _ -> ctexs
-        in
-        SyncSmt.spop solver;
-        new_ctexs
+    let* ctexs =
+      List.fold ~f:check_eqn_accum ~init:(return [])
+        (List.mapi ~f:(fun i eqn -> (i, eqn)) eqns |> combinations)
+    in
+    let+ _ = AsyncSmt.close_solver solver in
+    let elapsed = Unix.gettimeofday () -. start_time in
+    Log.debug (fun f () -> Fmt.(pf f "... finished in %3.4fs" elapsed));
+    Log.debug (fun f () ->
+        match ctexs with
+        | [] -> Fmt.pf f "No counterexample to realizability found."
+        | _ :: _ ->
+            Fmt.(
+              pf f
+                "@[Counterexamples found!@;\
+                 @[<hov 2>❔ Equations:@;\
+                 @[<v>%a@]@]@;\
+                 @[<hov 2>❔ Counterexample models:@;\
+                 @[<v>%a@]@]@]"
+                (list ~sep:sp (box (pair ~sep:colon int (box pp_equation))))
+                (List.mapi ~f:(fun i eqn -> (i, eqn)) eqns)
+                (list ~sep:sep_and pp_unrealizability_ctex)
+                ctexs));
+    ctexs
   in
-  let eqns_indexed = List.mapi ~f:(fun i eqn -> (i, eqn)) eqns in
-  let ctexs = List.fold ~f:check_eqn_accum ~init:[] (combinations eqns_indexed) in
-  SyncSmt.close_solver solver;
-  let elapsed = Unix.gettimeofday () -. start_time in
-  Log.debug (fun f () -> Fmt.(pf f "... finished in %3.4fs" elapsed));
-  Log.debug (fun f () ->
-      match ctexs with
-      | [] -> Fmt.pf f "No counterexample to realizability found."
-      | _ :: _ ->
-          Fmt.(
-            pf f
-              "@[Counterexamples found!@;\
-               @[<hov 2>❔ Equations:@;\
-               @[<v>%a@]@]@;\
-               @[<hov 2>❔ Counterexample models:@;\
-               @[<v>%a@]@]@]"
-              (list ~sep:sp (box (pair ~sep:colon int (box pp_equation))))
-              eqns_indexed
-              (list ~sep:sep_and pp_unrealizability_ctex)
-              ctexs));
-  ctexs
+  AsyncSmt.(cancellable_task (make_z3_solver ()) task)
 
 (* ============================================================================================= *)
 (*                            CLASSIFYING SPURIOUS COUNTEREXAMPLES                               *)
@@ -250,56 +280,56 @@ let check_image_sat ~p ctex : AsyncSmt.response * int u =
       in
       let rec aux accum tlist =
         let f binder eqn =
-          let%lwt _ = binder in
-          let%lwt _ = AsyncSmt.spush solver_instance in
-          let%lwt _ =
+          let* _ = binder in
+          let* _ = AsyncSmt.spush solver_instance in
+          let* _ =
             AsyncSmt.declare_all solver_instance
               (SmtInterface.decls_of_vars (Analysis.free_variables eqn))
           in
-          let%lwt _ = AsyncSmt.smt_assert solver_instance (smt_of_term eqn) in
-          let%lwt res = AsyncSmt.check_sat solver_instance in
-          let%lwt _ = AsyncSmt.spop solver_instance in
+          let* _ = AsyncSmt.smt_assert solver_instance (smt_of_term eqn) in
+          let* res = AsyncSmt.check_sat solver_instance in
+          let* _ = AsyncSmt.spop solver_instance in
           return res
         in
         match tlist with
         | [] -> accum
         | t0 :: tl -> (
-            let%lwt accum' = f accum t0 in
+            let* accum' = f accum t0 in
             match accum' with Unsat -> return SmtLib.Unsat | _ -> aux (return accum') tl)
       in
       aux accum term_eqs
     in
     let t_decl = List.map ~f:snd (Lang.SmtInterface.declare_datatype_of_rtype !AState._alpha) in
-    let%lwt _ = task_start in
+    let* _ = task_start in
     (* TODO : logic *)
-    let%lwt () = AsyncSmt.set_logic solver_instance "LIA" in
-    let%lwt () = AsyncSmt.declare_all solver_instance t_decl in
-    let%lwt () = AsyncSmt.load_min_max_defs solver_instance in
+    let* () = AsyncSmt.set_logic solver_instance "LIA" in
+    let* () = AsyncSmt.declare_all solver_instance t_decl in
+    let* () = AsyncSmt.load_min_max_defs solver_instance in
     (* Run the bounded checking loop. *)
-    let%lwt res =
+    let* res =
       Expand.lwt_expand_loop steps t_check (return (TermSet.singleton ctex.ctex_eqn.eterm))
     in
-    let%lwt () = AsyncSmt.close_solver solver_instance in
+    let* () = AsyncSmt.close_solver solver_instance in
     return res
   in
   AsyncSmt.(cancellable_task (make_z3_solver ()) build_task)
 
 let check_image_unsat ~p ctex : AsyncSmt.response * int u =
   let build_task (solver, task_start) =
-    let%lwt _ = task_start in
-    let%lwt () = AsyncSmt.set_logic solver "ALL" in
-    let%lwt () = AsyncSmt.set_option solver "quant-ind" "true" in
-    let%lwt () =
+    let* _ = task_start in
+    let* () = AsyncSmt.set_logic solver "ALL" in
+    let* () = AsyncSmt.set_option solver "quant-ind" "true" in
+    let* () =
       if !Config.induction_proof_tlimit >= 0 then
         AsyncSmt.set_option solver "tlimit" (Int.to_string !Config.induction_proof_tlimit)
       else return ()
     in
-    let%lwt () = AsyncSmt.load_min_max_defs solver in
+    let* () = AsyncSmt.load_min_max_defs solver in
     (* Declare Tinv, repr and reference functions. *)
-    let%lwt () =
+    let* () =
       Lwt_list.iter_p
         (fun x ->
-          let%lwt _ = AsyncSmt.exec_command solver x in
+          let* _ = AsyncSmt.exec_command solver x in
           return ())
         (smt_of_pmrs p.psi_reference @ if p.psi_repr_is_identity then [] else smt_of_pmrs p.psi_repr)
     in
@@ -325,9 +355,9 @@ let check_image_unsat ~p ctex : AsyncSmt.response * int u =
         (* Assert that the variables have the values assigned by the model. *)
         SmtLib.mk_assoc_and (List.map ~f:smt_of_term eqns) )
     in
-    let%lwt _ = AsyncSmt.smt_assert solver (SmtLib.mk_exists (sorted_vars_of_vars fv) formula) in
-    let%lwt resp = AsyncSmt.check_sat solver in
-    let%lwt () = AsyncSmt.close_solver solver in
+    let* _ = AsyncSmt.smt_assert solver (SmtLib.mk_exists (sorted_vars_of_vars fv) formula) in
+    let* resp = AsyncSmt.check_sat solver in
+    let* () = AsyncSmt.close_solver solver in
     return resp
   in
   AsyncSmt.(cancellable_task (AsyncSmt.make_cvc_solver ()) build_task)
@@ -415,20 +445,20 @@ let mk_model_sat_asserts ctex f_o_r instantiate =
 *)
 let check_tinv_unsat ~(p : psi_def) (tinv : PMRS.t) (ctex : ctex) : AsyncSmt.response * int Lwt.u =
   let build_task (cvc4_instance, task_start) =
-    let%lwt _ = task_start in
-    let%lwt () = AsyncSmt.set_logic cvc4_instance "ALL" in
-    let%lwt () = AsyncSmt.set_option cvc4_instance "quant-ind" "true" in
-    let%lwt () =
+    let* _ = task_start in
+    let* () = AsyncSmt.set_logic cvc4_instance "ALL" in
+    let* () = AsyncSmt.set_option cvc4_instance "quant-ind" "true" in
+    let* () =
       if !Config.induction_proof_tlimit >= 0 then
         AsyncSmt.set_option cvc4_instance "tlimit" (Int.to_string !Config.induction_proof_tlimit)
       else return ()
     in
-    let%lwt () = AsyncSmt.load_min_max_defs cvc4_instance in
+    let* () = AsyncSmt.load_min_max_defs cvc4_instance in
     (* Declare Tinv, repr and reference functions. *)
-    let%lwt () =
+    let* () =
       Lwt_list.iter_p
         (fun x ->
-          let%lwt _ = AsyncSmt.exec_command cvc4_instance x in
+          let* _ = AsyncSmt.exec_command cvc4_instance x in
           return ())
         (smt_of_pmrs tinv @ smt_of_pmrs p.psi_reference
         @ if p.psi_repr_is_identity then [] else smt_of_pmrs p.psi_repr)
@@ -459,11 +489,11 @@ let check_tinv_unsat ~(p : psi_def) (tinv : PMRS.t) (ctex : ctex) : AsyncSmt.res
       let model_sat = mk_model_sat_asserts ctex f_compose_r (fun t -> Some (mk_var t)) in
       SmtLib.mk_assoc_and (List.map ~f:smt_of_term (term_sat_tinv :: preconds) @ model_sat)
     in
-    let%lwt _ =
+    let* _ =
       AsyncSmt.smt_assert cvc4_instance (SmtLib.mk_exists (sorted_vars_of_vars fv) formula)
     in
-    let%lwt resp = AsyncSmt.check_sat cvc4_instance in
-    let%lwt () = AsyncSmt.close_solver cvc4_instance in
+    let* resp = AsyncSmt.check_sat cvc4_instance in
+    let* () = AsyncSmt.close_solver cvc4_instance in
     return resp
   in
   AsyncSmt.(cancellable_task (AsyncSmt.make_cvc_solver ()) build_task)
@@ -506,26 +536,26 @@ let check_tinv_sat ~(p : psi_def) (tinv : PMRS.t) (ctex : ctex) : AsyncSmt.respo
           @ [ Analysis.free_variables t; Analysis.free_variables (f_compose_r t) ])
       in
       (* Start sequence of solver commands, bind on accum. *)
-      let%lwt _ = binder in
-      let%lwt () = AsyncSmt.spush solver in
-      let%lwt () = AsyncSmt.declare_all solver (SmtInterface.decls_of_vars vars) in
+      let* _ = binder in
+      let* () = AsyncSmt.spush solver in
+      let* () = AsyncSmt.declare_all solver (SmtInterface.decls_of_vars vars) in
       (* Assert that Tinv(t) *)
-      let%lwt () = AsyncSmt.smt_assert solver (smt_of_term tinv_t) in
+      let* () = AsyncSmt.smt_assert solver (smt_of_term tinv_t) in
       (* Assert that term satisfies model. *)
-      let%lwt () = AsyncSmt.smt_assert solver (SmtLib.mk_assoc_and (preconds @ model_sat)) in
+      let* () = AsyncSmt.smt_assert solver (SmtLib.mk_assoc_and (preconds @ model_sat)) in
       (* Assert that preconditions hold. *)
-      let%lwt resp = AsyncSmt.check_sat solver in
-      let%lwt () = AsyncSmt.spop solver in
+      let* resp = AsyncSmt.check_sat solver in
+      let* () = AsyncSmt.spop solver in
       return resp
     in
-    let%lwt _ = starter in
+    let* _ = starter in
     (* TODO : logic *)
-    let%lwt () = AsyncSmt.set_logic solver "LIA" in
-    let%lwt () = AsyncSmt.load_min_max_defs solver in
-    let%lwt res =
+    let* () = AsyncSmt.set_logic solver "LIA" in
+    let* () = AsyncSmt.load_min_max_defs solver in
+    let* res =
       Expand.lwt_expand_loop steps t_check (return (TermSet.singleton ctex.ctex_eqn.eterm))
     in
-    let%lwt () = AsyncSmt.close_solver solver in
+    let* () = AsyncSmt.close_solver solver in
     return res
   in
   AsyncSmt.(cancellable_task (make_z3_solver ()) task)

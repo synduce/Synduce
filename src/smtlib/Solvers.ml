@@ -556,8 +556,8 @@ module Asyncs (Log : Logger) (Stats : Statistics) = struct
     let%lwt _ = exec_command solver (mk_push 1) in
     return ()
 
-  let cancellable_task ((s, starter, resolver) : solver * int t * int u) task_func :
-      response * int u =
+  let cancellable_task ((s, starter, resolver) : solver * int t * int u)
+      (task_func : solver * 'a t -> 'b t) : 'b t * int u =
     let task = task_func (s, starter) in
     solver_make_cancellable s task;
     (task, resolver)

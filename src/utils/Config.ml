@@ -242,8 +242,9 @@ let set_induction_proof_tlimit (s : string) =
 
 (** A time limit parallel calls when waiting on first result..
   Infinity if set to negative.
+  Default is 10 mins.
 *)
-let wait_parallel_tlimit = ref 400.
+let wait_parallel_tlimit = ref 600.
 
 let set_wait_parallel_tlimit (s : string) =
   let i = Float.of_string s in

@@ -4,6 +4,7 @@ open Smtlib
 open SmtLib
 open Utils
 open Option.Let_syntax
+open Lwt.Syntax
 
 module Stats : Solvers.Statistics = Utils.Stats
 
@@ -441,6 +442,33 @@ let request_different_models (model : term_model) (num_models : int)
     | _ -> models
   in
   req_loop model num_models []
+
+let request_different_models_async (model : term_model Lwt.t) (num_models : int)
+    (solver : AsyncSmt.solver) =
+  let rec req_loop model i models =
+    let* models = models in
+    (* Assert all variables different. *)
+    let* _ =
+      Lwt_list.iter_s
+        (fun (varname, value) ->
+          let smt_val = smt_of_term value in
+          AsyncSmt.smt_assert solver (mk_not (mk_eq (mk_var varname) smt_val)))
+        (Map.to_alist model)
+    in
+    let* resp = AsyncSmt.check_sat solver in
+    match resp with
+    | Sat -> (
+        let* model = AsyncSmt.get_model solver in
+        match model with
+        | SExps s ->
+            (* New model has been found, recursively find new ones. *)
+            let new_model = model_to_constmap (SExps s) in
+            if i > 0 then req_loop new_model (i - 1) (Lwt.return (new_model :: models))
+            else Lwt.return (new_model :: models)
+        | _ -> Lwt.return models)
+    | _ -> Lwt.return models
+  in
+  Lwt.bind model (fun m -> req_loop m num_models (Lwt.return []))
 
 (* ============================================================================================= *)
 (*                           COMMANDS                                                            *)
