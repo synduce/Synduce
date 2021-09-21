@@ -74,6 +74,8 @@ module type SolverSystemConfig = sig
   val dryadsynth_binary_path : unit -> string
 
   val eusolver_binary_path : unit -> string
+
+  val using_cvc5 : unit -> bool
 end
 
 type solver_instance = {
@@ -108,6 +110,13 @@ module SygusSolver (Stats : Statistics) (Log : Logger) (Config : SolverSystemCon
     | DryadSynth -> Config.dryadsynth_binary_path ()
     | EUSolver -> Config.eusolver_binary_path ()
 
+  let executable_name x =
+    let using_cvc5 = Config.using_cvc5 () in
+    match x with
+    | CVC -> if using_cvc5 then "cvc5" else "cvc4"
+    | DryadSynth -> Caml.Filename.basename (Config.dryadsynth_binary_path ())
+    | EUSolver -> Caml.Filename.basename (Config.eusolver_binary_path ())
+
   let sname = function CVC -> "CVC-SyGuS" | DryadSynth -> "DryadSynth" | EUSolver -> "EUSolver"
 
   let print_options (frmt : Formatter.t) =
@@ -137,7 +146,7 @@ module SygusSolver (Stats : Statistics) (Log : Logger) (Config : SolverSystemCon
       ((inputfile, outputfile) : string * string) :
       solver_instance * solver_response option Lwt.t * int Lwt.u =
     let command =
-      shell Fmt.(str "%s %a %s" (binary_path solver_kind) print_options options inputfile)
+      (binary_path solver_kind, Array.of_list (executable_name solver_kind :: inputfile :: options))
     in
     let out_fd = Unix.openfile outputfile [ Unix.O_RDWR; Unix.O_TRUNC; Unix.O_CREAT ] 0o644 in
     let process = open_process_out ~stdout:(`FD_move out_fd) command in
@@ -153,7 +162,6 @@ module SygusSolver (Stats : Statistics) (Log : Logger) (Config : SolverSystemCon
     Stats.log_solver_start solver.s_pid solver.s_name;
     try
       let t, r = Lwt.task () in
-
       ( solver,
         Lwt.bind t (fun _ ->
             let* status = process#status in
@@ -170,16 +178,6 @@ module SygusSolver (Stats : Statistics) (Log : Logger) (Config : SolverSystemCon
                 Lwt.return None),
         r )
     with Sys_error s -> failwith ("couldn't talk to solver, double-check path. Sys_error " ^ s)
-
-  let wrapped_solver_call ?(solver_kind = !default_solver) ?(options = [])
-      ((inputfile, outputfile) : string * string) : string * process_out =
-    let command =
-      shell Fmt.(str "%s %a %s" (binary_path solver_kind) print_options options inputfile)
-    in
-    let out_fd = Unix.openfile outputfile [ Unix.O_RDWR; Unix.O_TRUNC; Unix.O_CREAT ] 0o644 in
-    let po = open_process_out ~stdout:(`FD_move out_fd) command in
-    Stats.log_solver_start po#pid (sname solver_kind);
-    (outputfile, po)
 
   let solve_commands (p : program) : solver_response option Lwt.t * int Lwt.u =
     let inputfile = mk_tmp_sl "in_" in

@@ -31,6 +31,8 @@ module SygusSolver =
       let dryadsynth_binary_path () = Config.dryadsynth_binary_path
 
       let eusolver_binary_path () = Config.eusolver_binary_path
+
+      let using_cvc5 = Config.using_cvc5
     end)
 
 let rec rtype_of_sort (s : sygus_sort) : RType.t option =

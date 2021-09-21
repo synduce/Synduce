@@ -30,7 +30,7 @@ module EmptyLog : Logger = struct
 
   let verb _ = ()
 
-  let log_file = "tmp"
+  let log_file = Filename.temp_file "tmp" ".log"
 
   let verbose = false
 
