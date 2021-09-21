@@ -58,7 +58,7 @@ let interactive_check_lemma = ref false
 
 (**
   Check whether a system of equations defines a "functionally realizable" synthesis problem.
-  OFF by default.
+  ON by default.
 *)
 let check_unrealizable = ref true
 
@@ -239,6 +239,15 @@ let induction_proof_tlimit = ref (-1)
 let set_induction_proof_tlimit (s : string) =
   let i = Int.of_string s in
   induction_proof_tlimit := i
+
+(** A time limit parallel calls when waiting on first result..
+  Infinity if set to negative.
+*)
+let wait_parallel_tlimit = ref 400.
+
+let set_wait_parallel_tlimit (s : string) =
+  let i = Float.of_string s in
+  wait_parallel_tlimit := i
 
 (** A limit for the number of rewriting steps applied during deduction.
 *)

@@ -6,6 +6,7 @@ open Projection
 open Syguslib.Sygus
 open SygusInterface
 open Utils
+open Lwt.Syntax
 
 (* ============================================================================================= *)
 (*                               BUILDING SYSTEMS OF EQUATIONS                                   *)
@@ -450,8 +451,7 @@ let constraints_of_eqns (eqns : equation list) : command list =
   in
   List.map ~f:eqn_to_constraint detupled_equations
 
-let solve_eqns (unknowns : VarSet.t) (eqns : equation list) :
-    solver_response * (partial_soln, Counterexamples.unrealizability_ctex list) Either.t =
+let aux_solve (gen_only : bool) (unknowns : VarSet.t) (eqns : equation list) =
   let build_task gen_only (_cvc4_instance, _task_starter) =
     let free_vars, all_operators, has_ite =
       let f (fvs, ops, hi) eqn =
@@ -526,23 +526,38 @@ let solve_eqns (unknowns : VarSet.t) (eqns : equation list) :
       | None -> (RFail, Either.Second [])
     else (RFail, Either.Second [])
   in
-  let aux_solve gen_only () =
-    (* TODO: parallel solving with LIA < NIA < optims. < etc. ... *)
-    (* Example of failure because non-linear arith is not used:
-       benchmarks/numbers/int_nat_twomul.ml
-    *)
-    build_task gen_only ((), ())
+  (* TODO: parallel solving with LIA < NIA < optims. < etc. ... *)
+  (* Example of failure because non-linear arith is not used:
+     benchmarks/numbers/int_nat_twomul.ml
+  *)
+  build_task gen_only ((), ())
+
+let solve_eqns (unknowns : VarSet.t) (eqns : equation list) :
+    solver_response * (partial_soln, Counterexamples.unrealizability_ctex list) Either.t =
+  let lwt_tasks =
+    [
+      (* Task 1 : checking unrelizability. *)
+      (fun () ->
+        if !Config.check_unrealizable then (
+          match Counterexamples.check_unrealizable unknowns eqns with
+          | [] ->
+              (* It not infeasible, sleep for timeout duration. *)
+              let* () = Lwt_unix.sleep !Config.wait_parallel_tlimit in
+              Lwt.return (RFail, Either.Second [])
+          | _ as ctexs ->
+              if !Config.generate_benchmarks then ignore (aux_solve false unknowns eqns);
+              if !Config.check_unrealizable_smt_unsatisfiable then
+                Counterexamples.smt_unsatisfiability_check unknowns eqns;
+              Lwt.return (RInfeasible, Either.Second ctexs))
+        else
+          let* () = Lwt_unix.sleep !Config.wait_parallel_tlimit in
+          Lwt.return (RFail, Either.Second []));
+      (* Task 2 : solving system of equations. *)
+      (fun () -> Lwt.return (aux_solve false unknowns eqns));
+    ]
   in
   Log.debug_msg Fmt.(str "Solving for %a." VarSet.pp unknowns);
-  if !Config.check_unrealizable then (
-    match Counterexamples.check_unrealizable unknowns eqns with
-    | [] -> aux_solve false ()
-    | _ as ctexs ->
-        if !Config.generate_benchmarks then ignore (aux_solve true ());
-        if !Config.check_unrealizable_smt_unsatisfiable then
-          Counterexamples.smt_unsatisfiability_check unknowns eqns;
-        (RInfeasible, Either.Second ctexs))
-  else aux_solve false ()
+  Lwt_main.run (Lwt.pick (List.map ~f:(fun x -> x ()) lwt_tasks))
 
 let solve_eqns_proxy (unknowns : VarSet.t) (eqns : equation list) =
   if !Config.use_syntactic_definitions then
