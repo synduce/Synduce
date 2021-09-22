@@ -70,7 +70,8 @@ let rec refinement_loop (p : psi_def) (lstate : refinement_loop_state) =
           Int.decr refinement_steps;
           Int.incr secondary_refinement_steps;
           refinement_loop p new_lstate
-      | Error synt_failure when !Config.attempt_lifting -> (
+      | Error synt_failure
+        when !Config.attempt_lifting && Lifting.lift_count p < !Config.max_lifting_attempts -> (
           match Lifting.scalar ~p lstate synt_failure with
           | Ok (p', lstate') ->
               Int.decr refinement_steps;

@@ -28,6 +28,7 @@ let print_usage () =
     \       --no-simplify               Don't simplify equations with partial evaluation.\n\
     \       --no-gropt                  Don't optimize grammars.\n\
     \       --no-lifting                Don't attempt lifting.\n\
+    \       --max-lifting=NUM           Set how many times Synduce attempts to lift.\n\
     \    -u --no-check-unrealizable     Do not check if synthesis problems are functionally \
      realizable.\n\
     \  Bounded checking:\n\
@@ -89,6 +90,7 @@ let options =
     ('\000', "generate-benchmarks", None, Some Config.set_benchmark_generation_dir);
     ('\000', "generate-proof", None, Some Config.set_proof_output_file);
     ('\000', "parse-only", set parse_only true, None);
+    ('\000', "max-lifting", None, Some Config.set_max_lifting_attempts);
     ('\000', "no-gropt", set Config.optimize_grammars false, None);
     ('\000', "no-lifting", set Config.attempt_lifting false, None);
     ('\000', "no-simplify", set Config.simplify_eqns false, None);

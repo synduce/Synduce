@@ -195,7 +195,7 @@ base_benchmark_set = [
 lifting_benchmarks = [
     ["lifting/mits_nosum.ml", ""],
     ["lifting/mpsl.ml", ""],
-
+    ["lifting/poly.ml", ""],
 ]
 
 

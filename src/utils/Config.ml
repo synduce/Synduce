@@ -68,11 +68,6 @@ second-order quantification is unrealizable, using a SMT solver (Z3 by default).
 let check_unrealizable_smt_unsatisfiable = ref false
 
 (**
-  Attempt to lift the function if there is no solution.
-*)
-let attempt_lifting = ref true
-
-(**
   Accept no-sat in bounded checking as unsat.
 *)
 let no_bounded_sat_as_unsat = ref false
@@ -267,4 +262,18 @@ let set_fuzzing_count (s : string) =
   try
     let i = Int.of_string s in
     if i >= 0 && i < 1024 then fuzzing_count := i
+  with _ -> ()
+
+(**
+  Attempt to lift the function if there is no solution.
+*)
+let attempt_lifting = ref true
+
+(** The number of times Synduce should attempt to add a lifting variable. *)
+let max_lifting_attempts = ref 2
+
+let set_max_lifting_attempts (s : string) =
+  try
+    let i = Int.of_string s in
+    if i >= 0 && i < 64 then max_lifting_attempts := i
   with _ -> ()
