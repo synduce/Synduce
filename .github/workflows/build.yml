@@ -9,13 +9,22 @@ on:
 
   # Allows you to run this workflow manually from the Actions tab
   workflow_dispatch:
+          
 
 # A workflow run is made up of one or more jobs that can run sequentially or in parallel
 jobs:
   # This workflow contains a single job called "build"
   build:
+    strategy:
+      fail-fast: false
+      matrix:
+        os:
+          - ubuntu-latest
+        ocaml-compiler:
+          - 4.12.x
+          - 4.08.x
     # The type of runner that the job will run on
-    runs-on: ubuntu-latest
+    runs-on: ${{ matrix.os }}
 
     # Steps represent a sequence of tasks that will be executed as part of the job
     steps:
@@ -24,11 +33,11 @@ jobs:
       
       - name: submodules-init
         uses: snickerbockers/submodules-init@v4
-          
+        
       - name: Set up OCaml
         uses: ocaml/setup-ocaml@v1.1.11
         with:
-          ocaml-version: 4.12.0
+          ocaml-version: ${{ matrix.ocaml-compiler }}
           
       - name: Include (and create) .local/bin in the PATH
         run: |
@@ -52,7 +61,7 @@ jobs:
         run: sudo apt install z3 python3
 
       - name: Build Synduce
-        run: dune build bin/Synduce.exe
+        run: opam exec -- dune build bin/Synduce.exe
         
       - name: Run basic tests
         run: python3 benchmarks/test.py --run --kick-the-tires
