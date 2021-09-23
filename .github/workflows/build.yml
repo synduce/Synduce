@@ -30,8 +30,10 @@ jobs:
         with:
           ocaml-version: 4.12.0
           
-      - name: Include .local/bin in the PATH
-        run: export PATH="$HOME/.local/bin:$PATH"
+      - name: Include (and create) .local/bin in the PATH
+        run: |
+          mkdir -p $HOME/.local/bin
+          export PATH="$HOME/.local/bin:$PATH"
 
       # Install core
       - name: Install core
@@ -51,4 +53,7 @@ jobs:
 
       - name: Build Synduce
         run: dune build bin/Synduce.exe
+        
+      - name: Run basic tests
+        run: python3 benchmarks/test.py --run --kick-the-tires
 
