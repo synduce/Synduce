@@ -41,6 +41,7 @@ let print_usage () =
     \       --ind-tlimit=TIMEOUT        Set the solver to timeout after TIMEOUT ms when doing an \
      induction proof.\n\
     \       --cvc4                      Use CVC4 instead of CVC5 if both are available.\n\
+    \       --cvc5                      Always use CVC5 instead of CVC4 if both are available.\n\
     \  Debugging:\n\
     \  -I   --interactive               Request additional lemmas interactively.\n\
     \  -J   --interactive-lifting       Request expressions for lifting.\n\
@@ -85,6 +86,7 @@ let options =
     ('\000', "acegis", set Config.use_acegis true, None);
     ('\000', "ccegis", set Config.use_ccegis true, None);
     ('\000', "cvc4", set Config.use_cvc4 true, None);
+    ('\000', "cvc5", set Config.use_cvc4 false, None);
     ('\000', "check-smt-unrealizable", set Config.check_unrealizable_smt_unsatisfiable true, None);
     ('\000', "fuzzing", None, Some Config.set_fuzzing_count);
     ('\000', "generate-benchmarks", None, Some Config.set_benchmark_generation_dir);
