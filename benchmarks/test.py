@@ -152,9 +152,11 @@ base_benchmark_set = [
     ["tree/maxPathWeight.pmrs", ""],
     ["list/sumhom.pmrs", ""],
     ["list/sumevens.pmrs", ""],
+    ["list/zero_after_one.ml", ""],
     ["list/lenhom.pmrs", ""],
     ["list/prodhom.pmrs", ""],
     ["list/polyhom.pmrs", ""],
+    ["list/atoi.ml", ""],
     ["list/hamming.pmrs", ""],
     ["list/maxcount.pmrs", "--cvc4"],
     ["list/minhom.pmrs", ""],
@@ -182,6 +184,7 @@ base_benchmark_set = [
     ["list/sumgt.ml", ""],
     ["list/sndminhom.pmrs", ""],
     ["list/mincount.pmrs", ""],
+    ["list/zeros_ones.ml", ""],
     ["zippers/list_sum_basic.ml", ""],
     ["zippers/list_sum.ml", ""],
     ["sort_list/min.ml", ""],
@@ -201,9 +204,11 @@ lifting_benchmarks = [
 
 benchmark_set = constraint_benchmarks + base_benchmark_set + lifting_benchmarks
 
+# Extra extra benchmarks (takes extra time..)
 extra_benchmarks = [
     ["list/bal.ml", ""],
     ["list/lpeak.ml", ""],
+    
 ]
 
 root = os.getcwd()
