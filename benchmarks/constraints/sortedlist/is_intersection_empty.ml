@@ -1,5 +1,3 @@
-external fstop : int -> int -> bool = "fstop"
-
 type two_list = TwoLists of list * list
 
 and list = Elt of int | Cons of int * list
@@ -29,7 +27,7 @@ and seek y = function
 
 and find2 a = function
   | Elt b -> [%synt base_case] a b
-  | Cons (hd, tl) -> if a > hd then fstop a hd else [%synt fcontinue] hd a (find2 a tl)
+  | Cons (hd, tl) -> if a > hd then [%synt fstop] a hd else [%synt fcontinue] hd a (find2 a tl)
 ;;
 
 assert (target = is_intersection_nonempty)

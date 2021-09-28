@@ -83,6 +83,9 @@ constraint_benchmarks = [
     ["constraints/sortedlist/max.ml", ""],
     ["constraints/sortedlist/count_lt.ml", ""],
     ["constraints/sortedlist/index_of.ml", ""],
+    ["constraints/sortedlist/is_intersection_empty.ml", ""],
+    ["constraints/sortedlist/largest_diff.ml", ""],
+    ["constraints/sortedlist/smallest_diff.ml", ""],
     # constantlist
     ["constraints/constantlist/index_of.ml", ""],
     ["constraints/constantlist/contains.ml", ""],
@@ -208,7 +211,7 @@ benchmark_set = constraint_benchmarks + base_benchmark_set + lifting_benchmarks
 extra_benchmarks = [
     ["list/bal.ml", ""],
     ["list/lpeak.ml", ""],
-    
+
 ]
 
 root = os.getcwd()
