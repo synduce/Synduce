@@ -31,6 +31,8 @@ let print_usage () =
     \       --max-lifting=NUM           Set how many times Synduce attempts to lift.\n\
     \    -u --no-check-unrealizable     Do not check if synthesis problems are functionally \
      realizable.\n\
+    \       --sysfe-opt-off             Turn off optimizations to solve systems of equations in \
+     parallel\n\
     \  Bounded checking:\n\
     \       --use-bmc                   Use acegis bounded model checking (bmc mode).\n\
     \    -b --bmc=MAX_DEPTH             Maximum depth of terms for bounded model checking, in bmc \
@@ -98,6 +100,7 @@ let options =
     ('\000', "no-simplify", set Config.simplify_eqns false, None);
     ('\000', "no-syndef", set Config.use_syntactic_definitions false, None);
     ('\000', "show-vars", set Config.show_vars true, None);
+    ('\000', "sysfe-opt-off", set Config.sysfe_opt false, None);
     ('\000', "use-bmc", set Config.use_bmc true, None);
     (* Background solver parameters *)
     ('\000', "ind-tlimit", None, Some Config.set_induction_proof_tlimit);

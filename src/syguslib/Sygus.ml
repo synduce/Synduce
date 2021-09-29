@@ -478,6 +478,7 @@ let reponse_of_sexps (s : Sexp.t list) : solver_response =
     | [ Atom "fail" ] -> Some RFail
     | [ Atom "infeasible" ] -> Some RInfeasible
     | [ Atom "unknown" ] -> Some RUnknown
+    | [ Atom "sat" ] -> Some RInfeasible
     | _ -> None
   in
   let one_command cmd =

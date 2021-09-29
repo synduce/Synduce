@@ -623,7 +623,10 @@ module Solve = struct
           (* Task 3,4: solving system of equations, optimizations / grammar choices.
               If answer is Fail, must stall.
           *)
-          (if Set.exists unknowns ~f:(fun v -> RType.is_base (Variable.vtype_or_new v)) then
+          (if
+           !Config.sysfe_opt
+           && Set.exists unknowns ~f:(fun v -> RType.is_base (Variable.vtype_or_new v))
+          then
            Some
              (let t, r = core_solve ~predict_constants:(Some false) ~gen_only:false unknowns eqns in
               let t =
@@ -638,7 +641,10 @@ module Solve = struct
               in
               (r, t))
           else None);
-          (if Set.exists unknowns ~f:(fun v -> RType.is_base (Variable.vtype_or_new v)) then
+          (if
+           !Config.sysfe_opt
+           && Set.exists unknowns ~f:(fun v -> RType.is_base (Variable.vtype_or_new v))
+          then
            Some
              (let t, r = core_solve ~predict_constants:(Some true) ~gen_only:false unknowns eqns in
               let t =

@@ -1,7 +1,10 @@
 #!/usr/bin/env python3
+# -*- coding: UTF-8 -*-
 import os
 import sys
+import time
 import argparse
+import subprocess
 
 # Timeout for all experiments.
 timeout_value = 400
@@ -217,13 +220,32 @@ extra_benchmarks = [
 ]
 
 
+def summarize():
+    num_constraint = len(constraint_benchmarks)
+    num_base = len(base_benchmark_set)
+    num_lifting = len(lifting_benchmarks)
+    num_extrs = len(extra_benchmarks)
+    total = num_constraint + num_base + num_lifting + num_extrs
+    print("%i benchmarks in total:" % total)
+    print("\t- %i basic benchmarks (run with --base)." % num_base)
+    print("\t\tincluding %i in kick-the-tires set (run with --kick-the-tires)." %
+          len(kick_the_tires_set))
+    print("\t- %i benchmarks with requires constraints (run with --constraint-benchmarks)." % num_constraint)
+    print("\t- %i benchmarks with lifting (run with --lifting-benchmarks)." % num_lifting)
+    print("\t- %i extras benchmarks." % num_extrs)
+
+
 def run_benchmarks(input_files, algos, optims):
+    benchmark_cnt = 0
+    errors = []
+    start = time.time()
     for filename_with_opt in input_files:
         filename = filename_with_opt[0]
         category = os.path.dirname(filename)
         extra_opt = filename_with_opt[1]
         for algo in algos:
             for optim in optims:
+                benchmark_cnt += 1
                 # Benchmark generation optional
                 gen_opt = ""
                 if generate_benchmarks:
@@ -240,14 +262,51 @@ def run_benchmarks(input_files, algos, optims):
                     soln_file_opt = "-o extras/solutions/%s/" % category
 
                 # Print benchmark name, algorithm used and optimization options.
-                print("B:%s,%s+%s" % (filename, algo[0], optim[0]))
+                bench_id = "%s,%s+%s" % (filename, algo[0], optim[0])
+                command = ("%s %s %s -i %s %s %s %s %s" %
+                           (timeout, exec_path, algo[1], optim[1], extra_opt,
+                            os.path.realpath(os.path.join(
+                                "benchmarks", filename)),
+                            soln_file_opt, gen_opt))
+                print("  %s 🏃" % bench_id, end="\r")
                 sys.stdout.flush()
 
-                os.system("%s %s %s -i %s %s %s %s %s" %
-                          (timeout, exec_path, algo[1], optim[1], extra_opt,
-                           os.path.realpath(os.path.join(
-                               "benchmarks", filename)),
-                           soln_file_opt, gen_opt))
+                process = subprocess.Popen(
+                    command, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+                buf = ""
+                i = 1
+                # Poll process for new output until finished
+                while True:
+                    nextline = process.stdout.readline()
+                    if process.poll() is not None:
+                        break
+                    print("./Synduce benchmarks/%s %s %s %s 🏃 at step %i" %
+                          (filename, extra_opt, algo[1], optim[1], i), end="\r")
+                    i += 1
+                    sys.stdout.flush()
+                    buf += nextline.decode('utf-8')
+
+                print("", end="\r")
+                output = buf.strip().split("\n")
+                if len(output) >= 2 and output[-1] == "success":
+                    elapsed = float(output[-2].split(",")[2])
+                    sp = " "
+                    msg = f"✅ {bench_id: <70s}  [{elapsed: 4.3f} s]{sp : <10s}"
+                    print(msg)
+                else:
+                    errors += [bench_id]
+                    print("\r❌ %s " % bench_id)
+                sys.stdout.flush()
+    elapsed = time.time() - start
+    if len(errors) <= 0:
+        print(
+            f"\n✅ All {benchmark_cnt} benchmarks passed in {elapsed: 5.1f} s.")
+    else:
+        print(
+            f"\n❌ {len(errors)} errors out of {benchmark_cnt} benchmarks in {elapsed: 5.1f} s.")
+        print("Problematic benchmarks with algorithm:")
+        for e in errors:
+            print(e)
 
 
 if __name__ == "__main__":
@@ -268,7 +327,19 @@ if __name__ == "__main__":
         "--kick-the-tires", help="Run a subset of benchmarks.", action="store_true")
     aparser.add_argument(
         "--lifting-benchmarks", help="Run the lifting benchmarks.", action="store_true")
+    aparser.add_argument(
+        "--constraint-benchmarks", help="Run the lifting benchmarks.", action="store_true")
+    aparser.add_argument(
+        "--base-benchmarks", help="Run the base benchmarks.", action="store_true")
+    aparser.add_argument(
+        "--all-benchmarks", help="Run all the benchmarks and exit.", action="store_true")
+    aparser.add_argument(
+        "--summary", help="Give a summary of benchmarks.", action="store_true")
     args = aparser.parse_args()
+
+    if args.summary:
+        summarize()
+        exit()
 
     table_no = args.table
     generate_solutions = args.generate_solutions
@@ -276,13 +347,26 @@ if __name__ == "__main__":
 
     run_test_only = table_no == -1 or args.run
 
-    # Special runs
-    if args.lifting_benchmarks:
-        algos = [["requation", ""]]
+    # === Special runs with simplified output ===
+    if args.lifting_benchmarks or args.all_benchmarks:
+        algos = [["requation", "--cvc4"]]
         optims = [["all", ""]]
         run_benchmarks(lifting_benchmarks, algos, optims)
+
+    if args.constraint_benchmarks or args.all_benchmarks:
+        algos = [["requation", "--cvc4"]]
+        optims = [["all", ""]]
+        run_benchmarks(constraint_benchmarks, algos, optims)
+
+    if args.base_benchmarks or args.all_benchmarks:
+        algos = [["requation", "--cvc4"]]
+        optims = [["all", ""]]
+        run_benchmarks(base_benchmark_set, algos, optims)
+
+    if args.base_benchmarks or args.lifting_benchmarks or args.constraint_benchmarks:
         exit()
 
+    # === TABLES and older runs ===
     if run_test_only:
         algos = [["requation", ""]]
         optims = [["all", ""]]
@@ -327,7 +411,7 @@ if __name__ == "__main__":
         algos = [["requation"]]
         optims = [["all", ""]]
 
-    # Table 5 / Test with baseline comparison
+    # Table 5 / Test with cvc4 against baseline comparison
     elif table_no == 5:
         algos = [["requation", "--cvc4"], ["acegis", "--acegis --cvc4"]]
         optims = [["all", ""]]

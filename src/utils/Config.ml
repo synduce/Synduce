@@ -74,6 +74,12 @@ let no_bounded_sat_as_unsat = ref false
 
 let bounded_lemma_check = ref false
 
+(**
+  Run with the optimizations used to synthesize solutions for systems of equations.
+  Works best when there are more than 4 cores.
+*)
+let sysfe_opt = ref true
+
 (* ============================================================================================= *)
 (*                                STORAGE AND BINARY PATHS                                       *)
 (* ============================================================================================= *)
