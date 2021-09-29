@@ -4,7 +4,7 @@ import sys
 import argparse
 
 # Timeout for all experiments.
-timeout_value = 240  # 4min timeout for the review
+timeout_value = 400
 # Maximum 4gb memory - this should not be limiting!
 memout_value = 8000 * (2 ** 10)  # 4GB memory limit
 
@@ -199,9 +199,11 @@ base_benchmark_set = [
 ]
 
 lifting_benchmarks = [
-    ["lifting/mits_nosum.ml", ""],
     ["lifting/mpsl.ml", ""],
     ["lifting/poly.ml", ""],
+    ["lifting/atoi_no.ml", ""],
+    ["lifting/largest_diff_sorted_list_nohead.ml", ""],
+    ["lifting/mits_nosum.ml", ""]
 ]
 
 
@@ -214,13 +216,45 @@ extra_benchmarks = [
 
 ]
 
-root = os.getcwd()
-exec_path = os.path.join(root, "_build/default/bin/Synduce.exe")
 
-sys.stdout.flush()
+def run_benchmarks(input_files, algos, optims):
+    for filename_with_opt in input_files:
+        filename = filename_with_opt[0]
+        category = os.path.dirname(filename)
+        extra_opt = filename_with_opt[1]
+        for algo in algos:
+            for optim in optims:
+                # Benchmark generation optional
+                gen_opt = ""
+                if generate_benchmarks:
+                    if not os.path.exists(os.path.dirname("test/tmp_benchmarks/%s" % filename)):
+                        os.makedirs(os.path.dirname(
+                            "test/tmp_benchmarks/%s" % filename))
+                    gen_opt = "--generate-benchmarks=\"test/tmp_benchmarks\""
+                # Optional solution generation
+                soln_file_opt = ""
+                if generate_solutions:
+                    if not os.path.exists(os.path.dirname("extras/solutions/%s" % filename)):
+                        os.makedirs(os.path.dirname(
+                            "extras/solutions/%s" % filename))
+                    soln_file_opt = "-o extras/solutions/%s/" % category
+
+                # Print benchmark name, algorithm used and optimization options.
+                print("B:%s,%s+%s" % (filename, algo[0], optim[0]))
+                sys.stdout.flush()
+
+                os.system("%s %s %s -i %s %s %s %s %s" %
+                          (timeout, exec_path, algo[1], optim[1], extra_opt,
+                           os.path.realpath(os.path.join(
+                               "benchmarks", filename)),
+                           soln_file_opt, gen_opt))
 
 
 if __name__ == "__main__":
+    root = os.getcwd()
+    exec_path = os.path.join(root, "_build/default/bin/Synduce.exe")
+
+    sys.stdout.flush()
     aparser = argparse.ArgumentParser()
     aparser.add_argument(
         "-t", "--table", help="Table number that the script must generate data for.", type=int, default=-1)
@@ -232,6 +266,8 @@ if __name__ == "__main__":
         "--generate-solutions", help="Generate solutions in extras/solution.", action="store_true")
     aparser.add_argument(
         "--kick-the-tires", help="Run a subset of benchmarks.", action="store_true")
+    aparser.add_argument(
+        "--lifting-benchmarks", help="Run the lifting benchmarks.", action="store_true")
     args = aparser.parse_args()
 
     table_no = args.table
@@ -240,8 +276,14 @@ if __name__ == "__main__":
 
     run_test_only = table_no == -1 or args.run
 
-    if run_test_only:
+    # Special runs
+    if args.lifting_benchmarks:
+        algos = [["requation", ""]]
+        optims = [["all", ""]]
+        run_benchmarks(lifting_benchmarks, algos, optims)
+        exit()
 
+    if run_test_only:
         algos = [["requation", ""]]
         optims = [["all", ""]]
 
@@ -311,33 +353,4 @@ if __name__ == "__main__":
         else:
             input_files = kick_the_tires_set
 
-    for filename_with_opt in input_files:
-        filename = filename_with_opt[0]
-        category = os.path.dirname(filename)
-        extra_opt = filename_with_opt[1]
-        for algo in algos:
-            for optim in optims:
-                # Benchmark generation optional
-                gen_opt = ""
-                if generate_benchmarks:
-                    if not os.path.exists(os.path.dirname("test/tmp_benchmarks/%s" % filename)):
-                        os.makedirs(os.path.dirname(
-                            "test/tmp_benchmarks/%s" % filename))
-                    gen_opt = "--generate-benchmarks=\"test/tmp_benchmarks\""
-                # Optional solution generation
-                soln_file_opt = ""
-                if generate_solutions:
-                    if not os.path.exists(os.path.dirname("extras/solutions/%s" % filename)):
-                        os.makedirs(os.path.dirname(
-                            "extras/solutions/%s" % filename))
-                    soln_file_opt = "-o extras/solutions/%s/" % category
-
-                # Print benchmark name, algorithm used and optimization options.
-                print("B:%s,%s+%s" % (filename, algo[0], optim[0]))
-                sys.stdout.flush()
-
-                os.system("%s %s %s -i %s %s %s %s %s" %
-                          (timeout, exec_path, algo[1], optim[1], extra_opt,
-                           os.path.realpath(os.path.join(
-                               "benchmarks", filename)),
-                           soln_file_opt, gen_opt))
+    run_benchmarks(input_files, algos, optims)

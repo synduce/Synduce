@@ -233,7 +233,7 @@ module Expression = struct
   let mk_e_assoc op l =
     match l with
     | [] -> failwith "Creation of operation with empty args"
-    | [ a ] -> a
+    | [ a ] -> ( match op with Operator.Unary _ -> EOp (op, l) | _ -> a)
     | _ -> EOp (op, l)
 
   let mk_e_ite a b c = EIte (a, b, c)
@@ -435,6 +435,7 @@ module Expression = struct
 
   (** Evaluation *)
   let simplify (e : t) : t =
+    (* Integer evaluation. *)
     let ieval op f args =
       let symbs, maybe_concrete =
         List.fold args ~init:([], None) ~f:(fun (symbs, concrete) arg ->
@@ -457,6 +458,7 @@ module Expression = struct
       | [] -> [ List.hd_exn args' ]
       | _ as l -> l
     in
+    (* Boolean evaluation. *)
     let beval op f args =
       let args = List.dedup_and_sort ~compare args in
       let symbs, maybe_concrete =
@@ -485,13 +487,13 @@ module Expression = struct
       | [] -> [ List.hd_exn args' ]
       | _ as l -> l
     in
-    let tr f e =
+    let tr_peval f e =
       match e with
       | EIte (c, a, b) ->
           Some (match f c with ETrue -> f a | EFalse -> f b | c' -> EIte (c', f a, f b))
       | EOp (op, args) -> (
           match List.map ~f args with
-          | [ x ] -> Some x
+          | [ x ] -> Some (mk_e_assoc op [ x ])
           | args -> (
               match op with
               | Binary Plus -> Some (mk_e_assoc op (ieval Binop.Plus ( + ) args))
@@ -503,7 +505,21 @@ module Expression = struct
               | _ -> Some (mk_e_assoc op args)))
       | _ -> None
     in
-    rewrite_until_stable (transform tr) e
+    let tr_prew _ e =
+      match e with
+      (* not (not x) -> x *)
+      | EOp (Unary Not, [ EOp (Unary Not, [ x ]) ]) -> Some x
+      (* max (abs x) 0 -> abs x *)
+      | EOp (Binary Max, [ EOp (Unary Abs, [ x ]); EInt 0 ])
+      | EOp (Binary Max, [ EInt 0; EOp (Unary Abs, [ x ]) ]) ->
+          Some (EOp (Unary Abs, [ x ]))
+      (* min (abs x) 0 -> 0 *)
+      | EOp (Binary Min, [ EOp (Unary Abs, [ _ ]); EInt 0 ])
+      | EOp (Binary Min, [ EInt 0; EOp (Unary Abs, [ _ ]) ]) ->
+          Some (EInt 0)
+      | _ -> None
+    in
+    rewrite_until_stable (fun x -> x |> transform tr_prew |> transform tr_peval) e
 
   (** Normalizing *)
   let normalize (e : t) : t =
@@ -525,7 +541,7 @@ module Expression = struct
   (** Get the identity element of a given operator.*)
   let get_id_const (op : Operator.t) : t option =
     match op with
-    | Binary Plus | Unary Neg | Binary Minus -> Some (mk_e_int 0)
+    | Binary Plus | Unary Abs | Unary Neg | Binary Minus -> Some (mk_e_int 0)
     | Binary Times -> Some (mk_e_int 1)
     | Binary Min -> Some (mk_e_int Int.max_value)
     | Binary Max -> Some (mk_e_int Int.min_value)
@@ -633,7 +649,10 @@ let distrib (op1 : Operator.t) (args : t list) : t =
            | _ -> acc @ [ e' ]))
   in
   let args = if is_commutative op1 then List.sort ~compare args else args in
-  match args with [ a ] -> a | hd :: tl -> f hd tl | _ -> failwith "Empty application."
+  match args with
+  | [ a ] -> mk_e_assoc op1 [ a ]
+  | hd :: tl -> f hd tl
+  | _ -> failwith "Empty application."
 
 (** Expand a term by applying distributivity rules.*)
 let expand (e : t) : t =

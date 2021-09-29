@@ -117,12 +117,12 @@ let components_of_unrealizability ~unknowns (eqn1 : equation) (eqn2 : equation) 
   | Some args_1_2 -> Some (args_1_2, (eqn1.elhs, eqn2.elhs))
   | None ->
       if Terms.equal eqn1.erhs eqn2.erhs then Some ([], (eqn1.elhs, eqn2.erhs))
-      else (
-        Log.verbose_msg
-          Fmt.(
-            str "Unrealizability check: %a is not in normal form (no match with %a)" pp_term
-              eqn1.erhs pp_term eqn2.erhs);
-        None)
+      else
+        (* Log.verbose_msg
+           Fmt.(
+             str "Unrealizability check: %a is not in normal form (no match with %a)" pp_term
+               eqn1.erhs pp_term eqn2.erhs); *)
+        None
 
 let gen_info (eqn_i, eqn_j) unknowns =
   let fv e =

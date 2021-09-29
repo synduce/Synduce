@@ -5,13 +5,13 @@ let problem_name = ref "unknown"
 (** Toggle debugging. *)
 let debug = ref false
 
-(* Limit the size of debugging messages. *)
+(** Limit the size of debugging messages. *)
 let debug_msg_max_chars = ref 400
 
-(* Toggle info messages. Set to true by default. *)
+(** Toggle info and error messages. Set to true by default. *)
 let info = ref true
 
-(* Toggle printing timing info when info is off. Set to true by default. *)
+(** Toggle printing timing info when info is off. Set to true by default. *)
 let timings = ref true
 
 (** Maximum steps of rewrites to apply during PMRS reduction (symbolic evaluation). *)

@@ -72,10 +72,11 @@ module Solver = struct
       else
         match state.free_bound_exprs with
         | hd :: tl -> (
+            let hd = Expression.simplify hd in
             Log.verbose
               (Log.wrap2 "@[\t\tTry to %a %a.@]"
                  (styled (`Bg `Magenta) string)
-                 "match" Expression.pp (Expression.simplify hd));
+                 "match" Expression.pp hd);
             match match_as_subexpr ~lemma hd ~of_:state.expression with
             | Some (id, res') ->
                 Log.verbose (fun fmt () ->

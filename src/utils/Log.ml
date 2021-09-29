@@ -64,7 +64,8 @@ let wrap2 f s1 t1 s2 t2 fmt () = pf fmt f s1 t1 s2 t2
 let wrapn fmt () = pf fmt
 
 let error (msg : Formatter.t -> unit -> unit) : unit =
-  pf Fmt.stdout "@[<h 8>%a@;%a@]@." (styled (`Bg `Red) string) "[ERROR]" msg ()
+  if !Config.info then pf Fmt.stdout "@[<h 8>%a@;%a@]@." (styled (`Bg `Red) string) "[ERROR]" msg ()
+  else ()
 
 let error_msg (msg : string) = error (fun fmt () -> pf fmt "%s" msg)
 

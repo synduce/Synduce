@@ -481,7 +481,7 @@ module Solve = struct
     in
     List.map ~f:eqn_to_constraint detupled_equations
 
-  let mk_constant_unknown_eqn_optim (unknowns : VarSet.t) : equation list =
+  let mk_constant_unknown_eqn_optim (mul : bool) (unknowns : VarSet.t) : equation list =
     let f v =
       match Variable.vtype_or_new v with
       | RType.TInt ->
@@ -489,7 +489,7 @@ module Solve = struct
             {
               eterm = Terms.(int 0);
               eelim = [];
-              elhs = Terms.(int 0);
+              elhs = (if mul then Terms.(int 1) else Terms.(int 0));
               erhs = Terms.(~^v);
               eprecond = None;
             };
@@ -499,7 +499,7 @@ module Solve = struct
             {
               eterm = Terms.(int 0);
               eelim = [];
-              elhs = Terms.(bool true);
+              elhs = Terms.(if mul then bool false else bool true);
               erhs = Terms.(~^v);
               eprecond = None;
             };
@@ -508,13 +508,14 @@ module Solve = struct
     in
     List.concat_map ~f (Set.elements unknowns)
 
-  let core_solve ?(predict_constants = false) ~(gen_only : bool) (unknowns : VarSet.t)
+  let core_solve ?(predict_constants = None) ~(gen_only : bool) (unknowns : VarSet.t)
       (eqns : equation list) =
     let psoln, unknowns, eqns =
-      if predict_constants then
-        let constant_unknowns_eqn = mk_constant_unknown_eqn_optim unknowns in
-        solve_constant_eqns unknowns (constant_unknowns_eqn @ eqns)
-      else ([], unknowns, eqns)
+      match predict_constants with
+      | Some x ->
+          let constant_unknowns_eqn = mk_constant_unknown_eqn_optim x unknowns in
+          solve_constant_eqns unknowns (constant_unknowns_eqn @ eqns)
+      | None -> ([], unknowns, eqns)
     in
     let free_vars, all_operators, has_ite =
       let f (fvs, ops, hi) eqn =
@@ -593,67 +594,76 @@ module Solve = struct
   let solve_eqns (unknowns : VarSet.t) (eqns : equation list) :
       solver_response * (partial_soln, Counterexamples.unrealizability_ctex list) Either.t =
     let lwt_tasks =
-      [
-        (* Task 1 : checking unrelizability. *)
-        (fun () ->
-          if !Config.check_unrealizable then (
-            let t, r = Counterexamples.check_unrealizable unknowns eqns in
-            let task =
-              let* ctexs = t in
-              match ctexs with
-              | [] ->
-                  (* It not infeasible, sleep for timeout duration. *)
-                  let* () = Lwt_unix.sleep !Config.wait_parallel_tlimit in
-                  Lwt.return (RFail, Either.Second [])
-              | _ ->
-                  if !Config.generate_benchmarks then
-                    ignore (core_solve ~gen_only:true unknowns eqns);
-                  if !Config.check_unrealizable_smt_unsatisfiable then
-                    Counterexamples.smt_unsatisfiability_check unknowns eqns;
-                  Lwt.return (RInfeasible, Either.Second ctexs)
-            in
-            Lwt.wakeup r 0;
-            task)
-          else
-            let t, r = Lwt.task () in
-            let task =
-              Lwt.bind t (fun _ ->
-                  let* _ = Lwt_unix.sleep !Config.wait_parallel_tlimit in
-                  Lwt.return (RFail, Either.Second []))
-            in
-            Lwt.wakeup r 0;
-            task);
-        (* Task 2 : solving system of equations, default strategy. *)
-        (fun () ->
-          let t, r = core_solve ~gen_only:false unknowns eqns in
-          Lwt.wakeup r 0;
-          t);
-      ]
-      @
-      (* Task 3: solving system of equations, optimizations / grammar choices.
-          If answer is Fail, must stall.
-      *)
-      if Set.exists unknowns ~f:(fun v -> RType.is_base (Variable.vtype_or_new v)) then
+      List.concat_map ~f:Option.to_list
         [
-          (fun () ->
-            let t, r = core_solve ~predict_constants:true ~gen_only:false unknowns eqns in
-            let t =
-              Lwt.bind t (fun t ->
-                  match t with
-                  (* Wait on failure. *)
-                  | (RFail | RUnknown | RInfeasible), _ ->
-                      let* _ = Lwt_unix.sleep !Config.wait_parallel_tlimit in
-                      Lwt.return t
-                  (* Continue on success. *)
-                  | _ -> Lwt.return t)
-            in
-            Lwt.wakeup r 0;
-            t);
+          (* Task 1 : checking unrealizability, if the option is set. *)
+          (if !Config.check_unrealizable then
+           Some
+             (let t, r = Counterexamples.check_unrealizable unknowns eqns in
+              let task =
+                let* ctexs = t in
+                match ctexs with
+                | [] ->
+                    (* It not infeasible, sleep for timeout duration. *)
+                    let* () = Lwt_unix.sleep !Config.wait_parallel_tlimit in
+                    Lwt.return (RFail, Either.Second [])
+                | _ ->
+                    if !Config.generate_benchmarks then
+                      ignore (core_solve ~gen_only:true unknowns eqns);
+                    if !Config.check_unrealizable_smt_unsatisfiable then
+                      Counterexamples.smt_unsatisfiability_check unknowns eqns;
+                    Lwt.return (RInfeasible, Either.Second ctexs)
+              in
+              (r, task))
+          else None);
+          (* Task 2 : solving system of equations, default strategy. *)
+          Some
+            (let t, r = core_solve ~gen_only:false unknowns eqns in
+             (r, t));
+          (* Task 3,4: solving system of equations, optimizations / grammar choices.
+              If answer is Fail, must stall.
+          *)
+          (if Set.exists unknowns ~f:(fun v -> RType.is_base (Variable.vtype_or_new v)) then
+           Some
+             (let t, r = core_solve ~predict_constants:(Some false) ~gen_only:false unknowns eqns in
+              let t =
+                Lwt.bind t (fun t ->
+                    match t with
+                    (* Wait on failure. *)
+                    | (RFail | RUnknown | RInfeasible), _ ->
+                        let* _ = Lwt_unix.sleep !Config.wait_parallel_tlimit in
+                        Lwt.return t
+                    (* Continue on success. *)
+                    | _ -> Lwt.return t)
+              in
+              (r, t))
+          else None);
+          (if Set.exists unknowns ~f:(fun v -> RType.is_base (Variable.vtype_or_new v)) then
+           Some
+             (let t, r = core_solve ~predict_constants:(Some true) ~gen_only:false unknowns eqns in
+              let t =
+                Lwt.bind t (fun t ->
+                    match t with
+                    (* Wait on failure. *)
+                    | (RFail | RUnknown | RInfeasible), _ ->
+                        let* _ = Lwt_unix.sleep !Config.wait_parallel_tlimit in
+                        Lwt.return t
+                    (* Continue on success. *)
+                    | _ -> Lwt.return t)
+              in
+              (r, t))
+          else None);
         ]
-      else []
     in
-    Log.debug_msg Fmt.(str "Solving for %a." VarSet.pp unknowns);
-    Lwt_main.run (Lwt.pick (List.map ~f:(fun x -> x ()) lwt_tasks))
+    Log.debug_msg
+      Fmt.(str "Solving for %a with %i processes." VarSet.pp unknowns (List.length lwt_tasks));
+    Lwt_main.run
+      (Lwt.pick
+         (List.map
+            ~f:(fun (r, t) ->
+              Lwt.wakeup r 0;
+              t)
+            lwt_tasks))
 
   let solve_eqns_proxy (unknowns : VarSet.t) (eqns : equation list) =
     if !Config.use_syntactic_definitions then
