@@ -619,6 +619,20 @@ module Solve = struct
           (* Task 2 : solving system of equations, default strategy. *)
           Some
             (let t, r = core_solve ~gen_only:false unknowns eqns in
+            (* Wait on failure, if the unrealizability check has not terminated 
+              we would end up with a synthesis failure but no counterexamples 
+              to decide what to do!
+            *)
+            let t =
+                Lwt.bind t (fun t ->
+                    match t with
+                    (* Wait on failure. *)
+                    | (RFail | RUnknown | RInfeasible), _ ->
+                        let* _ = Lwt_unix.sleep !Config.wait_parallel_tlimit in
+                        Lwt.return t
+                    (* Continue on success. *)
+                    | _ -> Lwt.return t)
+              in
              (r, t));
           (* Task 3,4: solving system of equations, optimizations / grammar choices.
               If answer is Fail, must stall.

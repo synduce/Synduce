@@ -38,7 +38,11 @@ kick_the_tires_set = [
     ["list/hamming.pmrs", ""],
     ["list/sumevens.pmrs", ""],
     ["list/lenhom.pmrs", ""],
-    ["list/last.pmrs", ""]
+    ["list/last.pmrs", ""],
+    ["constraints/sortedlist/count_lt.ml", ""],
+    ["constraints/bst/count_lt.ml", "-NB"],
+    ["lifting/largest_diff_sorted_list_nohead.ml", ""],
+    ["lifting/poly.ml", ""],
 ]
 
 reduced_benchmark_set_table2 = [
@@ -238,8 +242,9 @@ def summarize():
     print("\t- %i extras benchmarks." % num_extrs)
 
 
-def run_benchmarks(input_files, algos, optims, raw_output=None):
+def run_benchmarks(input_files, algos, optims, raw_output=None, exit_err=False):
     benchmark_cnt = 0
+    benchmark_total = len(input_files) * len(algos) * len(optims)
     errors = []
     start = time.time()
     for filename_with_opt in input_files:
@@ -266,8 +271,9 @@ def run_benchmarks(input_files, algos, optims, raw_output=None):
 
                 # Print benchmark name, algorithm used and optimization options.
                 bench_id = "%s,%s+%s" % (filename, algo[0], optim[0])
+                progress = f"({benchmark_cnt} / {benchmark_total})"
                 command = ("%s %s %s -i %s %s %s %s %s" %
-                           (timeout, exec_path, algo[1], optim[1], extra_opt,
+                        (timeout, exec_path, algo[1], optim[1], extra_opt,
                             os.path.realpath(os.path.join(
                                 "benchmarks", filename)),
                             soln_file_opt, gen_opt))
@@ -275,7 +281,7 @@ def run_benchmarks(input_files, algos, optims, raw_output=None):
                 if raw_output is not None:
                     raw_output.write(f"B:{bench_id}\n")
 
-                print(f"  {bench_id} 🏃", end="\r")
+                print(f"{progress : >11s}  {bench_id} 🏃", end="\r")
                 sys.stdout.flush()
 
                 process = subprocess.Popen(
@@ -287,8 +293,7 @@ def run_benchmarks(input_files, algos, optims, raw_output=None):
                     nextline = process.stdout.readline()
                     if process.poll() is not None:
                         break
-                    print("./Synduce benchmarks/%s %s %s %s 🏃 at step %i" %
-                          (filename, extra_opt, algo[1], optim[1], i), end="\r")
+                    print(f"{progress : >11s}./Synduce benchmarks/{filename} {extra_opt} {algo[1]} {optim[1]} 🏃 at step {i}", end="\r")                          
                     i += 1
                     sys.stdout.flush()
                     line = nextline.decode('utf-8')
@@ -301,11 +306,11 @@ def run_benchmarks(input_files, algos, optims, raw_output=None):
                 if len(output) >= 2 and output[-1] == "success":
                     elapsed = float(output[-2].split(",")[2])
                     sp = " "
-                    msg = f"✅ {bench_id: <70s}  [{elapsed: 4.3f} s]{sp : <10s}"
+                    msg = f"{progress : >11s} ✅ {bench_id: <70s}  [{elapsed: 4.3f} s]{sp : <10s}"
                     print(msg)
                 else:
                     errors += [bench_id]
-                    print("\r❌ %s " % bench_id)
+                    print(f"\r{progress : >11s} ❌ {bench_id : <70s}")
                 sys.stdout.flush()
     elapsed = time.time() - start
     if len(errors) <= 0:
@@ -317,6 +322,8 @@ def run_benchmarks(input_files, algos, optims, raw_output=None):
         print("Problematic benchmarks with algorithm:")
         for e in errors:
             print(e)
+        if exit_err:
+            exit(-1)
 
 
 if __name__ == "__main__":
@@ -468,4 +475,4 @@ if __name__ == "__main__":
         else:
             input_files = kick_the_tires_set
 
-    run_benchmarks(input_files, algos, optims, raw_output)
+    run_benchmarks(input_files, algos, optims, raw_output, exit_err=True)
