@@ -238,7 +238,7 @@ def summarize():
     print("\t- %i extras benchmarks." % num_extrs)
 
 
-def run_benchmarks(input_files, algos, optims):
+def run_benchmarks(input_files, algos, optims, raw_output=None):
     benchmark_cnt = 0
     errors = []
     start = time.time()
@@ -271,7 +271,11 @@ def run_benchmarks(input_files, algos, optims):
                             os.path.realpath(os.path.join(
                                 "benchmarks", filename)),
                             soln_file_opt, gen_opt))
-                print("  %s 🏃" % bench_id, end="\r")
+
+                if raw_output is not None:
+                    raw_output.write(f"B:{bench_id}\n")
+
+                print(f"  {bench_id} 🏃", end="\r")
                 sys.stdout.flush()
 
                 process = subprocess.Popen(
@@ -287,7 +291,10 @@ def run_benchmarks(input_files, algos, optims):
                           (filename, extra_opt, algo[1], optim[1], i), end="\r")
                     i += 1
                     sys.stdout.flush()
-                    buf += nextline.decode('utf-8')
+                    line = nextline.decode('utf-8')
+                    buf += line
+                    if raw_output is not None:
+                        raw_output.write(line)
 
                 print("", end="\r")
                 output = buf.strip().split("\n")
@@ -317,15 +324,17 @@ if __name__ == "__main__":
     exec_path = os.path.join(root, "_build/default/bin/Synduce.exe")
 
     table_info = "Tables: #1 is for CAV21 paper Table 1,\
-    #2 is for CAV21 paper Table 2,\
-    #3 is for CAV21 paper Table 3,\
-    #4 is for testing benchmarks with constraints, with partial bounding only,\
-    #5 is for testing benchmarks with constraints, with p-bounding and Symbolic-CEGIS."
+    # 2 is for CAV21 paper Table 2,\
+    # 3 is for CAV21 paper Table 3,\
+    # 4 is for testing benchmarks with constraints, with partial bounding only,\
+    # 5 is for testing benchmarks with constraints, with p-bounding and Symbolic-CEGIS."
 
     sys.stdout.flush()
     aparser = argparse.ArgumentParser()
     aparser.add_argument(
         "-t", "--table", help=table_info, type=int, default=-1)
+    aparser.add_argument(
+        "-o", "--output", help="Dump Synduce output in -i mode to file (appending to file).", type=str, default=-1)
     aparser.add_argument(
         "--run", help="Run tests for all benchmarks.", action="store_true")
     aparser.add_argument(
@@ -358,6 +367,13 @@ if __name__ == "__main__":
 
     run_test_only = table_no == -1 or args.run
 
+    raw_output = None
+    if args.output is not None:
+        try:
+            raw_output = open(args.output, 'a+', encoding='utf-8')
+        except:
+            pass
+
     cvc = "--cvc4"
     if args.cvc5:
         cvc = "--cvc5"
@@ -365,17 +381,17 @@ if __name__ == "__main__":
     if args.lifting_benchmarks or args.all_benchmarks:
         algos = [["requation", cvc]]
         optims = [["all", ""]]
-        run_benchmarks(lifting_benchmarks, algos, optims)
+        run_benchmarks(lifting_benchmarks, algos, optims, raw_output)
 
     if args.constraint_benchmarks or args.all_benchmarks:
         algos = [["requation", cvc]]
         optims = [["all", ""]]
-        run_benchmarks(constraint_benchmarks, algos, optims)
+        run_benchmarks(constraint_benchmarks, algos, optims, raw_output)
 
     if args.base_benchmarks or args.all_benchmarks:
         algos = [["requation", cvc]]
         optims = [["all", ""]]
-        run_benchmarks(base_benchmark_set, algos, optims)
+        run_benchmarks(base_benchmark_set, algos, optims, raw_output)
 
     if args.base_benchmarks or args.lifting_benchmarks or args.constraint_benchmarks:
         exit()
@@ -452,4 +468,4 @@ if __name__ == "__main__":
         else:
             input_files = kick_the_tires_set
 
-    run_benchmarks(input_files, algos, optims)
+    run_benchmarks(input_files, algos, optims, raw_output)
