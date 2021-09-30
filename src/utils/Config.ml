@@ -5,13 +5,13 @@ let problem_name = ref "unknown"
 (** Toggle debugging. *)
 let debug = ref false
 
-(* Limit the size of debugging messages. *)
+(** Limit the size of debugging messages. *)
 let debug_msg_max_chars = ref 400
 
-(* Toggle info messages. Set to true by default. *)
+(** Toggle info and error messages. Set to true by default. *)
 let info = ref true
 
-(* Toggle printing timing info when info is off. Set to true by default. *)
+(** Toggle printing timing info when info is off. Set to true by default. *)
 let timings = ref true
 
 (** Maximum steps of rewrites to apply during PMRS reduction (symbolic evaluation). *)
@@ -68,16 +68,17 @@ second-order quantification is unrealizable, using a SMT solver (Z3 by default).
 let check_unrealizable_smt_unsatisfiable = ref false
 
 (**
-  Attempt to lift the function if there is no solution.
-*)
-let attempt_lifting = ref true
-
-(**
   Accept no-sat in bounded checking as unsat.
 *)
 let no_bounded_sat_as_unsat = ref false
 
 let bounded_lemma_check = ref false
+
+(**
+  Run with the optimizations used to synthesize solutions for systems of equations.
+  Works best when there are more than 4 cores.
+*)
+let sysfe_opt = ref true
 
 (* ============================================================================================= *)
 (*                                STORAGE AND BINARY PATHS                                       *)
@@ -267,4 +268,18 @@ let set_fuzzing_count (s : string) =
   try
     let i = Int.of_string s in
     if i >= 0 && i < 1024 then fuzzing_count := i
+  with _ -> ()
+
+(**
+  Attempt to lift the function if there is no solution.
+*)
+let attempt_lifting = ref true
+
+(** The number of times Synduce should attempt to add a lifting variable. *)
+let max_lifting_attempts = ref 2
+
+let set_max_lifting_attempts (s : string) =
+  try
+    let i = Int.of_string s in
+    if i >= 0 && i < 64 then max_lifting_attempts := i
   with _ -> ()

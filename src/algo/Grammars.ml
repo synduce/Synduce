@@ -147,6 +147,9 @@ let bool_parametric ?(guess = None) ?(special_const_prod = true) (params : gramm
             GTerm (SyApp (IdSimple "and", [ ipred; ipred ]));
             GTerm (SyApp (IdSimple "or", [ ipred; ipred ]));
           ]
+        @ (if List.length params.g_locals <= 0 then
+           [ GTerm (SyId (IdSimple "true")); GTerm (SyId (IdSimple "false")) ]
+          else [])
         @
         if has_ints then
           (if special_const_prod then [ GTerm (SyApp (IdSimple "=", [ ix; ic ])) ] else [])

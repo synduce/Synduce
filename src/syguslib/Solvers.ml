@@ -160,6 +160,10 @@ module SygusSolver (Stats : Statistics) (Log : Logger) (Config : SolverSystemCon
       }
     in
     Stats.log_solver_start solver.s_pid solver.s_name;
+    Log.debug
+      Fmt.(
+        fun fmt () ->
+          pf fmt "%s (pid : %i) solving %s -> %s" solver.s_name solver.s_pid inputfile outputfile);
     try
       let t, r = Lwt.task () in
       ( solver,
@@ -168,7 +172,11 @@ module SygusSolver (Stats : Statistics) (Log : Logger) (Config : SolverSystemCon
             match status with
             | Unix.WEXITED 0 -> Lwt.return (Some (fetch_solution solver.s_pid outputfile))
             | Unix.WEXITED i ->
-                Log.error Fmt.(fun fmt () -> pf fmt "Solver exited with code %i." i);
+                Log.error
+                  Fmt.(
+                    fun fmt () ->
+                      pf fmt "Solver %s (pid : %i) exited with code %i." solver.s_name solver.s_pid
+                        i);
                 Lwt.return None
             | Unix.WSIGNALED i ->
                 Log.error Fmt.(fun fmt () -> pf fmt "Solver signaled with code %i." i);
@@ -182,7 +190,6 @@ module SygusSolver (Stats : Statistics) (Log : Logger) (Config : SolverSystemCon
   let solve_commands (p : program) : solver_response option Lwt.t * int Lwt.u =
     let inputfile = mk_tmp_sl "in_" in
     let outputfile = mk_tmp_sl "out_" in
-    Log.debug Fmt.(fun fmt () -> pf fmt "Solving %s -> %s" inputfile outputfile);
     commands_to_file p inputfile;
     let s, t, r = exec_solver (inputfile, outputfile) in
     solver_make_cancellable s t;

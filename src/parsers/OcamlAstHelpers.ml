@@ -115,13 +115,15 @@ and fterm_of_pattern (pat : pattern) =
 
 and op_fterm_of_args loc (name : Longident.t) (args : (Asttypes.arg_label * expression) list) =
   let maybe_ident = simple_ident_of_longident name in
-  let of_ident id =
-    match (T.Binop.of_string id, args) with
+
+  let of_ident ident =
+    match (T.Binop.of_string ident, args) with
     | Some bop, [ (Asttypes.Nolabel, arg1); (Asttypes.Nolabel, arg2) ] ->
         Some (mk_bin loc bop (fterm_of_expr arg1) (fterm_of_expr arg2))
     | _ -> (
-        match (T.Unop.of_string id, args) with
+        match (T.Unop.of_string ident, args) with
         | Some uop, [ (Asttypes.Nolabel, arg) ] -> Some (mk_un loc uop (fterm_of_expr arg))
+        | Some uop, _ -> failwith Fmt.(str "%a has more than one argument." T.Unop.pp uop)
         | _ -> None)
   in
   Option.bind ~f:of_ident maybe_ident

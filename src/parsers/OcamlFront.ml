@@ -29,9 +29,11 @@ let file_options =
     ('C', "interactive-check-lemma", set Config.interactive_check_lemma true, None);
     ('\000', "check-smt-unrealizable", set Config.check_unrealizable_smt_unsatisfiable true, None);
     ('\000', "cvc4", set Config.use_cvc4 true, None);
+    ('\000', "cvc5", set Config.use_cvc4 false, None);
     ('\000', "fuzzing", None, Some Config.set_fuzzing_count);
     ('\000', "generate-benchmarks", None, Some Config.set_benchmark_generation_dir);
     ('\000', "generate-proof", None, Some Config.set_proof_output_file);
+    ('\000', "max-lifting", None, Some Config.set_max_lifting_attempts);
     ('\000', "no-gropt", set Config.optimize_grammars false, None);
     ('\000', "no-lifting", set Config.attempt_lifting false, None);
     ('\000', "no-simplify", set Config.simplify_eqns false, None);

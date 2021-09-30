@@ -1,9 +1,9 @@
 
-let s0 x32 x33 = x33 > x32 ? x33 : 0
+let s0 x0 x1 = x1 > x0 ? x1 : 0
 
-let f1 x34 x35 x36 x37 = (x36 + x37) + (x35 > x34 ? x35 : 0)
+let f1 x2 x3 x4 x5 = (x4 + x5) + (x3 > x2 ? x3 : 0)
 
-let c0  = (0 + 0) + 0
+let c0  = 0
 
 let rec g =
   function MLeaf(a) -> s0 input a
