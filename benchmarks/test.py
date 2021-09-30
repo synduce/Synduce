@@ -116,6 +116,7 @@ constraint_benchmarks = [
     # symmetric tree
     ["constraints/symmetric_tree/sum.ml", "-N"],
     ["constraints/symmetric_tree/height.ml", "-N"],
+    ["constraints/symmetric_tree/min.ml", "-N"],
     # memo
     ["constraints/memo/tree_size.ml", "-NB"],
     ["constraints/memo/constant.ml", ""],
