@@ -100,7 +100,7 @@ constraint_benchmarks = [
     # bst
     ["constraints/bst/contains.ml", ""],
     ["constraints/bst/count_lt.ml", "-NB"],
-    ["constraints/bst/count_between.ml", "-NB --cvc4"],
+    ["constraints/bst/count_between.ml", "-NB"],
     ["constraints/bst/most_frequent_v1.ml", ""],
     ["constraints/bst/from_list_contains.ml", ""],
     ["constraints/bst/from_list_max.ml", "-NB -n 100"],
@@ -108,7 +108,10 @@ constraint_benchmarks = [
     # balanced_tree
     ["constraints/balanced_tree/node_count.ml", "-N"],
     ["constraints/balanced_tree/height.ml", "-N"],
-    ["constraints/balanced_tree/height_v2.ml", "-NB --cvc4"],
+    ["constraints/balanced_tree/height_v2.ml", "-NB"],
+    # symmetric tree
+    ["constraints/symmetric_tree/sum.ml", "-N"],
+    ["constraints/symmetric_tree/height.ml", "-N"],
     # memo
     ["constraints/memo/tree_size.ml", "-NB"],
     ["constraints/memo/constant.ml", ""],
@@ -154,7 +157,7 @@ base_benchmark_set = [
     ["tree/min.pmrs", ""],
     ["tree/minmax.pmrs", ""],
     ["tree/maxtree2.pmrs", ""],
-    ["tree/poly.pmrs", "--cvc4"],
+    ["tree/poly.pmrs", ""],
     ["tree/maxPathWeight.pmrs", ""],
     ["list/sumhom.pmrs", ""],
     ["list/sumevens.pmrs", ""],
@@ -164,7 +167,7 @@ base_benchmark_set = [
     ["list/polyhom.pmrs", ""],
     ["list/atoi.ml", ""],
     ["list/hamming.pmrs", ""],
-    ["list/maxcount.pmrs", "--cvc4"],
+    ["list/maxcount.pmrs", ""],
     ["list/minhom.pmrs", ""],
     ["list/last.pmrs", ""],
     ["list/mtshom.pmrs", ""],
@@ -313,10 +316,16 @@ if __name__ == "__main__":
     root = os.getcwd()
     exec_path = os.path.join(root, "_build/default/bin/Synduce.exe")
 
+    table_info = "Tables: #1 is for CAV21 paper Table 1,\
+    #2 is for CAV21 paper Table 2,\
+    #3 is for CAV21 paper Table 3,\
+    #4 is for testing benchmarks with constraints, with partial bounding only,\
+    #5 is for testing benchmarks with constraints, with p-bounding and Symbolic-CEGIS."
+
     sys.stdout.flush()
     aparser = argparse.ArgumentParser()
     aparser.add_argument(
-        "-t", "--table", help="Table number that the script must generate data for.", type=int, default=-1)
+        "-t", "--table", help=table_info, type=int, default=-1)
     aparser.add_argument(
         "--run", help="Run tests for all benchmarks.", action="store_true")
     aparser.add_argument(
@@ -335,6 +344,8 @@ if __name__ == "__main__":
         "--all-benchmarks", help="Run all the benchmarks and exit.", action="store_true")
     aparser.add_argument(
         "--summary", help="Give a summary of benchmarks.", action="store_true")
+    aparser.add_argument(
+        "--cvc5", help="Force use of CVC5 (useful if you can't install CVC4 on Mac M1)", action="store_true")
     args = aparser.parse_args()
 
     if args.summary:
@@ -347,19 +358,22 @@ if __name__ == "__main__":
 
     run_test_only = table_no == -1 or args.run
 
+    cvc = "--cvc4"
+    if args.cvc5:
+        cvc = "--cvc5"
     # === Special runs with simplified output ===
     if args.lifting_benchmarks or args.all_benchmarks:
-        algos = [["requation", "--cvc4"]]
+        algos = [["requation", cvc]]
         optims = [["all", ""]]
         run_benchmarks(lifting_benchmarks, algos, optims)
 
     if args.constraint_benchmarks or args.all_benchmarks:
-        algos = [["requation", "--cvc4"]]
+        algos = [["requation", cvc]]
         optims = [["all", ""]]
         run_benchmarks(constraint_benchmarks, algos, optims)
 
     if args.base_benchmarks or args.all_benchmarks:
-        algos = [["requation", "--cvc4"]]
+        algos = [["requation", cvc]]
         optims = [["all", ""]]
         run_benchmarks(base_benchmark_set, algos, optims)
 
@@ -369,7 +383,7 @@ if __name__ == "__main__":
     # === TABLES and older runs ===
     if run_test_only:
         algos = [["requation", ""]]
-        optims = [["all", ""]]
+        optims = [["all", cvc]]
 
     # Table 1 / CAV 21 paper : compare Synduce and Baseline
     elif table_no == 1:
@@ -425,6 +439,7 @@ if __name__ == "__main__":
 
     if args.kick_the_tires:
         input_files = kick_the_tires_set
+
     else:
         if table_no == 2:
             input_files = reduced_benchmark_set_table2
