@@ -82,17 +82,26 @@ let is_bounded (t : term) =
     ~case:(fun _ t -> match t.tkind with TVar _ -> Some (is_novariant t) | _ -> None)
     t
 
-let subst_args (fpatterns : fpattern list) (args : term list) : (term * term) list option =
-  let rec f (fpat, t) =
+let subst_args (fpatterns : fpattern list) (args : term list) :
+    (fpattern list * (term * term) list, string) Result.t =
+  let rec match_pattern_to_arg (fpat, t) =
     match (fpat, t.tkind) with
-    | FPatVar x, _ -> [ (mk_var x, t) ]
+    | FPatVar x, _ -> Some [ (mk_var x, t) ]
+    | FPatAny, _ -> Some []
     | FPatTup pl, TTup tl -> (
-        match List.zip pl tl with Ok ptl -> List.concat (List.map ~f ptl) | _ -> failwith "no sub")
-    | _ -> failwith "no sub"
+        match List.zip pl tl with
+        | Ok ptl -> Option.map ~f:List.concat (all_or_none (List.map ~f:match_pattern_to_arg ptl))
+        | _ -> None)
+    | _ -> None
   in
-  match List.zip fpatterns args with
-  | Ok l -> ( try Some (List.concat (List.map ~f l)) with _ -> None)
-  | _ -> None
+  List.fold_until args ~init:(fpatterns, []) ~finish:Result.return
+    ~f:(fun (fpatterns_left, substs) arg ->
+      match fpatterns_left with
+      | hd :: tl -> (
+          match match_pattern_to_arg (hd, arg) with
+          | Some substs' -> Continue (tl, substs @ substs')
+          | None -> Stop (Error (Fmt.str "Could not match %a with %a." pp_fpattern hd pp_term arg)))
+      | _ -> Stop (Error "Too many arguments in function application."))
 
 (** [replace_calls_to functions t] replaces all calls to functions in [functions]
   by a fresh variable.

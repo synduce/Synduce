@@ -10,7 +10,7 @@ val until_irreducible : (term -> term * bool) -> term -> term
   *)
 
 val rule_lookup :
-  ('a, variable * variable list * (string * term list) option * term, 'b) Base.Map.t ->
+  ('a, variable * variable list * pattern option * term, 'b) Base.Map.t ->
   variable ->
   term list ->
   term list

@@ -86,8 +86,8 @@ let rule_lookup prules (f : variable) (fargs : term list) : term list =
     let bindt = List.map ~f:mk_var bindv in
     match List.map2 ~f:Utils.pair bindt bindto with Ok x -> Some (substitution x expr) | _ -> None
   in
-  let match_with_pat (_, rule_args, _, rhs) (cstr, pat_args) first_args to_pat_match =
-    match Analysis.matches to_pat_match ~pattern:(mk_data cstr pat_args) with
+  let match_with_pat (_, rule_args, _, rhs) pat first_args to_pat_match =
+    match Analysis.matches_pattern to_pat_match pat with
     | Some bindto_map ->
         let bindto_list = Map.to_alist bindto_map in
         let pat_v, pat_bto = List.unzip bindto_list in
@@ -98,11 +98,11 @@ let rule_lookup prules (f : variable) (fargs : term list) : term list =
     if Variable.(nt = f) then
       match rule_pat with
       (* We have a pattern, try to match it. *)
-      | Some (cstr, pat_args) -> (
+      | Some pat -> (
           (* Separate last argument and the rest. Last argument is pattern-matched. *)
           match (List.last fargs, List.drop_last fargs) with
           | Some to_pat_match, Some first_args ->
-              let f = match_with_pat (nt, rule_args, rule_pat, rhs) (cstr, pat_args) first_args in
+              let f = match_with_pat (nt, rule_args, rule_pat, rhs) pat first_args in
               let cond_pat = CondTree.of_term to_pat_match in
               Option.map ~f:CondTree.to_term CondTree.(all_or_none (map ~f cond_pat))
           | _ -> None)
@@ -127,8 +127,12 @@ let rec reduce_term ?(unboxing = false) (t : term) : term =
             match resolve_func func' with
             | FRFun (fpatterns, body) -> (
                 match Analysis.subst_args fpatterns args' with
-                | Some subst -> Some (substitution subst body)
-                | None -> None)
+                | Ok (remaining_patterns, subst) -> (
+                    (* If there are remaining patterns the application is partial. *)
+                    match remaining_patterns with
+                    | [] -> Some (substitution subst body)
+                    | rem -> Some (mk_fun rem (substitution subst body)))
+                | Error _ -> None)
             | FRPmrs pm -> (
                 match args' with
                 | [ tp ] -> Some (f (reduce_pmrs pm tp))
@@ -202,7 +206,7 @@ and reduce_pmrs (prog : PMRS.t) (input : term) =
 (* ============================================================================================= *)
 
 (**
-  reduce_term reduces a term using only the lambda-calculus
+  calc_term_step reduces a term using only the lambda-calculus
 *)
 let rec calc_term_step (rstep : bool ref) (t : term) : term =
   let case f t =
@@ -212,8 +216,12 @@ let rec calc_term_step (rstep : bool ref) (t : term) : term =
         match resolve_func func' with
         | FRFun (fpatterns, body) -> (
             match Analysis.subst_args fpatterns args' with
-            | Some subst -> Some (substitution subst body)
-            | None -> None)
+            | Ok (remaining_patterns, subst) -> (
+                (* If there are remaining patterns the application is partial. *)
+                match remaining_patterns with
+                | [] -> Some (substitution subst body)
+                | rem -> Some (mk_fun rem (substitution subst body)))
+            | Error _ -> None)
         | FRPmrs pm -> (
             match args' with
             | [ tp ] -> Some (f (pmrs_calc_one_step rstep pm (mk_app (mk_var pm.pvar) [ tp ])))

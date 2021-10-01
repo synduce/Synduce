@@ -164,8 +164,10 @@ let smtPattern_of_pattern (p : pattern) =
   | PatAny -> Pat (mk_symb "_")
   | PatConstant c -> Pat (mk_symb (Fmt.str "%a" Constant.pp c))
   | PatVar v -> Pat (mk_symb v.vname)
-  | PatConstr (c, pats) ->
-      PatComp (mk_symb c, List.map ~f:(fun p -> mk_symb Fmt.(str "%a" pp_pattern p)) pats)
+  | PatConstr (c, pats) -> (
+      match pats with
+      | [] -> Pat (mk_symb c)
+      | _ -> PatComp (mk_symb c, List.map ~f:(fun p -> mk_symb Fmt.(str "%a" pp_pattern p)) pats))
   | PatTuple pats ->
       let smt_pats = List.map ~f:(fun p -> mk_symb Fmt.(str "%a" pp_pattern p)) pats in
       let tl =
@@ -514,9 +516,7 @@ let build_match_cases pmrs _nont vars (relevant_rules : PMRS.rewrite_rule list) 
     (smtTerm * match_case list) option =
   let build_with matched_var rest_args =
     let rule_to_match_case (_, var_args, pat, body) =
-      let pattern =
-        match pat with Some (d, l) -> smtPattern_of_term (mk_data d l) | None -> None
-      in
+      let pattern = match pat with Some p -> Some (smtPattern_of_pattern p) | None -> None in
       let non_pattern_matched_args = pmrs.PMRS.pargs @ var_args in
       let case_body =
         let extra_param_args = List.map ~f:Term.mk_var pmrs.pargs in

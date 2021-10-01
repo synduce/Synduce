@@ -70,6 +70,63 @@ let parse_option (setting : attribute) =
 (* ============================================================================================= *)
 (*                                                                                               *)
 (* ============================================================================================= *)
+[%%if ocaml_version < (4, 12, 0)]
+
+let extract_params decl =
+  let f (ct, variance) =
+    match variance with
+    | Asttypes.Invariant -> (
+        match ct.ptyp_desc with
+        | Ptyp_var x -> x
+        | _ -> failwith "Only type variable as parameters supported.")
+    | _ -> failwith "Covariant and contravariant types unsupported."
+  in
+  List.map ~f decl.ptype_params
+
+[%%else]
+
+let extract_params decl =
+  let f (ct, variance) =
+    match variance with
+    | Asttypes.NoVariance, _ -> (
+        match ct.ptyp_desc with
+        | Ptyp_var x -> x
+        | _ -> failwith "Only type variable as parameters supported.")
+    | _ -> failwith "Covariant and contravariant types unsupported."
+  in
+  List.map ~f decl.ptype_params
+
+[%%endif]
+
+[%%if ocaml_version < (4, 13, 0)]
+
+let constructor_arguments args =
+  match args with
+  | Some pat -> (
+      match pat.ppat_desc with
+      | Ppat_var ident -> [ mk_var (wloc pat.ppat_loc) ident.txt ]
+      | Ppat_tuple pats -> List.map ~f:fterm_of_pattern pats
+      | Ppat_any -> [ mk_any (wloc pat.ppat_loc) ]
+      | _ ->
+          failwith
+            (Fmt.str "Pattern not supported in constructor arguments: %a." Pprintast.pattern pat))
+  | None -> []
+
+[%%else]
+
+let constructor_arguments args =
+  match args with
+  | Some (_, pat) -> (
+      match pat.ppat_desc with
+      | Ppat_var ident -> [ mk_var (wloc pat.ppat_loc) ident.txt ]
+      | Ppat_tuple pats -> List.map ~f:fterm_of_pattern pats
+      | Ppat_any -> [ mk_any (wloc pat.ppat_loc) ]
+      | _ ->
+          failwith
+            (Fmt.str "Pattern not supported in constructor arguments: %a." Pprintast.pattern pat))
+  | None -> []
+
+[%%endif]
 
 let read_sig filename =
   Location.input_name := filename;
@@ -109,34 +166,6 @@ let rec type_term_of_core_type (t : core_type) : type_term =
   | _ ->
       Log.error_msg Fmt.(str "%a" Pprintast.core_type t);
       failwith "type unsupported"
-
-[%%if ocaml_version < (4, 12, 0)]
-
-let extract_params decl =
-  let f (ct, variance) =
-    match variance with
-    | Asttypes.Invariant -> (
-        match ct.ptyp_desc with
-        | Ptyp_var x -> x
-        | _ -> failwith "Only type variable as parameters supported.")
-    | _ -> failwith "Covariant and contravariant types unsupported."
-  in
-  List.map ~f decl.ptype_params
-
-[%%else]
-
-let extract_params decl =
-  let f (ct, variance) =
-    match variance with
-    | Asttypes.NoVariance, _ -> (
-        match ct.ptyp_desc with
-        | Ptyp_var x -> x
-        | _ -> failwith "Only type variable as parameters supported.")
-    | _ -> failwith "Covariant and contravariant types unsupported."
-  in
-  List.map ~f decl.ptype_params
-
-[%%endif]
 
 let type_term_of_type_decl (decl : type_declaration) =
   let variants_of_cstr clist =
@@ -238,17 +267,10 @@ let type_definitions (_ : Asttypes.rec_flag) (decls : type_declaration list) =
   in
   List.map ~f:declare decls
 
-let rules_of_case_list loc (nont : ident) (preargs : ident list) (cases : case list) =
+let rules_of_case_list loc (nont : ident) (preargs : ident option list) (cases : case list) =
   let fsymb = mk_var loc nont in
-  let preargs = List.map ~f:(fun x -> mk_var loc x) preargs in
-  let constructor_arguments args =
-    match args with
-    | Some pat -> (
-        match pat.ppat_desc with
-        | Ppat_var ident -> [ mk_var (wloc pat.ppat_loc) ident.txt ]
-        | Ppat_tuple pats -> List.map ~f:fterm_of_pattern pats
-        | _ -> failwith (Fmt.str "Pattern not supported: %a." Pprintast.pattern pat))
-    | None -> []
+  let preargs =
+    List.map ~f:(fun x -> Option.(value ~default:(mk_any loc) (map ~f:(mk_var loc) x))) preargs
   in
   let f (c : case) =
     if Option.is_some c.pc_guard then failwith "Case with guard not supported."
@@ -283,14 +305,24 @@ let as_pmrs (vb : value_binding) : (ident * (loc * term * term) list * term opti
     match expr.pexp_desc with
     | Pexp_fun (_, _, arg_pat, body) -> (
         match arg_pat.ppat_desc with
-        | Ppat_var id -> as_pmrs_named s (preargs @ [ id.txt ]) body
-        | _ -> failwith (Fmt.str "Pattern not supported: %a." Pprintast.pattern pat))
+        | Ppat_var id -> as_pmrs_named s (preargs @ [ Some id.txt ]) body
+        | Ppat_any -> as_pmrs_named s (preargs @ [ None ]) body
+        | _ ->
+            failwith
+              (Fmt.str "Pattern not supported in function arguments: %a." Pprintast.pattern pat))
     | Pexp_function cl -> rules_of_case_list (wloc pat.ppat_loc) s preargs cl
     | _ -> (
         try
           let t = fterm_of_expr expr in
           let loc = wloc expr.pexp_loc in
-          [ (loc, mk_app loc (mk_var loc s) (List.map ~f:(mk_var loc) preargs), t) ]
+          [
+            ( loc,
+              mk_app loc (mk_var loc s)
+                (List.map
+                   ~f:(fun v -> Option.value (Option.map ~f:(mk_var loc) v) ~default:(mk_any loc))
+                   preargs),
+              t );
+          ]
         with _ -> [])
   in
   match pat.ppat_desc with

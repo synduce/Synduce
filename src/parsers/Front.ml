@@ -14,6 +14,7 @@ type termkind =
   | FTApp of term * term list
   | FTData of id * term list
   | FTVar of id
+  | FTAny
   | FTTup of term list
   | FTLet of term * term * term
   | FTFun of term list * term
@@ -31,6 +32,8 @@ let mk_app pos f args = { pos; kind = FTApp (f, args) }
 let mk_data pos c args = { pos; kind = FTData (c, args) }
 
 let mk_var pos v = { pos; kind = FTVar v }
+
+let mk_any pos = { pos; kind = FTAny }
 
 let mk_bin pos op a b = { pos; kind = FTBin (op, a, b) }
 
@@ -90,6 +93,7 @@ let rec pp_fterm (frmt : Formatter.t) (t : term) =
   | FTUn (op, t1) -> Fmt.(pf frmt "%a %a" Unop.pp op pp_fterm t1)
   | FTHOBin op -> Fmt.(pf frmt "(%a)" Binop.pp op)
   | FTIte (c, a, b) -> Fmt.(pf frmt "(%a?%a:%a)" pp_fterm c pp_fterm a pp_fterm b)
+  | FTAny -> Fmt.(pf frmt "_")
 
 (* Preprocessing progam *)
 let make_rules functions =

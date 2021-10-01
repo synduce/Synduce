@@ -1,42 +1,16 @@
 (** @synduce *)
 
-type ilist = INil | ICons of int * ilist
+type nat = Z | S of nat
 
-type blist = BNil | BCons of bool * blist
+type list = Nil | Cons of int * list
 
-type silist = SiElt of int | SiCons of int * silist 
+type compressed_list = CNil | CCons of (nat * int) * compressed_list
 
-type sblist = SbElt of bool | SbCons of bool * sblist 
+let rec no_adjacent_duplicates = function Nil -> true | Cons (hd, tl) -> nodup hd tl
 
-type clist = CNil | CElt of int | CConcat of clist * clist 
+and nodup x = function Nil -> true | Cons (hd, tl) -> (not (hd = x)) && nodup hd tl
 
-
-
-let rec clist_to_ilist = function CNil -> INil | CElt a -> ICons (a, INil) | CConcat (x, y) -> dec1 y x
-
-and dec1 l = function
-  | CNil -> clist_to_ilist l
-  | CElt a -> ICons (a, clist_to_ilist l)
-  | CConcat (x, y) -> dec1 (CConcat (y, l)) x
-
-let rec ilist_to_blist = function 
-  | INil -> BNil
-  | ICons(hd, tl) -> BCons(hd = 1, ilist_to_blist tl)
-
-let rec pred1 = function
-  | BCons(hd, tl) -> hd && pred1_aux tl 
-  | BNil -> true 
-  and pred1_aux = function
-  | BNil  -> false 
-  | BCons(hd, tl) -> (not hd) && pred1 tl
-
-let rec target = 
-  function 
-  | INil -> [%synt c1]
-  | ICons(hd, tl) -> [%synt f] hd (target_aux tl)
-and target_aux =
-  function 
-  | INil -> false
-  | ICons(hd, tl) -> [%synt g] hd (target tl)
-;;
-assert (target = ilist_to_blist @@ pred1)
+let rec stutter =
+  function
+  | CNil()
+  | CCons()

@@ -4,7 +4,7 @@ let _IDS = Hashtbl.create (module Int) ~size:20
 
 let get_ids () = _IDS
 
-let _NAMES = Hashtbl.create (module String) ~size:100
+let _NAMES = Hashtbl.create (module String) ~size:1000
 
 let _MAX_ID = ref 0
 
@@ -52,3 +52,5 @@ let mk_with_id (i : int) (s : string) (f : int -> 'a) : 'a =
     | _ ->
         Hashtbl.add_multi _NAMES ~key:s ~data:i;
         f id
+
+let get_exn (id : int) = Hashtbl.find_exn _IDS id

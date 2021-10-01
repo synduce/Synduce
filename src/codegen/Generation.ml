@@ -63,6 +63,7 @@ let rec get_params_from_arg = function
       let typ = Variable.vtype var in
       match typ with Some t -> get_params_from_type t | None -> SS.empty)
   | FPatTup vars -> List.fold_left SS.union SS.empty (List.map get_params_from_arg vars)
+  | _ -> failwith "FIXME: _ - Pattern not supported in proof generation."
 
 let rec convert_otyp_to_dfy (typ : t) : d_domain_type =
   match typ with
@@ -82,12 +83,13 @@ let rec convert_otyp_to_dfy (typ : t) : d_domain_type =
 
 let rec gen_func_tup_arg (arg : fpattern) : d_domain_type =
   match arg with
-  | FPatVar _ -> failwith "Unexpected argument pattern"
+  | FPatAny | FPatVar _ -> failwith "Unexpected argument pattern"
   | FPatTup vars ->
       mk_tuple_type
         (List.map
            (fun fpats ->
              match fpats with
+             | FPatAny -> failwith "Unexpected _ pattern."
              | FPatVar var -> (
                  match Variable.vtype var with
                  | Some t -> convert_otyp_to_dfy t
@@ -104,6 +106,7 @@ let gen_func_arg (arg : fpattern) : string * d_domain_type =
       | Some t -> (name, convert_otyp_to_dfy t)
       | None -> (name, mk_named_type "FILL IN TYPE"))
   | FPatTup _ -> ("tup", gen_func_tup_arg arg)
+  | FPatAny -> ("_", mk_named_type "FILL IN TYPE")
 
 let gen_func_decl (name : ident) (func : term) =
   match func.tkind with
