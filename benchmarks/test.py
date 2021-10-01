@@ -185,7 +185,7 @@ base_benchmark_set = [
     ["tree/sorted.pmrs", "-t"],
     ["tree/mips.pmrs", ""],
     ["tree/mits.pmrs", ""],
-    ["tree/mpps.pmrs", "--cvc4"],
+    ["tree/mpps.pmrs", "--no-gropt"],
     # ----------- Extra benchmarks ---------------
     ["list_to_tree/search.pmrs", ""],
     ["list_to_tree/search_v2.pmrs", ""],
@@ -212,7 +212,7 @@ base_benchmark_set = [
 lifting_benchmarks = [
     ["lifting/mpsl.ml", ""],
     ["lifting/poly.ml", ""],
-    ["lifting/atoi_no.ml", ""],
+    ["lifting/atoi_no.ml", "--no-gropt"],
     ["lifting/largest_diff_sorted_list_nohead.ml", ""],
     ["lifting/mits_nosum.ml", ""]
 ]
@@ -274,7 +274,7 @@ def run_benchmarks(input_files, algos, optims, raw_output=None, exit_err=False):
                 bench_id = "%s,%s+%s" % (filename, algo[0], optim[0])
                 progress = f"({benchmark_cnt} / {benchmark_total})"
                 command = ("%s %s %s -i %s %s %s %s %s" %
-                        (timeout, exec_path, algo[1], optim[1], extra_opt,
+                           (timeout, exec_path, algo[1], optim[1], extra_opt,
                             os.path.realpath(os.path.join(
                                 "benchmarks", filename)),
                             soln_file_opt, gen_opt))
@@ -294,7 +294,8 @@ def run_benchmarks(input_files, algos, optims, raw_output=None, exit_err=False):
                     nextline = process.stdout.readline()
                     if process.poll() is not None:
                         break
-                    print(f"{progress : >11s}./Synduce benchmarks/{filename} {extra_opt} {algo[1]} {optim[1]} 🏃 at step {i}", end="\r")                          
+                    print(
+                        f"{progress : >11s}./Synduce benchmarks/{filename} {extra_opt} {algo[1]} {optim[1]} 🏃 at step {i}", end="\r")
                     i += 1
                     sys.stdout.flush()
                     line = nextline.decode('utf-8')

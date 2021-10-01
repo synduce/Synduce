@@ -619,21 +619,11 @@ module Solve = struct
           (* Task 2 : solving system of equations, default strategy. *)
           Some
             (let t, r = core_solve ~gen_only:false unknowns eqns in
-            (* Wait on failure, if the unrealizability check has not terminated 
-              we would end up with a synthesis failure but no counterexamples 
-              to decide what to do!
-            *)
-            let t =
-                Lwt.bind t (fun t ->
-                    match t with
-                    (* Wait on failure. *)
-                    | (RFail | RUnknown | RInfeasible), _ ->
-                        let* _ = Lwt_unix.sleep !Config.wait_parallel_tlimit in
-                        Lwt.return t
-                    (* Continue on success. *)
-                    | _ -> Lwt.return t)
-              in
-             (r, t));
+             (* Wait on failure, if the unrealizability check has not terminated
+                we would end up with a synthesis failure but no counterexamples
+                to decide what to do!
+             *)
+             (r, wait_on_failure t));
           (* Task 3,4: solving system of equations, optimizations / grammar choices.
               If answer is Fail, must stall.
           *)
@@ -643,17 +633,7 @@ module Solve = struct
           then
            Some
              (let t, r = core_solve ~predict_constants:(Some false) ~gen_only:false unknowns eqns in
-              let t =
-                Lwt.bind t (fun t ->
-                    match t with
-                    (* Wait on failure. *)
-                    | (RFail | RUnknown | RInfeasible), _ ->
-                        let* _ = Lwt_unix.sleep !Config.wait_parallel_tlimit in
-                        Lwt.return t
-                    (* Continue on success. *)
-                    | _ -> Lwt.return t)
-              in
-              (r, t))
+              (r, wait_on_failure t))
           else None);
           (if
            !Config.sysfe_opt
@@ -661,17 +641,7 @@ module Solve = struct
           then
            Some
              (let t, r = core_solve ~predict_constants:(Some true) ~gen_only:false unknowns eqns in
-              let t =
-                Lwt.bind t (fun t ->
-                    match t with
-                    (* Wait on failure. *)
-                    | (RFail | RUnknown | RInfeasible), _ ->
-                        let* _ = Lwt_unix.sleep !Config.wait_parallel_tlimit in
-                        Lwt.return t
-                    (* Continue on success. *)
-                    | _ -> Lwt.return t)
-              in
-              (r, t))
+              (r, wait_on_failure t))
           else None);
         ]
     in

@@ -149,7 +149,8 @@ let create_or_update_term_state_for_ctex ~(p : psi_def) (is_pos_ctex : bool) (ts
     (ctex : ctex) : term_state =
   match Map.find ts ctex.ctex_eqn.eterm with
   | None ->
-      Log.debug_msg Fmt.(str "Creating new term state for term %a" pp_term ctex.ctex_eqn.eterm);
+      Log.debug (fun fmt () ->
+          Fmt.pf fmt "Creating new term state for term@;%a" pp_term ctex.ctex_eqn.eterm);
       Map.add_exn ~key:ctex.ctex_eqn.eterm
         ~data:(make_term_state_detail_from_ctex ~p is_pos_ctex ctex)
         ts

@@ -275,3 +275,12 @@ let sorted_vars_of_types (tl : RType.t list) : sorted_var list =
     (varname, sort_of_rtype t)
   in
   List.map ~f tl
+
+let wait_on_failure t =
+  Lwt.bind t (fun t ->
+      match t with
+      (* Wait on failure. *)
+      | (RFail | RUnknown | RInfeasible), _ ->
+          Lwt.map (fun _ -> t) (Lwt_unix.sleep !Config.wait_parallel_tlimit)
+      (* Continue on success. *)
+      | _ -> Lwt.return t)

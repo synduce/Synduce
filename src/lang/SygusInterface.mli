@@ -69,3 +69,9 @@ val sorted_vars_of_types : RType.t list -> Sygus.sorted_var list
     Returns as many variables as there are elements in the input lists,
     and a fresh name is used for each created variable.
 *)
+
+val wait_on_failure : (Sygus.solver_response * 'a) Lwt.t -> (Sygus.solver_response * 'a) Lwt.t
+(**
+    Bind to the response of a solver to that if that response is a failure, the promise is
+    deferrred by [!Config.wait_parallel_tlimit].
+*)
