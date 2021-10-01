@@ -70,6 +70,7 @@ let options =
     ('c', "simple-init", set Config.simple_init true, None);
     ('u', "no-check-unrealizable", set Config.check_unrealizable false, None);
     ('d', "debug", set Config.debug true, None);
+    ('f', "force-nonlinear", set Config.force_nonlinear true, None);
     ('h', "help", Some print_usage, None);
     ('i', "info-off", set Config.info false, None);
     ('I', "interactive", set Config.interactive_lemmas true, None);

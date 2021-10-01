@@ -443,8 +443,8 @@ module Solve = struct
       Log.debug_msg Fmt.(str "Syntactic definition:@;@[<hov 2>%a@]" pp_partial_soln partial_soln);
     (partial_soln, Set.diff unknowns resolved, new_eqns)
 
-  let synthfuns_of_unknowns ?(bools = false) ?(eqns = []) ?(ops = OpSet.empty) (unknowns : VarSet.t)
-      =
+  let synthfuns_of_unknowns ?(nonlinear = false) ?(bools = false) ?(eqns = []) ?(ops = OpSet.empty)
+      (unknowns : VarSet.t) =
     let xi_formals (xi : variable) : sorted_var list * sygus_sort =
       let tv = Variable.vtype_or_new xi in
       let targs, tout = RType.fun_typ_unpack tv in
@@ -460,7 +460,8 @@ module Solve = struct
         else None
       in
       let grammar =
-        Grammars.generate_grammar ~guess ~bools ~special_const_prod:false ops args ret_sort
+        Grammars.generate_grammar ~nonlinear ~guess ~bools ~special_const_prod:false ops args
+          ret_sort
       in
       CSynthFun (xi.vname, args, ret_sort, grammar)
     in
@@ -540,16 +541,22 @@ module Solve = struct
       (Set.diff fvs unknowns, ops, hi)
     in
     (* Prepare commands *)
-    let logic =
-      let base_logic = logic_of_operators all_operators in
+    let logic, nonlinear =
+      let nonlinear =
+        (* TODO : how do we find whether we need nonlinear operators. *)
+        !Config.force_nonlinear
+      in
+      let base_logic = logic_of_operators ~nonlinear all_operators in
       let needs_dt =
         List.exists
           ~f:(fun v -> requires_dt_theory (Variable.vtype_or_new v))
           (Set.elements free_vars @ Set.elements unknowns)
       in
-      if needs_dt then dt_extend_base_logic base_logic else base_logic
+      ((if needs_dt then dt_extend_base_logic base_logic else base_logic), nonlinear)
     in
-    let synth_objs = synthfuns_of_unknowns ~bools:has_ite ~eqns ~ops:all_operators unknowns in
+    let synth_objs =
+      synthfuns_of_unknowns ~nonlinear ~bools:has_ite ~eqns ~ops:all_operators unknowns
+    in
     let set_logic = CSetLogic logic in
     let sort_decls = declare_sorts_of_vars free_vars in
     let var_decls = List.map ~f:declaration_of_var (Set.elements free_vars) in

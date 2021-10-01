@@ -30,7 +30,7 @@ val requires_dt_theory : RType.t -> bool
     objects of that type.
  *)
 
-val logic_of_operators : OpSet.t -> string
+val logic_of_operators : ?nonlinear:bool -> OpSet.t -> string
 (**
     Returns a string corresponding to the logic that allows to reason about all the operators
     in the set. Does not include the "DT" prefix required for reasoning about datatypes (see [requires_dt_theory]).

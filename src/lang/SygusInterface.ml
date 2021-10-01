@@ -96,8 +96,8 @@ let requires_dt_theory (t : RType.t) =
   in
   aux t
 
-let logic_of_operators (opset : OpSet.t) : string =
-  if Set.for_all opset ~f:Operator.is_lia then "LIA" else "NIA"
+let logic_of_operators ?(nonlinear = false) (opset : OpSet.t) : string =
+  if (not nonlinear) && Set.for_all opset ~f:Operator.is_lia then "LIA" else "NIA"
 
 let dt_extend_base_logic (base_logic : string) : string = "DT" ^ base_logic
 (* TODO : Z3 has other names like DT_LIA instead of DTLIA? *)

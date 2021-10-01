@@ -80,6 +80,11 @@ let bounded_lemma_check = ref false
 *)
 let sysfe_opt = ref true
 
+(**
+    Sometimes non-linearity occurs even when the reference only has linear operators.
+*)
+let force_nonlinear = ref false
+
 (* ============================================================================================= *)
 (*                                STORAGE AND BINARY PATHS                                       *)
 (* ============================================================================================= *)
