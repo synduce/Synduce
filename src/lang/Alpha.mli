@@ -20,3 +20,6 @@ val mk_with_id : int -> string -> (int -> 'a) -> 'a
     reigsters the name [s] to that fresh id, and returns the result of applying [f]
     to that fresh id.
 *)
+
+val get_exn : int -> string
+(** Get the name that corresponds to a given id. *)

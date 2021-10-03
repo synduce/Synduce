@@ -5,9 +5,9 @@ type 'a list = Nil | Cons of 'a * 'a list
 let rec mps = function
   | Nil -> (0, 0)
   | Cons (hd, tl) ->
-      let _mps, _sum = mps tl in
-      (max (_mps + hd) 0, _sum + hd)
-  [@@ensures fun (x, y) -> x >= 0]
+      let amps, asum = mps tl in
+      (max (amps + hd) 0, asum + hd)
+  [@@ensures fun (x, _) -> x >= 0]
 
 let rec clist_to_list = function
   | CNil -> Nil
@@ -23,6 +23,6 @@ let rec hom = function
   | CNil -> [%synt s0]
   | Single a -> [%synt f0] a
   | Concat (x, y) -> [%synt join] (hom x) (hom y)
-
 ;;
+
 assert (hom = clist_to_list @@ mps)

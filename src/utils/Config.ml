@@ -80,6 +80,11 @@ let bounded_lemma_check = ref false
 *)
 let sysfe_opt = ref true
 
+(**
+    Sometimes non-linearity occurs even when the reference only has linear operators.
+*)
+let force_nonlinear = ref false
+
 (* ============================================================================================= *)
 (*                                STORAGE AND BINARY PATHS                                       *)
 (* ============================================================================================= *)
@@ -196,7 +201,7 @@ let simplify_eqns = ref true
   Use the equations as a indicator to optimize grammars, without compromising soundness.
   OFF for CAV
 *)
-let optimize_grammars = ref false
+let optimize_grammars = ref true
 
 (** When printing a system of equations, put a limit on how many equations are printed. *)
 let pp_eqn_count = ref 20

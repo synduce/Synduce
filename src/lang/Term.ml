@@ -431,7 +431,7 @@ module Constant = struct
 end
 
 (** Simple patterns for function arguments: a fpattern is either a variable or a tuple of patterns.  *)
-type fpattern = FPatVar of variable | FPatTup of fpattern list
+type fpattern = FPatAny | FPatVar of variable | FPatTup of fpattern list
 
 (** More complex patterns are used in match-cases.
   In the current implementation, this is only used as a way to translate a PMRS back to
@@ -475,11 +475,13 @@ let rec fpat_ty (fp : fpattern) : RType.t =
   match fp with
   | FPatVar v -> Variable.vtype_or_new v
   | FPatTup tl -> RType.(TTup (List.map ~f:fpat_ty tl))
+  | FPatAny -> RType.get_fresh_tvar ()
 
 let rec fpat_vars (fp : fpattern) : VarSet.t =
   match fp with
   | FPatVar v -> VarSet.singleton v
   | FPatTup tl -> VarSet.union_list (List.map ~f:fpat_vars tl)
+  | FPatAny -> VarSet.empty
 
 let pattern_of_term (t : term) =
   let rec aux t =
@@ -598,7 +600,10 @@ let term_of_pattern (p : pattern) : term =
   aux p
 
 let rec fpat_to_term fp =
-  match fp with FPatVar v -> mk_var v | FPatTup tl -> mk_tup (List.map ~f:fpat_to_term tl)
+  match fp with
+  | FPatVar v -> mk_var v
+  | FPatTup tl -> mk_tup (List.map ~f:fpat_to_term tl)
+  | _ -> mk_tup []
 
 let fpat_sub (fp1 : fpattern) (fp2 : fpattern) =
   let rec aux (fp1, fp2) =
@@ -610,6 +615,7 @@ let fpat_sub (fp1 : fpattern) (fp2 : fpattern) =
         | _ -> failwith "no sub")
     | FPatVar v1, _ -> [ (mk_var v1, fpat_to_term fp2) ]
     | _, FPatVar v2 -> [ (fpat_to_term fp1, mk_var v2) ]
+    | _, _ -> []
   in
   try Some (aux (fp1, fp2)) with _ -> None
 
@@ -989,6 +995,7 @@ let rec pp_fpattern (frmt : Formatter.t) (fp : fpattern) =
   match fp with
   | FPatVar x -> Variable.pp frmt x
   | FPatTup tl -> pf frmt "%a" (box (parens (list ~sep:comma pp_fpattern))) tl
+  | FPatAny -> pf frmt "_"
 
 let rec pp_pattern (frmt : Formatter.t) (p : pattern) =
   match p with
@@ -998,7 +1005,7 @@ let rec pp_pattern (frmt : Formatter.t) (p : pattern) =
   | PatConstr (c, args) -> (
       match args with
       | [] -> string frmt c
-      | _ -> pf frmt "%s(%a)" c (list ~sep:comma pp_pattern) args)
+      | _ -> pf frmt "%a(%a)" (styled `Italic string) c (list ~sep:comma pp_pattern) args)
   | PatTuple tl -> (parens (list ~sep:comma pp_pattern)) frmt tl
 
 let pp_term (frmt : Formatter.t) (x : term) =

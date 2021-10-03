@@ -6,7 +6,7 @@ type grammar_parameters = {
   g_opset : OpSet.t;
   g_fixed_constants : bool;
   g_mul_constant : bool;
-  g_linear : bool;
+  g_nonlinear : bool;
   g_locals : (sygus_term * sygus_sort) list;
   g_bools : bool;
 }
@@ -59,7 +59,7 @@ let int_parametric ?(guess = None) (params : grammar_parameters) =
               match s with SId (IdSimple "Int") -> Some (GTerm t) | _ -> None)
         @ [ GTerm (SyApp (IdSimple "-", [ ix ])) ]
         @ [ GTerm (SyApp (IdSimple "+", [ ix; ix ])) ]
-        @ (if params.g_linear && params.g_mul_constant then
+        @ (if (not params.g_nonlinear) && params.g_mul_constant then
            [ GTerm (SyApp (IdSimple "*", [ ic; ix ])); GTerm (SyApp (IdSimple "div", [ ix; ic ])) ]
           else [])
         @ (if Set.mem params.g_opset (Binary Min) then
@@ -71,7 +71,7 @@ let int_parametric ?(guess = None) (params : grammar_parameters) =
         @ (if
            Set.mem params.g_opset (Binary Times)
            || Set.mem params.g_opset (Binary Div)
-           || not params.g_linear
+           || params.g_nonlinear
           then
            [ GTerm (SyApp (IdSimple "*", [ ix; ix ])); GTerm (SyApp (IdSimple "div", [ ix; ix ])) ]
           else [])
@@ -253,15 +253,16 @@ let rec project ((v, s) : sorted_var) =
 and tuple_sel i projs =
   List.map projs ~f:(fun (t, s) -> (SyApp (IdIndexed ("tupSel", [ INum i ]), [ t ]), s))
 
-let generate_grammar ?(guess = None) ?(bools = false) ?(special_const_prod = true) (opset : OpSet.t)
-    (args : sorted_var list) (ret_sort : sygus_sort) =
+let generate_grammar ?(nonlinear = false) ?(guess = None) ?(bools = false)
+    ?(special_const_prod = true) (opset : OpSet.t) (args : sorted_var list) (ret_sort : sygus_sort)
+    =
   let locals_of_scalar_type = List.concat (List.map ~f:project args) in
   let params =
     {
       g_opset = opset;
       g_fixed_constants = false;
       g_mul_constant = false;
-      g_linear = true;
+      g_nonlinear = nonlinear;
       g_locals = locals_of_scalar_type;
       g_bools = bools || not (Set.are_disjoint opset OpSet.comparison_operators);
     }

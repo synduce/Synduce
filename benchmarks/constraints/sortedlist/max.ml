@@ -6,6 +6,6 @@ and aux prev = function Elt x -> prev >= x | Cons (hd, tl) -> prev >= hd && aux 
 
 let rec maxs = function Elt x -> x | Cons (hd, tl) -> max hd (maxs tl)
 
-let rec amax = function Elt x -> x | Cons (hd, tl) -> [%synt join] hd [@@requires is_sorted];;
+let rec amax = function Elt x -> x | Cons (hd, _) -> [%synt join] hd [@@requires is_sorted];;
 
 assert (amax = maxs)

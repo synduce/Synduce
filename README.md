@@ -3,7 +3,7 @@
 ## Building the tool
 
 Synduce is mainly written in OCaml using the `dune` build system and `opam` to install package dependencies.
-You will need a recent [OCaml](https://ocaml.org/releases/4.11.1.html) (>= 4.09.0) installation and the [OCaml Package Manager (opam)](https://opam.ocaml.org) to get started.
+You will need a recent [OCaml](https://ocaml.org/releases/4.11.1.html) (>= 4.08.0) installation and the [OCaml Package Manager (opam)](https://opam.ocaml.org) to get started.
 The Ocaml dependencies of this project can be installed via opam (```opam install . --deps-only```).
 Once all the dependencies are installed, call ```make``` from the root of the project. The Makefile simply calls `dune build` and creates a shortcut to the binary executable.
 

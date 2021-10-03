@@ -116,6 +116,7 @@ constraint_benchmarks = [
     # symmetric tree
     ["constraints/symmetric_tree/sum.ml", "-N"],
     ["constraints/symmetric_tree/height.ml", "-N"],
+    ["constraints/symmetric_tree/min.ml", "-N"],
     # memo
     ["constraints/memo/tree_size.ml", "-NB"],
     ["constraints/memo/constant.ml", ""],
@@ -137,60 +138,38 @@ constraint_benchmarks = [
 ]
 
 base_benchmark_set = [
-    ["misc/simple_nnf.ml", ""],
-    ["misc/unknowns_are_ids.ml", ""],
-    ["misc/composed_unkwns.ml", ""],
-    ["ptree/sum.pmrs", ""],
-    ["tree/sumtree.pmrs", ""],
-    ["tailopt/sum.pmrs", ""],
-    ["tailopt/mts.pmrs", ""],
-    ["tailopt/mps.pmrs", ""],
+    # Combine
     ["combine/mts.pmrs", ""],
     ["combine/mts_and_mps.pmrs", ""],
-    ["treepaths/sum.pmrs", ""],
-    ["treepaths/height.pmrs", ""],
-    ["treepaths/mips.pmrs", ""],
-    ["treepaths/leftmostodd.pmrs", "-b 6"],
-    ["treepaths/maxPathWeight.pmrs", ""],
-    ["treepaths/maxPathWeight2.pmrs", ""],
-    ["ptree/mul.pmrs", ""],
-    ["ptree/maxheads.pmrs", ""],
-    ["ptree/maxlast.pmrs", ""],
-    ["ptree/maxsum.pmrs", ""],
-    ["tree/maxtree.pmrs", ""],
-    ["tree/min.pmrs", ""],
-    ["tree/minmax.pmrs", ""],
-    ["tree/maxtree2.pmrs", ""],
-    ["tree/poly.pmrs", ""],
-    ["tree/maxPathWeight.pmrs", ""],
-    ["list/sumhom.pmrs", ""],
-    ["list/sumevens.pmrs", ""],
-    ["list/zero_after_one.ml", ""],
-    ["list/lenhom.pmrs", ""],
-    ["list/prodhom.pmrs", ""],
-    ["list/polyhom.pmrs", ""],
-    ["list/atoi.ml", ""],
-    ["list/hamming.pmrs", ""],
-    ["list/maxcount.pmrs", ""],
-    ["list/minhom.pmrs", ""],
-    ["list/last.pmrs", ""],
-    ["list/mtshom.pmrs", ""],
-    ["list/mpshom.pmrs", ""],
-    ["list/msshom.pmrs", ""],
-    ["list/search.pmrs", ""],
-    ["list/line_of_sight.pmrs", ""],
-    ["list/mts_and_mps_hom.pmrs", ""],
+    ["compressed_list/sum.ml", "-f"],
+    # Misc
+    ["misc/count_between.ml", ""],
+    ["misc/composed_unkwns.ml", ""],
+    ["misc/simple_nnf.ml", ""],
+    ["misc/unknowns_are_ids.ml", ""],
+    # List
     ["list/issorted.pmrs", "-t"],
-    ["tree/sorted.pmrs", "-t"],
-    ["tree/mips.pmrs", ""],
-    ["tree/mits.pmrs", ""],
-    ["tree/mpps.pmrs", "--cvc4"],
-    # ----------- Extra benchmarks ---------------
     ["list_to_tree/search.pmrs", ""],
     ["list_to_tree/search_v2.pmrs", ""],
     ["list_to_tree/search_v3.pmrs", ""],
     ["list_to_tree/mls.pmrs", ""],
-    ["misc/count_between.ml", ""],
+    ["list/atoi.ml", ""],
+    ["list/line_of_sight.pmrs", ""],
+    ["list/mts_and_mps_hom.pmrs", ""],
+    ["list/sumhom.pmrs", ""],
+    ["list/sumevens.pmrs", ""],
+    ["list/zero_after_one.ml", ""],
+    ["list/last.pmrs", ""],
+    ["list/lenhom.pmrs", ""],
+    ["list/maxcount.pmrs", ""],
+    ["list/minhom.pmrs", ""],
+    ["list/prodhom.pmrs", ""],
+    ["list/polyhom.pmrs", ""],
+    ["list/hamming.pmrs", ""],
+    ["list/mtshom.pmrs", ""],
+    ["list/mpshom.pmrs", ""],
+    ["list/msshom.pmrs", ""],
+    ["list/search.pmrs", ""],
     ["list/alist_sum.ml", ""],
     ["list/maxhom.pmrs", ""],
     ["list/sumodds.pmrs", ""],
@@ -198,20 +177,53 @@ base_benchmark_set = [
     ["list/sndminhom.pmrs", ""],
     ["list/mincount.pmrs", ""],
     ["list/zeros_ones.ml", ""],
-    ["zippers/list_sum_basic.ml", ""],
-    ["zippers/list_sum.ml", ""],
+    # Numbers
+    ["numbers/int_nat_twosum.ml", ""],
+    ["numbers/int_nat_toint.ml", ""],
+    # Ptrees
+    ["ptree/mul.pmrs", ""],
+    ["ptree/maxheads.pmrs", ""],
+    ["ptree/maxlast.pmrs", ""],
+    ["ptree/maxsum.pmrs", ""],
+    ["ptree/sum.pmrs", ""],
+    # Sorting lists
     ["sort_list/min.ml", ""],
     ["sort_list/max.ml", ""],
     ["sort_list/sumgtz.ml", ""],
-    ["numbers/int_nat_twosum.ml", ""],
-    ["numbers/int_nat_toint.ml", ""],
-    ["terms/height.ml", ""]
+    # Tail optimization
+    ["tailopt/sum.pmrs", ""],
+    ["tailopt/mts.pmrs", ""],
+    ["tailopt/mps.pmrs", ""],
+    # Terms
+    ["terms/height.ml", ""],
+    # Trees
+    ["tree/maxtree.pmrs", ""],
+    ["tree/min.pmrs", ""],
+    ["tree/minmax.pmrs", ""],
+    ["tree/maxtree2.pmrs", ""],
+    ["tree/poly.pmrs", ""],
+    ["tree/maxPathWeight.pmrs", ""],
+    ["tree/sorted.pmrs", "-t"],
+    ["tree/sumtree.pmrs", ""],
+    ["tree/mips.pmrs", ""],
+    ["tree/mits.pmrs", ""],
+    ["tree/mpps.pmrs", "--no-gropt"],
+    # Tree paths
+    ["treepaths/sum.pmrs", ""],
+    ["treepaths/height.pmrs", ""],
+    ["treepaths/mips.pmrs", ""],
+    ["treepaths/leftmostodd.pmrs", "-b 6"],
+    ["treepaths/maxPathWeight.pmrs", ""],
+    ["treepaths/maxPathWeight2.pmrs", ""],
+    # Zippers
+    ["zippers/list_sum_basic.ml", ""],
+    ["zippers/list_sum.ml", ""],
 ]
 
 lifting_benchmarks = [
     ["lifting/mpsl.ml", ""],
     ["lifting/poly.ml", ""],
-    ["lifting/atoi_no.ml", ""],
+    ["lifting/atoi_no.ml", "--no-gropt"],
     ["lifting/largest_diff_sorted_list_nohead.ml", ""],
     ["lifting/mits_nosum.ml", ""]
 ]
@@ -273,7 +285,7 @@ def run_benchmarks(input_files, algos, optims, raw_output=None, exit_err=False):
                 bench_id = "%s,%s+%s" % (filename, algo[0], optim[0])
                 progress = f"({benchmark_cnt} / {benchmark_total})"
                 command = ("%s %s %s -i %s %s %s %s %s" %
-                        (timeout, exec_path, algo[1], optim[1], extra_opt,
+                           (timeout, exec_path, algo[1], optim[1], extra_opt,
                             os.path.realpath(os.path.join(
                                 "benchmarks", filename)),
                             soln_file_opt, gen_opt))
@@ -293,7 +305,8 @@ def run_benchmarks(input_files, algos, optims, raw_output=None, exit_err=False):
                     nextline = process.stdout.readline()
                     if process.poll() is not None:
                         break
-                    print(f"{progress : >11s}./Synduce benchmarks/{filename} {extra_opt} {algo[1]} {optim[1]} 🏃 at step {i}", end="\r")                          
+                    print(
+                        f"{progress : >11s}./Synduce benchmarks/{filename} {extra_opt} {algo[1]} {optim[1]} 🏃 at step {i}", end="\r")
                     i += 1
                     sys.stdout.flush()
                     line = nextline.decode('utf-8')

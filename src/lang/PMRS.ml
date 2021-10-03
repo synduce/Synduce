@@ -9,7 +9,6 @@ open Option.Let_syntax
 (*                      TYPE DEFINITIONS AND UTILS                                               *)
 (* ============================================================================================= *)
 
-type pattern = string * term list
 (**
   A pattern in a PMRS rewrite rule is limited to matching
   terms of the form "Constructor_name(arguments)" where each argument is a term,
@@ -95,7 +94,7 @@ let find_nonterminal_by_name (name : string) : variable option =
 let lhs (nt, args, pat, rhs) =
   let all_args =
     let args = List.map ~f:mk_var args in
-    match pat with Some (c, pat_args) -> args @ [ mk_data c pat_args ] | None -> args
+    match pat with Some p -> args @ [ term_of_pattern p ] | None -> args
   in
   let t, _ = infer_type (mk_app ~pos:rhs.tpos (mk_var nt) all_args) in
   t
@@ -108,9 +107,6 @@ let reinit () =
 (* ============================================================================================= *)
 (*                                 PRETTY PRINTING                                               *)
 (* ============================================================================================= *)
-let pp_pattern (frmt : Formatter.t) ((t, args) : pattern) : unit =
-  if List.length args = 0 then Fmt.(pf frmt "%a" (styled `Italic string) t)
-  else Fmt.(pf frmt "%a(%a)" (styled `Italic string) t (list ~sep:comma Term.pp_term) args)
 
 let pp_rewrite_rule (frmt : Formatter.t) ((nt, vargs, pat, t) : rewrite_rule) : unit =
   Fmt.(
@@ -229,12 +225,16 @@ let update_order (p : t) : t =
   - the unknowns in the PMRS.
 *)
 let clear_pmrs_types (prog : t) : t =
+  let rec clear_type_pat pat =
+    match pat with
+    | PatConstr (_, args) -> List.iter ~f:clear_type_pat args
+    | PatVar v -> Variable.clear_type v
+    | PatTuple args -> List.iter ~f:clear_type_pat args
+    | PatAny | PatConstant _ -> ()
+  in
   let f_rule ~key:_ ~data:(nt, args, pat, body) : _ =
     List.iter ~f:Variable.clear_type args;
-    (match pat with
-    | Some (_, args) ->
-        List.iter ~f:(fun t -> Set.iter ~f:Variable.clear_type (Analysis.free_variables t)) args
-    | None -> ());
+    let _ = Option.map ~f:clear_type_pat pat in
     (nt, args, pat, erase_term_type body)
   in
   let prules = Map.mapi ~f:f_rule prog.prules in
@@ -255,7 +255,7 @@ let infer_pmrs_types (prog : t) =
       let head_term =
         let t_args = List.map ~f:mk_var args in
         match pat with
-        | Some (pat_cstr, pat_args) -> mk_app (mk_var nt) (t_args @ [ mk_data pat_cstr pat_args ])
+        | Some pattern -> mk_app (mk_var nt) (t_args @ [ term_of_pattern pattern ])
         | None -> mk_app (mk_var nt) t_args
       in
       infer_type head_term
@@ -384,9 +384,6 @@ let build_match_cases pmrs _nont vars (relevant_rules : rewrite_rule list) :
     (term * match_case list) option =
   let build_with matched_var rest_args =
     let rule_to_match_case (_, var_args, pat, body) =
-      let pattern =
-        match pat with Some (d, l) -> Some (pattern_of_term (mk_data d l)) | None -> None
-      in
       let non_pattern_matched_args = pmrs.pargs @ var_args in
       let case_body =
         let extra_param_args = List.map ~f:Term.mk_var pmrs.pargs in
@@ -413,7 +410,7 @@ let build_match_cases pmrs _nont vars (relevant_rules : rewrite_rule list) :
         in
         substitution sub body'
       in
-      Option.map ~f:(fun x -> (x, case_body)) pattern
+      Option.map ~f:(fun x -> (x, case_body)) pat
     in
     Option.map
       ~f:(fun l -> (mk_var matched_var, l))

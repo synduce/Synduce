@@ -74,6 +74,7 @@ let fterm_to_term _ (allv : Term.VarSet.t) globs (locals : Term.VarSet.t) rterm 
       match x.kind with
       | FTTup tl -> Term.(FPatTup (List.map ~f tl))
       | FTVar id -> Term.(FPatVar (Variable.mk id))
+      | FTAny -> Term.(FPatAny)
       | _ -> loc_fatal_errmsg x.pos "Function arguments can only be variables or tuples."
     in
     let t_args = List.map ~f args in
@@ -109,6 +110,7 @@ let fterm_to_term _ (allv : Term.VarSet.t) globs (locals : Term.VarSet.t) rterm 
     | FTUn (op, t1) -> Term.(mk_un ~pos:t.pos op (f env t1))
     | FTIte (c, a, b) -> Term.(mk_ite ~pos:t.pos (f env c) (f env a) (f env b))
     | FTHOBin _ -> failwith "Higher order binary operator not supported."
+    | FTAny -> failwith "Pattern _ not supported."
   in
   f _env rterm
 
@@ -147,18 +149,21 @@ let pmrs_of_rules loc (globs : (string, Term.variable) Hashtbl.t) (synt_objs : T
   in
   (* Find a variable in environment. If it's not in the local enviroment, it should be in the globals.*)
   let allv = Term.VarSet.union_list [ nont; pset; aset ] in
-  let translate_pattern constr args : PMRS.pattern =
+  let translate_pattern constr args : Term.pattern =
     let f arg =
       let rec aux t =
-        match t.kind with
-        | FTVar x -> Term.(mk_var (Variable.mk x))
-        | FTData (cstr, xl) -> Term.(mk_data cstr (List.map ~f:aux xl))
-        | _ ->
-            loc_fatal_errmsg arg.pos (Fmt.str "expected a variable in pattern, got %a" pp_fterm arg)
+        Term.(
+          match t.kind with
+          | FTVar x -> PatVar (Variable.mk x)
+          | FTData (cstr, xl) -> PatConstr (cstr, List.map ~f:aux xl)
+          | FTAny -> PatAny
+          | _ ->
+              loc_fatal_errmsg arg.pos
+                (Fmt.str "expected a variable in pattern, got %a" pp_fterm arg))
       in
       aux arg
     in
-    (constr, List.map ~f args)
+    PatConstr (constr, List.map ~f args)
   in
   let rules : PMRS.rewrite_rule list =
     let transf_rule ((rloc, rhead, rterm) : pmrs_rule) =
@@ -184,8 +189,7 @@ let pmrs_of_rules loc (globs : (string, Term.variable) Hashtbl.t) (synt_objs : T
       let local_vars : Term.VarSet.t =
         let pat_vars =
           match pat with
-          | Some (_, pat_args) ->
-              Term.VarSet.union_list (List.map ~f:Analysis.free_variables pat_args)
+          | Some pattern -> Analysis.vars_of_pattern pattern
           | None -> Term.VarSet.empty
         in
         Set.union (Term.VarSet.of_list xs) pat_vars
