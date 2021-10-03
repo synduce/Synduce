@@ -2,6 +2,10 @@ open Fmt
 open Lexing
 open Base
 
+(* ============================================================================================= *)
+(*        Printing errors in the input program, with some context on where the error appears.    *)
+(* ============================================================================================= *)
+
 let reference_text = ref ""
 
 let extract text (pos1, pos2) : string =
@@ -55,6 +59,10 @@ let log_with_excerpt (frmt : Formatter.t) (ttext : string) (location : position 
     pf frmt "@[<h 8>%s (%i:%i)-(%i:%i): %s@;%a@]" _start.pos_fname start_line start_col end_lin
       end_col (range ttext location) s x)
 
+(* ============================================================================================= *)
+(*                            General purpose printing functions with helpers.                   *)
+(* ============================================================================================= *)
+
 let wrap (s : string) fmt () = string fmt s
 
 let wrap1 f s t fmt () = pf fmt f s t
@@ -104,14 +112,50 @@ let verb msg =
 
 let verbose msg = if !Config.verbose then verb msg () else ()
 
-let verbose_msg msg =
-  if !Config.verbose then
-    pf Fmt.stdout "@[<h 8>%a@;%s@]@."
-      (styled (`Fg `Black) (styled (`Bg `Cyan) string))
-      " VERB <" msg
-  else ()
+let verbose_msg msg = verbose (fun fmt () -> pf fmt "%s" msg)
 
+(* ============================================================================================= *)
+(*                            Printing info on solver sub-processes                              *)
+(* ============================================================================================= *)
+let status_printer () =
+  while true do
+    Unix.sleepf 0.05;
+    let ids = Stats.get_alive () in
+    let s =
+      String.concat ~sep:" "
+        (List.map ids ~f:(fun (sname, sid) -> "(" ^ sname ^ " : " ^ Int.to_string sid ^ ")"))
+    in
+    Caml.Format.printf "Running: %s\r" s;
+    Caml.flush Caml.stdout;
+    ()
+  done
+
+(* ============================================================================================= *)
+(*                            Miscelleanous                                                      *)
+(* ============================================================================================= *)
+
+(** Print a message function to a file. *)
 let to_file (file : string) (msg : Formatter.t -> unit -> unit) : unit =
   let oc = Stdio.Out_channel.create file in
   let frmt = Caml.Format.formatter_of_out_channel oc in
-  msg frmt ()
+  msg frmt ();
+  Stdio.Out_channel.close oc
+
+let print_solvers_summary (frmt : Formatter.t) () : unit =
+  let open Fmt in
+  let total_solvers_time = ref 0.0 in
+  let total_instances = ref 0 in
+  let f (key, data) =
+    let total_time = List.sum (module Float) ~f:Stats.get_elapsed data in
+    let instances = List.length data in
+    total_solvers_time := !total_solvers_time +. total_time;
+    total_instances := !total_instances + instances;
+    (key, total_time, instances)
+  in
+  let pp frmt (key, time, instances) =
+    Fmt.(pf frmt "@[<v 0>%-10s [%4i instances] %.3fs @]" key instances time)
+  in
+  let l = List.map ~f (Stats.get_solver_pids ()) in
+  pf frmt "@[<v 0>Total time spent in solvers:@;@[%a@]@;> %-8s [%4i instances]: %.3f@]@;"
+    (list ~sep:(fun fmt () -> pf fmt "@;<80 0>") pp)
+    l "TOTAL" !total_instances !total_solvers_time

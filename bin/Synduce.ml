@@ -111,7 +111,7 @@ let on_success ~(is_ocaml_syntax : bool) (source_filename : string ref) (pb : Al
     (soln : Algo.AState.soln) : unit =
   let elapsed = Stats.get_glob_elapsed () in
   let verif_ratio = 100.0 *. (!Stats.verif_time /. elapsed) in
-  Log.verbose Stats.print_solvers_summary;
+  Log.(verbose print_solvers_summary);
   Log.info
     Fmt.(
       fun frmt () ->
@@ -161,6 +161,7 @@ let main () =
       raise e
   in
   if !parse_only then Caml.exit 1;
+
   (match Algo.PmrsAlgos.solve_problem psi_comps all_pmrs with
   | pb, Ok soln -> on_success ~is_ocaml_syntax filename pb soln
   | _, Error _ -> Utils.Log.error_msg "No solution found.");
