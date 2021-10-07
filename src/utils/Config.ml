@@ -1,4 +1,5 @@
 open Base
+open Getopt
 
 let problem_name = ref "unknown"
 
@@ -303,3 +304,51 @@ let set_max_lifting_attempts (s : string) =
     let i = Int.of_string s in
     if i >= 0 && i < 64 then max_lifting_attempts := i
   with _ -> ()
+
+(* ============================================================================================= *)
+(*                                CLI OPTIONS                                                    *)
+(* ============================================================================================= *)
+
+let options print_usage parse_only =
+  [
+    ('b', "bmc", None, Some set_check_depth);
+    ('c', "simple-init", set simple_init true, None);
+    ('u', "no-check-unrealizable", set check_unrealizable false, None);
+    ('d', "debug", set debug true, None);
+    ('f', "force-nonlinear", set force_nonlinear true, None);
+    ('h', "help", Some print_usage, None);
+    ('i', "info-off", set info false, None);
+    ('I', "interactive", set interactive_lemmas true, None);
+    ('J', "interactive-lifting", set interactive_lifting true, None);
+    ('L', "interactive-loop", set interactive_lemmas_loop true, None);
+    ('m', "style-math", set math_display true, None);
+    ('n', "verification", None, Some set_num_expansions_check);
+    ('N', "no-sat-as-unsat", set no_bounded_sat_as_unsat true, None);
+    ('B', "bounded-lemma-check", set bounded_lemma_check true, None);
+    ('o', "output", None, Some set_output_folder);
+    ('s', "no-splitting", set split_solve_on false, None);
+    ('t', "no-detupling", set detupling_on false, None);
+    ('v', "verbose", set verbose true, None);
+    ('X', "classify-ctex", set classify_ctex true, None);
+    ('C', "interactive-check-lemma", set interactive_check_lemma true, None);
+    ('\000', "acegis", set use_acegis true, None);
+    ('\000', "ccegis", set use_ccegis true, None);
+    ('\000', "cvc4", set use_cvc4 true, None);
+    ('\000', "cvc5", set use_cvc4 false, None);
+    ('\000', "check-smt-unrealizable", set check_unrealizable_smt_unsatisfiable true, None);
+    ('\000', "fuzzing", None, Some set_fuzzing_count);
+    ('\000', "generate-benchmarks", None, Some set_benchmark_generation_dir);
+    ('\000', "generate-proof", None, Some set_proof_output_file);
+    ('\000', "parse-only", set parse_only true, None);
+    ('\000', "max-lifting", None, Some set_max_lifting_attempts);
+    ('\000', "no-gropt", set optimize_grammars false, None);
+    ('\000', "no-lifting", set attempt_lifting false, None);
+    ('\000', "no-simplify", set simplify_eqns false, None);
+    ('\000', "no-syndef", set use_syntactic_definitions false, None);
+    ('\000', "show-vars", set show_vars true, None);
+    ('\000', "sysfe-opt-off", set sysfe_opt false, None);
+    ('\000', "use-bmc", set use_bmc true, None);
+    ('\000', "verif-with", None, Some set_verification_solver);
+    (* Background solver parameters *)
+    ('\000', "ind-tlimit", None, Some set_induction_proof_tlimit);
+  ]
