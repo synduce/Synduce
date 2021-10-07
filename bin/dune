@@ -1,5 +1,6 @@
 (executable
  (name Synduce)
- (modes native js)
- (public_name Synduce.Driver)
+ (public_name Synduce)
+ (flags
+  (:standard -cclib -static -cclib -no-pie))
  (libraries Lib fmt base parsexp compiler-libs sexplib getopt))
