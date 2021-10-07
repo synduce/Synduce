@@ -44,6 +44,8 @@ let print_usage () =
      induction proof.\n\
     \       --cvc4                      Use CVC4 instead of CVC5 if both are available.\n\
     \       --cvc5                      Always use CVC5 instead of CVC4 if both are available.\n\
+    \       --verif-with=SOLVER         Don't use z3 for verification, use SOLVER \
+     (=z3,cvc4,cvc5,yices)\n\
     \  Debugging:\n\
     \  -I   --interactive               Request additional lemmas interactively.\n\
     \  -J   --interactive-lifting       Request expressions for lifting.\n\
@@ -103,6 +105,7 @@ let options =
     ('\000', "show-vars", set Config.show_vars true, None);
     ('\000', "sysfe-opt-off", set Config.sysfe_opt false, None);
     ('\000', "use-bmc", set Config.use_bmc true, None);
+    ('\000', "verif-with", None, Some Config.set_verification_solver);
     (* Background solver parameters *)
     ('\000', "ind-tlimit", None, Some Config.set_induction_proof_tlimit);
   ]

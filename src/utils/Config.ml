@@ -106,19 +106,34 @@ let cvc5_binary_path = try Some (FileUtil.which "cvc5") with _ -> None
 let using_cvc5 () = Option.is_some cvc5_binary_path && not !use_cvc4
 
 let cvc_binary_path () =
-  if !use_cvc4 then match cvc4_binary_path with Some p -> p | None -> failwith "CVC4 not found."
+  if !use_cvc4 then
+    match cvc4_binary_path with
+    | Some p -> p
+    | None -> failwith "CVC4 not found using 'which cvc4')."
   else
     match cvc5_binary_path with
     | Some p -> p
     | None -> (
         match cvc4_binary_path with Some p -> p | None -> failwith "CVC5 and CVC4 not found.")
 
-let z3_binary_path = try FileUtil.which "z3" with _ -> failwith "Z3 not found."
+let z3_binary_path = try FileUtil.which "z3" with _ -> failwith "Z3 not found (using 'which z3')."
+
+let yices_binary_path = try Some (FileUtil.which "yices-smt2") with _ -> None
 
 (* TODO fix this. Not functional. *)
 let dryadsynth_binary_path = try FileUtil.which "DryadSynth" with _ -> ""
 
 let eusolver_binary_path = try FileUtil.which "eusolver" with _ -> ""
+
+let verification_solver = ref "z3"
+
+let set_verification_solver (s : string) =
+  match s with
+  | "z3" -> verification_solver := "z3"
+  | "cvc4" -> verification_solver := "cvc4"
+  | "cvc5" -> verification_solver := "cvc5"
+  | "yices" -> verification_solver := "yices"
+  | _ -> ()
 
 (* Smt solver logging. *)
 

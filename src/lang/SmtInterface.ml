@@ -30,6 +30,13 @@ module AsyncSmt = struct
   let make_z3_solver () =
     make_solver ~name:"Z3-SMT" Utils.Config.z3_binary_path [ "z3"; "-in"; "-smt2" ]
 
+  let make_yices_solver () =
+    match Utils.Config.yices_binary_path with
+    | Some yices -> make_solver ~name:"Yices-SMT2" yices [ "yices-smt2" ]
+    | None ->
+        Log.error_msg "Yices not found. Using z3 instead.";
+        make_z3_solver ()
+
   (** Create a process with a CVC4 solver. *)
   let make_cvc_solver () =
     let cvc_path = Config.cvc_binary_path () in
@@ -45,12 +52,27 @@ module SyncSmt = struct
 
   let make_z3_solver () = make_solver ~name:"Z3-SMT" Config.z3_binary_path [ "-in"; "-smt2" ]
 
+  let make_yices_solver () =
+    match Utils.Config.yices_binary_path with
+    | Some yices -> make_solver ~name:"Yices-SMT2" yices [ "yices-smt2" ]
+    | None ->
+        Log.error_msg "Yices not found. Using z3 instead.";
+        make_z3_solver ()
+
   (** Create a process with a CVC4 solver. *)
   let make_cvc_solver () =
     let cvc_path = Config.cvc_binary_path () in
     let using_cvc5 = Config.using_cvc5 () in
     let name = if using_cvc5 then "CVC5-SMT" else "CVC4-SMT" in
     make_solver ~name cvc_path [ "--lang=smt2.6"; "--incremental" ]
+
+  (** Create a process given some solver name. *)
+  let make_solver (name : string) =
+    match name with
+    | "cvc4" -> make_cvc_solver ()
+    | "cvc5" -> make_cvc_solver ()
+    | "yices" -> make_yices_solver ()
+    | _ -> make_z3_solver ()
 end
 
 let string_of_smtSymbol (s : smtSymbol) : string =

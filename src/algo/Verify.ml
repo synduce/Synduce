@@ -76,7 +76,7 @@ let check_solution ?(use_acegis = false) ~(p : psi_def) (lstate : refinement_loo
   let target_inst = Lang.Reduce.instantiate_with_solution p.psi_target soln in
   let free_vars = VarSet.empty in
   let init_vardecls = decls_of_vars free_vars in
-  let solver = SyncSmt.make_z3_solver () in
+  let solver = SyncSmt.make_solver !Config.verification_solver in
   SyncSmt.load_min_max_defs solver;
   let expand_and_check i (t0 : term) =
     let t_set, u_set = Expand.to_maximally_reducible p t0 in
@@ -161,7 +161,7 @@ let bounded_check ?(use_concrete_ctex = false) ~(p : psi_def)
   let target_inst = Lang.Reduce.instantiate_with_solution p.psi_target soln in
   let free_vars = VarSet.empty in
   let init_vardecls = decls_of_vars free_vars in
-  let solver = SyncSmt.make_z3_solver () in
+  let solver = SyncSmt.make_solver !Config.verification_solver in
   SyncSmt.load_min_max_defs solver;
   let check term =
     let sys_eqns, _ =
@@ -272,7 +272,7 @@ let invert (recf : PMRS.t) (c : Constant.t) : term list option =
   match recf.pinput_typ with
   | [ typ1 ] ->
       let x1 = Variable.mk ~t:(Some typ1) (Alpha.fresh ()) in
-      let solver = SyncSmt.make_z3_solver () in
+      let solver = SyncSmt.make_solver !Config.verification_solver in
       let rec expand_loop u =
         match Set.min_elt u with
         | Some t0 -> (
