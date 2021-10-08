@@ -22,19 +22,22 @@ module SmtLog : Solvers.Logger = struct
   let verbose = !Config.smt_solve_verbose
 end
 
+let cvc_opts = [ "--lang=smt2.6"; "--incremental" ]
+
+let yices_opts = [ "--incremental"; "--smt2-model-format" ]
+
+let z3_opts = [ "-in"; "-smt2" ]
+
 module AsyncSmt = struct
   module S = Solvers.Asyncs (SmtLog) (Stats)
   include S
 
   (** Create a process with a Z3 solver. *)
-  let make_z3_solver () =
-    make_solver ~name:"Z3-SMT" Utils.Config.z3_binary_path [ "z3"; "-in"; "-smt2" ]
+  let make_z3_solver () = make_solver ~name:"Z3-SMT" Utils.Config.z3_binary_path ("z3" :: z3_opts)
 
   let make_yices_solver () =
     match Utils.Config.yices_binary_path with
-    | Some yices ->
-        make_solver ~name:"Yices-SMT2" yices
-          [ "yices-smt2"; "--incremental"; "--smt2-model-format" ]
+    | Some yices -> make_solver ~name:"Yices-SMT2" yices ("yices-smt2" :: yices_opts)
     | None ->
         Log.error_msg "Yices not found. Using z3 instead.";
         make_z3_solver ()
@@ -45,19 +48,18 @@ module AsyncSmt = struct
     let using_cvc5 = Config.using_cvc5 () in
     let name = if using_cvc5 then "CVC5-SMT" else "CVC4-SMT" in
     let executable_name = if using_cvc5 then "cvc5" else "cvc4" in
-    make_solver ~name cvc_path
-      [ executable_name; "--lang=smt2.6"; "--incremental"; "--smt2-model-format" ]
+    make_solver ~name cvc_path (executable_name :: cvc_opts)
 end
 
 module SyncSmt = struct
   module S = Solvers.Synchronous (SmtLog) (Stats)
   include S
 
-  let make_z3_solver () = make_solver ~name:"Z3-SMT" Config.z3_binary_path [ "-in"; "-smt2" ]
+  let make_z3_solver () = make_solver ~name:"Z3-SMT" Config.z3_binary_path z3_opts
 
   let make_yices_solver () =
     match Utils.Config.yices_binary_path with
-    | Some yices -> make_solver ~name:"Yices-SMT2" yices [ "yices-smt2"; "--incremental" ]
+    | Some yices -> make_solver ~name:"Yices-SMT2" yices yices_opts
     | None ->
         Log.error_msg "Yices not found. Using z3 instead.";
         make_z3_solver ()
@@ -67,7 +69,7 @@ module SyncSmt = struct
     let cvc_path = Config.cvc_binary_path () in
     let using_cvc5 = Config.using_cvc5 () in
     let name = if using_cvc5 then "CVC5-SMT" else "CVC4-SMT" in
-    make_solver ~name cvc_path [ "--lang=smt2.6"; "--incremental" ]
+    make_solver ~name cvc_path cvc_opts
 
   (** Create a process given some solver name. *)
   let make_solver (name : string) =

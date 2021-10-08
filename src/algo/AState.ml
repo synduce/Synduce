@@ -100,7 +100,7 @@ type spurious_cause =
 
 type ctex_stat =
   | Valid
-  | Spurious of spurious_cause
+  | Spurious of spurious_cause list
   | Unknown  (**
   A counterexample is either valid, or spurious with some reason, or unknown.
 *)

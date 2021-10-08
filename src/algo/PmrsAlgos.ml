@@ -65,6 +65,7 @@ let rec refinement_loop (p : psi_def) (lstate : refinement_loop_state) =
       with _ -> (* A failure during the bounded check is an error. *)
                 Error RFail)
   | _ as synt_failure_info -> (
+      (* On synthesis failure, start by trying to synthesize lemmas. *)
       match Lemmas.synthesize_lemmas ~p synt_failure_info lstate with
       | Ok new_lstate ->
           Int.decr refinement_steps;
@@ -72,6 +73,7 @@ let rec refinement_loop (p : psi_def) (lstate : refinement_loop_state) =
           refinement_loop p new_lstate
       | Error synt_failure
         when !Config.attempt_lifting && Lifting.lift_count p < !Config.max_lifting_attempts -> (
+          (* If all no counterexample is spurious, lemma synthesis fails, we need lifting. *)
           match Lifting.scalar ~p lstate synt_failure with
           | Ok (p', lstate') ->
               Int.decr refinement_steps;

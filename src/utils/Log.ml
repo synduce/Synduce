@@ -71,8 +71,15 @@ let wrap2 f s1 t1 s2 t2 fmt () = pf fmt f s1 t1 s2 t2
 
 let wrapn fmt () = pf fmt
 
+let indent = ref 0
+
+let section_indent () = String.of_char_list (List.init !indent ~f:(fun _ -> '\t'))
+
 let error (msg : Formatter.t -> unit -> unit) : unit =
-  if !Config.info then pf Fmt.stdout "@[<h 8>%a@;%a@]@." (styled (`Bg `Red) string) "[ERROR]" msg ()
+  if !Config.info then
+    pf Fmt.stdout "%s@[<h 8>%a@;%a@]@." (section_indent ())
+      (styled (`Bg `Red) string)
+      "[ERROR]" msg ()
   else ()
 
 let error_msg (msg : string) = error (fun fmt () -> pf fmt "%s" msg)
@@ -85,12 +92,14 @@ let loc_fatal_errmsg loc msg =
 
 let info (msg : Formatter.t -> unit -> unit) : unit =
   if !Config.info then
-    pf Fmt.stdout "@[<h 8>%a@;%a@]@." (styled (`Bg `Blue) string) " INFO :" msg ()
+    pf Fmt.stdout "%s@[<h 8>%a@;%a@]@." (section_indent ())
+      (styled (`Bg `Blue) string)
+      " INFO :" msg ()
   else ()
 
 let debug (msg : Formatter.t -> unit -> unit) : unit =
   if !Config.debug then
-    pf Fmt.stdout "@[<h 8>%a@;%a@]@."
+    pf Fmt.stdout "%s@[<h 8>%a@;%a@]@." (section_indent ())
       (styled (`Fg `Black) (styled (`Bg `Yellow) string))
       "!DEBUG!" msg ()
   else ()
@@ -105,7 +114,7 @@ let print_ok () =
 
 let verb msg =
   if !Config.verbose then
-    pf Fmt.stdout "@[<h 8>%a@;@[%a@]@]@."
+    pf Fmt.stdout "%s@[<h 8>%a@;@[%a@]@]@." (section_indent ())
       (styled (`Fg `Black) (styled (`Bg `Cyan) string))
       " VERB <" msg
   else fun _ -> ()
@@ -113,6 +122,12 @@ let verb msg =
 let verbose msg = if !Config.verbose then verb msg () else ()
 
 let verbose_msg msg = verbose (fun fmt () -> pf fmt "%s" msg)
+
+let start_section s =
+  info (fun fmt () -> pf fmt "%s" s);
+  Int.incr indent
+
+let end_section () = Int.decr indent
 
 (* ============================================================================================= *)
 (*                            Printing info on solver sub-processes                              *)
