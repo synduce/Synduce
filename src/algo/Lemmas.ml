@@ -1292,7 +1292,7 @@ let synthesize_lemmas ~(p : psi_def) synt_failure_info (lstate : refinement_loop
       Error RFail
     | RInfeasible, _ ->
       (* Rare - but the synthesis solver can answer "infeasible", in which case it can give
-           counterexamples. *)
+             counterexamples. *)
       Log.info
         Fmt.(
           fun frmt () ->
@@ -1304,7 +1304,7 @@ let synthesize_lemmas ~(p : psi_def) synt_failure_info (lstate : refinement_loop
       Error RInfeasible
     | RUnknown, _ ->
       (* In most cases if the synthesis solver does not find a solution and terminates, it will
-           answer unknowns. We interpret it as "no solution can be found". *)
+             answer unknowns. We interpret it as "no solution can be found". *)
       Log.error_msg "SyGuS solver returned unknown.";
       Error RUnknown
     | s_resp, _ ->
