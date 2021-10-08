@@ -97,7 +97,7 @@ module Solver = struct
           let hd = Expression.simplify hd in
           Log.verbose
             (Log.wrap2
-               "@[\t\tTry to %a %a.@]"
+               "@[~ ~ Try to %a %a.@]"
                (styled (`Bg `Magenta) string)
                "match"
                Expression.pp
@@ -108,18 +108,19 @@ module Solver = struct
             Log.verbose (fun fmt () ->
                 pf
                   fmt
-                  "@[\t\t[-> %i]✅  %a =@;%a <- (%a)@]"
-                  id
+                  "@[~ ~ ✅  λ.%a.%a@;%a =@;%a@]"
                   Expression.pp
-                  state.expression
-                  Expression.pp
+                  (Expression.EBox id)
+                  (box Expression.pp)
                   res'
-                  Expression.pp
-                  hd);
+                  (box Expression.pp)
+                  hd
+                  (box Expression.pp)
+                  state.expression);
             floop i' { state with expression = res'; free_bound_exprs = tl }
           (* No match; keep the argument but queue it. It might match after rewriting steps.  *)
           | None ->
-            Log.verbose_msg "\t\t\t❌";
+            Log.verbose_msg "~ ~ ~ ❌";
             floop i' { state with free_bound_exprs = tl; queue = state.queue @ [ hd ] })
         | [] ->
           (* If there are no arguments in the queue, we start using free boxes.  *)
@@ -128,7 +129,7 @@ module Solver = struct
             Log.verbose (fun fmt () ->
                 pf
                   fmt
-                  "@[\t\tTry to %a %a.@]@."
+                  "@[~ ~ Try to %a %a.@]@."
                   (styled (`Bg `Cyan) string)
                   "assign"
                   (pair ~sep:comma Expression.pp_ivar Expression.pp_ivarset)
@@ -141,14 +142,15 @@ module Solver = struct
               Log.verbose (fun fmt () ->
                   pf
                     fmt
-                    "@[\t\t[-> %i]✅ %a =@;%a <- %a@]"
-                    hd_id
-                    Expression.pp
-                    state.expression
-                    Expression.pp
+                    "@[~ ~ ✅ λ%a.%a@;%a=@;%a@]"
+                    (box Expression.pp)
+                    (Expression.EBox hd_id)
+                    (box Expression.pp)
                     res'
-                    (parens (pair ~sep:comma int Expression.pp))
-                    (hd_id, hd_e));
+                    (box Expression.pp)
+                    hd_e
+                    (box Expression.pp)
+                    state.expression);
               floop
                 i'
                 { expression = res'
@@ -159,7 +161,7 @@ module Solver = struct
                 }
             | None ->
               (* No match; there's a good change this problem has no solution, but try again with arguments.  *)
-              Log.verbose_msg "\t\t\t❌@.";
+              Log.verbose_msg "~ ~ ~ ❌@.";
               floop
                 i'
                 { state with
@@ -208,11 +210,11 @@ module Solver = struct
     in
     Log.verbose
       (Log.wrap1
-         "\t@[Box args: %a@]"
+         "~ @[Box args: %a@]"
          (list ~sep:comma (parens (pair ~sep:sp int IS.pp)))
          box_args);
     Log.verbose
-      (Log.wrap1 "\t@[Bound args: %a@]" (list ~sep:comma Expression.pp) bound_args);
+      (Log.wrap1 "~ @[Bound args: %a@]" (list ~sep:comma Expression.pp) bound_args);
     match deduction_loop ~lemma box_args bound_args res with
     | Ok x -> Ok x
     | Error state -> Error (state.full_boxes, state.expression)

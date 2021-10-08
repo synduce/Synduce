@@ -456,21 +456,24 @@ let check_image_unsat ~p ctex : AsyncSmt.response * int u =
 let check_ctex_in_image ?(ignore_unknown = false) ~(p : psi_def) (ctex : ctex) : ctex =
   Log.verbose_msg Fmt.(str "Checking whether ctex is in the image of function...");
   let resp =
-    try
-      Lwt_main.run
-        ((* This call is expected to respond "unsat" when terminating. *)
-         let pr1, resolver1 = check_image_sat ~p ctex in
-         (* This call is expected to respond "sat" when terminating. *)
-         let pr2, resolver2 = check_image_unsat ~p ctex in
-         Lwt.wakeup resolver2 1;
-         Lwt.wakeup resolver1 1;
-         (* The first call to return is kept, the other one is ignored. *)
-         Lwt.pick [ pr1; pr2 ])
-    with
-    | End_of_file ->
-      Log.error_msg "Solvers terminated unexpectedly  ⚠️ .";
-      Log.error_msg "Please inspect logs.";
-      SmtLib.Unknown
+    if Analysis.is_bounded ctex.ctex_eqn.eterm
+    then SmtLib.Sat (* Bounded term: nothing to check! *)
+    else (
+      try
+        Lwt_main.run
+          ((* This call is expected to respond "unsat" when terminating. *)
+           let pr1, resolver1 = check_image_sat ~p ctex in
+           (* This call is expected to respond "sat" when terminating. *)
+           let pr2, resolver2 = check_image_unsat ~p ctex in
+           Lwt.wakeup resolver2 1;
+           Lwt.wakeup resolver1 1;
+           (* The first call to return is kept, the other one is ignored. *)
+           Lwt.pick [ pr1; pr2 ])
+      with
+      | End_of_file ->
+        Log.error_msg "Solvers terminated unexpectedly  ⚠️ .";
+        Log.error_msg "Please inspect logs.";
+        SmtLib.Unknown)
   in
   Log.verbose (fun frmt () ->
       if SyncSmt.is_unsat resp

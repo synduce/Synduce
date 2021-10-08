@@ -364,7 +364,13 @@ module Expression = struct
         if z = 0 then List.compare aux args args' else z
       | EOp (op, args), EOp (op', args') ->
         let z = Operator.compare op op' in
-        if z = 0 then List.compare aux args args' else z
+        if z = 0
+        then
+          if is_commutative op
+          then
+            List.compare aux (List.sort ~compare:aux args) (List.sort ~compare:aux args')
+          else List.compare aux args args'
+        else z
       | ETup tl, ETup tl' -> List.compare aux tl tl'
       | _ ->
         let z = expr_size_compare a b in
@@ -793,7 +799,7 @@ let rewrite_with_lemma (lemma : t) : t -> t list =
 ;;
 
 (** Matching subexpressions (up to rewriting) *)
-let match_as_subexpr ?(lemma = None) (sube : t) ~(of_ : t) : (int * t) option =
+let match_after_expand ?(lemma = None) (sube : t) ~(of_ : t) : (int * t) option =
   (* Expand expressions. *)
   let of_ = expand of_
   and sube = expand sube in
@@ -843,4 +849,44 @@ let match_as_subexpr ?(lemma = None) (sube : t) ~(of_ : t) : (int * t) option =
   match List.filter_opt results with
   | hd :: _ -> Some hd
   | _ -> None
+;;
+
+let match_after_factorization (sube : t) ~(of_ : t) : (int * t) option =
+  let sube = factorize sube in
+  let of_ = factorize of_ in
+  let bids = Hashtbl.create (module Int) in
+  let transformer ~i _ e0 =
+    if equal sube e0
+    then (
+      match Hashtbl.find bids i with
+      | Some bid -> Some (EBox bid)
+      | None ->
+        let bid = new_box_id () in
+        Hashtbl.set bids ~key:i ~data:bid;
+        Some (EBox bid))
+    else (
+      match e0, sube with
+      | EOp (op, args), EOp (subop, subargs) when Operator.equal op subop ->
+        let subargs', rest = List.partition_tf ~f:(List.mem ~equal subargs) args in
+        if List.length subargs' = List.length subargs
+        then (
+          match Hashtbl.find bids i with
+          | Some bid -> Some (mk_e_assoc op (EBox bid :: rest))
+          | None ->
+            let bid = new_box_id () in
+            Hashtbl.set bids ~key:i ~data:bid;
+            Some (mk_e_assoc op (EBox bid :: rest)))
+        else None
+      | _ -> None)
+  in
+  let res = transform (transformer ~i:(-1)) of_ in
+  match Hashtbl.find bids (-1) with
+  | Some id -> Some (id, res)
+  | None -> None
+;;
+
+let match_as_subexpr ?(lemma = None) (sube : t) ~(of_ : t) : (int * t) option =
+  match match_after_expand ~lemma sube ~of_ with
+  | Some hd -> Some hd
+  | None -> match_after_factorization sube ~of_
 ;;

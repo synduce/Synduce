@@ -208,7 +208,7 @@ let create_or_update_term_state_for_ctex
             })
 ;;
 
-let update_term_state_for_ctexs
+let pre_refinement_update_term_state
     ~(p : psi_def)
     (ts : term_state)
     ~(pos_ctexs : ctex list)
@@ -1189,9 +1189,49 @@ let add_ensures_to_term_state
       Map.add_exn ~key ~data:new_det acc)
 ;;
 
+let refine_ensures_predicates
+    ~(p : psi_def)
+    ~(neg_ctexs : ctex list)
+    ~(pos_ctexs : ctex list)
+    (lstate : refinement_loop_state)
+  =
+  Log.info
+    Fmt.(
+      fun fmt () ->
+        pf fmt "%i counterexamples violate image assumption." (List.length neg_ctexs));
+  let maybe_pred = ImagePredicates.synthesize ~p pos_ctexs neg_ctexs [] in
+  match maybe_pred with
+  | None -> lstate.term_state, false
+  | Some ensures ->
+    (match Specifications.get_ensures p.psi_reference.pvar with
+    | None -> Specifications.set_ensures p.psi_reference.pvar ensures
+    | Some old_ensures ->
+      let var : variable =
+        Variable.mk ~t:(Some p.psi_reference.poutput_typ) (Alpha.fresh ())
+      in
+      Specifications.set_ensures
+        p.psi_reference.pvar
+        (mk_fun
+           [ FPatVar var ]
+           (mk_bin
+              Binop.And
+              (mk_app old_ensures [ mk_var var ])
+              (mk_app ensures [ mk_var var ]))));
+    lstate.term_state, true
+;;
+
 let synthesize_lemmas ~(p : psi_def) synt_failure_info (lstate : refinement_loop_state)
     : (refinement_loop_state, solver_response) Result.t
   =
+  let interactive_synthesis () =
+    !Config.interactive_lemmas_loop
+    &&
+    (Log.info (fun frmt () -> Fmt.pf frmt "No luck. Try again? (Y/N)");
+     match Stdio.In_channel.input_line Stdio.stdin with
+     | None | Some "" | Some "N" -> false
+     | Some "Y" -> true
+     | _ -> false)
+  in
   (*
     Example: the synt_failure_info should be a list of unrealizability counterexamples, which
     are pairs of counterexamples.
@@ -1199,52 +1239,44 @@ let synthesize_lemmas ~(p : psi_def) synt_failure_info (lstate : refinement_loop
     The lemma corresponding to a particular term should be refined to eliminate the counterexample
     (a counterexample cex is also associated to a particular term through cex.ctex_eqn.eterm)
    *)
-  let new_state, success =
+  let new_state, lemma_synthesis_success =
     match synt_failure_info with
     | _, Either.Second unrealizability_ctexs ->
       (* Forget about the specific association in pairs. *)
       let ctexs = List.concat_map unrealizability_ctexs ~f:(fun uc -> [ uc.ci; uc.cj ]) in
       let classified_ctexs = classify_ctexs_opt ~p ctexs in
+      (* Positive and negatives for the ensures predicates. *)
       let ensures_positives, ensures_negatives, _ =
         List.partition3_map ~f:ctexs_for_ensures_synt classified_ctexs
       in
+      (* Positive and negatives for the requires of the target function. *)
+      let lemma_synt_positives, lemma_synt_negatives, _ =
+        List.partition3_map ~f:ctexs_for_lemma_synt classified_ctexs
+      in
       if List.length ensures_negatives > 0
-      then (
-        Log.info
-          Fmt.(
-            fun fmt () ->
-              pf
-                fmt
-                "%i counterexamples violate image assumption."
-                (List.length ensures_negatives));
-        let maybe_pred =
-          ImagePredicates.synthesize ~p ensures_positives ensures_negatives []
-        in
-        match maybe_pred with
-        | None -> lstate.term_state, false
-        | Some ensures ->
-          (match Specifications.get_ensures p.psi_reference.pvar with
-          | None -> Specifications.set_ensures p.psi_reference.pvar ensures
-          | Some old_ensures ->
-            let var : variable =
-              Variable.mk ~t:(Some p.psi_reference.poutput_typ) (Alpha.fresh ())
-            in
-            Specifications.set_ensures
-              p.psi_reference.pvar
-              (mk_fun
-                 [ FPatVar var ]
-                 (mk_bin
-                    Binop.And
-                    (mk_app old_ensures [ mk_var var ])
-                    (mk_app ensures [ mk_var var ]))));
-          lstate.term_state, true)
+      then
+        refine_ensures_predicates
+          ~p
+          ~neg_ctexs:ensures_negatives
+          ~pos_ctexs:ensures_positives
+          lstate
       else (
-        (* Classify in negative and positive cexs. *)
-        let lemma_synt_positives, lemma_synt_negatives, _ =
-          List.partition3_map ~f:ctexs_for_lemma_synt classified_ctexs
+        let ts : term_state =
+          pre_refinement_update_term_state
+            ~p
+            lstate.term_state
+            ~neg_ctexs:lemma_synt_negatives
+            ~pos_ctexs:lemma_synt_positives
         in
-        if List.length lemma_synt_negatives > 0
-        then
+        if List.is_empty lemma_synt_negatives
+        then (
+          (* lemma_synt_negatives and ensures_negatives are empty; all ctexs spurious! *)
+          Log.info
+            Fmt.(
+              fun fmt () ->
+                pf fmt "All counterexamples are non-spurious: nothing to refine.");
+          ts, false)
+        else (
           Log.info
             Fmt.(
               fun fmt () ->
@@ -1252,16 +1284,6 @@ let synthesize_lemmas ~(p : psi_def) synt_failure_info (lstate : refinement_loop
                   fmt
                   "%i counterexamples violate requires."
                   (List.length lemma_synt_negatives));
-        let ts : term_state =
-          update_term_state_for_ctexs
-            ~p
-            lstate.term_state
-            ~neg_ctexs:lemma_synt_negatives
-            ~pos_ctexs:lemma_synt_positives
-        in
-        if List.is_empty lemma_synt_negatives
-        then ts, false
-        else
           Map.fold
             ts
             ~init:(Map.empty (module Terms), true)
@@ -1273,17 +1295,10 @@ let synthesize_lemmas ~(p : psi_def) synt_failure_info (lstate : refinement_loop
               else (
                 match lemma_refinement_loop det ~p with
                 | None -> acc, false
-                | Some det -> Map.add_exn ~key ~data:det acc, status)))
+                | Some det -> Map.add_exn ~key ~data:det acc, status))))
     | _ -> failwith "There is no synt_failure_info in synthesize_lemmas."
   in
-  if success
-     || (!Config.interactive_lemmas_loop
-        &&
-        (Log.info (fun frmt () -> Fmt.pf frmt "No luck. Try again? (Y/N)");
-         match Stdio.In_channel.input_line Stdio.stdin with
-         | None | Some "" | Some "N" -> false
-         | Some "Y" -> true
-         | _ -> false))
+  if lemma_synthesis_success || interactive_synthesis ()
   then Ok { lstate with term_state = new_state }
   else (
     match synt_failure_info with
@@ -1307,7 +1322,5 @@ let synthesize_lemmas ~(p : psi_def) synt_failure_info (lstate : refinement_loop
              answer unknowns. We interpret it as "no solution can be found". *)
       Log.error_msg "SyGuS solver returned unknown.";
       Error RUnknown
-    | s_resp, _ ->
-      Log.error_msg "SyGuS solver did not succeed.";
-      Error s_resp)
+    | s_resp, _ -> Error s_resp)
 ;;
