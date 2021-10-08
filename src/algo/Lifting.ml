@@ -399,13 +399,45 @@ let deduce_lifting_expressions
 (**
   Perform a scalar lifting.
 *)
-let scalar ~(p : psi_def) (l : refinement_loop_state) _synt_failure_info
+let scalar
+    ~(p : psi_def)
+    (l : refinement_loop_state)
+    ((_s_resp, synt_failure_info) :
+      solver_response * ('a, Counterexamples.unrealizability_ctex list) Either.t)
     : (psi_def * refinement_loop_state, solver_response) Result.t
   =
-  (*
-    This function will perform the scalar lifting and continue the refinement loop
-    with the lifted problem.
-  *)
-  let p' = apply_lifting ~p !next_lifing_type in
+  (* Select the type of lifting from the synt_failure_info.  *)
+  let lifting_type =
+    let m (uc : Counterexamples.unrealizability_ctex) =
+      let hint_1 =
+        let common_vars = Set.union uc.ci.ctex_vars uc.cj.ctex_vars in
+        let f type_decision var =
+          let val_in_i = Map.find uc.ci.ctex_model var
+          and val_in_j = Map.find uc.cj.ctex_model var in
+          match val_in_i, val_in_j with
+          | Some vi, Some vj ->
+            if not (Terms.equal vi vj)
+            then Some (Variable.vtype_or_new var)
+            else type_decision
+          | Some _, _ | _, Some _ ->
+            Option.first_some type_decision (Some (Variable.vtype_or_new var))
+          | _ -> type_decision
+        in
+        Set.fold common_vars ~f ~init:None
+      in
+      Option.value ~default:RType.TInt hint_1
+    in
+    let join l type_candidate =
+      if Caml.List.mem type_candidate l then l else type_candidate :: l
+    in
+    let f a uc = join a (m uc) in
+    match synt_failure_info with
+    | First _ -> !next_lifing_type
+    | Second ctex_list -> List.fold ~f ~init:[] ctex_list
+  in
+  (* Change the type of the functions. The actual lifting expressions will be computed when solving
+    for the equation systems.
+   *)
+  let p' = apply_lifting ~p lifting_type in
   Ok (p', l)
 ;;

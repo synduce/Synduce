@@ -282,16 +282,24 @@ let check_unrealizable (unknowns : VarSet.t) (eqns : equation_system)
     Log.debug (fun f () -> Fmt.(pf f "... finished in %3.4fs" elapsed));
     Log.info (fun f () ->
         match ctexs with
-        | [] -> Fmt.pf f "No counterexample to realizability found."
+        | [] ->
+          Fmt.(
+            pf
+              f
+              "(%a) no counterexample to realizability found."
+              VarSet.pp_var_names
+              unknowns)
         | _ :: _ ->
           Fmt.(
             pf
               f
-              "@[Counterexamples found!@;\
+              "@[%a) Counterexamples found!@;\
                @[<hov 2>❔ Equations:@;\
                @[<v>%a@]@]@;\
                @[<hov 2>❔ Counterexample models:@;\
                @[<v>%a@]@]@]"
+              VarSet.pp_var_names
+              unknowns
               (list ~sep:sp (box (pair ~sep:colon int (box pp_equation))))
               (List.mapi ~f:(fun i eqn -> i, eqn) eqns)
               (list ~sep:sep_and pp_unrealizability_ctex)

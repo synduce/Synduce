@@ -154,6 +154,7 @@ base_benchmark_set = [
     ["list_to_tree/search_v3.pmrs", ""],
     ["list_to_tree/mls.pmrs", ""],
     ["list/atoi.ml", ""],
+    ["list/bal.ml", ""],
     ["list/line_of_sight.pmrs", ""],
     ["list/mts_and_mps_hom.pmrs", ""],
     ["list/sumhom.pmrs", ""],
@@ -223,6 +224,7 @@ base_benchmark_set = [
 lifting_benchmarks = [
     ["lifting/mpsl.ml", ""],
     ["lifting/poly.ml", ""],
+    ["lifting/zero_a_one_no.ml", ""],
     ["lifting/atoi_no.ml", "--no-gropt"],
     ["lifting/largest_diff_sorted_list_nohead.ml", ""],
     ["lifting/mits_nosum.ml", ""]

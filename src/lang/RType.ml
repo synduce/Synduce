@@ -278,6 +278,12 @@ let merge_subs loc (s : substitution) (t : substitution) : substitution =
   | Error _ -> Log.loc_fatal_errmsg loc "Error merging constraints."
 ;;
 
+let t_equals a b =
+  match unify_one a b with
+  | Ok _ -> true
+  | _ -> false
+;;
+
 (* ============================================================================================= *)
 (*                      VARIANT TYPES                                                            *)
 (* ============================================================================================= *)

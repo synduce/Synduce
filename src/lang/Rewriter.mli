@@ -4,7 +4,7 @@ val is_and : Term.Binop.t -> bool
 val is_or : Term.Binop.t -> bool
 val get_ty_const : RType.t -> Term.term
 val is_left_distrib : Term.Operator.t -> Term.Operator.t -> bool
-val get_distributing : Term.Operator.t -> Term.Operator.t
+val get_distributing : Term.Operator.t -> Term.Operator.t option
 val is_right_distrib : Term.Binop.t -> Term.Binop.t -> bool
 val is_assoc : Term.Binop.t -> bool
 val mk_assoc_with_id : Term.Binop.t -> Term.term list -> Term.term option

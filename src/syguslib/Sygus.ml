@@ -195,12 +195,16 @@ let literal_of_string (s : string) : literal =
     let b = String.chop_prefix_exn ~prefix:"#b" s in
     LitBin (List.map ~f:char_to_bool (String.to_list b)))
   else (
-    match Caml.int_of_string_opt s with
-    | Some i -> LitNum i
-    | None ->
-      (match Caml.float_of_string_opt s with
-      | Some f -> LitDec f
-      | None -> failwith "Not a literal."))
+    match s with
+    | "true" -> LitBool true
+    | "false" -> LitBool false
+    | _ ->
+      (match Caml.int_of_string_opt s with
+      | Some i -> LitNum i
+      | None ->
+        (match Caml.float_of_string_opt s with
+        | Some f -> LitDec f
+        | None -> failwith "Not a literal.")))
 ;;
 
 let literal_of_sexp (s : Sexp.t) : literal =

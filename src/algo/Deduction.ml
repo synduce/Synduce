@@ -51,7 +51,7 @@ let assign_match_box ((bid, bargs) : int * IS.t) ~(of_ : Expression.t)
         | _ -> None)
       | _ -> None)
   in
-  let e' = Expression.transform case of_ in
+  let e' = Expression.transform case (Rewriter.factorize of_) in
   match !boxed with
   | Some b -> Some (e', (bid, b))
   | None -> None
@@ -90,8 +90,10 @@ module Solver = struct
         *)
         Ok state.full_boxes
       else (
+        (* First try to remove subexpressions that match arguments of the equation. *)
         match state.free_bound_exprs with
         | hd :: tl ->
+          (* There are some arguments to match. Try using the head first.  *)
           let hd = Expression.simplify hd in
           Log.verbose
             (Log.wrap2
@@ -102,6 +104,7 @@ module Solver = struct
                hd);
           (match match_as_subexpr ~lemma hd ~of_:state.expression with
           | Some (id, res') ->
+            (* Some match; Discard the argument and box the subexpression.  *)
             Log.verbose (fun fmt () ->
                 pf
                   fmt
@@ -114,10 +117,12 @@ module Solver = struct
                   Expression.pp
                   hd);
             floop i' { state with expression = res'; free_bound_exprs = tl }
+          (* No match; keep the argument but queue it. It might match after rewriting steps.  *)
           | None ->
             Log.verbose_msg "\t\t\t❌";
             floop i' { state with free_bound_exprs = tl; queue = state.queue @ [ hd ] })
         | [] ->
+          (* If there are no arguments in the queue, we start using free boxes.  *)
           (match state.free_boxes with
           | hd :: tl ->
             Log.verbose (fun fmt () ->
@@ -130,6 +135,9 @@ module Solver = struct
                   hd);
             (match assign_match_box hd ~of_:state.expression with
             | Some (res', (hd_id, hd_e)) ->
+              (* Some subexpression has the same free variables as the free box. Box it,
+              a bind the box to that subexpression.
+             *)
               Log.verbose (fun fmt () ->
                   pf
                     fmt
@@ -150,6 +158,7 @@ module Solver = struct
                 ; queue = []
                 }
             | None ->
+              (* No match; there's a good change this problem has no solution, but try again with arguments.  *)
               Log.verbose_msg "\t\t\t❌@.";
               floop
                 i'

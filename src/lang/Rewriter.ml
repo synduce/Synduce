@@ -58,20 +58,20 @@ let get_ty_const (typ : RType.t) : term =
   Left distributive operators: for each pair op1, op2 it means that:
   a op1 (b op2 c) = (a op1 b) op2 (a op1 c)
 *)
-let _left_distrib =
+let left_distrib =
   Map.of_alist_multi
     (module Operator)
     Operator.
-      [ Binary Plus, Binary Max
-      ; Binary Times, Binary Plus
-      ; Binary Plus, Binary Min
-      ; Binary And, Binary Or
+      [ Binary Plus, Binary Max (* c + max(a,b) -> max(c+a, c+b) *)
+      ; Binary Times, Binary Plus (* c * (a + b) -> c * a + c * b *)
+      ; Binary Plus, Binary Min (* c + min(a,b) -> min(c + a, c + b) *)
+      ; Binary And, Binary Or (* c && (a || b) -> c && a || c && b *)
       ]
 ;;
 
 (** For example, `is_left_distrib Plus Max` is true. *)
 let is_left_distrib op1 op2 =
-  match Map.find _left_distrib op1 with
+  match Map.find left_distrib op1 with
   | Some binops -> Binop.(List.mem binops ~equal op2)
   | None -> false
 ;;
@@ -79,19 +79,17 @@ let is_left_distrib op1 op2 =
 let get_distributing op =
   Operator.(
     match op with
-    | Binary Plus -> Binary Times
-    | Binary (Min | Max) -> Binary Plus
-    | Binary Or -> Binary And
-    | _ ->
-      Log.(error (wrap1 "no distributing op for %a" Operator.pp op));
-      failwith "Error in rewriting.")
+    | Binary Plus -> Some (Binary Times)
+    | Binary (Min | Max) -> Some (Binary Plus)
+    | Binary Or -> Some (Binary And)
+    | _ -> None)
 ;;
 
 (**
   Right distributive operators: for each pair op1, op2 it means that:
   (b op2 c) op1 a = (b op1 a) op2 (c op1 a)
 *)
-let _right_distrib =
+let right_distrib =
   Map.of_alist_multi
     (module Operator)
     Binop.
@@ -105,7 +103,7 @@ let _right_distrib =
 
 (** For example, `is_right_distrib Plus Max` is true. *)
 let is_right_distrib op1 op2 =
-  match Map.find _right_distrib (Binary op1) with
+  match Map.find right_distrib (Binary op1) with
   | Some binops -> Binop.(List.mem binops ~equal op2)
   | None -> false
 ;;
@@ -675,8 +673,6 @@ let collect_common_factors (op : Operator.t) (args : t list)
 let best_factor (factors : (int * Operator.t option * t) list)
     : (Operator.t option * t) option
   =
-  Fmt.(pf stdout "%i factors:@." (List.length factors));
-  List.iter ~f:Fmt.(fun (_, _, e) -> pf stdout "%a@." pp e) factors;
   match
     List.max_elt ~compare:(fun (i1, _, _) (i2, _, _) -> Int.compare i1 i2) factors
   with
@@ -690,13 +686,7 @@ let apply_factor
     (fac_op : Operator.t option)
     (fac_expr : t)
   =
-  let fac_op =
-    try Option.value fac_op ~default:(get_distributing op) with
-    | Failure s ->
-      Log.(error (wrap2 "(%a %a)" Operator.pp op Fmt.(list ~sep:sp pp) args));
-      Log.(error (wrap1 "(fac_expr: %a" pp fac_expr));
-      failwith s
-  in
+  let%map fac_op = Option.first_some fac_op (get_distributing op) in
   let args_with_fac, args_no_fac =
     let f arg =
       match arg with
@@ -730,9 +720,8 @@ let factorize (e : t) : t =
       | EOp (op, args) ->
         let args' = List.map ~f args in
         let factors = collect_common_factors op args' in
-        Option.map (best_factor factors) ~f:(fun (fac_op, fac_expr) ->
-            let e = apply_factor op args' fac_op fac_expr in
-            e)
+        Option.bind (best_factor factors) ~f:(fun (fac_op, fac_expr) ->
+            apply_factor op args' fac_op fac_expr)
       | _ -> None
     in
     normalize (transform case e)
