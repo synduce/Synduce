@@ -238,7 +238,7 @@ let check_unrealizable (unknowns : VarSet.t) (eqns : equation_system) :
     let+ _ = AsyncSmt.close_solver solver in
     let elapsed = Unix.gettimeofday () -. start_time in
     Log.debug (fun f () -> Fmt.(pf f "... finished in %3.4fs" elapsed));
-    Log.debug (fun f () ->
+    Log.info (fun f () ->
         match ctexs with
         | [] -> Fmt.pf f "No counterexample to realizability found."
         | _ :: _ ->
@@ -260,6 +260,12 @@ let check_unrealizable (unknowns : VarSet.t) (eqns : equation_system) :
 (* ============================================================================================= *)
 (*                            CLASSIFYING SPURIOUS COUNTEREXAMPLES                               *)
 (* ============================================================================================= *)
+
+let add_cause (ctx : ctex_stat) (cause : spurious_cause) =
+  match ctx with
+  | Valid -> Spurious [ cause ]
+  | Spurious c -> if not (Caml.List.mem cause c) then Spurious (cause :: c) else Spurious c
+  | Unknown -> Spurious [ cause ]
 
 (*               CLASSIFYING SPURIOUS COUNTEREXAMPLES - NOT IN REFERENCE IMAGE                   *)
 
@@ -366,7 +372,7 @@ let check_image_unsat ~p ctex : AsyncSmt.response * int u =
   [check_ctex_in_image ~p ctex] checks whether the recursion elimination's variables values in the
   model of [ctex] are in the image of (p.psi_reference o p.psi_repr).
 *)
-let check_ctex_in_image ~(p : psi_def) (ctex : ctex) : ctex =
+let check_ctex_in_image ?(ignore_unknown = false) ~(p : psi_def) (ctex : ctex) : ctex =
   Log.verbose_msg Fmt.(str "Checking whether ctex is in the image of function...");
   let resp =
     try
@@ -396,9 +402,9 @@ let check_ctex_in_image ~(p : psi_def) (ctex : ctex) : ctex =
           pf frmt "I do not know whether (%a) is in the image of %s." (box pp_ctex) ctex
             p.psi_reference.pvar.vname));
   match resp with
-  | Sat -> { ctex with ctex_stat = Valid }
-  | Unsat -> { ctex with ctex_stat = Spurious NotInReferenceImage }
-  | _ -> ctex
+  | Sat -> ctex
+  | Unsat -> { ctex with ctex_stat = add_cause ctex.ctex_stat NotInReferenceImage }
+  | _ -> if ignore_unknown then ctex else { ctex with ctex_stat = Unknown }
 
 (* ============================================================================================= *)
 (*               CLASSIFYING SPURIOUS COUNTEREXAMPLES - DOES NOT SAT TINV                        *)
@@ -586,17 +592,33 @@ let satisfies_tinv ~(p : psi_def) (tinv : PMRS.t) (ctex : ctex) : ctex =
         Fmt.(pf frmt "I dot not know whether (%a) satisfies %s." (box pp_ctex) ctex tinv.pvar.vname));
   match resp with
   | Sat -> { ctex with ctex_stat = Valid }
-  | Unsat -> { ctex with ctex_stat = Spurious ViolatesTargetRequires }
+  | Unsat -> { ctex with ctex_stat = add_cause ctex.ctex_stat ViolatesTargetRequires }
   | _ -> ctex
 
 (** Classify counterexamples into positive or negative counterexamples with respect
     to the Tinv predicate in the problem.
 *)
 let classify_ctexs ~(p : psi_def) (ctexs : ctex list) : ctex list =
-  let classify_with_tinv tinv =
+  let classify_with_tinv tinv ctexs =
     (* TODO: DT_LIA for z3, DTLIA for cvc4... Should write a type to represent logics. *)
     let f (ctex : ctex) = satisfies_tinv ~p tinv ctex in
     List.map ~f ctexs
   in
-  let classify_wrt_ref = List.map ~f:(check_ctex_in_image ~p) in
-  match p.psi_tinv with Some tinv -> classify_with_tinv tinv | None -> classify_wrt_ref ctexs
+  let classify_wrt_ref b = List.map ~f:(check_ctex_in_image ~ignore_unknown:b ~p) in
+  Log.start_section "Classify counterexamples...";
+  let ctexs_c1, ignore_further_unknowns =
+    match p.psi_tinv with
+    | Some tinv ->
+        (* If there is some tinv, we may ignore unknowns in further classification steps. *)
+        (classify_with_tinv tinv ctexs, true)
+    | None ->
+        (* Otherwise don't ignore anything. *)
+        (ctexs, false)
+  in
+  let ctexs_c2 =
+    if ignore_further_unknowns then (* TODO: there are some bugs with classification.. *)
+      ctexs_c1
+    else classify_wrt_ref ignore_further_unknowns ctexs_c1
+  in
+  Log.end_section ();
+  ctexs_c2

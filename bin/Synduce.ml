@@ -1,6 +1,5 @@
 open Lang
 open Base
-open Getopt
 open Fmt
 open Parsers
 open Utils
@@ -44,6 +43,8 @@ let print_usage () =
      induction proof.\n\
     \       --cvc4                      Use CVC4 instead of CVC5 if both are available.\n\
     \       --cvc5                      Always use CVC5 instead of CVC4 if both are available.\n\
+    \       --verif-with=SOLVER         Don't use z3 for verification, use SOLVER \
+     (=z3,cvc4,cvc5,yices)\n\
     \  Debugging:\n\
     \  -I   --interactive               Request additional lemmas interactively.\n\
     \  -J   --interactive-lifting       Request expressions for lifting.\n\
@@ -63,49 +64,6 @@ let print_usage () =
     \     -> Try:\n\
      ./Synduce benchmarks/list/mps.ml@.";
   Caml.exit 0
-
-let options =
-  [
-    ('b', "bmc", None, Some Config.set_check_depth);
-    ('c', "simple-init", set Config.simple_init true, None);
-    ('u', "no-check-unrealizable", set Config.check_unrealizable false, None);
-    ('d', "debug", set Config.debug true, None);
-    ('f', "force-nonlinear", set Config.force_nonlinear true, None);
-    ('h', "help", Some print_usage, None);
-    ('i', "info-off", set Config.info false, None);
-    ('I', "interactive", set Config.interactive_lemmas true, None);
-    ('J', "interactive-lifting", set Config.interactive_lifting true, None);
-    ('L', "interactive-loop", set Config.interactive_lemmas_loop true, None);
-    ('m', "style-math", set Config.math_display true, None);
-    ('n', "verification", None, Some Config.set_num_expansions_check);
-    ('N', "no-sat-as-unsat", set Config.no_bounded_sat_as_unsat true, None);
-    ('B', "bounded-lemma-check", set Config.bounded_lemma_check true, None);
-    ('o', "output", None, Some Config.set_output_folder);
-    ('s', "no-splitting", set Config.split_solve_on false, None);
-    ('t', "no-detupling", set Config.detupling_on false, None);
-    ('v', "verbose", set Config.verbose true, None);
-    ('X', "classify-ctex", set Config.classify_ctex true, None);
-    ('C', "interactive-check-lemma", set Config.interactive_check_lemma true, None);
-    ('\000', "acegis", set Config.use_acegis true, None);
-    ('\000', "ccegis", set Config.use_ccegis true, None);
-    ('\000', "cvc4", set Config.use_cvc4 true, None);
-    ('\000', "cvc5", set Config.use_cvc4 false, None);
-    ('\000', "check-smt-unrealizable", set Config.check_unrealizable_smt_unsatisfiable true, None);
-    ('\000', "fuzzing", None, Some Config.set_fuzzing_count);
-    ('\000', "generate-benchmarks", None, Some Config.set_benchmark_generation_dir);
-    ('\000', "generate-proof", None, Some Config.set_proof_output_file);
-    ('\000', "parse-only", set parse_only true, None);
-    ('\000', "max-lifting", None, Some Config.set_max_lifting_attempts);
-    ('\000', "no-gropt", set Config.optimize_grammars false, None);
-    ('\000', "no-lifting", set Config.attempt_lifting false, None);
-    ('\000', "no-simplify", set Config.simplify_eqns false, None);
-    ('\000', "no-syndef", set Config.use_syntactic_definitions false, None);
-    ('\000', "show-vars", set Config.show_vars true, None);
-    ('\000', "sysfe-opt-off", set Config.sysfe_opt false, None);
-    ('\000', "use-bmc", set Config.use_bmc true, None);
-    (* Background solver parameters *)
-    ('\000', "ind-tlimit", None, Some Config.set_induction_proof_tlimit);
-  ]
 
 let on_success ~(is_ocaml_syntax : bool) (source_filename : string ref) (pb : Algo.AState.psi_def)
     (soln : Algo.AState.soln) : unit =
@@ -138,7 +96,7 @@ let on_success ~(is_ocaml_syntax : bool) (source_filename : string ref) (pb : Al
 
 let main () =
   let filename = ref None in
-  parse_cmdline options (fun s -> filename := Some s);
+  Getopt.parse_cmdline (Config.options print_usage parse_only) (fun s -> filename := Some s);
   let filename = match !filename with Some f -> ref f | None -> print_usage () in
   Config.problem_name := Caml.Filename.basename (Caml.Filename.chop_extension !filename);
   set_style_renderer stdout `Ansi_tty;
