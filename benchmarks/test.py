@@ -41,8 +41,8 @@ kick_the_tires_set = [
     ["list/last.pmrs", ""],
     ["constraints/sortedlist/count_lt.ml", ""],
     ["constraints/bst/count_lt.ml", "-NB"],
-    ["lifting/largest_diff_sorted_list_nohead.ml", ""],
-    ["lifting/poly.ml", ""],
+    ["list/largest_diff_sorted_list_nohead.ml", ""],
+    ["list/poly_no_fac.ml", ""],
 ]
 
 reduced_benchmark_set_table2 = [
