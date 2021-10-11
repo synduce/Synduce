@@ -560,28 +560,31 @@ let smt_of_lemma_validity ~(p : psi_def) lemma (det : term_state_detail) =
 ;;
 
 let set_up_lemma_solver solver ~(p : psi_def) lemma_candidate =
-  let%lwt () = Smt.AsyncSmt.set_logic solver "ALL" in
-  let%lwt () = Smt.AsyncSmt.set_option solver "quant-ind" "true" in
-  let%lwt () = Smt.AsyncSmt.set_option solver "produce-models" "true" in
-  let%lwt () = Smt.AsyncSmt.set_option solver "incremental" "true" in
-  let%lwt () =
-    if !Config.induction_proof_tlimit >= 0
-    then
-      Smt.AsyncSmt.set_option
-        solver
-        "tlimit"
-        (Int.to_string !Config.induction_proof_tlimit)
-    else return ()
+  let preamble =
+    Smt.Commands.mk_preamble
+      ~logic:
+        (SmtLogic.infer_logic
+           ~quantifier_free:false
+           ~with_uninterpreted_functions:true
+           ~for_induction:true
+           ~logic_infos:(AState.psi_def_logics p)
+           [])
+      ~incremental:false
+      ~induction:true
+      ~models:true
+      ()
   in
-  let%lwt () = Smt.AsyncSmt.load_min_max_defs solver in
+  let%lwt () = Smt.AsyncSmt.exec_all solver preamble in
   let%lwt () =
     Lwt_list.iter_p
       (fun x ->
         let%lwt _ = Smt.AsyncSmt.exec_command solver x in
         return ())
-      ((match p.psi_tinv with
+      ((* Start by defining tinv. *)
+       (match p.psi_tinv with
        | None -> []
        | Some tinv -> Smt.smt_of_pmrs tinv)
+      (* PMRS definitions.*)
       @ (if p.psi_repr_is_identity
         then Smt.smt_of_pmrs p.psi_reference
         else Smt.smt_of_pmrs p.psi_reference @ Smt.smt_of_pmrs p.psi_repr)
@@ -597,24 +600,6 @@ let set_up_lemma_solver solver ~(p : psi_def) lemma_candidate =
               body)
         ])
   in
-  return ()
-;;
-
-let set_up_bounded_solver (logic : string) (vars : VarSet.t) solver =
-  let%lwt () = Smt.AsyncSmt.set_logic solver logic in
-  let%lwt () = Smt.AsyncSmt.set_option solver "produce-models" "true" in
-  let%lwt () = Smt.AsyncSmt.set_option solver "incremental" "true" in
-  let%lwt () =
-    if !Config.induction_proof_tlimit >= 0
-    then
-      SmtInterface.AsyncSmt.set_option
-        solver
-        "tlimit"
-        (Int.to_string !Config.induction_proof_tlimit)
-    else return ()
-  in
-  let%lwt () = Smt.AsyncSmt.load_min_max_defs solver in
-  let%lwt () = Smt.(AsyncSmt.exec_all solver (Commands.decls_of_vars vars)) in
   return ()
 ;;
 
@@ -720,14 +705,24 @@ let mk_model_sat_asserts det f_o_r instantiate =
 let verify_lemma_bounded ~(p : psi_def) (det : term_state_detail) lemma_candidate
     : Smt.AsyncSmt.response * int Lwt.u
   =
+  let logic = SmtLogic.infer_logic ~logic_infos:(AState.psi_def_logics p) [] in
   let task (solver, starter) =
     let%lwt _ = starter in
-    let%lwt _ = set_up_bounded_solver "LIA" (VarSet.of_list det.scalar_vars) solver in
+    let%lwt () =
+      Smt.AsyncSmt.exec_all
+        solver
+        Smt.Commands.(
+          mk_preamble
+            ~incremental:(String.is_prefix ~prefix:"CVC" solver.s_name)
+            ~logic
+            ()
+          @ decls_of_vars (VarSet.of_list det.scalar_vars))
+    in
     let steps = ref 0 in
     let rec check_bounded_sol accum terms =
       let f accum t =
         let rec_instantation =
-          Option.value ~default:VarMap.empty (Analysis.matches t ~pattern:det.term)
+          Option.value ~default:VarMap.empty (Matching.matches t ~pattern:det.term)
         in
         let%lwt _ = accum in
         let f_compose_r t =

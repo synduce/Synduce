@@ -248,6 +248,7 @@ let pmrs_of_rules
       ; prules = rules
       ; porder = -1
       ; pmain_symb = main_symb
+      ; plogic = SmtLogic.base_logic_info
       }
   in
   PMRS.infer_pmrs_types pmrs0

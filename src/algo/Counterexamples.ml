@@ -29,7 +29,7 @@ let smt_unsatisfiability_check (unknowns : VarSet.t) (eqns : equation list) : un
     let fvs = List.fold eqns ~f ~init:VarSet.empty in
     Set.diff fvs unknowns
   in
-  let constraint_of_eqns =
+  let constraint_of_eqns, terms_for_logic_deduction =
     let eqns_constraints =
       let f eqn =
         let lhs = smt_of_term eqn.elhs in
@@ -41,12 +41,21 @@ let smt_unsatisfiability_check (unknowns : VarSet.t) (eqns : equation list) : un
       in
       List.map ~f eqns
     in
-    SmtLib.(mk_forall (sorted_vars_of_vars free_vars) (mk_assoc_and eqns_constraints))
+    ( SmtLib.(mk_forall (sorted_vars_of_vars free_vars) (mk_assoc_and eqns_constraints))
+    , List.map ~f:(fun eqn -> Terms.(eqn.elhs == eqn.erhs)) eqns )
   in
   let z3 = SyncSmt.make_z3_solver () in
-  SyncSmt.set_logic z3 "UFLIA";
-  SyncSmt.load_min_max_defs z3;
-  SyncSmt.exec_all z3 (Commands.decls_of_vars unknowns);
+  let preamble =
+    Commands.mk_preamble
+      ~logic:
+        (SmtLogic.infer_logic
+           ~with_uninterpreted_functions:true
+           ~for_induction:false
+           ~quantifier_free:false
+           terms_for_logic_deduction)
+      ()
+  in
+  SyncSmt.exec_all z3 (preamble @ Commands.decls_of_vars unknowns);
   SyncSmt.smt_assert z3 constraint_of_eqns;
   Log.debug
     Fmt.(
@@ -121,9 +130,9 @@ let unrealizability_ctex_of_constmap (i, j) (eqn_i, eqn_j) (vseti, vsetj) var_su
 ;;
 
 let skeleton_match ~unknowns (e1 : term) (e2 : term) : (term * term) list option =
-  let args1, e1' = Analysis.skeletize ~functions:unknowns e1
-  and args2, e2' = Analysis.skeletize ~functions:unknowns e2 in
-  match Analysis.matches ~boundvars:unknowns ~pattern:e1' e2' with
+  let args1, e1' = Matching.skeletize ~functions:unknowns e1
+  and args2, e2' = Matching.skeletize ~functions:unknowns e2 in
+  match Matching.matches ~boundvars:unknowns ~pattern:e1' e2' with
   | Some subs ->
     let f (v1, packedv) =
       match packedv.tkind with
@@ -374,10 +383,15 @@ let check_image_sat ~p ctex : AsyncSmt.response * int u =
       List.map ~f:snd (Lang.SmtInterface.declare_datatype_of_rtype !AState._alpha)
     in
     let* _ = task_start in
-    (* TODO : logic *)
-    let* () = AsyncSmt.set_logic solver_instance "ALL" in
+    let* () =
+      AsyncSmt.exec_all
+        solver_instance
+        (Commands.mk_preamble
+           ~incremental:(String.is_prefix ~prefix:"CVC" solver_instance.s_name)
+           ~logic:(SmtLogic.infer_logic ~logic_infos:(AState.psi_def_logics p) [])
+           ())
+    in
     let* () = AsyncSmt.exec_all solver_instance t_decl in
-    let* () = AsyncSmt.load_min_max_defs solver_instance in
     (* Run the bounded checking loop. *)
     let* res =
       Expand.lwt_expand_loop
@@ -394,15 +408,20 @@ let check_image_sat ~p ctex : AsyncSmt.response * int u =
 let check_image_unsat ~p ctex : AsyncSmt.response * int u =
   let build_task (solver, task_start) =
     let* _ = task_start in
-    let* () = AsyncSmt.set_logic solver "ALL" in
-    let* () = AsyncSmt.set_option solver "quant-ind" "true" in
     let* () =
-      if !Config.induction_proof_tlimit >= 0
-      then
-        AsyncSmt.set_option solver "tlimit" (Int.to_string !Config.induction_proof_tlimit)
-      else return ()
+      AsyncSmt.exec_all
+        solver
+        (Commands.mk_preamble
+           ~induction:true
+           ~incremental:false
+           ~logic:
+             (SmtLogic.infer_logic
+                ~quantifier_free:false
+                ~for_induction:true
+                ~logic_infos:(AState.psi_def_logics p)
+                [])
+           ())
     in
-    let* () = AsyncSmt.load_min_max_defs solver in
     (* Declare Tinv, repr and reference functions. *)
     let* () =
       Lwt_list.iter_p
@@ -611,7 +630,18 @@ let check_tinv_unsat ~(p : psi_def) (tinv : PMRS.t) (ctex : ctex)
       SmtLib.mk_exists (sorted_vars_of_vars fv) formula_body
     in
     (* Start solving... *)
-    let preamble = Commands.mk_preamble ~induction:true ~logic:"ALL" () in
+    let preamble =
+      Commands.mk_preamble
+        ~induction:true
+        ~logic:
+          (SmtLogic.infer_logic
+             ~quantifier_free:false
+             ~for_induction:true
+             ~with_uninterpreted_functions:true
+             ~logic_infos:(AState.psi_def_logics p)
+             [])
+        ()
+    in
     let* () =
       AsyncSmt.exec_all cvc4_instance (preamble @ pmrs_decls @ [ mk_assert formula ])
     in
@@ -641,7 +671,7 @@ let check_tinv_sat ~(p : psi_def) (tinv : PMRS.t) (ctex : ctex)
     let t_check binder t =
       let tinv_t = Reduce.reduce_pmrs tinv t in
       let rec_instantation =
-        Option.value ~default:VarMap.empty (Analysis.matches t ~pattern:initial_t)
+        Option.value ~default:VarMap.empty (Matching.matches t ~pattern:initial_t)
       in
       let preconds =
         let subs =
@@ -679,9 +709,14 @@ let check_tinv_sat ~(p : psi_def) (tinv : PMRS.t) (ctex : ctex)
       return resp
     in
     let* _ = starter in
-    (* TODO : logic *)
-    let* () = AsyncSmt.set_logic solver "LIA" in
-    let* () = AsyncSmt.load_min_max_defs solver in
+    let* () =
+      AsyncSmt.exec_all
+        solver
+        (Commands.mk_preamble
+           ~incremental:(String.is_prefix ~prefix:"CVC" solver.s_name)
+           ~logic:(SmtLogic.infer_logic ~logic_infos:(AState.psi_def_logics p) [])
+           ())
+    in
     let* res =
       Expand.lwt_expand_loop
         steps

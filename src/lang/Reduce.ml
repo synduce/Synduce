@@ -106,7 +106,7 @@ let rule_lookup prules (f : variable) (fargs : term list) : term list =
     | _ -> None
   in
   let match_with_pat (_, rule_args, _, rhs) pat first_args to_pat_match =
-    match Analysis.matches_pattern to_pat_match pat with
+    match Matching.matches_pattern to_pat_match pat with
     | Some bindto_map ->
       let bindto_list = Map.to_alist bindto_map in
       let pat_v, pat_bto = List.unzip bindto_list in
@@ -184,7 +184,7 @@ let rec reduce_term ?(unboxing = false) (t : term) : term =
              List.filter_opt
                (List.map
                   ~f:(fun (p, t') ->
-                    Option.map ~f:(fun m -> m, t') (Analysis.matches_pattern t p))
+                    Option.map ~f:(fun m -> m, t') (Matching.matches_pattern t p))
                   cases)
            with
           | [] -> None
@@ -279,7 +279,7 @@ let rec calc_term_step (rstep : bool ref) (t : term) : term =
          List.filter_opt
            (List.map
               ~f:(fun (p, t') ->
-                Option.map ~f:(fun m -> m, t') (Analysis.matches_pattern t p))
+                Option.map ~f:(fun m -> m, t') (Matching.matches_pattern t p))
               cases)
        with
       | [] -> None

@@ -316,9 +316,7 @@ module Synchronous (Log : Logger) (Stats : Statistics) = struct
     ignore (exec_command s mk_min_def)
   ;;
 
-  let set_logic solver logic_id =
-    ignore (exec_command solver (SetLogic (SSimple logic_id)))
-  ;;
+  let set_logic solver logic = ignore (exec_command solver (mk_set_logic logic))
 
   let set_option solver option_id option_value =
     ignore (exec_command solver (SetOption (option_id, option_value)))
@@ -609,8 +607,8 @@ module Asyncs (Log : Logger) (Stats : Statistics) = struct
     >>= fun _ -> return ()
   ;;
 
-  let set_logic solver logic_id : unit t =
-    let%lwt _ = exec_command solver (SetLogic (SSimple logic_id)) in
+  let set_logic solver logic : unit t =
+    let%lwt _ = exec_command solver (mk_set_logic logic) in
     return ()
   ;;
 

@@ -76,22 +76,34 @@ let partial_bounding_checker
 ;;
 
 let check_solution
-    ?(use_acegis = false)
     ~(p : psi_def)
     (lstate : refinement_loop_state)
     (soln : (string * variable list * term) list)
   =
-  if use_acegis
-  then Log.info (fun f () -> Fmt.(pf f "Check solution."))
-  else Log.info (fun f () -> Fmt.(pf f "Checking solution..."));
+  Log.info (fun f () -> Fmt.(pf f "Checking solution..."));
+  (* Turn of verbosity for bounded verification, otherwise too many messages appear. *)
   let verb = !Config.verbose in
   Config.verbose := false;
   let start_time = Unix.gettimeofday () in
+  (* Replace the unknowns with their solution. *)
   let target_inst = Lang.Reduce.instantiate_with_solution p.psi_target soln in
   let free_vars = VarSet.empty in
-  let init_vardecls = Commands.decls_of_vars free_vars in
   let solver = SyncSmt.make_solver !Config.verification_solver in
-  SyncSmt.load_min_max_defs solver;
+  let preamble =
+    let logic =
+      SmtLogic.infer_logic
+        ~quantifier_free:true
+        ~with_uninterpreted_functions:false
+        ~logic_infos:[ p.psi_reference.plogic; p.psi_target.plogic ]
+        []
+    in
+    Commands.mk_preamble
+      ~incremental:(String.is_prefix ~prefix:"CVC" solver.s_name)
+      ~logic
+      ~models:true
+      ()
+    @ Commands.decls_of_vars free_vars
+  in
   let expand_and_check i (t0 : term) =
     let t_set, u_set = Expand.to_maximally_reducible p t0 in
     let t_set, tmp_lstate = partial_bounding_checker ~p lstate t_set in
@@ -148,7 +160,7 @@ let check_solution
           find_ctex num_checks elts))
   in
   (* Declare all variables *)
-  SyncSmt.exec_all solver init_vardecls;
+  SyncSmt.exec_all solver preamble;
   (match find_ctex 0 lstate.t_set with
   | Some _ -> failwith "Synthesizer and solver disagree on solution. That's unexpected!"
   | None -> ());

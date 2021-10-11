@@ -309,10 +309,10 @@ let rec smt_of_term (t : term) : smtTerm =
     let make_one_binding bto bdg =
       let tto = fpat_to_term bto in
       (* Try to transform the function into a let-binding, by first creating a tuple. *)
-      match Analysis.matches ~pattern:tto (tuplify bdg) with
+      match Matching.matches ~pattern:tto (tuplify bdg) with
       | Some varmap -> bindings_of_varmap varmap, []
       | None ->
-        (match Analysis.matches ~pattern:tto bdg with
+        (match Matching.matches ~pattern:tto bdg with
         | Some varmap -> bindings_of_varmap varmap, []
         | None ->
           (match tto.tkind with
@@ -607,15 +607,16 @@ module Commands = struct
   ;;
 
   let mk_preamble
-      ~(logic : string)
+      ~(logic : Logics.logic)
       ?(induction = false)
+      ?(incremental = false)
       ?(load_defs = true)
       ?(models = true)
       ?(proofs = false)
       ()
       : command list
     =
-    let logic_command = SetLogic (SSimple logic)
+    let logic_command = mk_set_logic logic
     and models_commands =
       mk_set_option "produce-models" (if models then "true" else "false")
     and tlimit_opt =
@@ -624,8 +625,12 @@ module Commands = struct
       else []
     and induction_on = if induction then [ mk_set_option "quant-ind" "true" ] else []
     and proofs_on = if proofs then [ mk_set_option "produce-proofs" "true" ] else []
+    and incremental_on =
+      if incremental then [ mk_set_option "incremental" "true" ] else []
     and pre_defs = if load_defs then [ mk_max_def; mk_min_def ] else [] in
-    logic_command :: models_commands :: (induction_on @ proofs_on @ tlimit_opt @ pre_defs)
+    logic_command
+    :: models_commands
+    :: (induction_on @ proofs_on @ incremental_on @ tlimit_opt @ pre_defs)
   ;;
 end
 

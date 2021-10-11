@@ -1,4 +1,3 @@
-open Analysis
 open Base
 open Term
 open Utils
@@ -53,6 +52,7 @@ type t =
   ; pnon_terminals : VarSet.t (** Non-terminals of the PMRS. *)
   ; pmain_symb : variable (** The main symbol of the PMRS. *)
   ; porder : int (** The order of the PMRS (mostly useless for now). *)
+  ; plogic : SmtLogic.logic_info
   }
 
 (* Type shortcuts *)
@@ -267,6 +267,19 @@ let update_order (p : t) : t =
   { p with porder = order }
 ;;
 
+let set_logic_info_of_pmrs (p : t) : t =
+  let f ~key:_ ~data:(_, _, _, rhs) logic_info =
+    let operators = Analysis.operators_of rhs in
+    let theory = SmtLogic.theory_of (type_of rhs) in
+    SmtLogic.
+      { theory = Smtlib.Logics.join_theories theory logic_info.theory
+      ; linearity = logic_info.linearity && Set.for_all ~f:Operator.is_lia operators
+      }
+  in
+  let li = Map.fold ~f ~init:SmtLogic.base_logic_info p.prules in
+  { p with plogic = li }
+;;
+
 (** Clear the type information stored in the different components of the PMRS.
   Clears the type information of:
   - the local variables in each rule of the PMRS.
@@ -374,7 +387,8 @@ let infer_pmrs_types (prog : t) =
         Log.error_msg err_msg;
         failwith err_msg
     in
-    { prog with prules = new_rules; pinput_typ = typ_in; poutput_typ = typ_out }
+    set_logic_info_of_pmrs
+      { prog with prules = new_rules; pinput_typ = typ_in; poutput_typ = typ_out }
   | Error e ->
     Log.error_msg Fmt.(str "Error: %a" Sexp.pp_hum e);
     failwith "Type inference failed for pmrs."
@@ -454,6 +468,7 @@ let func_to_pmrs (f : Variable.t) (args : fpattern list) (body : Term.term) =
   ; pmain_symb
   ; prules
   ; pnon_terminals
+  ; plogic = SmtLogic.base_logic_info
   }
 ;;
 
@@ -570,7 +585,8 @@ let inverted_rule_lookup
   =
   let list_matching l =
     let m =
-      List.map l ~f:(fun (rhs_arg, arg) -> matches ~boundvars ~pattern:rhs_arg arg)
+      List.map l ~f:(fun (rhs_arg, arg) ->
+          Matching.matches ~boundvars ~pattern:rhs_arg arg)
     in
     let merge_subs ~key:_ s =
       match s with

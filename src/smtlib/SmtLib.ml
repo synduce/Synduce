@@ -182,7 +182,11 @@ let info_flag_of_sexp (sexp : t) : info_flag =
   | _ -> 7
 ;;
 
-let sexp_of_numeral (n : numeral) : Sexp.t = Sexp.Atom Fmt.(str "%i" n)
+let sexp_of_numeral (n : numeral) : Sexp.t =
+  if Int.(n >= 0)
+  then Sexp.Atom Fmt.(str "%i" n)
+  else Sexp.(List [ Atom "-"; Atom Fmt.(str "%i" (abs n)) ])
+;;
 
 let numeral_of_sexp (sexp : Sexp.t) : numeral option =
   match sexp with
@@ -781,6 +785,7 @@ let mk_named_assert (name : string) (t : smtTerm) =
 ;;
 
 let mk_set_option (oname : string) (oval : string) = SetOption (oname, oval)
+let mk_set_logic (l : Logics.logic) = SetLogic (SSimple (Logics.to_string l))
 let mk_simplify ?(options : solver_option list = []) (t : smtTerm) = Simplify (t, options)
 let mk_print_success = SetOption ("print-success", "true")
 let mk_exit = Exit

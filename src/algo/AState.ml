@@ -9,6 +9,10 @@ open Utils
    definitions and printing functions for displaying solutions.
  *)
 
+(**
+  psi_def is the definition of the problem: the goal is to synthesize the unknowns in target such
+  that target = orig ∘ repr
+*)
 type psi_def =
   { psi_target : PMRS.t (**
   The target recursion skeleton in the problem.
@@ -32,10 +36,7 @@ type psi_def =
   should be !_alpha extended with the tuple of types psi_lifting. *)
   }
 
-(**
-  psi_def is the definition of the problem: the goal is to synthesize the unknowns in target such
-  that target = orig ∘ repr
-*)
+let psi_def_logics p = [ p.psi_repr.plogic; p.psi_reference.plogic; p.psi_target.plogic ]
 
 (* State variables for the algorithm. *)
 

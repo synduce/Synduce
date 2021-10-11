@@ -13,8 +13,7 @@ open Lang.Term
    not perform bounded checking by expanding unnecessary terms.
 *)
 val check_solution
-  :  ?use_acegis:bool
-  -> p:AState.psi_def
+  :  p:AState.psi_def
   -> refinement_loop_state
   -> (string * variable list * term) list
   -> ((term, Terms.comparator_witness) Set.t * (term, Terms.comparator_witness) Set.t)

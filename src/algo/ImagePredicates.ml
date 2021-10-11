@@ -74,8 +74,19 @@ let gen_pmrs_positive_examples (p : PMRS.t) =
   get_positive_examples p.pvar
 ;;
 
-let set_up_bounded_solver (logic : string) (vars : VarSet.t) solver =
-  let preamble = Commands.mk_preamble ~induction:false ~logic () in
+let set_up_bounded_solver
+    (logic : Logics.logic)
+    (vars : VarSet.t)
+    (solver : AsyncSmt.solver)
+    : unit Lwt.t
+  =
+  let preamble =
+    Commands.mk_preamble
+      ~incremental:(String.is_prefix ~prefix:"CVC" solver.s_name)
+      ~induction:false
+      ~logic
+      ()
+  in
   let additional_decls = Commands.decls_of_vars vars in
   let%lwt () = AsyncSmt.exec_all solver (preamble @ additional_decls) in
   return ()
@@ -227,20 +238,8 @@ let constraint_of_neg (id : int) ~(p : psi_def) (ctex : ctex) : command =
 
 let set_up_ensures_solver solver ~(p : psi_def) (ensures : term) =
   ignore ensures;
-  let%lwt () = SmtInterface.AsyncSmt.set_logic solver "ALL" in
-  let%lwt () = SmtInterface.AsyncSmt.set_option solver "quant-ind" "true" in
-  let%lwt () = SmtInterface.AsyncSmt.set_option solver "produce-models" "true" in
-  let%lwt () = SmtInterface.AsyncSmt.set_option solver "incremental" "true" in
-  let%lwt () =
-    if !Config.induction_proof_tlimit >= 0
-    then
-      SmtInterface.AsyncSmt.set_option
-        solver
-        "tlimit"
-        (Int.to_string !Config.induction_proof_tlimit)
-    else return ()
-  in
-  let%lwt () = SmtInterface.AsyncSmt.load_min_max_defs solver in
+  let preamble = Commands.mk_preamble ~logic:Logics.ALL ~induction:true ~models:true () in
+  let%lwt () = SmtInterface.AsyncSmt.exec_all solver preamble in
   let%lwt () =
     Lwt_list.iter_p
       (fun x ->
@@ -302,13 +301,13 @@ let verify_ensures_bounded ~(p : psi_def) (ensures : term) (var : variable)
   in
   let task (solver, starter) =
     let%lwt _ = starter in
-    let%lwt _ = set_up_bounded_solver "DTLIA" VarSet.empty solver in
+    let%lwt _ = set_up_bounded_solver Logics.LIA VarSet.empty solver in
     let steps = ref 0 in
     let rec check_bounded_sol accum terms =
       let f accum t =
         let%lwt _ = accum in
         let rec_instantation =
-          Option.value ~default:VarMap.empty (Analysis.matches t ~pattern:base_term)
+          Option.value ~default:VarMap.empty (Matching.matches t ~pattern:base_term)
         in
         let f_compose_r t =
           let repr_of_v =

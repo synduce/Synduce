@@ -28,7 +28,7 @@ module LiftingMap = struct
   let empty : t = []
 
   let key_match ~key:(i1, t1) i2 t2 =
-    if i1 = i2 then Analysis.matches ~pattern:t1 t2 else None
+    if i1 = i2 then Matching.matches ~pattern:t1 t2 else None
   ;;
 
   let get (map : t) ((i, t0) : int * term) =

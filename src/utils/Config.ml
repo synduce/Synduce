@@ -146,7 +146,7 @@ let eusolver_binary_path =
   | _ -> ""
 ;;
 
-let verification_solver = ref "z3"
+let verification_solver = ref "cvc"
 
 let set_verification_solver (s : string) =
   match s with
