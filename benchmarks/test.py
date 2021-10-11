@@ -203,6 +203,7 @@ base_benchmark_set = [
     ["tree/minmax.pmrs", ""],
     ["tree/maxtree2.pmrs", ""],
     ["tree/poly.pmrs", ""],
+    ["tree/poly2.ml", ""],
     ["tree/maxPathWeight.pmrs", ""],
     ["tree/sorted.pmrs", "-t"],
     ["tree/sumtree.pmrs", ""],

@@ -304,7 +304,11 @@ module Synchronous (Log : Logger) (Stats : Statistics) = struct
   (* === Command helpers ===  *)
 
   let check_sat s = exec_command s mk_check_sat
-  let declare_all s decls = List.iter ~f:(fun decl -> ignore (exec_command s decl)) decls
+
+  let exec_all s commands =
+    List.iter ~f:(fun decl -> ignore (exec_command s decl)) commands
+  ;;
+
   let get_model s = exec_command s GetModel
 
   let load_min_max_defs s =
@@ -588,7 +592,7 @@ module Asyncs (Log : Logger) (Stats : Statistics) = struct
 
   let check_sat s : response = exec_command s mk_check_sat
 
-  let declare_all (s : solver) (decls : command list) : unit t =
+  let exec_all (s : solver) (decls : command list) : unit t =
     List.fold
       ~f:(fun _ decl ->
         let%lwt _ = exec_command s decl in

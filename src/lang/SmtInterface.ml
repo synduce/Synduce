@@ -16,7 +16,7 @@ module SmtLog : Solvers.Logger = struct
   let verbose = !Config.smt_solve_verbose
 end
 
-let cvc_opts = [ "--lang=smt2.6"; "--incremental" ]
+let cvc_opts = [ "--incremental"; "--lang=smt2.6" ]
 let yices_opts = [ "--incremental"; "--smt2-model-format" ]
 let z3_opts = [ "-in"; "-smt2" ]
 
@@ -45,6 +45,13 @@ module AsyncSmt = struct
     let executable_name = if using_cvc5 then "cvc5" else "cvc4" in
     make_solver ~name cvc_path (executable_name :: cvc_opts)
   ;;
+
+  let make_solver (name : string) =
+    match name with
+    | "cvc" | "cvc4" | "cvc5" -> make_cvc_solver ()
+    | "yices" -> make_yices_solver ()
+    | _ -> make_z3_solver ()
+  ;;
 end
 
 module SyncSmt = struct
@@ -72,8 +79,7 @@ module SyncSmt = struct
   (** Create a process given some solver name. *)
   let make_solver (name : string) =
     match name with
-    | "cvc4" -> make_cvc_solver ()
-    | "cvc5" -> make_cvc_solver ()
+    | "cvc" | "cvc4" | "cvc5" -> make_cvc_solver ()
     | "yices" -> make_yices_solver ()
     | _ -> make_z3_solver ()
   ;;
@@ -563,28 +569,65 @@ let request_different_models_async
 (* ============================================================================================= *)
 (*                           COMMANDS                                                            *)
 (* ============================================================================================= *)
-let maybe_decl_of_tuple_type (t : RType.t) =
-  match t with
-  | TTup tl -> [ snd (decl_of_tup_type tl) ]
-  | _ -> []
-;;
-
-let decls_of_vars (vars : VarSet.t) =
-  let f v =
-    let t = Variable.vtype_or_new v in
+module Commands = struct
+  let decl_of_tuple_type (t : RType.t) : command list =
     match t with
-    | RType.TFun _ ->
-      let intypes, outtypes = RType.fun_typ_unpack t in
-      let in_sorts = List.map ~f:sort_of_rtype intypes in
-      let out_sort = sort_of_rtype outtypes in
-      List.concat_map ~f:maybe_decl_of_tuple_type (outtypes :: intypes)
-      @ [ DeclareFun (mk_symb v.vname, in_sorts, out_sort) ]
-    | _ ->
-      let sort = sort_of_rtype t in
-      maybe_decl_of_tuple_type t @ [ DeclareConst (mk_symb v.vname, sort) ]
-  in
-  List.concat_map ~f (Set.elements vars)
-;;
+    | TTup tl -> [ snd (decl_of_tup_type tl) ]
+    | _ -> []
+  ;;
+
+  let decls_of_vars (vars : VarSet.t) : command list =
+    let f v =
+      let t = Variable.vtype_or_new v in
+      match t with
+      | RType.TFun _ ->
+        let intypes, outtypes = RType.fun_typ_unpack t in
+        let in_sorts = List.map ~f:sort_of_rtype intypes in
+        let out_sort = sort_of_rtype outtypes in
+        List.concat_map ~f:decl_of_tuple_type (outtypes :: intypes)
+        @ [ DeclareFun (mk_symb v.vname, in_sorts, out_sort) ]
+      | _ ->
+        let sort = sort_of_rtype t in
+        decl_of_tuple_type t @ [ DeclareConst (mk_symb v.vname, sort) ]
+    in
+    List.concat_map ~f (Set.elements vars)
+  ;;
+
+  let mk_def_fun
+      (name : string)
+      (args : (string * RType.t) list)
+      (rtype : RType.t)
+      (body : term)
+      : command
+    =
+    let smt_args =
+      List.map ~f:(fun (name, rtype) -> mk_symb name, sort_of_rtype rtype) args
+    in
+    DefineFun (mk_symb name, smt_args, sort_of_rtype rtype, smt_of_term body)
+  ;;
+
+  let mk_preamble
+      ~(logic : string)
+      ?(induction = false)
+      ?(load_defs = true)
+      ?(models = true)
+      ?(proofs = false)
+      ()
+      : command list
+    =
+    let logic_command = SetLogic (SSimple logic)
+    and models_commands =
+      mk_set_option "produce-models" (if models then "true" else "false")
+    and tlimit_opt =
+      if induction && !Config.induction_proof_tlimit >= 0
+      then [ mk_set_option "tlimit" (Int.to_string !Config.induction_proof_tlimit) ]
+      else []
+    and induction_on = if induction then [ mk_set_option "quant-ind" "true" ] else []
+    and proofs_on = if proofs then [ mk_set_option "produce-proofs" "true" ] else []
+    and pre_defs = if load_defs then [ mk_max_def; mk_min_def ] else [] in
+    logic_command :: models_commands :: (induction_on @ proofs_on @ tlimit_opt @ pre_defs)
+  ;;
+end
 
 (* ============================================================================================= *)
 (*                             TRANSLATION FROM PMRS TO SMT define-funs-rec                      *)
@@ -730,18 +773,6 @@ let _smt_of_pmrs (pmrs : PMRS.t) : (smtSymbol list * command) list * command lis
     DefineFunsRec (decls, bodies) :: main_f
   in
   datatype_decls, definition_commands
-;;
-
-let mk_def_fun_command
-    (name : string)
-    (args : (string * RType.t) list)
-    (rtype : RType.t)
-    (body : term)
-  =
-  let smt_args =
-    List.map ~f:(fun (name, rtype) -> mk_symb name, sort_of_rtype rtype) args
-  in
-  DefineFun (mk_symb name, smt_args, sort_of_rtype rtype, smt_of_term body)
 ;;
 
 let mk_assert = mk_assert

@@ -89,7 +89,7 @@ let check_solution
   let start_time = Unix.gettimeofday () in
   let target_inst = Lang.Reduce.instantiate_with_solution p.psi_target soln in
   let free_vars = VarSet.empty in
-  let init_vardecls = decls_of_vars free_vars in
+  let init_vardecls = Commands.decls_of_vars free_vars in
   let solver = SyncSmt.make_solver !Config.verification_solver in
   SyncSmt.load_min_max_defs solver;
   let expand_and_check i (t0 : term) =
@@ -110,9 +110,10 @@ let check_solution
       (* Solver calls. *)
       SyncSmt.spush solver;
       (* Declare all the new variables used in the system of equations. *)
-      SyncSmt.declare_all
+      SyncSmt.exec_all
         solver
-        (decls_of_vars (Set.diff (Equations.free_vars_of_equations sys_eqns) free_vars));
+        (Commands.decls_of_vars
+           (Set.diff (Equations.free_vars_of_equations sys_eqns) free_vars));
       let has_ctex =
         List.fold_until ~finish:(fun x -> x) ~init:false ~f:(check_eqn solver) smt_eqns
       in
@@ -147,7 +148,7 @@ let check_solution
           find_ctex num_checks elts))
   in
   (* Declare all variables *)
-  SyncSmt.declare_all solver init_vardecls;
+  SyncSmt.exec_all solver init_vardecls;
   (match find_ctex 0 lstate.t_set with
   | Some _ -> failwith "Synthesizer and solver disagree on solution. That's unexpected!"
   | None -> ());
@@ -191,7 +192,7 @@ let bounded_check
   let start_time = Unix.gettimeofday () in
   let target_inst = Lang.Reduce.instantiate_with_solution p.psi_target soln in
   let free_vars = VarSet.empty in
-  let init_vardecls = decls_of_vars free_vars in
+  let init_vardecls = Commands.decls_of_vars free_vars in
   let solver = SyncSmt.make_solver !Config.verification_solver in
   SyncSmt.load_min_max_defs solver;
   let check term =
@@ -214,8 +215,8 @@ let bounded_check
       in
       Set.diff (List.fold ~f ~init:VarSet.empty sys_eqns) free_vars
     in
-    SyncSmt.declare_all solver init_vardecls;
-    SyncSmt.declare_all solver (decls_of_vars new_free_vars);
+    SyncSmt.exec_all solver init_vardecls;
+    SyncSmt.exec_all solver (Commands.decls_of_vars new_free_vars);
     let rec search_ctex _eqns =
       match _eqns with
       | [] -> None
@@ -292,7 +293,7 @@ let invert (recf : PMRS.t) (c : Constant.t) : term list option =
       let f_t = Reduce.reduce_pmrs recf t in
       let f_t_eq_c = mk_bin Eq f_t (mk_const c) in
       SyncSmt.spush solver;
-      SyncSmt.declare_all solver (SmtInterface.decls_of_vars vars);
+      SyncSmt.exec_all solver (Commands.decls_of_vars vars);
       SyncSmt.smt_assert solver (smt_of_term f_t_eq_c);
       let sol =
         match SyncSmt.check_sat solver with

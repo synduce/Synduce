@@ -259,7 +259,7 @@ let add_lemmas_interactively ~(p : psi_def) (lstate : refinement_loop_state)
         with
         | Failure _ -> None
       in
-      let pred_term = SmtInterface.term_of_smt env in
+      let pred_term = Smt.term_of_smt env in
       let term x =
         match get_lemma ~p existing_lemmas ~key:t with
         | None -> pred_term x
@@ -590,7 +590,7 @@ let set_up_lemma_solver solver ~(p : psi_def) lemma_candidate =
       (* Declare lemmas. *)
       @ [ (match lemma_candidate with
           | name, vars, body ->
-            Smt.mk_def_fun_command
+            Smt.Commands.mk_def_fun
               name
               (List.map ~f:(fun v -> v.vname, Variable.vtype_or_new v) vars)
               RType.TBool
@@ -601,9 +601,9 @@ let set_up_lemma_solver solver ~(p : psi_def) lemma_candidate =
 ;;
 
 let set_up_bounded_solver (logic : string) (vars : VarSet.t) solver =
-  let%lwt () = SmtInterface.AsyncSmt.set_logic solver logic in
-  let%lwt () = SmtInterface.AsyncSmt.set_option solver "produce-models" "true" in
-  let%lwt () = SmtInterface.AsyncSmt.set_option solver "incremental" "true" in
+  let%lwt () = Smt.AsyncSmt.set_logic solver logic in
+  let%lwt () = Smt.AsyncSmt.set_option solver "produce-models" "true" in
+  let%lwt () = Smt.AsyncSmt.set_option solver "incremental" "true" in
   let%lwt () =
     if !Config.induction_proof_tlimit >= 0
     then
@@ -613,10 +613,8 @@ let set_up_bounded_solver (logic : string) (vars : VarSet.t) solver =
         (Int.to_string !Config.induction_proof_tlimit)
     else return ()
   in
-  let%lwt () = SmtInterface.AsyncSmt.load_min_max_defs solver in
-  let%lwt () =
-    SmtInterface.AsyncSmt.declare_all solver (SmtInterface.decls_of_vars vars)
-  in
+  let%lwt () = Smt.AsyncSmt.load_min_max_defs solver in
+  let%lwt () = Smt.(AsyncSmt.exec_all solver (Commands.decls_of_vars vars)) in
   return ()
 ;;
 
@@ -660,12 +658,14 @@ let smt_of_disallow_ctex_values (det : term_state_detail) : S.smtTerm =
 let set_up_to_get_model solver ~(p : psi_def) lemma (det : term_state_detail) =
   (* Step 1. Declare vars for term, and assert that term satisfies tinv. *)
   let%lwt () =
-    Smt.AsyncSmt.declare_all solver (Smt.decls_of_vars (Analysis.free_variables det.term))
+    Smt.(
+      AsyncSmt.exec_all solver (Commands.decls_of_vars (Analysis.free_variables det.term)))
   in
   let%lwt _ = Smt.AsyncSmt.exec_command solver (S.mk_assert (smt_of_tinv_app ~p det)) in
   (* Step 2. Declare scalars (vars for recursion elimination & spec param) and their constraints (preconds & recurs elim eqns) *)
   let%lwt () =
-    Smt.AsyncSmt.declare_all solver (Smt.decls_of_vars (VarSet.of_list det.scalar_vars))
+    Smt.(
+      AsyncSmt.exec_all solver (Commands.decls_of_vars (VarSet.of_list det.scalar_vars)))
   in
   let%lwt _ =
     Smt.AsyncSmt.exec_command
@@ -756,13 +756,14 @@ let verify_lemma_bounded ~(p : psi_def) (det : term_state_detail) lemma_candidat
         let%lwt () = Smt.AsyncSmt.spush solver in
         (* Assert that preconditions hold and map original term's recurs elim variables to the variables that they reduce to for this concrete term. *)
         let%lwt _ =
-          Smt.AsyncSmt.declare_all
-            solver
-            (Smt.decls_of_vars
-               (List.fold
-                  ~init:VarSet.empty
-                  ~f:(fun acc t -> Set.union acc (Analysis.free_variables t))
-                  (preconds @ Map.data rec_instantation)))
+          Smt.(
+            AsyncSmt.exec_all
+              solver
+              (Commands.decls_of_vars
+                 (List.fold
+                    ~init:VarSet.empty
+                    ~f:(fun acc t -> Set.union acc (Analysis.free_variables t))
+                    (preconds @ Map.data rec_instantation))))
         in
         let%lwt () =
           Smt.AsyncSmt.smt_assert
@@ -776,9 +777,10 @@ let verify_lemma_bounded ~(p : psi_def) (det : term_state_detail) lemma_candidat
           | Some tinv ->
             let tinv_t = Reduce.reduce_pmrs tinv t in
             let%lwt _ =
-              Smt.AsyncSmt.declare_all
-                solver
-                (Smt.decls_of_vars (Analysis.free_variables tinv_t))
+              Smt.(
+                AsyncSmt.exec_all
+                  solver
+                  (Commands.decls_of_vars (Analysis.free_variables tinv_t)))
             in
             let%lwt _ = Smt.AsyncSmt.smt_assert solver (Smt.smt_of_term tinv_t) in
             return ()
@@ -836,7 +838,7 @@ let verify_lemma_bounded ~(p : psi_def) (det : term_state_detail) lemma_candidat
     let%lwt res = expand_loop (TermSet.singleton det.term) in
     return res
   in
-  Smt.AsyncSmt.(cancellable_task (make_cvc_solver ()) task)
+  Smt.AsyncSmt.(cancellable_task (make_solver "cvc") task)
 ;;
 
 let verify_lemma_unbounded ~(p : psi_def) (det : term_state_detail) lemma_candidate
@@ -866,7 +868,7 @@ let verify_lemma_unbounded ~(p : psi_def) (det : term_state_detail) lemma_candid
     Log.debug_msg "Unbounded lemma verification is complete.";
     return final_response
   in
-  Smt.AsyncSmt.(cancellable_task (Smt.AsyncSmt.make_cvc_solver ()) build_task)
+  Smt.AsyncSmt.(cancellable_task (Smt.AsyncSmt.make_solver "cvc") build_task)
 ;;
 
 let verify_lemma_candidate ~(p : psi_def) (det : term_state_detail)

@@ -33,15 +33,13 @@ let gen_pmrs_positive_examples (p : PMRS.t) =
   let iterations = ref 0 in
   let z3 = Solvers.make_z3_solver () in
   Solvers.load_min_max_defs z3;
-  Solvers.declare_all
-    z3
-    (List.map ~f:snd (SmtInterface.declare_datatype_of_rtype !_alpha));
-  Solvers.declare_all z3 (decls_of_vars atoms);
+  Solvers.exec_all z3 (List.map ~f:snd (SmtInterface.declare_datatype_of_rtype !_alpha));
+  Solvers.exec_all z3 (Commands.decls_of_vars atoms);
   let mk_ex _ t =
     let t' = reference t in
     let fv = Analysis.free_variables t' in
     Solvers.spush z3;
-    Solvers.declare_all z3 (decls_of_vars fv);
+    Solvers.exec_all z3 (Commands.decls_of_vars fv);
     Solvers.smt_assert z3 (smt_of_term (mk_bin Binop.Eq t' out_term));
     let resp =
       match Solvers.check_sat z3 with
@@ -77,22 +75,9 @@ let gen_pmrs_positive_examples (p : PMRS.t) =
 ;;
 
 let set_up_bounded_solver (logic : string) (vars : VarSet.t) solver =
-  let%lwt () = SmtInterface.AsyncSmt.set_logic solver logic in
-  let%lwt () = SmtInterface.AsyncSmt.set_option solver "produce-models" "true" in
-  let%lwt () = SmtInterface.AsyncSmt.set_option solver "incremental" "true" in
-  let%lwt () =
-    if !Config.induction_proof_tlimit >= 0
-    then
-      SmtInterface.AsyncSmt.set_option
-        solver
-        "tlimit"
-        (Int.to_string !Config.induction_proof_tlimit)
-    else return ()
-  in
-  let%lwt () = SmtInterface.AsyncSmt.load_min_max_defs solver in
-  let%lwt () =
-    SmtInterface.AsyncSmt.declare_all solver (SmtInterface.decls_of_vars vars)
-  in
+  let preamble = Commands.mk_preamble ~induction:false ~logic () in
+  let additional_decls = Commands.decls_of_vars vars in
+  let%lwt () = AsyncSmt.exec_all solver (preamble @ additional_decls) in
   return ()
 ;;
 
@@ -173,9 +158,8 @@ let set_up_to_get_ensures_model solver ~(p : psi_def) (ensures : term) =
     Reduce.reduce_term (Reduce.reduce_pmrs p.psi_reference repr_of_v)
   in
   let%lwt () =
-    SmtInterface.AsyncSmt.declare_all
-      solver
-      (SmtInterface.decls_of_vars (VarSet.singleton var))
+    SmtInterface.(
+      AsyncSmt.exec_all solver (Commands.decls_of_vars (VarSet.singleton var)))
   in
   let ensures_app =
     SmtInterface.smt_of_term
@@ -307,7 +291,7 @@ let verify_ensures_unbounded ~(p : psi_def) (ensures : term)
     return final_response
   in
   SmtInterface.AsyncSmt.(
-    cancellable_task (SmtInterface.AsyncSmt.make_cvc_solver ()) build_task)
+    cancellable_task (SmtInterface.AsyncSmt.make_solver "cvc") build_task)
 ;;
 
 let verify_ensures_bounded ~(p : psi_def) (ensures : term) (var : variable)
@@ -333,19 +317,19 @@ let verify_ensures_bounded ~(p : psi_def) (ensures : term) (var : variable)
           Reduce.reduce_term (Reduce.reduce_pmrs p.psi_reference repr_of_v)
         in
         let%lwt _ =
-          SmtInterface.AsyncSmt.declare_all
-            solver
-            (SmtInterface.decls_of_vars (VarSet.singleton var))
+          SmtInterface.(
+            AsyncSmt.exec_all solver (Commands.decls_of_vars (VarSet.singleton var)))
         in
         let%lwt () = SmtInterface.AsyncSmt.spush solver in
         let%lwt _ =
-          SmtInterface.AsyncSmt.declare_all
-            solver
-            (SmtInterface.decls_of_vars
-               (VarSet.of_list
-                  (List.concat_map
-                     ~f:(fun t -> Set.to_list (Analysis.free_variables t))
-                     (Map.data rec_instantation))))
+          SmtInterface.(
+            AsyncSmt.exec_all
+              solver
+              (Commands.decls_of_vars
+                 (VarSet.of_list
+                    (List.concat_map
+                       ~f:(fun t -> Set.to_list (Analysis.free_variables t))
+                       (Map.data rec_instantation)))))
         in
         let instance_equals =
           smt_of_term
@@ -360,9 +344,10 @@ let verify_ensures_bounded ~(p : psi_def) (ensures : term) (var : variable)
           | Some tinv ->
             let tinv_t = Reduce.reduce_pmrs tinv t in
             let%lwt _ =
-              SmtInterface.AsyncSmt.declare_all
-                solver
-                (SmtInterface.decls_of_vars (Analysis.free_variables tinv_t))
+              SmtInterface.(
+                AsyncSmt.exec_all
+                  solver
+                  (Commands.decls_of_vars (Analysis.free_variables tinv_t)))
             in
             let%lwt _ =
               SmtInterface.AsyncSmt.smt_assert solver (SmtInterface.smt_of_term tinv_t)
@@ -374,7 +359,7 @@ let verify_ensures_bounded ~(p : psi_def) (ensures : term) (var : variable)
           Reduce.reduce_term (mk_app ensures [ Reduce.reduce_term (f_compose_r t) ])
         in
         (* let%lwt _ =
-             SmtInterface.AsyncSmt.declare_all solver
+             SmtInterface.AsyncSmt.exec_all solver
                (SmtInterface.decls_of_vars (Analysis.free_variables ensures_reduc))
            in *)
         let%lwt _ =
@@ -428,7 +413,7 @@ let verify_ensures_bounded ~(p : psi_def) (ensures : term) (var : variable)
     let%lwt res = expand_loop (TermSet.singleton base_term) in
     return res
   in
-  SmtInterface.AsyncSmt.(cancellable_task (make_cvc_solver ()) task)
+  SmtInterface.AsyncSmt.(cancellable_task (make_solver "cvc") task)
 ;;
 
 let verify_ensures_candidate ~(p : psi_def) (maybe_ensures : term option) (var : variable)
