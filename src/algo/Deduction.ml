@@ -215,7 +215,14 @@ module Solver = struct
          box_args);
     Log.verbose
       (Log.wrap1 "~ @[Bound args: %a@]" (list ~sep:comma Expression.pp) bound_args);
-    match deduction_loop ~lemma box_args bound_args res with
+    match
+      deduction_loop
+        ~lemma
+        box_args
+        (* Match large expressions first. *)
+        (List.rev (List.sort ~compare:Expression.expr_size_compare bound_args))
+        res
+    with
     | Ok x -> Ok x
     | Error state -> Error (state.full_boxes, state.expression)
   ;;
