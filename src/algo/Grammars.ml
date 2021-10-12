@@ -12,10 +12,43 @@ type grammar_parameters =
   }
 
 type grammar_guess =
-  | GBin of Binop.t
-  | GUn of Unop.t
-  | GIte
+  | GChoice of grammar_guess list
+  | GBin of Binop.t * grammar_guess * grammar_guess
+  | GUn of Unop.t * grammar_guess
+  | GIte of grammar_guess * grammar_guess * grammar_guess
+  | GType of Lang.RType.t
   | GNonGuessable
+
+let preamble ret_sort (gguess : grammar_guess) ~(ints : sygus_term) ~(bools : sygus_term) =
+  let rec build_prods gguess =
+    match gguess with
+    | GType t ->
+      (match t with
+      | TInt -> [ ints ]
+      | TBool -> [ bools ]
+      | _ -> failwith "Unsupported type in grammar.")
+    | GUn (u, g) ->
+      let g_prods = build_prods g in
+      List.map g_prods ~f:(fun prod -> SyApp (IdSimple (Unop.to_string u), [ prod ]))
+    | GBin (b, ta, tb) ->
+      let prods_a = build_prods ta
+      and prods_b = build_prods tb in
+      let a_x_b = List.cartesian_product prods_a prods_b in
+      List.map a_x_b ~f:(fun (proda, prodb) ->
+          SyApp (IdSimple (Binop.to_string b), [ proda; prodb ]))
+    | GIte (a, b, c) ->
+      let prods_a = build_prods a
+      and prods_b = build_prods b
+      and prods_c = build_prods c in
+      let a_x_b_x_c =
+        List.cartesian_product prods_a (List.cartesian_product prods_b prods_c)
+      in
+      List.map a_x_b_x_c ~f:(fun (a, (b, c)) -> SyApp (IdSimple "ite", [ a; b; c ]))
+    | GChoice c -> List.concat_map ~f:build_prods c
+    | _ -> []
+  in
+  [ ("IStart", ret_sort), List.map ~f:(fun x -> GTerm x) (build_prods gguess) ]
+;;
 
 let int_sort = SId (IdSimple "Int")
 let bool_sort = SId (IdSimple "Bool")
@@ -116,30 +149,7 @@ let int_parametric ?(guess = None) (params : grammar_parameters) =
   in
   match guess with
   | None -> main_grammar
-  | Some gguess ->
-    let preamble =
-      match gguess with
-      | GUn u ->
-        [ ("IStart", int_sort), [ GTerm (SyApp (IdSimple (Unop.to_string u), [ ix ])) ] ]
-      | GBin b ->
-        let args =
-          match Binop.operand_types b with
-          | (Lang.RType.TInt, Lang.RType.TInt) :: _ -> Some [ ix; ix ]
-          | [ (Lang.RType.TInt, Lang.RType.TBool) ] -> Some [ ix; ipred ]
-          | [ (Lang.RType.TBool, Lang.RType.TBool) ] -> Some [ ipred; ipred ]
-          | _ -> None
-        in
-        (match args with
-        | Some args ->
-          Utils.Log.debug_msg
-            Fmt.(str "Grammar optimization: top binary symbol is %s" (Binop.to_string b));
-          [ ("IStart", int_sort), [ GTerm (SyApp (IdSimple (Binop.to_string b), args)) ] ]
-        | None -> [])
-      | GIte ->
-        [ ("IStart", int_sort), [ GTerm (SyApp (IdSimple "ite", [ ipred; ix; ix ])) ] ]
-      | _ -> []
-    in
-    preamble @ main_grammar
+  | Some gguess -> preamble int_sort ~ints:ix ~bools:ipred gguess @ main_grammar
 ;;
 
 let bool_parametric
@@ -226,31 +236,7 @@ let bool_parametric
   let main_grammar = if has_ints then bool_section @ int_section else bool_section in
   match guess with
   | None -> main_grammar
-  | Some gguess ->
-    let preamble =
-      match gguess with
-      | GUn u ->
-        [ ("IStart", bool_sort), [ GTerm (SyApp (IdSimple (Unop.to_string u), [ ix ])) ] ]
-      | GBin b ->
-        let args =
-          match Binop.operand_types b with
-          | (Lang.RType.TInt, Lang.RType.TInt) :: _ -> Some [ ix; ix ]
-          | [ (Lang.RType.TInt, Lang.RType.TBool) ] -> Some [ ix; ipred ]
-          | [ (Lang.RType.TBool, Lang.RType.TBool) ] -> Some [ ipred; ipred ]
-          | _ -> None
-        in
-        (match args with
-        | Some args ->
-          [ ("IStart", bool_sort), [ GTerm (SyApp (IdSimple (Binop.to_string b), args)) ]
-          ]
-        | None -> [])
-      | GIte ->
-        [ ( ("IStart", bool_sort)
-          , [ GTerm (SyApp (IdSimple "ite", [ ipred; ipred; ipred ])) ] )
-        ]
-      | _ -> []
-    in
-    preamble @ main_grammar
+  | Some gguess -> preamble bool_sort ~ints:ix ~bools:ipred gguess @ main_grammar
 ;;
 
 let tuple_grammar_constr (params : grammar_parameters) (sorts : sygus_sort list) =
@@ -317,7 +303,11 @@ let generate_grammar
   | _ -> None
 ;;
 
-let make_guess (eqns : (term * term option * term * term) list) (xi : variable) =
+(* ============================================================================================= *)
+(*                          GRAMMAR OPTIMIZATION                                                 *)
+(* ============================================================================================= *)
+
+let make_basic_guess (eqns : (term * term option * term * term) list) (xi : variable) =
   let lhs_of_xi =
     let f (_, _, lhs, rhs) =
       match rhs.tkind with
@@ -328,10 +318,19 @@ let make_guess (eqns : (term * term option * term * term) list) (xi : variable) 
   in
   let guesses =
     let f lhs =
+      let t = lhs.ttyp in
       match lhs.tkind with
-      | TBin (op, _, _) -> Some (GBin op)
-      | TUn (op, _) -> Some (GUn op)
-      | TIte (_, _, _) -> Some GIte
+      | TBin (op, _, _) ->
+        Some
+          (match
+             List.map
+               ~f:(fun (ta, tb) -> GBin (op, GType ta, GType tb))
+               (Binop.operand_types op)
+           with
+          | [ a ] -> a
+          | _ as l -> GChoice l)
+      | TUn (op, _) -> Some (GUn (op, GType (Unop.operand_type op)))
+      | TIte (_, _, _) -> Some (GIte (GType Lang.RType.TBool, GType t, GType t))
       | TConst _ -> None
       | TVar _ -> None
       | _ -> Some GNonGuessable
@@ -341,4 +340,23 @@ let make_guess (eqns : (term * term option * term * term) list) (xi : variable) 
   match guesses with
   | [] -> None
   | hd :: tl -> if List.for_all tl ~f:(fun x -> Poly.equal x hd) then Some hd else None
+;;
+
+let make_unification_guess
+    (eqns : (term * term option * term * term) list)
+    (xi : variable)
+  =
+  make_basic_guess eqns xi
+;;
+
+let make_guess
+    ?(level = 1)
+    (eqns : (term * term option * term * term) list)
+    (xi : variable)
+  =
+  match level with
+  | 0 -> None
+  | 1 -> make_basic_guess eqns xi
+  | 2 -> make_unification_guess eqns xi
+  | _ -> None
 ;;

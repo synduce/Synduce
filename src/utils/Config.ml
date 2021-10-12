@@ -237,9 +237,16 @@ let simplify_eqns = ref true
 
 (**
   Use the equations as a indicator to optimize grammars, without compromising soundness.
-  OFF for CAV
 *)
-let optimize_grammars = ref true
+let optimize_grammars = ref 1
+
+let set_grammar_optimization_level (s : string) : unit =
+  try
+    let i = Int.of_string s in
+    if i >= 0 then optimize_grammars := max i 2
+  with
+  | _ -> ()
+;;
 
 (** When printing a system of equations, put a limit on how many equations are printed. *)
 let pp_eqn_count = ref 20
@@ -251,7 +258,7 @@ let pp_eqn_count = ref 20
 (** Maximum depth of pointwise expansions to perform. Careful setting this variable to high,
   it will lead to explosion in the number of terms expanded. A lazy expansion should be
   implemented. *)
-let expand_depth = ref 2
+let expand_depth = ref 3
 
 (* Maximum of expansion depth performed during bounded checking. *)
 let num_expansions_check = ref 124
@@ -370,9 +377,10 @@ let options print_usage parse_only =
   ; '\000', "fuzzing", None, Some set_fuzzing_count
   ; '\000', "generate-benchmarks", None, Some set_benchmark_generation_dir
   ; '\000', "generate-proof", None, Some set_proof_output_file
+  ; '\000', "set-gropt", None, Some set_grammar_optimization_level
   ; '\000', "parse-only", set parse_only true, None
   ; '\000', "max-lifting", None, Some set_max_lifting_attempts
-  ; '\000', "no-gropt", set optimize_grammars false, None
+  ; '\000', "no-gropt", set optimize_grammars 0, None
   ; '\000', "no-lifting", set attempt_lifting false, None
   ; '\000', "no-simplify", set simplify_eqns false, None
   ; '\000', "no-syndef", set use_syntactic_definitions false, None

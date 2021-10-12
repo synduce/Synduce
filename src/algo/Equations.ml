@@ -540,12 +540,10 @@ module Solve = struct
     let f xi =
       let args, ret_sort = xi_formals xi in
       let guess =
-        if !Config.optimize_grammars
-        then
-          Grammars.make_guess
-            (List.map ~f:(fun eqn -> eqn.eterm, eqn.eprecond, eqn.elhs, eqn.erhs) eqns)
-            xi
-        else None
+        Grammars.make_guess
+          ~level:!Config.optimize_grammars
+          (List.map ~f:(fun eqn -> eqn.eterm, eqn.eprecond, eqn.elhs, eqn.erhs) eqns)
+          xi
       in
       let grammar =
         Grammars.generate_grammar
