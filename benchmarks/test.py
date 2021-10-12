@@ -229,6 +229,7 @@ lifting_benchmarks = [
     ["list/zero_after_one_no.ml", ""],
     ["list/atoi_no_fac.ml", "--no-gropt"],
     ["list/largest_diff_sorted_list_nohead.ml", ""],
+    ["list/is_sorted_no_last.ml", ""],
     # Tail optimizations
     ["tailopt/mps_no_sum.ml", ""],
     # Combining traversals

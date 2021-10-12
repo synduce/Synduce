@@ -19,7 +19,8 @@ val interactive_add_lifting_expression
 
 val replace_boxed_expressions : p:psi_def -> lifting -> Term.term -> Term.term
 val is_lifted : psi_def -> bool
-val lift_count : psi_def -> int
+val lifting_count : psi_def -> int
+val lifting_types : psi_def -> RType.t list
 val proj_to_non_lifting : psi_def -> Term.term option
 val is_proj_function : psi_def -> Term.term -> bool
 val proj_to_lifting : psi_def -> (Term.term -> Term.term) option

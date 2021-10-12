@@ -694,7 +694,10 @@ module Solve = struct
     (* Call the solver on the generated file. *)
     if not gen_only
     then (
-      let t, r = SygusInterface.SygusSolver.solve_commands commands in
+      let solver_kind =
+        if !Config.use_eusolver then SygusSolver.EUSolver else SygusSolver.CVC
+      in
+      let t, r = SygusInterface.SygusSolver.solve_commands ~solver_kind commands in
       ( Lwt.map
           (function
             | Some resp -> handle_response resp

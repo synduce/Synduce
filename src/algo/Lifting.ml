@@ -127,12 +127,16 @@ let is_lifted (p : psi_def) : bool =
   not (Result.is_ok (RType.unify_one tout !_alpha))
 ;;
 
-let lift_count (p : psi_def) : int =
+let lifting_types (p : psi_def) : RType.t list =
   let _, tout = RType.fun_typ_unpack (Variable.vtype_or_new p.psi_target.pvar) in
   match tout with
-  | RType.TTup tl -> List.length tl - alpha_component_count ()
-  | _ -> 0
+  | RType.TTup tl ->
+    let n = alpha_component_count () in
+    if n > 0 then List.drop tl n else []
+  | _ -> []
 ;;
+
+let lifting_count (p : psi_def) : int = List.length (lifting_types p)
 
 (* ============================================================================================= *)
 (*                       PROJECTIONS TO AND FROM LIFTING                                         *)
@@ -170,7 +174,7 @@ let is_proj_function (p : psi_def) (t : term) : bool =
   | TFun ([ tuple_arg_pattern ], tuple_body) ->
     (match tuple_arg_pattern with
     | FPatTup t ->
-      if List.length t = lift_count p + alpha_component_count ()
+      if List.length t = lifting_count p + alpha_component_count ()
       then (
         match tuple_body.tkind with
         | TTup tl -> List.length tl = alpha_component_count ()
@@ -289,14 +293,14 @@ let analyze_leftover (expr : Rewriter.Expression.t) : unit =
 (**
   [apply_lifting ~p l] lifts [p.psi_target] by extending the output with [l].
 *)
-let apply_lifting ~(p : psi_def) (l : RType.t list) : psi_def =
+let apply_lifting ~(p : psi_def) (new_lifting : RType.t list) : psi_def =
   (* Type inference on p.target to update types *)
   let target' =
     let new_out_type =
       let open RType in
       match snd (fun_typ_unpack (Variable.vtype_or_new p.psi_target.PMRS.pvar)) with
-      | TTup old_ts -> TTup (old_ts @ l)
-      | t_out -> TTup (t_out :: l)
+      | TTup old_ts -> TTup (old_ts @ new_lifting)
+      | t_out -> TTup (t_out :: new_lifting)
     in
     let target' = PMRS.infer_pmrs_types (PMRS.clear_pmrs_types p.psi_target) in
     let free_theta = PMRS.extract_rec_input_typ target' in
@@ -316,7 +320,7 @@ let apply_lifting ~(p : psi_def) (l : RType.t list) : psi_def =
   in
   (* ⚠️ !TODO! : updates all the "ensures" *)
   Log.debug (fun ft () -> Fmt.(pf ft "@[After lifting:@;%a@]" (box PMRS.pp) target'));
-  { p with psi_target = target'; psi_lifting = p.psi_lifting @ l }
+  { p with psi_target = target'; psi_lifting = p.psi_lifting @ new_lifting }
 ;;
 
 let lift_interactive ~p lifting boxes =
@@ -432,13 +436,13 @@ let scalar
     in
     let f a uc = join a (m uc) in
     match synt_failure_info with
-    | First _ -> !next_lifing_type
-    | Second ctex_list -> List.fold ~f ~init:[] ctex_list
+    | First _ -> lifting_types p @ !next_lifing_type
+    | Second ctex_list -> lifting_types p @ List.fold ~f ~init:[] ctex_list
   in
   Log.info
     Fmt.(
       fun fmt () ->
-        pf fmt "Adding a new component of type %a" (list ~sep:comma RType.pp) lifting_type);
+        pf fmt "Lifting with components %a" (list ~sep:comma RType.pp) lifting_type);
   (* Change the type of the functions. The actual lifting expressions will be computed when solving
     for the equation systems.
    *)
