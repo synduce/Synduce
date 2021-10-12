@@ -37,6 +37,7 @@ module AsyncSmt = struct
       make_z3_solver ()
   ;;
 
+
   (** Create a process with a CVC4 solver. *)
   let make_cvc_solver () =
     let cvc_path = Config.cvc_binary_path () in
@@ -67,6 +68,7 @@ module SyncSmt = struct
       Log.error_msg "Yices not found. Using z3 instead.";
       make_z3_solver ()
   ;;
+
 
   (** Create a process with a CVC4 solver. *)
   let make_cvc_solver () =
