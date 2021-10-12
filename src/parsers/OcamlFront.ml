@@ -4,7 +4,6 @@ open Parsetree
 open Utils
 open Front
 open Lang.RType
-open Getopt
 
 let psi_comps : (string * string * string) option ref = ref None
 
@@ -12,60 +11,36 @@ let psi_comps : (string * string * string) option ref = ref None
 (*                 IN-FILE OPTION PARSING                                                        *)
 (* ============================================================================================= *)
 
-(** A different set of options that can be configured from the file.
-*)
-let file_options =
-  [
-    ('u', "no-check-unrealizable", set Config.check_unrealizable false, None);
-    ('I', "interactive", set Config.interactive_lemmas true, None);
-    ('J', "interactive-lifting", set Config.interactive_lifting true, None);
-    ('L', "interactive-loop", set Config.interactive_lemmas_loop true, None);
-    ('n', "verification", None, Some Config.set_num_expansions_check);
-    ('N', "no-sat-as-unsat", set Config.no_bounded_sat_as_unsat true, None);
-    ('B', "bounded-lemma-check", set Config.bounded_lemma_check true, None);
-    ('s', "no-splitting", set Config.split_solve_on false, None);
-    ('t', "no-detupling", set Config.detupling_on false, None);
-    ('X', "classify-ctex", set Config.classify_ctex true, None);
-    ('C', "interactive-check-lemma", set Config.interactive_check_lemma true, None);
-    ('\000', "check-smt-unrealizable", set Config.check_unrealizable_smt_unsatisfiable true, None);
-    ('\000', "cvc4", set Config.use_cvc4 true, None);
-    ('\000', "cvc5", set Config.use_cvc4 false, None);
-    ('\000', "fuzzing", None, Some Config.set_fuzzing_count);
-    ('\000', "generate-benchmarks", None, Some Config.set_benchmark_generation_dir);
-    ('\000', "generate-proof", None, Some Config.set_proof_output_file);
-    ('\000', "max-lifting", None, Some Config.set_max_lifting_attempts);
-    ('\000', "no-gropt", set Config.optimize_grammars false, None);
-    ('\000', "no-lifting", set Config.attempt_lifting false, None);
-    ('\000', "no-simplify", set Config.simplify_eqns false, None);
-    ('\000', "no-syndef", set Config.use_syntactic_definitions false, None);
-    (* Background solver parameters *)
-    ('\000', "ind-tlimit", None, Some Config.set_induction_proof_tlimit);
-  ]
-
 let option_parse (vals : string list) =
-  Log.debug_msg Fmt.(str "Option given: %a." (list ~sep:comma string) vals);
-  Getopt.parse file_options (fun _ -> ()) (Array.of_list vals) 0 (List.length vals - 1)
+  let placeholder = ref false in
+  Log.debug_msg Fmt.(str "Option given in file: %a." (list ~sep:comma string) vals);
+  Getopt.parse
+    (Config.options (fun _ -> ()) placeholder)
+    (fun _ -> ())
+    (Array.of_list vals)
+    0
+    (List.length vals - 1)
+;;
 
 (** [parse_option option] parses a string that defines a setting in Synduce. *)
 let parse_option (setting : attribute) =
   let analyze_parts value =
     let value = Str.(global_replace (regexp "\"") "" value) in
     let parts = Str.(split (regexp "[ ]+")) value in
-    (*     Log.debug_msg Fmt.(str "Option given: %a." (list ~sep:comma string) parts); *)
     match parts with
     | option_keyword :: option_args ->
-        if String.equal option_keyword "@synduce" then option_parse option_args else ()
+      if String.equal option_keyword "@synduce" then option_parse option_args else ()
     | _ -> ()
   in
   match setting.attr_payload with
-  | PStr [ str_attr ] -> (
-      match str_attr.pstr_desc with
-      | Pstr_eval (e, _) ->
-          let value = Fmt.str "%a" Pprintast.expression e in
-          (*           Fmt.(pf stdout "VALUE: %s@." value); *)
-          analyze_parts value
-      | _ -> ())
+  | PStr [ str_attr ] ->
+    (match str_attr.pstr_desc with
+    | Pstr_eval (e, _) ->
+      let value = Fmt.str "%a" Pprintast.expression e in
+      analyze_parts value
+    | _ -> ())
   | _ -> ()
+;;
 
 (* ============================================================================================= *)
 (*                                                                                               *)
@@ -75,64 +50,73 @@ let parse_option (setting : attribute) =
 let extract_params decl =
   let f (ct, variance) =
     match variance with
-    | Asttypes.Invariant -> (
-        match ct.ptyp_desc with
-        | Ptyp_var x -> x
-        | _ -> failwith "Only type variable as parameters supported.")
+    | Asttypes.Invariant ->
+      (match ct.ptyp_desc with
+      | Ptyp_var x -> x
+      | _ -> failwith "Only type variable as parameters supported.")
     | _ -> failwith "Covariant and contravariant types unsupported."
   in
   List.map ~f decl.ptype_params
+;;
 
 [%%else]
 
 let extract_params decl =
   let f (ct, variance) =
     match variance with
-    | Asttypes.NoVariance, _ -> (
-        match ct.ptyp_desc with
-        | Ptyp_var x -> x
-        | _ -> failwith "Only type variable as parameters supported.")
+    | Asttypes.NoVariance, _ ->
+      (match ct.ptyp_desc with
+      | Ptyp_var x -> x
+      | _ -> failwith "Only type variable as parameters supported.")
     | _ -> failwith "Covariant and contravariant types unsupported."
   in
   List.map ~f decl.ptype_params
+;;
 
 [%%endif]
-
 [%%if ocaml_version < (4, 13, 0)]
 
 let constructor_arguments args =
   match args with
-  | Some pat -> (
-      match pat.ppat_desc with
-      | Ppat_var ident -> [ mk_var (wloc pat.ppat_loc) ident.txt ]
-      | Ppat_tuple pats -> List.map ~f:fterm_of_pattern pats
-      | Ppat_any -> [ mk_any (wloc pat.ppat_loc) ]
-      | _ ->
-          failwith
-            (Fmt.str "Pattern not supported in constructor arguments: %a." Pprintast.pattern pat))
+  | Some pat ->
+    (match pat.ppat_desc with
+    | Ppat_var ident -> [ mk_var (wloc pat.ppat_loc) ident.txt ]
+    | Ppat_tuple pats -> List.map ~f:fterm_of_pattern pats
+    | Ppat_any -> [ mk_any (wloc pat.ppat_loc) ]
+    | _ ->
+      failwith
+        (Fmt.str
+           "Pattern not supported in constructor arguments: %a."
+           Pprintast.pattern
+           pat))
   | None -> []
+;;
 
 [%%else]
 
 let constructor_arguments args =
   match args with
-  | Some (_, pat) -> (
-      match pat.ppat_desc with
-      | Ppat_var ident -> [ mk_var (wloc pat.ppat_loc) ident.txt ]
-      | Ppat_tuple pats -> List.map ~f:fterm_of_pattern pats
-      | Ppat_any -> [ mk_any (wloc pat.ppat_loc) ]
-      | _ ->
-          failwith
-            (Fmt.str "Pattern not supported in constructor arguments: %a." Pprintast.pattern pat))
+  | Some (_, pat) ->
+    (match pat.ppat_desc with
+    | Ppat_var ident -> [ mk_var (wloc pat.ppat_loc) ident.txt ]
+    | Ppat_tuple pats -> List.map ~f:fterm_of_pattern pats
+    | Ppat_any -> [ mk_any (wloc pat.ppat_loc) ]
+    | _ ->
+      failwith
+        (Fmt.str
+           "Pattern not supported in constructor arguments: %a."
+           Pprintast.pattern
+           pat))
   | None -> []
+;;
 
 [%%endif]
 
 let read_sig filename =
   Location.input_name := filename;
   let handle =
-    try Stdio.In_channel.create filename
-    with Sys_error msg ->
+    try Stdio.In_channel.create filename with
+    | Sys_error msg ->
       Stdio.prerr_endline msg;
       Caml.exit 1
   in
@@ -142,6 +126,7 @@ let read_sig filename =
   Stdio.In_channel.close handle;
   Log.debug (fun f () -> Fmt.(pf f "Input program:@;%a" Pprintast.structure ast));
   ast
+;;
 
 let rec type_term_of_core_type (t : core_type) : type_term =
   let of_params =
@@ -150,22 +135,23 @@ let rec type_term_of_core_type (t : core_type) : type_term =
   in
   match t.ptyp_desc with
   | Ptyp_var s -> mk_t_param (wloc t.ptyp_loc) s
-  | Ptyp_poly (params, t) -> (
-      match params with
-      | [] -> type_term_of_core_type t
-      | _ -> mk_t_constr (wloc t.ptyp_loc) (of_params params) (type_term_of_core_type t))
+  | Ptyp_poly (params, t) ->
+    (match params with
+    | [] -> type_term_of_core_type t
+    | _ -> mk_t_constr (wloc t.ptyp_loc) (of_params params) (type_term_of_core_type t))
   | Ptyp_tuple _ -> failwith "tuple not supported"
-  | Ptyp_constr (c, targs) -> (
-      match c.txt with
-      | Lident cid -> (
-          let t1 = mk_t_typ (wloc c.loc) cid in
-          match targs with
-          | [] -> t1
-          | _ -> mk_t_constr (wloc t.ptyp_loc) (List.map ~f:type_term_of_core_type targs) t1)
-      | _ -> failwith Fmt.(str "constr %s unsupported" "unk"))
+  | Ptyp_constr (c, targs) ->
+    (match c.txt with
+    | Lident cid ->
+      let t1 = mk_t_typ (wloc c.loc) cid in
+      (match targs with
+      | [] -> t1
+      | _ -> mk_t_constr (wloc t.ptyp_loc) (List.map ~f:type_term_of_core_type targs) t1)
+    | _ -> failwith Fmt.(str "constr %s unsupported" "unk"))
   | _ ->
-      Log.error_msg Fmt.(str "%a" Pprintast.core_type t);
-      failwith "type unsupported"
+    Log.error_msg Fmt.(str "%a" Pprintast.core_type t);
+    failwith "type unsupported"
+;;
 
 let type_term_of_type_decl (decl : type_declaration) =
   let variants_of_cstr clist =
@@ -184,11 +170,14 @@ let type_term_of_type_decl (decl : type_declaration) =
     | _ -> mk_t_int (wloc decl.ptype_loc)
   in
   let tname = decl.ptype_name in
-
-  (tname, extract_params decl, tterm)
+  tname, extract_params decl, tterm
+;;
 
 let _is_recursive_flag (is_rec : Asttypes.rec_flag) =
-  match is_rec with Asttypes.Recursive -> Log.info (fun f () -> Fmt.(pf f "Recursive")) | _ -> ()
+  match is_rec with
+  | Asttypes.Recursive -> Log.info (fun f () -> Fmt.(pf f "Recursive"))
+  | _ -> ()
+;;
 
 (**
   `fun_args expr` unwraps the function arguments of expr, if expr is an expression
@@ -198,44 +187,55 @@ let unwrap_args (expr : expression) =
   let rec extract (e : expression) =
     match e.pexp_desc with
     | Pexp_fun (label, default, pat, e) ->
-        let args_rest, body = extract e in
-        ((label, default, Some pat) :: args_rest, body)
-    | Pexp_function _ -> ([ (Asttypes.Nolabel, None, None) ], e)
-    | _ -> ([], e)
+      let args_rest, body = extract e in
+      (label, default, Some pat) :: args_rest, body
+    | Pexp_function _ -> [ Asttypes.Nolabel, None, None ], e
+    | _ -> [], e
   in
   extract expr
+;;
 
 let _tuple_of_idents_attribute (name : string) (attr : attribute) : string list option =
   let all_items_tuples items =
     all_or_none
       (List.map
          ~f:(fun sitem ->
-           match sitem.pstr_desc with Pstr_eval (expr, _) -> tuple_of_idents_expr expr | _ -> None)
+           match sitem.pstr_desc with
+           | Pstr_eval (expr, _) -> tuple_of_idents_expr expr
+           | _ -> None)
          items)
   in
-  if String.equal attr.attr_name.txt name then
+  if String.equal attr.attr_name.txt name
+  then (
     match attr.attr_payload with
-    | PStr items -> ( match all_items_tuples items with Some [ l ] -> Some l | _ -> None)
-    | _ -> None
+    | PStr items ->
+      (match all_items_tuples items with
+      | Some [ l ] -> Some l
+      | _ -> None)
+    | _ -> None)
   else None
+;;
 
 (* ============================================================================================= *)
 (*                               ATTRIBUTES : ENSURES & REQUIRES                                 *)
 (* ============================================================================================= *)
 
 let parse_term_attribute ~(name : string) (attr : attribute) : Front.term option =
-  if String.equal attr.attr_name.txt name then (
+  if String.equal attr.attr_name.txt name
+  then (
     match attr.attr_payload with
-    | PStr [ s ] -> (
-        match s.pstr_desc with
-        | Pstr_eval (ensures_expr, _) -> Some (fterm_of_expr ensures_expr)
-        | _ ->
-            Log.error_msg Fmt.(str "Ignore %s %a." name (Printast.structure 0) [ s ]);
-            None)
-    | _ as pa ->
-        Log.error (fun f () -> Fmt.(pf f "Ensures: wrong payload %a" (Printast.payload 0) pa));
+    | PStr [ s ] ->
+      (match s.pstr_desc with
+      | Pstr_eval (ensures_expr, _) -> Some (fterm_of_expr ensures_expr)
+      | _ ->
+        Log.error_msg Fmt.(str "Ignore %s %a." name (Printast.structure 0) [ s ]);
         None)
+    | _ as pa ->
+      Log.error (fun f () ->
+          Fmt.(pf f "Ensures: wrong payload %a" (Printast.payload 0) pa));
+      None)
   else None
+;;
 
 (** Returns requires, ensures *)
 let get_predicate (b : value_binding) =
@@ -252,7 +252,8 @@ let get_predicate (b : value_binding) =
     | [] -> None
     | hd :: _ -> Some hd
   in
-  (requires_pred, ensures_pred)
+  requires_pred, ensures_pred
+;;
 
 (* ============================================================================================= *)
 
@@ -260,35 +261,45 @@ let type_definitions (_ : Asttypes.rec_flag) (decls : type_declaration list) =
   let declare (decl : type_declaration) =
     let tname, params, tterm = type_term_of_type_decl decl in
     Front.TypeDef
-      ( wloc decl.ptype_loc,
-        match params with
+      ( wloc decl.ptype_loc
+      , match params with
         | [] -> Front.TDSimple (tname.txt, tterm)
         | _ -> Front.TDParametric (params, tname.txt, tterm) )
   in
   List.map ~f:declare decls
+;;
 
-let rules_of_case_list loc (nont : ident) (preargs : ident option list) (cases : case list) =
+let rules_of_case_list
+    loc
+    (nont : ident)
+    (preargs : ident option list)
+    (cases : case list)
+  =
   let fsymb = mk_var loc nont in
   let preargs =
-    List.map ~f:(fun x -> Option.(value ~default:(mk_any loc) (map ~f:(mk_var loc) x))) preargs
+    List.map
+      ~f:(fun x -> Option.(value ~default:(mk_any loc) (map ~f:(mk_var loc) x)))
+      preargs
   in
   let f (c : case) =
-    if Option.is_some c.pc_guard then failwith "Case with guard not supported."
-    else
+    if Option.is_some c.pc_guard
+    then failwith "Case with guard not supported."
+    else (
       let pat = c.pc_lhs in
       let loc = wloc pat.ppat_loc in
       match c.pc_lhs.ppat_desc with
-      | Ppat_construct (constr_name, args) -> (
-          match simple_ident_of_longident constr_name.txt with
-          | Some cname ->
-              let lhs = mk_data loc cname (constructor_arguments args) in
-              let rhs = fterm_of_expr c.pc_rhs in
-              (loc, mk_app loc fsymb (preargs @ [ lhs ]), rhs)
-          | None -> failwith "Bad constructor name.")
+      | Ppat_construct (constr_name, args) ->
+        (match simple_ident_of_longident constr_name.txt with
+        | Some cname ->
+          let lhs = mk_data loc cname (constructor_arguments args) in
+          let rhs = fterm_of_expr c.pc_rhs in
+          loc, mk_app loc fsymb (preargs @ [ lhs ]), rhs
+        | None -> failwith "Bad constructor name.")
       | Ppat_or _ -> failwith "Or pattern."
-      | _ -> failwith "All match cases should be constructors."
+      | _ -> failwith "All match cases should be constructors.")
   in
   List.map ~f cases
+;;
 
 (** `as_pmrs pat expr _` interprets the binding let pat = expr as a definition of
   a set of rules that are part of a PMRS.
@@ -297,49 +308,60 @@ let rules_of_case_list loc (nont : ident) (preargs : ident option list) (cases :
   case, or a `fun` expression, in which case we have only one rule without pattern
   matching.
  *)
-let as_pmrs (vb : value_binding) : (ident * (loc * term * term) list * term option) option =
-  let pat, expr = (vb.pvb_pat, vb.pvb_expr) in
-
+let as_pmrs (vb : value_binding) : (ident * (loc * term * term) list * term option) option
+  =
+  let pat, expr = vb.pvb_pat, vb.pvb_expr in
   (* Prepend `s preargs ..` as the head of each rule in expr. *)
   let rec as_pmrs_named s preargs expr =
     match expr.pexp_desc with
-    | Pexp_fun (_, _, arg_pat, body) -> (
-        match arg_pat.ppat_desc with
-        | Ppat_var id -> as_pmrs_named s (preargs @ [ Some id.txt ]) body
-        | Ppat_any -> as_pmrs_named s (preargs @ [ None ]) body
-        | _ ->
-            failwith
-              (Fmt.str "Pattern not supported in function arguments: %a." Pprintast.pattern pat))
+    | Pexp_fun (_, _, arg_pat, body) ->
+      (match arg_pat.ppat_desc with
+      | Ppat_var id -> as_pmrs_named s (preargs @ [ Some id.txt ]) body
+      | Ppat_any -> as_pmrs_named s (preargs @ [ None ]) body
+      | _ ->
+        failwith
+          (Fmt.str
+             "Pattern not supported in function arguments: %a."
+             Pprintast.pattern
+             pat))
     | Pexp_function cl -> rules_of_case_list (wloc pat.ppat_loc) s preargs cl
-    | _ -> (
-        try
-          let t = fterm_of_expr expr in
-          let loc = wloc expr.pexp_loc in
-          [
-            ( loc,
-              mk_app loc (mk_var loc s)
-                (List.map
-                   ~f:(fun v -> Option.value (Option.map ~f:(mk_var loc) v) ~default:(mk_any loc))
-                   preargs),
-              t );
-          ]
-        with _ -> [])
+    | _ ->
+      (try
+         let t = fterm_of_expr expr in
+         let loc = wloc expr.pexp_loc in
+         [ ( loc
+           , mk_app
+               loc
+               (mk_var loc s)
+               (List.map
+                  ~f:(fun v ->
+                    Option.value (Option.map ~f:(mk_var loc) v) ~default:(mk_any loc))
+                  preargs)
+           , t )
+         ]
+       with
+      | _ -> [])
   in
   match pat.ppat_desc with
-  | Ppat_var iloc -> Some (iloc.txt, as_pmrs_named iloc.txt [] expr, snd (get_predicate vb))
+  | Ppat_var iloc ->
+    Some (iloc.txt, as_pmrs_named iloc.txt [] expr, snd (get_predicate vb))
   | _ -> None
+;;
 
 let params_of (expr : expression) =
   let pats_to_name l =
     let f (_, _, pat) =
       match pat with
-      | Some pattern -> (
-          match pattern.ppat_desc with Ppat_var ident -> Some ident.txt | _ -> None)
+      | Some pattern ->
+        (match pattern.ppat_desc with
+        | Ppat_var ident -> Some ident.txt
+        | _ -> None)
       | None -> None
     in
     all_or_none (List.map ~f l)
   in
   Option.bind ~f:pats_to_name (List.drop_last (first (unwrap_args expr)))
+;;
 
 (** Interpret a list of value bindings as a set of mutually recursive functions
     defining a PMRS. Each binding should be a function. Each binding will be interpreted as a
@@ -348,71 +370,84 @@ let params_of (expr : expression) =
 let to_rules (vb : value_binding list) : ident list * pmrs_body * (ident * term) list =
   let f vb =
     match as_pmrs vb with
-    | Some (fname, l, e) -> (
-        match e with
-        | Some ensures -> (Some fname, l, [ (fname, ensures) ])
-        | None -> (Some fname, l, []))
-    | None -> (None, [], [])
+    | Some (fname, l, e) ->
+      (match e with
+      | Some ensures -> Some fname, l, [ fname, ensures ]
+      | None -> Some fname, l, [])
+    | None -> None, [], []
   in
   (* Each binding is interpreted as a list of rules.
       Each binding should be a function.
   *)
   let fnames, rule_sets, ensure_preds = List.unzip3 (List.map ~f vb) in
-  (List.filter_opt fnames, List.concat rule_sets, List.concat ensure_preds)
+  List.filter_opt fnames, List.concat rule_sets, List.concat ensure_preds
+;;
 
 let pmrs_head_of_rec_def loc (b : value_binding) (rest : value_binding list) =
-  let fname = match b.pvb_pat.ppat_desc with Ppat_var id -> Some id.txt | _ -> None in
+  let fname =
+    match b.pvb_pat.ppat_desc with
+    | Ppat_var id -> Some id.txt
+    | _ -> None
+  in
   let ppargs = params_of b.pvb_expr in
   let requires, ensures = get_predicate b in
   let _, prules, pensures = to_rules (b :: rest) in
   let pparams = List.map ~f:(fun (x, _) -> x) (get_objects ()) in
   reset_synt_objects ();
-  match (fname, ppargs) with
+  match fname, ppargs with
   | Some fname, Some ppargs ->
-      [ Front.PMRSDef (loc, pparams, fname, ppargs, requires, ensures, prules) ]
-      @ List.map ~f:(fun (i, e) -> Front.EnsuresDef (loc, i, e)) pensures
+    [ Front.PMRSDef (loc, pparams, fname, ppargs, requires, ensures, prules) ]
+    @ List.map ~f:(fun (i, e) -> Front.EnsuresDef (loc, i, e)) pensures
   | _ -> []
+;;
 
 let pmrs_def_of_nonrec_def loc (b : value_binding) : definition list =
-  let fname = match b.pvb_pat.ppat_desc with Ppat_var id -> Some id.txt | _ -> None in
+  let fname =
+    match b.pvb_pat.ppat_desc with
+    | Ppat_var id -> Some id.txt
+    | _ -> None
+  in
   let ppargs = params_of b.pvb_expr in
   let requires, ensures = get_predicate b in
   let _, core = unwrap_args b.pvb_expr in
   match core.pexp_desc with
   | Pexp_let (Asttypes.Recursive, bindings, expr) ->
-      let fnames, rules, part_ensures = to_rules bindings in
-      let pparams = List.map ~f:(fun (x, _) -> x) (get_objects ()) in
-      reset_synt_objects ();
-      let is_apply_first_rule =
-        match expr.pexp_desc with
-        | Pexp_apply (f, [ (_, recursive_arg) ]) -> (
-            (* The body after let is of the form f t *)
-            match (fnames, f.pexp_desc, recursive_arg.pexp_desc) with
-            | hd_f :: _, Pexp_ident f, Pexp_ident _ ->
-                (* f should be hd_f *)
-                Option.value ~default:false
-                  (Option.map (simple_ident_of_longident f.txt) ~f:(fun x -> String.(hd_f = x)))
-            | _ -> false)
-        | _ -> false
-      in
-      if is_apply_first_rule then
-        Option.to_list
-          (Option.map2 fname ppargs ~f:(fun x y ->
-               Front.PMRSDef (loc, pparams, x, y, requires, ensures, rules)))
-        @ List.map ~f:(fun (i, e) -> Front.EnsuresDef (loc, i, e)) part_ensures
-      else []
+    let fnames, rules, part_ensures = to_rules bindings in
+    let pparams = List.map ~f:(fun (x, _) -> x) (get_objects ()) in
+    reset_synt_objects ();
+    let is_apply_first_rule =
+      match expr.pexp_desc with
+      | Pexp_apply (f, [ (_, recursive_arg) ]) ->
+        (* The body after let is of the form f t *)
+        (match fnames, f.pexp_desc, recursive_arg.pexp_desc with
+        | hd_f :: _, Pexp_ident f, Pexp_ident _ ->
+          (* f should be hd_f *)
+          Option.value
+            ~default:false
+            (Option.map (simple_ident_of_longident f.txt) ~f:(fun x -> String.(hd_f = x)))
+        | _ -> false)
+      | _ -> false
+    in
+    if is_apply_first_rule
+    then
+      Option.to_list
+        (Option.map2 fname ppargs ~f:(fun x y ->
+             Front.PMRSDef (loc, pparams, x, y, requires, ensures, rules)))
+      @ List.map ~f:(fun (i, e) -> Front.EnsuresDef (loc, i, e)) part_ensures
+    else []
   | _ -> []
+;;
 
 (* `define_value loc is_rec binding` attempts to extract a PMRS definition of a function
    definition out of a Caml value definition.
 *)
 let define_value loc (is_rec : Asttypes.rec_flag) (bindings : value_binding list) =
-  match (bindings, is_rec) with
+  match bindings, is_rec with
   | hd :: tl, Asttypes.Recursive ->
-      (* A recursive function may be a PMRS. *)
-      pmrs_head_of_rec_def loc hd tl
+    (* A recursive function may be a PMRS. *)
+    pmrs_head_of_rec_def loc hd tl
   | [ vb ], Asttypes.Nonrecursive ->
-      (* A non-recursive function may be a parametric PMRS.
+    (* A non-recursive function may be a parametric PMRS.
          It should have the form:
          let f x1 .. xn t =
            let rec g = function ...
@@ -420,25 +455,28 @@ let define_value loc (is_rec : Asttypes.rec_flag) (bindings : value_binding list
          in
          g t
       *)
-      pmrs_def_of_nonrec_def loc vb
+    pmrs_def_of_nonrec_def loc vb
   | _ -> []
+;;
 
 let declare_synt_obj (assert_expr : expression) =
   let t = fterm_of_expr assert_expr in
   match t.kind with
   (* assert (target = repr @ reference) *)
-  | FTBin (T.Binop.Eq, target, { kind = FTApp (_, [ repr; reference ]); _ }) -> (
-      match (target.kind, repr.kind, reference.kind) with
-      | FTVar target, FTVar reprname, FTVar refname -> psi_comps := Some (target, refname, reprname)
-      | _ -> ())
+  | FTBin (T.Binop.Eq, target, { kind = FTApp (_, [ repr; reference ]); _ }) ->
+    (match target.kind, repr.kind, reference.kind with
+    | FTVar target, FTVar reprname, FTVar refname ->
+      psi_comps := Some (target, refname, reprname)
+    | _ -> ())
   (* assert (target = reference)  (repr is identity) *)
-  | FTBin (T.Binop.Eq, target, reference) -> (
-      match (target.kind, reference.kind) with
-      | FTVar target, FTVar refname -> psi_comps := Some (target, refname, "repr")
-      | _ -> ())
+  | FTBin (T.Binop.Eq, target, reference) ->
+    (match target.kind, reference.kind with
+    | FTVar target, FTVar refname -> psi_comps := Some (target, refname, "repr")
+    | _ -> ())
   | _ ->
-      Log.debug_msg Fmt.(str "Ignore (assert %a)" pp_fterm t);
-      ()
+    Log.debug_msg Fmt.(str "Ignore (assert %a)" pp_fterm t);
+    ()
+;;
 
 let parse_ocaml (filename : string) =
   let definitions = read_sig filename in
@@ -446,19 +484,20 @@ let parse_ocaml (filename : string) =
     match def.pstr_desc with
     (* Toplevel attributes can be used to set some options *)
     | Pstr_attribute attribute ->
-        parse_option attribute;
-        []
+      parse_option attribute;
+      []
     | Pstr_type (rec_flag, ps_type_decls) ->
-        (* match type definitions. *)
-        type_definitions rec_flag ps_type_decls
+      (* match type definitions. *)
+      type_definitions rec_flag ps_type_decls
     | Pstr_value (rec_flag, binding_list) ->
-        (* match let .. definitions. *)
-        define_value (wloc def.pstr_loc) rec_flag binding_list
+      (* match let .. definitions. *)
+      define_value (wloc def.pstr_loc) rec_flag binding_list
     | Pstr_eval ({ pexp_desc = Pexp_assert maybe_synt_obj; _ }, _) ->
-        (* match assert ... for declaration of synthesis objectives. *)
-        declare_synt_obj maybe_synt_obj;
-        []
+      (* match assert ... for declaration of synthesis objectives. *)
+      declare_synt_obj maybe_synt_obj;
+      []
     | _ -> []
   in
   let defs = List.concat (List.map ~f:per_def definitions) in
-  (defs, !psi_comps)
+  defs, !psi_comps
+;;

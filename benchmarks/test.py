@@ -154,6 +154,7 @@ base_benchmark_set = [
     ["list_to_tree/search_v3.pmrs", ""],
     ["list_to_tree/mls.pmrs", ""],
     ["list/atoi.ml", ""],
+    ["list/bal.ml", ""],
     ["list/line_of_sight.pmrs", ""],
     ["list/mts_and_mps_hom.pmrs", ""],
     ["list/sumhom.pmrs", ""],
@@ -221,11 +222,18 @@ base_benchmark_set = [
 ]
 
 lifting_benchmarks = [
-    ["lifting/mpsl.ml", ""],
-    ["lifting/poly.ml", ""],
-    ["lifting/atoi_no.ml", "--no-gropt"],
-    ["lifting/largest_diff_sorted_list_nohead.ml", ""],
-    ["lifting/mits_nosum.ml", ""]
+    # Automatic parallelization
+    ["list/mps_no_sum.ml", ""],
+    ["list/poly_no_fac.ml", ""],
+    ["list/zero_after_one_no.ml", ""],
+    ["list/atoi_no_fac.ml", "--no-gropt"],
+    ["list/largest_diff_sorted_list_nohead.ml", ""],
+    # Tail optimizations
+    ["tailopt/mps_no_sum.ml", ""],
+    # Combining traversals
+    ["combine/mts_and_mps_nosum.ml", ""],
+    # Switching tree traversals
+    ["tree/mits_nosum.ml", ""]
 ]
 
 

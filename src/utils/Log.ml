@@ -9,16 +9,21 @@ open Base
 let reference_text = ref ""
 
 let extract text (pos1, pos2) : string =
-  let ofs1 = pos1.pos_cnum and ofs2 = pos2.pos_cnum in
+  let ofs1 = pos1.pos_cnum
+  and ofs2 = pos2.pos_cnum in
   let len = ofs2 - ofs1 in
-  try String.sub text ~pos:ofs1 ~len with Invalid_argument _ -> "???"
+  try String.sub text ~pos:ofs1 ~len with
+  | Invalid_argument _ -> "???"
+;;
 
 let compress text = Str.global_replace (Str.regexp "[ \t\n\r]+") " " text
 
 let shorten k text =
   let n = String.length text in
-  if n <= (2 * k) + 3 then text
+  if n <= (2 * k) + 3
+  then text
   else String.sub text ~pos:0 ~len:k ^ "..." ^ String.sub text ~pos:(n - k) ~len:k
+;;
 
 let log_located (frmt : Formatter.t) (location : position * position) s x =
   let _start, _end = location in
@@ -27,8 +32,17 @@ let log_located (frmt : Formatter.t) (location : position * position) s x =
   and start_line = _start.pos_lnum
   and end_lin = _end.pos_lnum in
   Fmt.(
-    pf frmt "@[<v 2>%s (%i:%i)-(%i:%i)@;%a@]" _start.pos_fname start_line start_col end_lin end_col
-      s x)
+    pf
+      frmt
+      "@[<v 2>%s (%i:%i)-(%i:%i)@;%a@]"
+      _start.pos_fname
+      start_line
+      start_col
+      end_lin
+      end_col
+      s
+      x)
+;;
 
 let ( @! ) (msg : Sexp.t) (loc : position * position) =
   let _start, _end = loc in
@@ -36,8 +50,11 @@ let ( @! ) (msg : Sexp.t) (loc : position * position) =
   and end_col = _end.pos_cnum - _end.pos_bol
   and start_line = _start.pos_lnum
   and end_lin = _end.pos_lnum in
-  let locstring = str "%s (%i:%i)-(%i:%i)" _start.pos_fname start_line start_col end_lin end_col in
+  let locstring =
+    str "%s (%i:%i)-(%i:%i)" _start.pos_fname start_line start_col end_lin end_col
+  in
   Sexp.List [ Atom locstring; msg ]
+;;
 
 let width = 40
 
@@ -48,71 +65,127 @@ let range text (loc : position * position) : string =
   let fragment = extract text (pos1, pos2) in
   (* Sanitize it and limit its length. Enclose it in single quotes. *)
   "'" ^ shorten width (compress fragment) ^ "'"
+;;
 
-let log_with_excerpt (frmt : Formatter.t) (ttext : string) (location : position * position) s x =
+let log_with_excerpt
+    (frmt : Formatter.t)
+    (ttext : string)
+    (location : position * position)
+    s
+    x
+  =
   let _start, _end = location in
   let start_col = _start.pos_cnum - _start.pos_bol
   and end_col = _end.pos_cnum - _end.pos_bol
   and start_line = _start.pos_lnum
   and end_lin = _end.pos_lnum in
   Fmt.(
-    pf frmt "@[<h 8>%s (%i:%i)-(%i:%i): %s@;%a@]" _start.pos_fname start_line start_col end_lin
-      end_col (range ttext location) s x)
+    pf
+      frmt
+      "@[<h 8>%s (%i:%i)-(%i:%i): %s@;%a@]"
+      _start.pos_fname
+      start_line
+      start_col
+      end_lin
+      end_col
+      (range ttext location)
+      s
+      x)
+;;
 
 (* ============================================================================================= *)
 (*                            General purpose printing functions with helpers.                   *)
 (* ============================================================================================= *)
 
 let wrap (s : string) fmt () = string fmt s
-
 let wrap1 f s t fmt () = pf fmt f s t
-
 let wrap2 f s1 t1 s2 t2 fmt () = pf fmt f s1 t1 s2 t2
-
 let wrapn fmt () = pf fmt
+let indent = ref 0
+let section_indent () = String.of_char_list (List.init !indent ~f:(fun _ -> '\t'))
 
 let error (msg : Formatter.t -> unit -> unit) : unit =
-  if !Config.info then pf Fmt.stdout "@[<h 8>%a@;%a@]@." (styled (`Bg `Red) string) "[ERROR]" msg ()
+  if !Config.info
+  then
+    pf
+      Fmt.stdout
+      "%s@[<h 8>%a@;%a@]@."
+      (section_indent ())
+      (styled (`Bg `Red) string)
+      "[ERROR]"
+      msg
+      ()
   else ()
+;;
 
 let error_msg (msg : string) = error (fun fmt () -> pf fmt "%s" msg)
-
 let fatal () = failwith "Fatal error. See messages."
 
 let loc_fatal_errmsg loc msg =
   error (fun f () -> log_with_excerpt f !reference_text loc Fmt.string msg);
   fatal ()
+;;
 
 let info (msg : Formatter.t -> unit -> unit) : unit =
-  if !Config.info then
-    pf Fmt.stdout "@[<h 8>%a@;%a@]@." (styled (`Bg `Blue) string) " INFO :" msg ()
+  if !Config.info
+  then
+    pf
+      Fmt.stdout
+      "%s@[<h 8>%a@;%a@]@."
+      (section_indent ())
+      (styled (`Bg `Blue) string)
+      " INFO :"
+      msg
+      ()
   else ()
+;;
 
 let debug (msg : Formatter.t -> unit -> unit) : unit =
-  if !Config.debug then
-    pf Fmt.stdout "@[<h 8>%a@;%a@]@."
+  if !Config.debug
+  then
+    pf
+      Fmt.stdout
+      "%s@[<h 8>%a@;%a@]@."
+      (section_indent ())
       (styled (`Fg `Black) (styled (`Bg `Yellow) string))
-      "!DEBUG!" msg ()
+      "!DEBUG!"
+      msg
+      ()
   else ()
+;;
 
 let debug_msg (msg : string) =
   debug (fun fmt () -> pf fmt "%s" (String.prefix msg !Config.debug_msg_max_chars))
+;;
 
 let print_ok () =
-  if !Config.debug then
-    pf Fmt.stdout "%a@." (styled (`Fg `Black) (styled (`Bg `Green) string)) "  OK   "
+  if !Config.debug
+  then pf Fmt.stdout "%a@." (styled (`Fg `Black) (styled (`Bg `Green) string)) "  OK   "
   else ()
+;;
 
 let verb msg =
-  if !Config.verbose then
-    pf Fmt.stdout "@[<h 8>%a@;@[%a@]@]@."
+  if !Config.verbose
+  then
+    pf
+      Fmt.stdout
+      "%s@[<h 8>%a@;@[%a@]@]@."
+      (section_indent ())
       (styled (`Fg `Black) (styled (`Bg `Cyan) string))
-      " VERB <" msg
+      " VERB <"
+      msg
   else fun _ -> ()
+;;
 
 let verbose msg = if !Config.verbose then verb msg () else ()
-
 let verbose_msg msg = verbose (fun fmt () -> pf fmt "%s" msg)
+
+let start_section s =
+  info (fun fmt () -> pf fmt "%s" s);
+  Int.incr indent
+;;
+
+let end_section () = Int.decr indent
 
 (* ============================================================================================= *)
 (*                            Printing info on solver sub-processes                              *)
@@ -122,13 +195,16 @@ let status_printer () =
     Unix.sleepf 0.05;
     let ids = Stats.get_alive () in
     let s =
-      String.concat ~sep:" "
-        (List.map ids ~f:(fun (sname, sid) -> "(" ^ sname ^ " : " ^ Int.to_string sid ^ ")"))
+      String.concat
+        ~sep:" "
+        (List.map ids ~f:(fun (sname, sid) ->
+             "(" ^ sname ^ " : " ^ Int.to_string sid ^ ")"))
     in
     Caml.Format.printf "Running: %s\r" s;
     Caml.flush Caml.stdout;
     ()
   done
+;;
 
 (* ============================================================================================= *)
 (*                            Miscelleanous                                                      *)
@@ -140,6 +216,7 @@ let to_file (file : string) (msg : Formatter.t -> unit -> unit) : unit =
   let frmt = Caml.Format.formatter_of_out_channel oc in
   msg frmt ();
   Stdio.Out_channel.close oc
+;;
 
 let print_solvers_summary (frmt : Formatter.t) () : unit =
   let open Fmt in
@@ -150,12 +227,18 @@ let print_solvers_summary (frmt : Formatter.t) () : unit =
     let instances = List.length data in
     total_solvers_time := !total_solvers_time +. total_time;
     total_instances := !total_instances + instances;
-    (key, total_time, instances)
+    key, total_time, instances
   in
   let pp frmt (key, time, instances) =
     Fmt.(pf frmt "@[<v 0>%-10s [%4i instances] %.3fs @]" key instances time)
   in
   let l = List.map ~f (Stats.get_solver_pids ()) in
-  pf frmt "@[<v 0>Total time spent in solvers:@;@[%a@]@;> %-8s [%4i instances]: %.3f@]@;"
+  pf
+    frmt
+    "@[<v 0>Total time spent in solvers:@;@[%a@]@;> %-8s [%4i instances]: %.3f@]@;"
     (list ~sep:(fun fmt () -> pf fmt "@;<80 0>") pp)
-    l "TOTAL" !total_instances !total_solvers_time
+    l
+    "TOTAL"
+    !total_instances
+    !total_solvers_time
+;;

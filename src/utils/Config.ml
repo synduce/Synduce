@@ -1,4 +1,5 @@
 open Base
+open Getopt
 
 let problem_name = ref "unknown"
 
@@ -37,6 +38,7 @@ let get_output_file s =
   Option.map !output_folder ~f:(fun o_f ->
       let base = Caml.Filename.basename s in
       Caml.Filename.concat o_f base)
+;;
 
 (* ============================================================================================= *)
 (*                                TEMPORARY OPTIONS                                              *)
@@ -53,7 +55,6 @@ let interactive_lemmas_loop = ref false
 let interactive_lifting = ref false
 
 let classify_ctex = ref false
-
 let interactive_check_lemma = ref false
 
 (**
@@ -90,40 +91,60 @@ let force_nonlinear = ref false
 (* ============================================================================================= *)
 
 let tmp_folder = Caml.Filename.get_temp_dir_name ()
-
 let root_folder = Caml.Filename.current_dir_name
-
 let base s = Caml.Filename.concat root_folder s
 
 (* Set to true to force using cvc4 even if cvc5 is available. *)
 (* There are still bugs with CVC5, leave true for now. *)
 let use_cvc4 = ref true
 
-let cvc4_binary_path = try Some (FileUtil.which "cvc4") with _ -> None
+let cvc4_binary_path =
+  try Some (FileUtil.which "cvc4") with
+  | _ -> None
+;;
 
-let cvc5_binary_path = try Some (FileUtil.which "cvc5") with _ -> None
+let cvc5_binary_path =
+  try Some (FileUtil.which "cvc5") with
+  | _ -> None
+;;
 
 let using_cvc5 () = Option.is_some cvc5_binary_path && not !use_cvc4
 
 let cvc_binary_path () =
-  if !use_cvc4 then
+  if !use_cvc4
+  then (
     match cvc4_binary_path with
     | Some p -> p
-    | None -> failwith "CVC4 not found using 'which cvc4')."
-  else
+    | None -> failwith "CVC4 not found using 'which cvc4').")
+  else (
     match cvc5_binary_path with
     | Some p -> p
-    | None -> (
-        match cvc4_binary_path with Some p -> p | None -> failwith "CVC5 and CVC4 not found.")
+    | None ->
+      (match cvc4_binary_path with
+      | Some p -> p
+      | None -> failwith "CVC5 and CVC4 not found."))
+;;
 
-let z3_binary_path = try FileUtil.which "z3" with _ -> failwith "Z3 not found (using 'which z3')."
+let z3_binary_path =
+  try FileUtil.which "z3" with
+  | _ -> failwith "Z3 not found (using 'which z3')."
+;;
 
-let yices_binary_path = try Some (FileUtil.which "yices-smt2") with _ -> None
+let yices_binary_path =
+  try Some (FileUtil.which "yices-smt2") with
+  | _ -> None
+;;
 
 (* TODO fix this. Not functional. *)
-let dryadsynth_binary_path = try FileUtil.which "DryadSynth" with _ -> ""
+let dryadsynth_binary_path =
+  try FileUtil.which "DryadSynth" with
+  | _ -> ""
+;;
 
-let eusolver_binary_path = try FileUtil.which "eusolver" with _ -> ""
+let eusolver_binary_path =
+  try FileUtil.which "eusolver" with
+  | _ -> ""
+;;
 
 let verification_solver = ref "z3"
 
@@ -134,38 +155,38 @@ let set_verification_solver (s : string) =
   | "cvc5" -> verification_solver := "cvc5"
   | "yices" -> verification_solver := "yices"
   | _ -> ()
+;;
 
 (* Smt solver logging. *)
 
 let smt_solver_log_file = ref "/tmp/solver.smt2"
-
 let smt_log_queries = ref true
-
 let smt_solve_verbose = ref true
 
 (* Generating realizable and unrealizable SyGuS benchmarks. *)
 let generate_benchmarks = ref false
-
 let benchmark_generation_dir = ref tmp_folder
-
 let benchmark_lang_version = ref "1.1"
 
 let set_benchmark_generation_dir (s : string) =
   generate_benchmarks := true;
   benchmark_generation_dir := s
+;;
 
 let new_benchmark_file ?(hint = "") suffix =
-  Caml.Filename.temp_file ~temp_dir:!benchmark_generation_dir
+  Caml.Filename.temp_file
+    ~temp_dir:!benchmark_generation_dir
     ("bench_" ^ hint ^ !problem_name)
     suffix
+;;
 
 let generate_proof = ref false
-
 let proof_generation_file = ref ""
 
 let set_proof_output_file (s : string) =
   generate_proof := true;
   proof_generation_file := s
+;;
 
 (* ============================================================================================= *)
 (*                  SYSTEM OF EQUATIONS OPTIMIZATION FLAGS                                       *)
@@ -240,6 +261,7 @@ let expand_cut = ref 124
 let set_num_expansions_check (s : string) =
   let i = Int.of_string s in
   if i > 0 && i < 1024 then num_expansions_check := i
+;;
 
 (** Use bounded model checking. From CLI, use --use-bmc to set to true. *)
 let use_bmc = ref false
@@ -251,6 +273,7 @@ let check_depth = ref 5
 let set_check_depth (s : string) =
   let i = Int.of_string s in
   if i > 0 && i < 1024 then check_depth := i
+;;
 
 (** A time limit for induction proofs.
   Infinity if set to negative.
@@ -260,6 +283,7 @@ let induction_proof_tlimit = ref (-1)
 let set_induction_proof_tlimit (s : string) =
   let i = Int.of_string s in
   induction_proof_tlimit := i
+;;
 
 (** A time limit parallel calls when waiting on first result..
   Infinity if set to negative.
@@ -270,6 +294,7 @@ let wait_parallel_tlimit = ref 600.
 let set_wait_parallel_tlimit (s : string) =
   let i = Float.of_string s in
   wait_parallel_tlimit := i
+;;
 
 (** A limit for the number of rewriting steps applied during deduction.
 *)
@@ -278,6 +303,7 @@ let rewrite_limit = ref 100
 let set_rewrite_limit (s : string) =
   let i = Int.of_string s in
   rewrite_limit := i
+;;
 
 (** When a model has been found, attempt fuzzing to find models that satisfy the same constraints.
   Used in Counterexamples.ml.
@@ -288,7 +314,9 @@ let set_fuzzing_count (s : string) =
   try
     let i = Int.of_string s in
     if i >= 0 && i < 1024 then fuzzing_count := i
-  with _ -> ()
+  with
+  | _ -> ()
+;;
 
 (**
   Attempt to lift the function if there is no solution.
@@ -302,4 +330,54 @@ let set_max_lifting_attempts (s : string) =
   try
     let i = Int.of_string s in
     if i >= 0 && i < 64 then max_lifting_attempts := i
-  with _ -> ()
+  with
+  | _ -> ()
+;;
+
+(* ============================================================================================= *)
+(*                                CLI OPTIONS                                                    *)
+(* ============================================================================================= *)
+
+let options print_usage parse_only =
+  [ 'b', "bmc", None, Some set_check_depth
+  ; 'c', "simple-init", set simple_init true, None
+  ; 'u', "no-check-unrealizable", set check_unrealizable false, None
+  ; 'd', "debug", set debug true, None
+  ; 'f', "force-nonlinear", set force_nonlinear true, None
+  ; 'h', "help", Some print_usage, None
+  ; 'i', "info-off", set info false, None
+  ; 'I', "interactive", set interactive_lemmas true, None
+  ; 'J', "interactive-lifting", set interactive_lifting true, None
+  ; 'L', "interactive-loop", set interactive_lemmas_loop true, None
+  ; 'm', "style-math", set math_display true, None
+  ; 'n', "verification", None, Some set_num_expansions_check
+  ; 'N', "no-sat-as-unsat", set no_bounded_sat_as_unsat true, None
+  ; 'B', "bounded-lemma-check", set bounded_lemma_check true, None
+  ; 'o', "output", None, Some set_output_folder
+  ; 's', "no-splitting", set split_solve_on false, None
+  ; 't', "no-detupling", set detupling_on false, None
+  ; 'v', "verbose", set verbose true, None
+  ; 'X', "classify-ctex", set classify_ctex true, None
+  ; 'C', "interactive-check-lemma", set interactive_check_lemma true, None
+  ; '\000', "acegis", set use_acegis true, None
+  ; '\000', "ccegis", set use_ccegis true, None
+  ; '\000', "cvc4", set use_cvc4 true, None
+  ; '\000', "cvc5", set use_cvc4 false, None
+  ; '\000', "check-smt-unrealizable", set check_unrealizable_smt_unsatisfiable true, None
+  ; '\000', "fuzzing", None, Some set_fuzzing_count
+  ; '\000', "generate-benchmarks", None, Some set_benchmark_generation_dir
+  ; '\000', "generate-proof", None, Some set_proof_output_file
+  ; '\000', "parse-only", set parse_only true, None
+  ; '\000', "max-lifting", None, Some set_max_lifting_attempts
+  ; '\000', "no-gropt", set optimize_grammars false, None
+  ; '\000', "no-lifting", set attempt_lifting false, None
+  ; '\000', "no-simplify", set simplify_eqns false, None
+  ; '\000', "no-syndef", set use_syntactic_definitions false, None
+  ; '\000', "show-vars", set show_vars true, None
+  ; '\000', "sysfe-opt-off", set sysfe_opt false, None
+  ; '\000', "use-bmc", set use_bmc true, None
+  ; '\000', "verif-with", None, Some set_verification_solver
+  ; (* Background solver parameters *)
+    '\000', "ind-tlimit", None, Some set_induction_proof_tlimit
+  ]
+;;

@@ -12,10 +12,13 @@ fields = ["synt", "verif", "#i", "last"]
 
 show_benchmarks = [
     ["sortedlist", [
-        ["min",      ["        ", "min ", "no", "no", "min"]],
-        ["max",      [" Sorted ", "max ", "no", "no", "max"]],
-        ["count_lt", [" List   ", "count elt. < ", "no", "no", "cnt <"]],
-        ["index_of", ["        ", "index of elt ", "no", "no", "idx"]],
+        ["min",                    ["        ", "min ", "no", "no", "min"]],
+        ["max",                    [" Sorted ", "max ", "no", "no", "max"]],
+        ["count_lt",               [" List   ", "count elt. < ", "no", "no", "cnt <"]],
+        ["index_of",               ["        ", "index of elt ", "no", "no", "idx"]],
+        ["is_intersection_empty",  ["        ", "∩-empty ", "no", "no", "∩-∅"]],
+        ["largest_diff",           ["        ", "largest diff ", "no", "no", "ldiff"]],
+        ["smallest_diff",          ["        ", "smallest diff ", "no", "no", "sdiff"]],
     ]],
     ["constantlist", [
         ["index_of",  [" Constant ", "index of elt. ", "no", "no", "idx"]],
@@ -50,12 +53,19 @@ show_benchmarks = [
                                 "of list ∋", "no", "no", "contains (list)"]],
         ["from_list_max",      ["          ",
                                 "of list max ", "yes", "yes", "max (list)"]],
+        ["sum_gt_by_key",      ["          ",
+                                "sum if key >   ", "yes", "yes", "sumkey"]],
     ]],
     ["balanced_tree", [
         ["node_count",  [" Balanced ", "node count", "yes", "no",  "node cnt."]],
         ["height",      ["  Tree    ", "height", "yes", "no", "height"]],
         ["height_v2",   ["          ",
                          "height (v2)  ", "yes", "yes", "height v2."]],
+    ]],
+    ["symmetric_tree", [
+        ["sum",         [" Symmetric  ", "sum", "yes", "no", "sum"]],
+        ["height",      ["    Tree    ", "height", "yes", "no", "height"]],
+        ["min",         ["            ", "min", "yes", "no", "min"]]
     ]],
     ["memo", [
         ["tree_size",     ["             ", "tree size", "yes", "yes",  "size"]],
@@ -215,7 +225,7 @@ def produce_txt_table(tex_output_file, data):
                 acegis_bf = False
 
                 if (bkey, "requation") not in data.keys():
-                    #print("No data for %s, requation" % bkey)
+                    # print("No data for %s, requation" % bkey)
                     pass
                 else:
                     b_data = data[bkey, "requation"]["all"]
@@ -231,7 +241,7 @@ def produce_txt_table(tex_output_file, data):
                 best_t = timeout_time
 
                 if (bkey, "acegis") not in data.keys():
-                    #print("No data for %s, acegis" % bkey)
+                    # print("No data for %s, acegis" % bkey)
                     pass
                 else:
                     b_data = data[bkey, "acegis"]["all"]
@@ -421,7 +431,7 @@ def table3(tex_output_file, data):
             for i in range(1, len(cegis_csvline)):
                 if floti(cegis_csvline[i]) < amin:
                     indexmin = i
-            #cegis_csvline[indexmin] = bold(cegis_csvline[indexmin])
+            # cegis_csvline[indexmin] = bold(cegis_csvline[indexmin])
 
             # txt_out.write("%s & %s & %s \\\\ \n" % (
             #    benchmark_info[1], "& ".join(req_csvline), "& ".join(cegis_csvline)))
@@ -551,20 +561,24 @@ def raw_to_csv(input_file):
                         benchmark_data[key]["max"], int(step))
                 # A line with 3 numbers means synthesis finished.
                 if len(infos) == 3:
+                    try:
+                        steps = int(infos[0])
                     # Res = #of refinement steps, verif. time, total time.
-                    if "res" in benchmark_data[key]:
-                        old_res = benchmark_data[key]["res"]
-                        old_count = old_res[3]
-                        new_steps = max(old_res[0], int(infos[0]))
-                        new_verif = incr_avg(
-                            old_res[1], old_count, float((infos[1])))
-                        new_time = incr_avg(
-                            old_res[2], old_count, float(infos[2]))
-                        new_count = old_count + 1
-                        benchmark_data[key]["res"] = new_steps, new_verif, new_time, new_count
-                    else:
-                        benchmark_data[key]["res"] = int(
-                            infos[0]), float(infos[1]), float(infos[2]), 1
+                        if "res" in benchmark_data[key]:
+                            old_res = benchmark_data[key]["res"]
+                            old_count = old_res[3]
+                            new_steps = max(old_res[0], steps)
+                            new_verif = incr_avg(
+                                old_res[1], old_count, float((infos[1])))
+                            new_time = incr_avg(
+                                old_res[2], old_count, float(infos[2]))
+                            new_count = old_count + 1
+                            benchmark_data[key]["res"] = new_steps, new_verif, new_time, new_count
+                        else:
+                            benchmark_data[key]["res"] = steps, float(
+                                infos[1]), float(infos[2]), 1
+                    except:
+                        continue
 
     bd = {}
     for k, v in benchmark_data.items():
