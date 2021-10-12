@@ -1,17 +1,17 @@
-(** @synduce --no-lifting *)
+(** @synduce --max-lifting=1 *)
 
 type 'a clist = CNil | Single of 'a | Concat of 'a clist * 'a clist
 
 type 'a list = Nil | Cons of 'a * 'a list
 
 let rec fbal = function
-  | Nil -> (0, 0, true)
+  | Nil -> (0, true)
   | Cons (hd, tl) ->
-      let cnt, min_cnt, bal = fbal tl in
+      let cnt, bal = fbal tl in
       let cnt = if hd then cnt + 1 else cnt - 1 in
-      (cnt, min min_cnt cnt, bal && cnt >= 0)
-  [@@ensures fun (cnt, min_cnt, bal) -> min_cnt <= cnt && min_cnt <=0 && bal = (min_cnt >= 0)]
-
+      (cnt, bal && cnt >= 0)
+  [@@ensures fun (cnt, bal) -> not (cnt <= 0) || bal]
+  
 let rec target = function
   | CNil -> [%synt s0]
   | Single a -> [%synt f0] a

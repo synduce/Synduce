@@ -157,6 +157,7 @@ let set_verification_solver (s : string) =
   | _ -> ()
 ;;
 
+
 (* Smt solver logging. *)
 
 let smt_solver_log_file = ref "/tmp/solver.smt2"
