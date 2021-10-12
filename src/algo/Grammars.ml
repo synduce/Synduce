@@ -26,7 +26,8 @@ let preamble ret_sort (gguess : grammar_guess) ~(ints : sygus_term) ~(bools : sy
       (match t with
       | TInt -> [ ints ]
       | TBool -> [ bools ]
-      | _ -> failwith "Unsupported type in grammar.")
+      | TParam _ -> [ ints ]
+      | _ -> [])
     | GUn (u, g) ->
       let g_prods = build_prods g in
       List.map g_prods ~f:(fun prod -> SyApp (IdSimple (Unop.to_string u), [ prod ]))
@@ -47,7 +48,9 @@ let preamble ret_sort (gguess : grammar_guess) ~(ints : sygus_term) ~(bools : sy
     | GChoice c -> List.concat_map ~f:build_prods c
     | _ -> []
   in
-  [ ("IStart", ret_sort), List.map ~f:(fun x -> GTerm x) (build_prods gguess) ]
+  match build_prods gguess with
+  | [] -> []
+  | guesses -> [ ("IStart", ret_sort), List.map ~f:(fun x -> GTerm x) guesses ]
 ;;
 
 let int_sort = SId (IdSimple "Int")

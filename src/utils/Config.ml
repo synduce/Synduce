@@ -258,7 +258,7 @@ let pp_eqn_count = ref 20
 (** Maximum depth of pointwise expansions to perform. Careful setting this variable to high,
   it will lead to explosion in the number of terms expanded. A lazy expansion should be
   implemented. *)
-let expand_depth = ref 3
+let expand_depth = ref 2
 
 (* Maximum of expansion depth performed during bounded checking. *)
 let num_expansions_check = ref 124
