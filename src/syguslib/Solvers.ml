@@ -199,11 +199,13 @@ struct
       failwith ("couldn't talk to solver, double-check path. Sys_error " ^ s)
   ;;
 
-  let solve_commands (p : program) : solver_response option Lwt.t * int Lwt.u =
+  let solve_commands ?(solver_kind = !default_solver) (p : program)
+      : solver_response option Lwt.t * int Lwt.u
+    =
     let inputfile = mk_tmp_sl "in_" in
     let outputfile = mk_tmp_sl "out_" in
     commands_to_file p inputfile;
-    let s, t, r = exec_solver (inputfile, outputfile) in
+    let s, t, r = exec_solver ~solver_kind (inputfile, outputfile) in
     solver_make_cancellable s t;
     t, r
   ;;

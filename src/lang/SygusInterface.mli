@@ -8,7 +8,11 @@ module SygusSolver : sig
     | DryadSynth
     | EUSolver
 
-  val solve_commands : Sygus.program -> Sygus.solver_response option Lwt.t * int Lwt.u
+  val solve_commands
+    :  ?solver_kind:t
+    -> Sygus.program
+    -> Sygus.solver_response option Lwt.t * int Lwt.u
+
   val default_solver : t ref
 end
 

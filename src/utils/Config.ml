@@ -141,6 +141,8 @@ let dryadsynth_binary_path =
   | _ -> ""
 ;;
 
+let use_eusolver = ref false
+
 let eusolver_binary_path =
   try FileUtil.which "eusolver" with
   | _ -> ""
@@ -156,7 +158,6 @@ let set_verification_solver (s : string) =
   | "yices" -> verification_solver := "yices"
   | _ -> ()
 ;;
-
 
 (* Smt solver logging. *)
 
@@ -364,6 +365,7 @@ let options print_usage parse_only =
   ; '\000', "ccegis", set use_ccegis true, None
   ; '\000', "cvc4", set use_cvc4 true, None
   ; '\000', "cvc5", set use_cvc4 false, None
+  ; '\000', "eusolver", set use_eusolver true, None
   ; '\000', "check-smt-unrealizable", set check_unrealizable_smt_unsatisfiable true, None
   ; '\000', "fuzzing", None, Some set_fuzzing_count
   ; '\000', "generate-benchmarks", None, Some set_benchmark_generation_dir
