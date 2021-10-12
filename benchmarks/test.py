@@ -206,6 +206,7 @@ base_benchmark_set = [
     ["tree/poly2.ml", ""],
     ["tree/maxPathWeight.pmrs", ""],
     ["tree/sorted.pmrs", "-t"],
+    ["tree/sorted_2.ml", ""],
     ["tree/sumtree.pmrs", ""],
     ["tree/mips.pmrs", ""],
     ["tree/mits.pmrs", ""],
@@ -235,7 +236,8 @@ lifting_benchmarks = [
     # Combining traversals
     ["combine/mts_and_mps_nosum.ml", ""],
     # Switching tree traversals
-    ["tree/mits_nosum.ml", ""]
+    ["tree/mits_nosum.ml", ""],
+    # ["tree/gradient.ml", ""], # lifting works, but cvc4 takes too long on a simple problem
 ]
 
 
