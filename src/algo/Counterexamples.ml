@@ -406,6 +406,14 @@ let check_image_sat ~p ctex : AsyncSmt.response * int u =
 ;;
 
 let check_image_unsat ~p ctex : AsyncSmt.response * int u =
+  let f_compose_r t =
+    let repr_of_v =
+      if p.psi_repr_is_identity then t else mk_app_v p.psi_repr.pvar [ t ]
+    in
+    mk_app_v
+      p.psi_reference.pvar
+      (List.map ~f:mk_var p.psi_reference.pargs @ [ repr_of_v ])
+  in
   let build_task (solver, task_start) =
     let* _ = task_start in
     let* () =
@@ -418,6 +426,7 @@ let check_image_unsat ~p ctex : AsyncSmt.response * int u =
              (SmtLogic.infer_logic
                 ~quantifier_free:false
                 ~for_induction:true
+                ~with_uninterpreted_functions:true
                 ~logic_infos:(AState.psi_def_logics p)
                 [])
            ())
@@ -430,14 +439,6 @@ let check_image_unsat ~p ctex : AsyncSmt.response * int u =
           return ())
         (smt_of_pmrs p.psi_reference
         @ if p.psi_repr_is_identity then [] else smt_of_pmrs p.psi_repr)
-    in
-    let f_compose_r t =
-      let repr_of_v =
-        if p.psi_repr_is_identity then t else mk_app_v p.psi_repr.pvar [ t ]
-      in
-      mk_app_v
-        p.psi_reference.pvar
-        (List.map ~f:mk_var p.psi_reference.pargs @ [ repr_of_v ])
     in
     let fv, formula =
       (* Substitute recursion elimination by recursive calls. *)
@@ -479,7 +480,8 @@ let check_image_unsat ~p ctex : AsyncSmt.response * int u =
   model of [ctex] are in the image of (p.psi_reference o p.psi_repr).
 *)
 let check_ctex_in_image ?(ignore_unknown = false) ~(p : psi_def) (ctex : ctex) : ctex =
-  Log.verbose_msg Fmt.(str "Checking whether ctex is in the image of function...");
+  Log.verbose_msg
+    Fmt.(str "Checking whether ctex is in the image of %s..." p.psi_reference.pvar.vname);
   let resp =
     if Analysis.is_bounded ctex.ctex_eqn.eterm
     then SmtLib.Sat

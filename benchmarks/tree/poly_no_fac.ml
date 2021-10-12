@@ -1,6 +1,6 @@
-type 'a tree =
+type tree =
   | Nil
-  | Node of 'a * 'a tree * 'a tree
+  | Node of int * tree * tree
 
 let spec x t =
   let rec main t = f 0 t

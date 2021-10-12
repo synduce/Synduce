@@ -435,6 +435,10 @@ let scalar
     | First _ -> !next_lifing_type
     | Second ctex_list -> List.fold ~f ~init:[] ctex_list
   in
+  Log.info
+    Fmt.(
+      fun fmt () ->
+        pf fmt "Adding a new component of type %a" (list ~sep:comma RType.pp) lifting_type);
   (* Change the type of the functions. The actual lifting expressions will be computed when solving
     for the equation systems.
    *)

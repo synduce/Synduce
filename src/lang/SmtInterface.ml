@@ -706,13 +706,32 @@ let build_match_cases pmrs _nont vars (relevant_rules : PMRS.rewrite_rule list)
   | _ -> None
 ;;
 
-let single_rule_case _pmrs _nont vars (args, body) : smtTerm =
-  let sub =
-    match List.map2 ~f:(fun v x -> Term.mk_var v, Term.mk_var x) args vars with
-    | Ok zipped -> zipped
-    | Unequal_lengths -> failwith "Unexpected."
+let single_rule_case (pmrs : PMRS.t) nont vars (args, body) : smtTerm =
+  let _, tout = RType.fun_typ_unpack (Variable.vtype_or_new nont) in
+  let body' =
+    let extra_param_args = List.map ~f:Term.mk_var pmrs.pargs in
+    let case f t =
+      match t.tkind with
+      | TApp ({ tkind = TVar fv; _ }, args) ->
+        if Set.mem pmrs.pnon_terminals fv
+        then (
+          let args' = List.map ~f args in
+          Some (mk_app ~typ:(Some tout) (Term.mk_var fv) (extra_param_args @ args')))
+        else None
+      | _ -> None
+    in
+    Term.transform ~case body
   in
-  smt_of_term (substitution sub body)
+  let sub =
+    match
+      List.map2 ~f:(fun v x -> Term.mk_var v, Term.mk_var x) (pmrs.pargs @ args) vars
+    with
+    | Ok zipped -> zipped
+    | Unequal_lengths ->
+      Log.error_msg "single_rule_case";
+      failwith "Unexpected."
+  in
+  smt_of_term (substitution sub body')
 ;;
 
 let vars_and_formals (pmrs : PMRS.t) (fvar : variable) =
@@ -721,7 +740,11 @@ let vars_and_formals (pmrs : PMRS.t) (fvar : variable) =
     List.unzip
       (List.map
          ~f:(fun rt ->
-           let v = Variable.mk ~t:(Some rt) (Alpha.fresh ~s:("x" ^ fvar.vname) ()) in
+           let v =
+             Variable.mk
+               ~t:(Some rt)
+               (Alpha.fresh ~s:("x" ^ String.prefix fvar.vname 2) ())
+           in
            v, (mk_symb v.vname, sort_of_rtype rt))
          (List.map ~f:(fun v -> Variable.vtype_or_new v) pmrs.pargs @ args_t))
   in
@@ -786,7 +809,12 @@ let smt_of_pmrs (pmrs : PMRS.t) : command list =
   (* TODO : order of declarations matters. *)
   let deps = PMRS.depends pmrs in
   let sort_decls_of_deps, decls_of_deps = List.unzip (List.map ~f:_smt_of_pmrs deps) in
-  let sort_decls, main_decl = _smt_of_pmrs pmrs in
+  let sort_decls, main_decl =
+    try _smt_of_pmrs pmrs with
+    | Failure s ->
+      Log.error_msg "Failed to translate PMRS as smt.";
+      failwith s
+  in
   let datatype_decls = List.map ~f:snd (List.concat sort_decls_of_deps @ sort_decls) in
   datatype_decls @ List.concat decls_of_deps @ main_decl
 ;;

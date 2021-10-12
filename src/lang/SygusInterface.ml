@@ -285,8 +285,16 @@ let declare_sorts_of_vars (vars : VarSet.t) =
   snd (List.unzip (Map.to_alist decl_map))
 ;;
 
-let declaration_of_var (v : variable) =
-  CDeclareVar (v.vname, sort_of_rtype (Variable.vtype_or_new v))
+let declarations_of_vars (vars : VarSet.t) : command list =
+  let compare v1 v2 = String.compare v1.vname v2.vname in
+  let uniquely_named =
+    List.remove_consecutive_duplicates
+      ~equal:(fun v1 v2 -> compare v1 v2 = 0)
+      (List.sort ~compare (Set.elements vars))
+  in
+  List.map
+    ~f:(fun v -> CDeclareVar (v.vname, sort_of_rtype (Variable.vtype_or_new v)))
+    uniquely_named
 ;;
 
 let sorted_vars_of_types (tl : RType.t list) : sorted_var list =

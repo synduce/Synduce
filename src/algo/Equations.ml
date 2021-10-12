@@ -656,7 +656,7 @@ module Solve = struct
     in
     let set_logic = CSetLogic logic in
     let sort_decls = declare_sorts_of_vars free_vars in
-    let var_decls = List.map ~f:declaration_of_var (Set.elements free_vars) in
+    let var_decls = declarations_of_vars free_vars in
     let constraints = constraints_of_eqns eqns in
     let extra_defs =
       (if Set.mem all_operators (Binary Max) then [ max_definition ] else [])

@@ -64,9 +64,9 @@ val term_of_sygus
 val declare_sorts_of_vars : VarSet.t -> Sygus.command list
 
 (**
-    Returns a sygus command of the form (declare-const v sort) from a variable.
+    Returns a list of sygus commands of the form (declare-const v sort) from a set of variables.
 *)
-val declaration_of_var : variable -> Sygus.command
+val declarations_of_vars : VarSet.t -> Sygus.command list
 
 (**
     Given a list of types, returns a list of sorted sygus variables.

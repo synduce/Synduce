@@ -194,7 +194,7 @@ module Solver = struct
     Log.verbose
       Fmt.(
         Log.wrap2
-          "@[=== Solve Func. Equation:@;@[<h 2>@[F %a@] =@;@[%a@]@]@]@."
+          "@[=== Solve Func. Equation:@;@[<h 2>@[F %a@] =@;@[%a@]@]@]"
           (list ~sep:sp (parens Expression.pp))
           args
           Expression.pp

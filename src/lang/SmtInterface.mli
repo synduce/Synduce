@@ -143,26 +143,6 @@ val request_different_models_async
   -> (string, Term.term, Base.String.comparator_witness) Base.Map.t list Lwt.t
 
 val smtPattern_of_term : Term.term -> SmtLib.smtPattern option
-
-val build_match_cases
-  :  PMRS.t
-  -> 'a
-  -> Term.variable list
-  -> PMRS.rewrite_rule list
-  -> (SmtLib.smtTerm * SmtLib.match_case list) option
-
-val single_rule_case
-  :  'a
-  -> 'b
-  -> Term.variable list
-  -> Term.variable list * Term.term
-  -> SmtLib.smtTerm
-
-val vars_and_formals
-  :  PMRS.t
-  -> Term.variable
-  -> RType.t * Term.variable list * (SmtLib.smtSymbol * SmtLib.smtSort) list
-
 val mk_assert : SmtLib.smtTerm -> SmtLib.command
 val smt_of_pmrs : PMRS.t -> SmtLib.command list
 
