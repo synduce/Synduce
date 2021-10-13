@@ -27,7 +27,8 @@ let print_usage () =
     \       --acegis                    Use the Abstract CEGIS algorithm. Turns bmc on.\n\
     \       --ccegis                    Use the Concrete CEGIS algorithm. Turns bmc on.\n\
     \       --no-simplify               Don't simplify equations with partial evaluation.\n\
-    \       --no-gropt                  Don't optimize grammars.\n\
+    \       --no-gropt                  Don't optimize grammars (level 0)\n\
+    \       --set-gropt=NUM             Set grammar optimization level (NUM=0,1 or 2)\n\
     \       --no-lifting                Don't attempt lifting.\n\
     \       --max-lifting=NUM           Set how many times Synduce attempts to lift.\n\
     \    -u --no-check-unrealizable     Do not check if synthesis problems are \

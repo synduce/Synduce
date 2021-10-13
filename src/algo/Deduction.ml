@@ -242,7 +242,29 @@ module Solver = struct
       []
   ;;
 
-  (** "solve" a functional equation.
+  let best_unification (guesses : Skeleton.t option list) : Skeleton.t option =
+    let _ = guesses in
+    None
+  ;;
+
+  let solve_eqn ~unknowns xi pre lhs rhs =
+    let _ = xi, pre, lhs, rhs in
+    let _ = unknowns in
+    None
+  ;;
+
+  let presolve_equations
+      ~(unknowns : VarSet.t)
+      (eqns : (term * term option * term * term) list)
+      (xi : variable)
+      : Skeleton.t option
+    =
+    let f (_, pre, lhs, rhs) = solve_eqn ~unknowns xi pre lhs rhs in
+    let guesses = List.map ~f eqns in
+    best_unification guesses
+  ;;
+
+  (** "solve" a functional equation with lifting.
     Converts the term equation into a functionalization problem with Expressions.
     *)
   let functional_equation

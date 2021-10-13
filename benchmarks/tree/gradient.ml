@@ -1,3 +1,5 @@
+(** @synduce --set-gropt=2 *)
+
 type 'a tree =
   | Leaf of 'a
   | Node of 'a * 'a tree * 'a tree
@@ -12,7 +14,7 @@ and top = function
 ;;
 
 let rec target = function
-  | Leaf a -> [%synt s0]
+  | Leaf a -> [%synt s0] a
   | Node (a, l, r) -> [%synt j0] a (target l) (target r)
 ;;
 

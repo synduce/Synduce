@@ -1,5 +1,6 @@
 open Base
 open Lang.Term
+open Lang.Rewriter
 open Syguslib.Sygus
 
 type grammar_parameters =
@@ -11,42 +12,45 @@ type grammar_parameters =
   ; g_bools : bool
   }
 
-type grammar_guess =
-  | GChoice of grammar_guess list
-  | GBin of Binop.t * grammar_guess * grammar_guess
-  | GUn of Unop.t * grammar_guess
-  | GIte of grammar_guess * grammar_guess * grammar_guess
-  | GType of Lang.RType.t
-  | GNonGuessable
-
-let preamble ret_sort (gguess : grammar_guess) ~(ints : sygus_term) ~(bools : sygus_term) =
+let preamble
+    (grammar_params : grammar_parameters)
+    (ret_sort : sygus_sort)
+    (gguess : Skeleton.t)
+    ~(ints : sygus_term)
+    ~(bools : sygus_term)
+  =
   let rec build_prods gguess =
-    match gguess with
-    | GType t ->
-      (match t with
-      | TInt -> [ ints ]
-      | TBool -> [ bools ]
-      | TParam _ -> [ ints ]
-      | _ -> [])
-    | GUn (u, g) ->
-      let g_prods = build_prods g in
-      List.map g_prods ~f:(fun prod -> SyApp (IdSimple (Unop.to_string u), [ prod ]))
-    | GBin (b, ta, tb) ->
-      let prods_a = build_prods ta
-      and prods_b = build_prods tb in
-      let a_x_b = List.cartesian_product prods_a prods_b in
-      List.map a_x_b ~f:(fun (proda, prodb) ->
-          SyApp (IdSimple (Binop.to_string b), [ proda; prodb ]))
-    | GIte (a, b, c) ->
-      let prods_a = build_prods a
-      and prods_b = build_prods b
-      and prods_c = build_prods c in
-      let a_x_b_x_c =
-        List.cartesian_product prods_a (List.cartesian_product prods_b prods_c)
-      in
-      List.map a_x_b_x_c ~f:(fun (a, (b, c)) -> SyApp (IdSimple "ite", [ a; b; c ]))
-    | GChoice c -> List.concat_map ~f:build_prods c
-    | _ -> []
+    Skeleton.(
+      match gguess with
+      | SType t ->
+        (match t with
+        | TInt -> [ ints ]
+        | TBool -> [ bools ]
+        | TParam _ -> [ ints ]
+        | _ -> [])
+      | SUn (u, g) ->
+        let g_prods = build_prods g in
+        List.map g_prods ~f:(fun prod -> SyApp (IdSimple (Unop.to_string u), [ prod ]))
+      | SBin (b, ta, tb) ->
+        let prods_a = build_prods ta
+        and prods_b = build_prods tb in
+        let a_x_b = List.cartesian_product prods_a prods_b in
+        List.map a_x_b ~f:(fun (proda, prodb) ->
+            SyApp (IdSimple (Binop.to_string b), [ proda; prodb ]))
+      | SIte (a, b, c) ->
+        let prods_a = build_prods a
+        and prods_b = build_prods b
+        and prods_c = build_prods c in
+        let a_x_b_x_c =
+          List.cartesian_product prods_a (List.cartesian_product prods_b prods_c)
+        in
+        List.map a_x_b_x_c ~f:(fun (a, (b, c)) -> SyApp (IdSimple "ite", [ a; b; c ]))
+      | SChoice c -> List.concat_map ~f:build_prods c
+      | SArg arg_num ->
+        (match List.nth grammar_params.g_locals arg_num with
+        | Some (arg_term, _) -> [ arg_term ]
+        | None -> [])
+      | SNonGuessable -> [])
   in
   match build_prods gguess with
   | [] -> []
@@ -152,7 +156,7 @@ let int_parametric ?(guess = None) (params : grammar_parameters) =
   in
   match guess with
   | None -> main_grammar
-  | Some gguess -> preamble int_sort ~ints:ix ~bools:ipred gguess @ main_grammar
+  | Some gguess -> preamble params int_sort ~ints:ix ~bools:ipred gguess @ main_grammar
 ;;
 
 let bool_parametric
@@ -239,7 +243,7 @@ let bool_parametric
   let main_grammar = if has_ints then bool_section @ int_section else bool_section in
   match guess with
   | None -> main_grammar
-  | Some gguess -> preamble bool_sort ~ints:ix ~bools:ipred gguess @ main_grammar
+  | Some gguess -> preamble params bool_sort ~ints:ix ~bools:ipred gguess @ main_grammar
 ;;
 
 let tuple_grammar_constr (params : grammar_parameters) (sorts : sygus_sort list) =
@@ -322,21 +326,22 @@ let make_basic_guess (eqns : (term * term option * term * term) list) (xi : vari
   let guesses =
     let f lhs =
       let t = lhs.ttyp in
-      match lhs.tkind with
-      | TBin (op, _, _) ->
-        Some
-          (match
-             List.map
-               ~f:(fun (ta, tb) -> GBin (op, GType ta, GType tb))
-               (Binop.operand_types op)
-           with
-          | [ a ] -> a
-          | _ as l -> GChoice l)
-      | TUn (op, _) -> Some (GUn (op, GType (Unop.operand_type op)))
-      | TIte (_, _, _) -> Some (GIte (GType Lang.RType.TBool, GType t, GType t))
-      | TConst _ -> None
-      | TVar _ -> None
-      | _ -> Some GNonGuessable
+      Skeleton.(
+        match lhs.tkind with
+        | TBin (op, _, _) ->
+          Some
+            (match
+               List.map
+                 ~f:(fun (ta, tb) -> SBin (op, SType ta, SType tb))
+                 (Binop.operand_types op)
+             with
+            | [ a ] -> a
+            | _ as l -> SChoice l)
+        | TUn (op, _) -> Some (SUn (op, SType (Unop.operand_type op)))
+        | TIte (_, _, _) -> Some (SIte (SType Lang.RType.TBool, SType t, SType t))
+        | TConst _ -> None
+        | TVar _ -> None
+        | _ -> Some SNonGuessable)
     in
     List.filter_map ~f lhs_of_xi
   in
@@ -346,20 +351,24 @@ let make_basic_guess (eqns : (term * term option * term * term) list) (xi : vari
 ;;
 
 let make_unification_guess
+    ~(unknowns : VarSet.t)
     (eqns : (term * term option * term * term) list)
     (xi : variable)
   =
-  make_basic_guess eqns xi
+  Option.first_some
+    (Deduction.Solver.presolve_equations ~unknowns eqns xi)
+    (make_basic_guess eqns xi)
 ;;
 
 let make_guess
     ?(level = 1)
+    ~(unknowns : VarSet.t)
     (eqns : (term * term option * term * term) list)
     (xi : variable)
   =
   match level with
   | 0 -> None
   | 1 -> make_basic_guess eqns xi
-  | 2 -> make_unification_guess eqns xi
+  | 2 -> make_unification_guess ~unknowns eqns xi
   | _ -> None
 ;;

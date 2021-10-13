@@ -640,6 +640,19 @@ module Expression = struct
   ;;
 end
 
+module Skeleton = struct
+  (** A type to represent a grammar guess.  *)
+  type t =
+    | SChoice of t list (** A choice of possible guesses. *)
+    | SBin of Binop.t * t * t (** A binary expression.  *)
+    | SUn of Unop.t * t (** A unary expression.  *)
+    | SIte of t * t * t (** An if-then-else.  *)
+    | SType of RType.t
+        (** A guess of some type (to be filled with the appropriate non-terminal.  *)
+    | SArg of int (** A direct reference to a function argument.  *)
+    | SNonGuessable
+end
+
 open Expression
 
 let collect_common_factors (op : Operator.t) (args : t list)

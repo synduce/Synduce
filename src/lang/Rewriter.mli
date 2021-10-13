@@ -107,6 +107,17 @@ module Expression : sig
   val get_ty_const : RType.t -> t
 end
 
+module Skeleton : sig
+  type t =
+    | SChoice of t list
+    | SBin of Term.Binop.t * t * t
+    | SUn of Term.Unop.t * t
+    | SIte of t * t * t
+    | SType of RType.t
+    | SArg of int
+    | SNonGuessable
+end
+
 val factorize : Expression.t -> Expression.t
 val distrib : Term.Operator.t -> Expression.t list -> Expression.t
 val expand : Expression.t -> Expression.t

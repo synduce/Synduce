@@ -541,6 +541,7 @@ module Solve = struct
       let args, ret_sort = xi_formals xi in
       let guess =
         Grammars.make_guess
+          ~unknowns
           ~level:!Config.optimize_grammars
           (List.map ~f:(fun eqn -> eqn.eterm, eqn.eprecond, eqn.elhs, eqn.erhs) eqns)
           xi
