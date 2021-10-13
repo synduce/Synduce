@@ -50,6 +50,9 @@ let preamble
         (match List.nth grammar_params.g_locals arg_num with
         | Some (arg_term, _) -> [ arg_term ]
         | None -> [])
+      | STuple elts ->
+        let prods = Utils.cartesian_nary_product (List.map ~f:build_prods elts) in
+        List.map ~f:(fun tuple_args -> SyApp (IdSimple "mkTuple", tuple_args)) prods
       | SNonGuessable -> [])
   in
   match build_prods gguess with

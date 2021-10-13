@@ -238,7 +238,7 @@ let simplify_eqns = ref true
 (**
   Use the equations as a indicator to optimize grammars, without compromising soundness.
 *)
-let optimize_grammars = ref 1
+let optimize_grammars = ref 2
 
 let set_grammar_optimization_level (s : string) : unit =
   try

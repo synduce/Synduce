@@ -371,14 +371,13 @@ let deduce_lifting_expressions
       |> List.unzip
     in
     let boxvar_to_linput = List.filter_opt boxvar_to_linput in
-    let rec as_unknown_app t =
-      match t.tkind with
-      | TApp (f, [ arg ]) when is_proj_function p f -> as_unknown_app arg
-      | TApp ({ tkind = TVar f; _ }, args) ->
-        if Set.mem p.psi_target.psyntobjs f then Some args else None
-      | _ -> None
-    in
-    match rhs |> substitution subs |> as_unknown_app with
+    match
+      rhs
+      |> substitution subs
+      |> Deduction.as_unknown_app
+           ~match_functions:(is_proj_function p)
+           ~unknowns:p.psi_target.psyntobjs
+    with
     | Some rhs_args ->
       let var_to_lifting_expr, maybe_leftover_expr =
         let f (x, (_, t)) =

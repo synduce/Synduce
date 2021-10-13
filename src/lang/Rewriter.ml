@@ -194,12 +194,17 @@ module Expression = struct
     i
   ;;
 
+  type boxkind =
+    | Indexed of int
+    | Typed of RType.t
+    | Position of int
+
   type t =
     | ETrue
     | EFalse
     | EInt of int
     | EVar of int
-    | EBox of int
+    | EBox of boxkind
     | ETup of t list
     | EIte of t * t * t
     | EData of string * t list
@@ -227,7 +232,11 @@ module Expression = struct
       | EFalse -> pf f "#f"
       | EInt i -> pf f "%i" i
       | EVar i -> pp_ivar f i
-      | EBox i -> pf f ":%a" (styled `Faint int) i
+      | EBox kind ->
+        (match kind with
+        | Indexed i -> pf f ":%a" (styled `Faint int) i
+        | Typed t -> pf f ":%a" (styled `Faint RType.pp) t
+        | Position i -> pf f "@%a" (styled `Faint int) i)
       | ETup tl -> pf f "@[(%a)@]" (list ~sep:comma pp) tl
       | EIte (a, b, c) ->
         pf
@@ -357,7 +366,13 @@ module Expression = struct
       | EFalse, EFalse | ETrue, ETrue -> 0
       | EFalse, ETrue -> -1
       | ETrue, EFalse -> 1
-      | EInt a, EInt b | EBox a, EBox b | EVar a, EVar b -> compare a b
+      | EInt a, EInt b | EVar a, EVar b -> compare a b
+      | EBox a, EBox b ->
+        (match a, b with
+        | Position i, Position j -> compare i j
+        | Indexed i, Indexed j -> compare i j
+        | Typed t, Typed t' -> if RType.t_equals t t' then 0 else Poly.compare t t'
+        | _, _ -> Poly.compare a b)
       | EIte (c, a, b), EIte (c', a', b') -> List.compare aux [ c; a; b ] [ c'; a'; b' ]
       | EData (c, args), EData (c', args') ->
         let z = String.compare c c' in
@@ -455,9 +470,12 @@ module Expression = struct
       | EVar i ->
         let%map v = get_var i in
         mk_var v
-      | EBox i ->
-        let%map v = get_var i in
-        mk_var v
+      | EBox kind ->
+        (match kind with
+        | Indexed i ->
+          let%map v = get_var i in
+          mk_var v
+        | _ -> None)
       | ETup tl -> Option.map ~f:mk_tup (Option.all (List.map ~f tl))
       | EIte (c, tt, tf) ->
         let%map c' = f c
@@ -638,6 +656,15 @@ module Expression = struct
       | TBool -> mk_e_true
       | _ -> mk_e_int 0)
   ;;
+
+  let uses_boxkind (b : boxkind) =
+    let case _ e =
+      match e with
+      | EBox b' -> Some (Poly.equal b b')
+      | _ -> None
+    in
+    reduce ~join:( || ) ~case ~init:false
+  ;;
 end
 
 module Skeleton = struct
@@ -650,7 +677,46 @@ module Skeleton = struct
     | SType of RType.t
         (** A guess of some type (to be filled with the appropriate non-terminal.  *)
     | SArg of int (** A direct reference to a function argument.  *)
+    | STuple of t list
     | SNonGuessable
+
+  let rec of_expression : Expression.t -> t option =
+    let open Option.Let_syntax in
+    function
+    | EFalse | ETrue -> Some (SType RType.TBool)
+    | EInt _ -> Some (SType RType.TInt)
+    | EVar v ->
+      Option.(Expression.get_var v >>= Variable.vtype >>= fun t -> Some (SType t))
+    | EBox boxkind ->
+      (match boxkind with
+      | Expression.Position i -> Some (SArg i)
+      | _ -> None)
+    | ETup tl ->
+      let%map tl = all_or_none (List.map ~f:of_expression tl) in
+      STuple tl
+    | EIte (a, b, c) ->
+      let%bind a = of_expression a in
+      let%bind b = of_expression b in
+      let%map c = of_expression c in
+      SIte (a, b, c)
+    | EData _ -> None
+    | EOp (op, args) ->
+      (match op with
+      | Unary uop ->
+        (match args with
+        | [ arg ] ->
+          let%map arg = of_expression arg in
+          SUn (uop, arg)
+        | _ -> None)
+      | Binary bop ->
+        (match args with
+        | arg1 :: arg2 :: tl ->
+          let%bind arg1 = of_expression arg1 in
+          let%map arg2 = of_expression (EOp (Binary bop, arg2 :: tl)) in
+          SBin (bop, arg1, arg2)
+        | [ arg ] -> of_expression arg
+        | [] -> None))
+  ;;
 end
 
 open Expression
@@ -811,8 +877,24 @@ let rewrite_with_lemma (lemma : t) : t -> t list =
   apply_dyn_rule
 ;;
 
+let match_core (bid : boxkind) (sube : t) : t -> t =
+  let transformer _ e0 =
+    if equal sube e0
+    then Some (EBox bid)
+    else (
+      match e0, sube with
+      | EOp (op, args), EOp (subop, subargs) when Operator.equal op subop ->
+        let subargs', rest = List.partition_tf ~f:(List.mem ~equal subargs) args in
+        if List.length subargs' = List.length subargs
+        then Some (mk_e_assoc op (EBox bid :: rest))
+        else None
+      | _ -> None)
+  in
+  transform transformer
+;;
+
 (** Matching subexpressions (up to rewriting) *)
-let match_after_expand ?(lemma = None) (sube : t) ~(of_ : t) : (int * t) option =
+let match_after_expand ?(lemma = None) (bid : boxkind) (sube : t) ~(of_ : t) : t option =
   (* Expand expressions. *)
   let of_ = expand of_
   and sube = expand sube in
@@ -827,79 +909,21 @@ let match_after_expand ?(lemma = None) (sube : t) ~(of_ : t) : (int * t) option 
     in
     List.remove_consecutive_duplicates ~equal choices_from_lemma_r
   in
-  let bids = Hashtbl.create (module Int) in
-  let transformer ~i _ e0 =
-    if equal sube e0
-    then (
-      match Hashtbl.find bids i with
-      | Some bid -> Some (EBox bid)
-      | None ->
-        let bid = new_box_id () in
-        Hashtbl.set bids ~key:i ~data:bid;
-        Some (EBox bid))
-    else (
-      match e0, sube with
-      | EOp (op, args), EOp (subop, subargs) when Operator.equal op subop ->
-        let subargs', rest = List.partition_tf ~f:(List.mem ~equal subargs) args in
-        if List.length subargs' = List.length subargs
-        then (
-          match Hashtbl.find bids i with
-          | Some bid -> Some (mk_e_assoc op (EBox bid :: rest))
-          | None ->
-            let bid = new_box_id () in
-            Hashtbl.set bids ~key:i ~data:bid;
-            Some (mk_e_assoc op (EBox bid :: rest)))
-        else None
-      | _ -> None)
-  in
-  let e_choices = List.mapi ~f:(fun i x -> transform (transformer ~i) x) of_choices in
-  let results =
-    List.mapi e_choices ~f:(fun i ec ->
-        match Hashtbl.find bids i with
-        | Some id -> Some (id, ec)
-        | None -> None)
-  in
-  match List.filter_opt results with
+  let e_choices = List.map ~f:(match_core bid sube) of_choices in
+  match List.filter ~f:(uses_boxkind bid) e_choices with
   | hd :: _ -> Some hd
   | _ -> None
 ;;
 
-let match_after_factorization (sube : t) ~(of_ : t) : (int * t) option =
+let match_after_factorization (bid : boxkind) (sube : t) ~(of_ : t) : t option =
   let sube = factorize sube in
   let of_ = factorize of_ in
-  let bids = Hashtbl.create (module Int) in
-  let transformer ~i _ e0 =
-    if equal sube e0
-    then (
-      match Hashtbl.find bids i with
-      | Some bid -> Some (EBox bid)
-      | None ->
-        let bid = new_box_id () in
-        Hashtbl.set bids ~key:i ~data:bid;
-        Some (EBox bid))
-    else (
-      match e0, sube with
-      | EOp (op, args), EOp (subop, subargs) when Operator.equal op subop ->
-        let subargs', rest = List.partition_tf ~f:(List.mem ~equal subargs) args in
-        if List.length subargs' = List.length subargs
-        then (
-          match Hashtbl.find bids i with
-          | Some bid -> Some (mk_e_assoc op (EBox bid :: rest))
-          | None ->
-            let bid = new_box_id () in
-            Hashtbl.set bids ~key:i ~data:bid;
-            Some (mk_e_assoc op (EBox bid :: rest)))
-        else None
-      | _ -> None)
-  in
-  let res = transform (transformer ~i:(-1)) of_ in
-  match Hashtbl.find bids (-1) with
-  | Some id -> Some (id, res)
-  | None -> None
+  let res = match_core bid sube of_ in
+  if uses_boxkind bid res then Some res else None
 ;;
 
-let match_as_subexpr ?(lemma = None) (sube : t) ~(of_ : t) : (int * t) option =
-  match match_after_expand ~lemma sube ~of_ with
+let match_as_subexpr ?(lemma = None) (bid : boxkind) (sube : t) ~(of_ : t) : t option =
+  match match_after_expand ~lemma bid sube ~of_ with
   | Some hd -> Some hd
-  | None -> match_after_factorization sube ~of_
+  | None -> match_after_factorization bid sube ~of_
 ;;

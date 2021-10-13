@@ -5,6 +5,20 @@ open Lang.Rewriter
 open Utils
 open Fmt
 
+let as_unknown_app ?(match_functions = fun _ -> false) ~unknowns t : term list option =
+  let rec aux t =
+    match t.tkind with
+    | TApp (f, [ arg ]) when match_functions f -> aux arg
+    | TApp ({ tkind = TVar f; _ }, args) -> if Set.mem unknowns f then Some args else None
+    | _ -> None
+  in
+  aux t
+;;
+
+(* ============================================================================================= *)
+(*                           BOXING / UNBOXING                                                   *)
+(* ============================================================================================= *)
+
 let contains_ebox (e : Expression.t) : bool =
   Expression.(
     reduce
@@ -39,14 +53,16 @@ let assign_match_box ((bid, bargs) : int * IS.t) ~(of_ : Expression.t)
   let case _ e0 =
     (* Case 1 : the expression is immediately "boxable" *)
     if is_boxable_expr (bid, bargs) e0
-    then box_it e0 (EBox bid)
+    then box_it e0 (EBox (Indexed bid))
     else (
       (* Case 2: some subexpression in an EOp are "boxable". *)
       match e0 with
       | EOp (op, args) ->
         (match List.partition_tf ~f:(is_boxable_expr (bid, bargs)) args with
         | b1 :: bs, u1 :: us when is_commutative op ->
-          box_it (mk_e_assoc op (b1 :: bs)) (mk_e_assoc op (EBox bid :: u1 :: us))
+          box_it
+            (mk_e_assoc op (b1 :: bs))
+            (mk_e_assoc op (EBox (Indexed bid) :: u1 :: us))
         | _, [] -> None (*This case should have been detected in 1. *)
         | _ -> None)
       | _ -> None)
@@ -64,16 +80,17 @@ module Solver = struct
     { expression : Expression.t
     ; free_boxes : (int * IS.t) list
     ; full_boxes : (int * Expression.t) list
-    ; free_bound_exprs : Expression.t list
-    ; queue : Expression.t list
+    ; free_bound_exprs : (int * Expression.t) list
+    ; queue : (int * Expression.t) list
     }
 
   let deduction_loop
+      ?(verb = true)
       ~(lemma : Expression.t option)
       (box_args : (int * IS.t) list)
-      (bound_args : Expression.t list)
+      (bound_args : (int * Expression.t) list)
       (expr : Expression.t)
-      : ( (int * Expression.t) list
+      : ( (int * Expression.t) list * Expression.t
       , (* Return assignment from box id to expression. *)
         deduction_loop_state )
       (* Error returns information where the loop stopped. *)
@@ -88,69 +105,84 @@ module Solver = struct
         (* The expression is a function of the bound arguments.
            If there are unassigned boxes left, assign a constant.
         *)
-        Ok state.full_boxes
+        Ok (state.full_boxes, state.expression)
       else (
         (* First try to remove subexpressions that match arguments of the equation. *)
         match state.free_bound_exprs with
-        | hd :: tl ->
+        | (arg_id, arg_expr) :: tl ->
           (* There are some arguments to match. Try using the head first.  *)
-          let hd = Expression.simplify hd in
-          Log.verbose
-            (Log.wrap2
-               "@[~ ~ Try to %a %a.@]"
-               (styled (`Bg `Magenta) string)
-               "match"
-               Expression.pp
-               hd);
-          (match match_as_subexpr ~lemma hd ~of_:state.expression with
-          | Some (id, res') ->
+          let arg_expr = Expression.simplify arg_expr in
+          if verb
+          then
+            Log.verbose
+              (Log.wrap2
+                 "@[~ ~ Try to %a %a.@]"
+                 (styled (`Bg `Magenta) string)
+                 "match"
+                 Expression.pp
+                 arg_expr);
+          (match
+             match_as_subexpr ~lemma (Position arg_id) arg_expr ~of_:state.expression
+           with
+          | Some res' ->
             (* Some match; Discard the argument and box the subexpression.  *)
-            Log.verbose (fun fmt () ->
-                pf
-                  fmt
-                  "@[~ ~ ✅  λ.%a.%a@;%a =@;%a@]"
-                  Expression.pp
-                  (Expression.EBox id)
-                  (box Expression.pp)
-                  res'
-                  (box Expression.pp)
-                  hd
-                  (box Expression.pp)
-                  state.expression);
+            if verb
+            then
+              Log.verbose (fun fmt () ->
+                  pf
+                    fmt
+                    "@[~ ~ ✅  λ.%a.%a@;%a =@;%a@]"
+                    Expression.pp
+                    (Expression.EBox (Position arg_id))
+                    (box Expression.pp)
+                    res'
+                    (box Expression.pp)
+                    arg_expr
+                    (box Expression.pp)
+                    state.expression);
             floop i' { state with expression = res'; free_bound_exprs = tl }
           (* No match; keep the argument but queue it. It might match after rewriting steps.  *)
           | None ->
             Log.verbose_msg "~ ~ ~ ❌";
-            floop i' { state with free_bound_exprs = tl; queue = state.queue @ [ hd ] })
+            floop
+              i'
+              { state with
+                free_bound_exprs = tl
+              ; queue = state.queue @ [ arg_id, arg_expr ]
+              })
         | [] ->
           (* If there are no arguments in the queue, we start using free boxes.  *)
           (match state.free_boxes with
           | hd :: tl ->
-            Log.verbose (fun fmt () ->
-                pf
-                  fmt
-                  "@[~ ~ Try to %a %a.@]@."
-                  (styled (`Bg `Cyan) string)
-                  "assign"
-                  (pair ~sep:comma Expression.pp_ivar Expression.pp_ivarset)
-                  hd);
+            if verb
+            then
+              Log.verbose (fun fmt () ->
+                  pf
+                    fmt
+                    "@[~ ~ Try to %a %a.@]@."
+                    (styled (`Bg `Cyan) string)
+                    "assign"
+                    (pair ~sep:comma Expression.pp_ivar Expression.pp_ivarset)
+                    hd);
             (match assign_match_box hd ~of_:state.expression with
             | Some (res', (hd_id, hd_e)) ->
               (* Some subexpression has the same free variables as the free box. Box it,
               a bind the box to that subexpression.
              *)
-              Log.verbose (fun fmt () ->
-                  pf
-                    fmt
-                    "@[~ ~ ✅ λ%a.%a@;%a=@;%a@]"
-                    (box Expression.pp)
-                    (Expression.EBox hd_id)
-                    (box Expression.pp)
-                    res'
-                    (box Expression.pp)
-                    hd_e
-                    (box Expression.pp)
-                    state.expression);
+              if verb
+              then
+                Log.verbose (fun fmt () ->
+                    pf
+                      fmt
+                      "@[~ ~ ✅ λ%a.%a@;%a=@;%a@]"
+                      (box Expression.pp)
+                      (Expression.EBox (Indexed hd_id))
+                      (box Expression.pp)
+                      res'
+                      (box Expression.pp)
+                      hd_e
+                      (box Expression.pp)
+                      state.expression);
               floop
                 i'
                 { expression = res'
@@ -161,7 +193,7 @@ module Solver = struct
                 }
             | None ->
               (* No match; there's a good change this problem has no solution, but try again with arguments.  *)
-              Log.verbose_msg "~ ~ ~ ❌@.";
+              if verb then Log.verbose_msg "~ ~ ~ ❌@.";
               floop
                 i'
                 { state with
@@ -184,21 +216,30 @@ module Solver = struct
       }
   ;;
 
+  (**
+    [functionalize ~args ~lemma res boxes] extracts the function that computes res given
+    the arguments args and using boxes to capture any remaining expressions.
+  *)
   let functionalize
+      ?(verb = true)
       ~(args : Expression.t list)
       ~(lemma : Expression.t option)
       (res : Expression.t)
       (boxes : (int * IS.t) list)
-      : ((int * Expression.t) list, (int * Expression.t) list * Expression.t) Result.t
+      : ( (int * Expression.t) list * Expression.t
+      , (int * Expression.t) list * Expression.t ) Result.t
     =
-    Log.verbose
-      Fmt.(
-        Log.wrap2
-          "@[=== Solve Func. Equation:@;@[<h 2>@[F %a@] =@;@[%a@]@]@]"
-          (list ~sep:sp (parens Expression.pp))
-          args
-          Expression.pp
-          res);
+    (* Print the equation to be solved. *)
+    if verb
+    then
+      Log.verbose
+        Fmt.(
+          Log.wrap2
+            "@[=== Solve Func. Equation:@;@[<h 2>@[F %a@] =@;@[%a@]@]@]"
+            (list ~sep:sp (parens Expression.pp))
+            args
+            Expression.pp
+            res);
     let box_ids = IS.of_list (fst (List.unzip boxes)) in
     let box_args, bound_args =
       List.partition_map args ~f:(function
@@ -208,19 +249,28 @@ module Solver = struct
             | None -> Either.Second (Expression.mk_e_var vid))
           | _ as e -> Either.Second e)
     in
-    Log.verbose
-      (Log.wrap1
-         "~ @[Box args: %a@]"
-         (list ~sep:comma (parens (pair ~sep:sp int IS.pp)))
-         box_args);
-    Log.verbose
-      (Log.wrap1 "~ @[Bound args: %a@]" (list ~sep:comma Expression.pp) bound_args);
+    (* Print summary of arguments of the function. *)
+    if verb
+    then (
+      Log.verbose
+        (Log.wrap1
+           "~ @[Box args: %a@]"
+           (list ~sep:comma (parens (pair ~sep:sp int IS.pp)))
+           box_args);
+      Log.verbose
+        (Log.wrap1 "~ @[Bound args: %a@]" (list ~sep:comma Expression.pp) bound_args));
+    (* Start solving with a call to deduction_loop *)
     match
       deduction_loop
+        ~verb
         ~lemma
         box_args
         (* Match large expressions first. *)
-        (List.rev (List.sort ~compare:Expression.expr_size_compare bound_args))
+        (List.rev
+           (List.sort
+              ~compare:(fun (_, x) (_, x') -> Expression.expr_size_compare x x')
+              (index_list bound_args)))
+        (* The target to functionalize. *)
         res
     with
     | Ok x -> Ok x
@@ -243,14 +293,48 @@ module Solver = struct
   ;;
 
   let best_unification (guesses : Skeleton.t option list) : Skeleton.t option =
-    let _ = guesses in
-    None
+    match guesses with
+    | [ Some x ] -> Some x
+    | _ -> None
   ;;
 
   let solve_eqn ~unknowns xi pre lhs rhs =
-    let _ = xi, pre, lhs, rhs in
-    let _ = unknowns in
-    None
+    let open Option.Let_syntax in
+    let%bind lhs_expr = Expression.of_term lhs in
+    let pre_expr = Option.bind ~f:Expression.of_term pre in
+    let%bind args =
+      let flatten_args args =
+        List.concat_map
+          ~f:(fun t ->
+            match t.tkind with
+            | TTup tl -> tl
+            | _ -> [ t ])
+          args
+      in
+      Option.bind
+        ~f:(fun l -> all_or_none (List.map ~f:Expression.of_term (flatten_args l)))
+        (as_unknown_app ~unknowns rhs)
+    in
+    Log.verbose
+      Fmt.(
+        fun fmt () ->
+          pf
+            fmt
+            "Deduction: @;@[%a =>@;@[%s(%a)@] =@;@[%a@]"
+            (option Expression.pp)
+            pre_expr
+            xi.vname
+            (list ~sep:comma Expression.pp)
+            args
+            Expression.pp
+            lhs_expr);
+    match functionalize ~verb:false ~args ~lemma:pre_expr lhs_expr [] with
+    | Ok (_, r) ->
+      Log.verbose Fmt.(fun fmt () -> pf fmt "Solution =@;%a" (box Expression.pp) r);
+      Skeleton.of_expression r
+    | Error _ ->
+      Log.verbose Fmt.(fun fmt () -> pf fmt "No solution");
+      None
   ;;
 
   let presolve_equations
@@ -296,7 +380,7 @@ module Solver = struct
       match expr_args_o, expr_res_o with
       | Some args, Some expr_res ->
         (match functionalize ~lemma ~args expr_res ided_boxes with
-        | Ok l -> resolve_box_bindings l, None
+        | Ok (l, _) -> resolve_box_bindings l, None
         | Error (l, e_leftover) ->
           Log.error
             Fmt.(

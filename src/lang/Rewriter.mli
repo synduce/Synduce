@@ -41,12 +41,17 @@ module Expression : sig
   val box_id : int ref
   val new_box_id : unit -> int
 
+  type boxkind =
+    | Indexed of int
+    | Typed of RType.t
+    | Position of int
+
   type t =
     | ETrue
     | EFalse
     | EInt of int
     | EVar of int
-    | EBox of int
+    | EBox of boxkind
     | ETup of t list
     | EIte of t * t * t
     | EData of string * t list
@@ -115,7 +120,10 @@ module Skeleton : sig
     | SIte of t * t * t
     | SType of RType.t
     | SArg of int
+    | STuple of t list
     | SNonGuessable
+
+  val of_expression : Expression.t -> t option
 end
 
 val factorize : Expression.t -> Expression.t
@@ -125,6 +133,7 @@ val rewrite_with_lemma : Expression.t -> Expression.t -> Expression.t list
 
 val match_as_subexpr
   :  ?lemma:Expression.t option
+  -> Expression.boxkind
   -> Expression.t
   -> of_:Expression.t
-  -> (int * Expression.t) option
+  -> Expression.t option

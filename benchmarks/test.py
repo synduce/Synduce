@@ -237,7 +237,7 @@ lifting_benchmarks = [
     ["combine/mts_and_mps_nosum.ml", ""],
     # Switching tree traversals
     ["tree/mits_nosum.ml", ""],
-    # ["tree/gradient.ml", ""], # lifting works, but cvc4 takes too long on a simple problem
+    ["tree/gradient.ml", ""]
 ]
 
 
@@ -311,19 +311,34 @@ def run_benchmarks(input_files, algos, optims, raw_output=None, exit_err=False):
                 process = subprocess.Popen(
                     command, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
                 buf = ""
-                i = 1
+                minor_step_count = 1
+                prev_major_step = 1
                 # Poll process for new output until finished
                 while True:
                     nextline = process.stdout.readline()
                     if process.poll() is not None:
                         break
-                    print(
-                        f"{progress : >11s}./Synduce benchmarks/{filename} {extra_opt} {algo[1]} {optim[1]} 🏃 at step {i}", end="\r")
-                    i += 1
                     sys.stdout.flush()
                     line = nextline.decode('utf-8')
-                    buf += line
-                    if raw_output is not None:
+                    # Decode the line information
+                    stats = line.split(",")
+                    if len(stats) >= 3:
+                        try:
+                            major_step_count = int(stats[0])
+                        except:
+                            major_step_count = None
+                    is_result_line = (line == "success") or (
+                        (major_step_count is not None) and (major_step_count > 0))
+                    if is_result_line:
+                        if major_step_count > prev_major_step:
+                            minor_step_count = 1
+                        else:
+                            minor_step_count += 1
+                        prev_major_step = major_step_count
+                        print(
+                            f"{progress : >11s}./Synduce benchmarks/{filename} {extra_opt} {algo[1]} {optim[1]} 🏃 at step {major_step_count}:{minor_step_count}", end="\r")
+                        buf += line
+                    if raw_output is not None and is_result_line:
                         raw_output.write(line)
 
                 print("", end="\r")

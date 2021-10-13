@@ -46,6 +46,7 @@ let satom a = Sexp.Atom a
 let slist a = Sexp.List a
 let blast x = Result.map_error ~f:List.concat (Result.combine_errors x)
 let pair a b = a, b
+let index_list = List.mapi ~f:pair
 
 (* ============================================================================================= *)
 (*                  PRETTY PRINTING HELPERS                                                      *)
