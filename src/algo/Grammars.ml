@@ -30,7 +30,10 @@ let preamble
         | _ -> [])
       | SUn (u, g) ->
         let g_prods = build_prods g in
-        List.map g_prods ~f:(fun prod -> SyApp (IdSimple (Unop.to_string u), [ prod ]))
+        List.map g_prods ~f:(fun prod ->
+            match u with
+            | Unop.Inv -> SyApp (IdSimple "div", [ SyLit (LitNum 1); prod ])
+            | _ -> SyApp (IdSimple (Unop.to_string u), [ prod ]))
       | SBin (b, ta, tb) ->
         let prods_a = build_prods ta
         and prods_b = build_prods tb in

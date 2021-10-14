@@ -15,6 +15,20 @@ let as_unknown_app ?(match_functions = fun _ -> false) ~unknowns t : term list o
   aux t
 ;;
 
+let gather_args ~(unknowns : VarSet.t) (t : Term.term) : Expression.t list option =
+  let flatten_args args =
+    List.concat_map
+      ~f:(fun t ->
+        match t.tkind with
+        | TTup tl -> tl
+        | _ -> [ t ])
+      args
+  in
+  Option.bind
+    ~f:(fun l -> all_or_none (List.map ~f:Expression.of_term (flatten_args l)))
+    (as_unknown_app ~unknowns t)
+;;
+
 (* ============================================================================================= *)
 (*                           BOXING / UNBOXING                                                   *)
 (* ============================================================================================= *)
@@ -143,7 +157,7 @@ module Solver = struct
             floop i' { state with expression = res'; free_bound_exprs = tl }
           (* No match; keep the argument but queue it. It might match after rewriting steps.  *)
           | None ->
-            Log.verbose_msg "~ ~ ~ ❌";
+            if verb then Log.verbose_msg "~ ~ ~ ❌";
             floop
               i'
               { state with
@@ -268,7 +282,7 @@ module Solver = struct
         (* Match large expressions first. *)
         (List.rev
            (List.sort
-              ~compare:(fun (_, x) (_, x') -> Expression.expr_size_compare x x')
+              ~compare:(fun (_, x) (_, x') -> Expression.size_compare x x')
               (index_list bound_args)))
         (* The target to functionalize. *)
         res
@@ -292,29 +306,103 @@ module Solver = struct
       []
   ;;
 
-  let best_unification (guesses : Skeleton.t option list) : Skeleton.t option =
-    match guesses with
-    | [ Some x ] -> Some x
-    | _ -> None
+  (** Treat the guess expression as a function that needs to be applied to the arguments
+    gathered from applying the same arg-collecting procedure a in the other deduction
+    solving functions.
+    *)
+  let guess_application ~(unknowns : VarSet.t) (guess : Expression.t) (rhs : term)
+      : term option
+    =
+    let maybe_args = gather_args ~unknowns rhs in
+    Option.bind ~f:(fun args -> Expression.(apply guess args |> to_term)) maybe_args
   ;;
 
-  let solve_eqn ~unknowns xi pre lhs rhs =
+  let best_unification
+      ~(unknowns : VarSet.t)
+      (eqns : (term * term option * term * term) list)
+      (guesses : Expression.t option list)
+      : Skeleton.t option
+    =
+    let validate_via_solver guess =
+      let open SmtInterface in
+      let equations_to_check =
+        let eqns' =
+          List.map eqns ~f:(fun (_, pre, lhs, rhs) ->
+              Option.map (guess_application ~unknowns guess rhs) ~f:(fun rhs' ->
+                  let constr = mk_bin Binop.Eq lhs rhs' in
+                  pre, mk_un Unop.Not constr))
+        in
+        match all_or_none eqns' with
+        | Some eqns'' -> eqns''
+        | None -> failwith "UNSAT"
+      in
+      let solver = SyncSmt.make_z3_solver () in
+      let () =
+        SyncSmt.exec_all
+          solver
+          (Commands.mk_preamble
+             ~logic:(SmtLogic.infer_logic (List.map ~f:snd equations_to_check))
+             ())
+      in
+      List.fold_until
+        ~init:0
+        equations_to_check
+        ~f:(fun _ (pre, constr) ->
+          SyncSmt.spush solver;
+          let fv = Analysis.free_variables constr in
+          SyncSmt.exec_all solver (Commands.decls_of_vars fv);
+          (match pre with
+          | Some precond -> SyncSmt.smt_assert solver (smt_of_term precond)
+          | None -> ());
+          SyncSmt.smt_assert solver (smt_of_term constr);
+          match SyncSmt.check_sat solver with
+          | Unsat ->
+            SyncSmt.spop solver;
+            Continue 0
+          | _ ->
+            SyncSmt.close_solver solver;
+            Stop None)
+        ~finish:(fun _ -> Some guess)
+    in
+    let validate_guess guess =
+      if List.for_all guesses ~f:(function
+             | Some x' -> Poly.equal guess x'
+             | _ -> false)
+      then Some guess
+      else (
+        try validate_via_solver guess with
+        | _ -> None)
+    in
+    let guess_1 =
+      let ok_guesses =
+        let filter guess =
+          match guess with
+          (* Arbitrary cutoff for guess size *)
+          | Some g -> if Expression.size g > 15 then None else Some g
+          | None -> None
+        in
+        List.rev
+          (List.sort ~compare:Expression.compare (List.filter_map ~f:filter guesses))
+      in
+      match ok_guesses with
+      | hd :: _ -> Some hd
+      | _ -> None
+    in
+    Option.(guess_1 >>= validate_guess >>= Skeleton.of_expression)
+  ;;
+
+  let solve_eqn
+      ~(unknowns : VarSet.t)
+      (xi : variable)
+      (pre : term option)
+      (lhs : term)
+      (rhs : term)
+      : Expression.t option
+    =
     let open Option.Let_syntax in
     let%bind lhs_expr = Expression.of_term lhs in
     let pre_expr = Option.bind ~f:Expression.of_term pre in
-    let%bind args =
-      let flatten_args args =
-        List.concat_map
-          ~f:(fun t ->
-            match t.tkind with
-            | TTup tl -> tl
-            | _ -> [ t ])
-          args
-      in
-      Option.bind
-        ~f:(fun l -> all_or_none (List.map ~f:Expression.of_term (flatten_args l)))
-        (as_unknown_app ~unknowns rhs)
-    in
+    let%bind args = gather_args ~unknowns rhs in
     Log.verbose
       Fmt.(
         fun fmt () ->
@@ -330,10 +418,11 @@ module Solver = struct
             lhs_expr);
     match functionalize ~verb:false ~args ~lemma:pre_expr lhs_expr [] with
     | Ok (_, r) ->
+      let r = factorize r in
       Log.verbose Fmt.(fun fmt () -> pf fmt "Solution =@;%a" (box Expression.pp) r);
-      Skeleton.of_expression r
+      Some r
     | Error _ ->
-      Log.verbose Fmt.(fun fmt () -> pf fmt "No solution");
+      Log.verbose Fmt.(fun fmt () -> pf fmt "No solution.");
       None
   ;;
 
@@ -345,7 +434,7 @@ module Solver = struct
     =
     let f (_, pre, lhs, rhs) = solve_eqn ~unknowns xi pre lhs rhs in
     let guesses = List.map ~f eqns in
-    best_unification guesses
+    best_unification ~unknowns eqns guesses
   ;;
 
   (** "solve" a functional equation with lifting.

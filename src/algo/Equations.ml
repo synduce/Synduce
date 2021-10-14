@@ -710,6 +710,7 @@ module Solve = struct
       : solver_response
         * (partial_soln, Counterexamples.unrealizability_ctex list) Either.t
     =
+    let task_counter = ref 0 in
     let lwt_tasks =
       List.concat_map
         ~f:Option.to_list
@@ -722,9 +723,12 @@ module Solve = struct
                  let* ctexs = t in
                  match ctexs with
                  | [] ->
-                   (* It not infeasible, sleep for timeout duration. *)
-                   let* () = Lwt_unix.sleep !Config.wait_parallel_tlimit in
-                   Lwt.return (RFail, Either.Second [])
+                   (* It not infeasible, sleep for timeout duration, unless counter is 0 *)
+                   if !task_counter >= 1
+                   then
+                     let* () = Lwt_unix.sleep !Config.wait_parallel_tlimit in
+                     Lwt.return (RFail, Either.Second [])
+                   else Lwt.return (RFail, Either.Second [])
                  | _ ->
                    if !Config.generate_benchmarks
                    then ignore (core_solve ~gen_only:true unknowns eqns);
@@ -741,7 +745,7 @@ module Solve = struct
                 we would end up with a synthesis failure but no counterexamples
                 to decide what to do!
              *)
-             r, wait_on_failure t)
+             r, wait_on_failure task_counter t)
         ; (* Task 3,4: solving system of equations, optimizations / grammar choices.
               If answer is Fail, must stall.
           *)
@@ -752,7 +756,7 @@ module Solve = struct
               (let t, r =
                  core_solve ~predict_constants:(Some false) ~gen_only:false unknowns eqns
                in
-               r, wait_on_failure t)
+               r, wait_on_failure task_counter t)
           else None)
         ; (if !Config.sysfe_opt
               && Set.exists unknowns ~f:(fun v -> RType.is_base (Variable.vtype_or_new v))
@@ -761,10 +765,11 @@ module Solve = struct
               (let t, r =
                  core_solve ~predict_constants:(Some true) ~gen_only:false unknowns eqns
                in
-               r, wait_on_failure t)
+               r, wait_on_failure task_counter t)
           else None)
         ]
     in
+    task_counter := List.length lwt_tasks;
     Log.debug_msg
       Fmt.(
         str "Solving for %a with %i processes." VarSet.pp unknowns (List.length lwt_tasks));

@@ -98,8 +98,8 @@ module Expression : sig
 
   val transform : ((t -> t) -> t -> t option) -> t -> t
   val rewrite_until_stable : (t -> t) -> t -> t
-  val expr_size : t -> int
-  val expr_size_compare : t -> t -> int
+  val size : t -> int
+  val size_compare : t -> t -> int
   val compare : t -> t -> int
   val equal : t -> t -> bool
   val free_variables : t -> (int, Base.Int.comparator_witness) Base.Set.t
@@ -107,6 +107,7 @@ module Expression : sig
   val of_term : Term.term -> t option
   val to_term : t -> Term.term option
   val simplify : t -> t
+  val apply : t -> t list -> t
   val normalize : t -> t
   val get_id_const : Term.Operator.t -> t option
   val get_ty_const : RType.t -> t

@@ -357,8 +357,8 @@ module Expression = struct
   ;;
 
   (*  *)
-  let expr_size (e : t) : int = reduce ~case:(fun _ _ -> None) ~init:1 ~join:( + ) e
-  let expr_size_compare (e1 : t) (e2 : t) = compare (expr_size e1) (expr_size e2)
+  let size (e : t) : int = reduce ~case:(fun _ _ -> None) ~init:1 ~join:( + ) e
+  let size_compare (e1 : t) (e2 : t) = compare (size e1) (size e2)
 
   let compare a b =
     let rec aux a b =
@@ -388,7 +388,7 @@ module Expression = struct
         else z
       | ETup tl, ETup tl' -> List.compare aux tl tl'
       | _ ->
-        let z = expr_size_compare a b in
+        let z = size_compare a b in
         if z = 0 then Poly.compare a b else z
     in
     aux a b
@@ -636,6 +636,15 @@ module Expression = struct
     rewrite_until_stable rule e
   ;;
 
+  (** Using an expression with boxes like a function. *)
+  let apply (f : t) (args : t list) =
+    let transformer _ = function
+      | EBox (Position i) -> List.nth args i
+      | _ -> None
+    in
+    normalize (transform transformer f)
+  ;;
+
   (** Get the identity element of a given operator.*)
   let get_id_const (op : Operator.t) : t option =
     match op with
@@ -668,6 +677,8 @@ module Expression = struct
 end
 
 module Skeleton = struct
+  open Option.Let_syntax
+
   (** A type to represent a grammar guess.  *)
   type t =
     | SChoice of t list (** A choice of possible guesses. *)
@@ -680,11 +691,9 @@ module Skeleton = struct
     | STuple of t list
     | SNonGuessable
 
-  let rec of_expression : Expression.t -> t option =
-    let open Option.Let_syntax in
-    function
-    | EFalse | ETrue -> Some (SType RType.TBool)
+  let rec of_expression : Expression.t -> t option = function
     | EInt _ -> Some (SType RType.TInt)
+    | EFalse | ETrue -> Some (SType RType.TBool)
     | EVar v ->
       Option.(Expression.get_var v >>= Variable.vtype >>= fun t -> Some (SType t))
     | EBox boxkind ->
@@ -721,7 +730,7 @@ end
 
 open Expression
 
-let collect_common_factors (op : Operator.t) (args : t list)
+let collect_common_factors (top_op : Operator.t option) (args : t list)
     : (int * Operator.t option * t) list
   =
   let add_fac op_opt factors e =
@@ -747,10 +756,16 @@ let collect_common_factors (op : Operator.t) (args : t list)
     if added then factors' else (1, op_opt, e) :: factors'
   in
   let f factors arg =
-    match arg with
-    | EOp (op', args') when is_left_distrib op' op ->
-      List.fold ~init:factors ~f:(add_fac (Some op')) args'
-    | _ -> List.fold ~init:factors ~f:(add_fac None) [ arg ]
+    match top_op with
+    | Some top_op ->
+      (match arg with
+      | EOp (op', args') when is_left_distrib op' top_op ->
+        List.fold ~init:factors ~f:(add_fac (Some op')) args'
+      | _ -> List.fold ~init:factors ~f:(add_fac None) [ arg ])
+    | None ->
+      (match arg with
+      | EOp (op', args') -> List.fold ~init:factors ~f:(add_fac (Some op')) args'
+      | _ -> List.fold ~init:factors ~f:(add_fac None) [ arg ])
   in
   List.fold ~f ~init:[] args
 ;;
@@ -797,6 +812,39 @@ let apply_factor
     normalize (mk_e_assoc op (factorized :: args_no_fac))
 ;;
 
+let apply_ite_factor
+    (cond : t)
+    (true_br : t)
+    (false_br : t)
+    (fac_op : Operator.t)
+    (fac_expr : t)
+  =
+  let f arg =
+    match arg with
+    | EOp (op', args') when Operator.equal op' fac_op ->
+      let facs, rest = List.partition_tf ~f:(fun e -> equal e fac_expr) args' in
+      (match facs with
+      | [] -> None
+      | _ :: tl ->
+        (match tl @ rest with
+        | [] -> None
+        | _ as args -> Some (mk_e_assoc op' args)))
+    | _ ->
+      if equal arg fac_expr
+      then (
+        match get_id_const fac_op with
+        | Some e -> Some e
+        | _ -> None)
+      else None
+  in
+  let true_br_defac = f true_br
+  and false_br_defac = f false_br in
+  match true_br_defac, false_br_defac with
+  | Some tbr, Some fbr ->
+    Some (normalize (mk_e_assoc fac_op [ fac_expr; mk_e_ite cond tbr fbr ]))
+  | _ -> None
+;;
+
 (** Factorize a term using distributivity rules. *)
 let factorize (e : t) : t =
   let fac_rule e =
@@ -804,9 +852,19 @@ let factorize (e : t) : t =
       match e with
       | EOp (op, args) ->
         let args' = List.map ~f args in
-        let factors = collect_common_factors op args' in
-        Option.bind (best_factor factors) ~f:(fun (fac_op, fac_expr) ->
-            apply_factor op args' fac_op fac_expr)
+        let factors = collect_common_factors (Some op) args' in
+        Option.bind (best_factor factors) ~f:(fun (fac_op_opt, fac_expr) ->
+            apply_factor op args' fac_op_opt fac_expr)
+      | EIte (cond, br_true, br_false) ->
+        let cond = f cond
+        and br_true = f br_true
+        and br_false = f br_false in
+        Option.(
+          bind
+            (best_factor (collect_common_factors None [ br_true; br_false ]))
+            ~f:(fun (fac_op_opt, fac_expr) ->
+              bind fac_op_opt ~f:(fun fac_op ->
+                  apply_ite_factor cond br_true br_false fac_op fac_expr)))
       | _ -> None
     in
     normalize (transform case e)
@@ -917,8 +975,8 @@ let match_after_expand ?(lemma = None) (bid : boxkind) (sube : t) ~(of_ : t) : t
 
 let match_after_factorization (bid : boxkind) (sube : t) ~(of_ : t) : t option =
   let sube = factorize sube in
-  let of_ = factorize of_ in
-  let res = match_core bid sube of_ in
+  let of_fac = factorize of_ in
+  let res = match_core bid sube of_fac in
   if uses_boxkind bid res then Some res else None
 ;;
 
