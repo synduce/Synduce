@@ -299,7 +299,21 @@ let revert_projs
     : (string * variable list * term) list
   =
   (* Helper functions *)
-  let find_soln s = List.find_exn ~f:(fun (s', _, _) -> String.equal s.vname s') soln in
+  let find_soln s =
+    match List.find ~f:(fun (s', _, _) -> String.equal s.vname s') soln with
+    | Some s -> s
+    | None ->
+      Log.error
+        Fmt.(
+          fun fmt () ->
+            pf
+              fmt
+              "Unexpected: did not find %s in %a."
+              s.vname
+              (list ~sep:sp (parens string))
+              (List.map soln ~f:(fun (a, _, _) -> a)));
+      raise (Not_found_s (Sexp.Atom "no solution found"))
+  in
   let join_bodies main_args first_body rest =
     let f accum (_, args, body) =
       let subst =
@@ -541,24 +555,51 @@ module Solve = struct
       let args, ret_sort = xi_formals xi in
       let guess =
         Grammars.make_guess
-          ~unknowns
+          xi
           ~level:!Config.optimize_grammars
           (List.map ~f:(fun eqn -> eqn.eterm, eqn.eprecond, eqn.elhs, eqn.erhs) eqns)
-          xi
       in
-      let grammar =
+      let default_grammar =
         Grammars.generate_grammar
           ~nonlinear
-          ~guess
+          ~guess:None
           ~bools
           ~special_const_prod:false
           ops
           args
           ret_sort
       in
-      CSynthFun (xi.vname, args, ret_sort, grammar)
+      match guess with
+      | `First partial_soln ->
+        Log.verbose_msg "Partial solution!";
+        Either.First (partial_soln, CSynthFun (xi.vname, args, ret_sort, default_grammar))
+      | `Second skeleton ->
+        Log.verbose_msg "Got a skeleton!";
+        let opt_grammar =
+          Grammars.generate_grammar
+            ~nonlinear
+            ~guess:(Some skeleton)
+            ~bools
+            ~special_const_prod:false
+            ops
+            args
+            ret_sort
+        in
+        Either.Second (CSynthFun (xi.vname, args, ret_sort, opt_grammar))
+      | `Third -> Either.Second (CSynthFun (xi.vname, args, ret_sort, default_grammar))
     in
-    List.map ~f (Set.elements unknowns)
+    let synth_objs = List.map ~f (Set.elements unknowns) in
+    if List.for_all ~f:Either.is_first synth_objs && List.length synth_objs > 0
+    then
+      Either.First
+        (List.concat_map synth_objs ~f:(function
+            | Either.First (partial_soln, _) -> [ partial_soln ]
+            | _ -> []))
+    else
+      Either.Second
+        (List.map synth_objs ~f:(function
+            | Either.First (_, g) -> g
+            | Either.Second g -> g))
   ;;
 
   let constraints_of_eqns (eqns : equation list) : command list =
@@ -650,67 +691,88 @@ module Solve = struct
       in
       (if needs_dt then dt_extend_base_logic base_logic else base_logic), nonlinear
     in
-    let synth_objs =
+    match
       synthfuns_of_unknowns ~nonlinear ~bools:has_ite ~eqns ~ops:all_operators unknowns
-    in
-    let set_logic = CSetLogic logic in
-    let sort_decls = declare_sorts_of_vars free_vars in
-    let var_decls = declarations_of_vars free_vars in
-    let constraints = constraints_of_eqns eqns in
-    let extra_defs =
-      (if Set.mem all_operators (Binary Max) then [ max_definition ] else [])
-      @ if Set.mem all_operators (Binary Min) then [ min_definition ] else []
-    in
-    let commands =
-      set_logic
-      :: (extra_defs @ sort_decls @ synth_objs @ var_decls @ constraints @ [ CCheckSynth ])
-    in
-    (* Handling the solver response. *)
-    let handle_response (resp : solver_response) =
-      let parse_synth_fun (fname, fargs, _, fbody) =
-        let args =
-          let f (varname, sort) = Variable.mk ~t:(rtype_of_sort sort) varname in
-          List.map ~f fargs
+    with
+    (* First case: we actually have a partial solution!  *)
+    | Either.First partial_soln ->
+      let success_resp =
+        let f (fname, args, body) =
+          ( fname
+          , List.map ~f:(fun v -> v.vname, sort_of_rtype (Variable.vtype_or_new v)) args
+          , sort_of_rtype body.ttyp
+          , sygus_of_term body )
         in
-        let local_vars = VarSet.of_list args in
-        let body, _ = infer_type (term_of_sygus (VarSet.to_env local_vars) fbody) in
-        fname, args, body
+        List.map ~f partial_soln
       in
-      match resp with
-      | RSuccess resps ->
-        let soln = List.map ~f:parse_synth_fun resps in
-        resp, Either.First (psoln @ soln)
-      | RInfeasible -> RInfeasible, Either.Second []
-      | RFail -> RFail, Either.Second []
-      | RUnknown -> RUnknown, Either.Second []
-    in
-    if !Config.generate_benchmarks
-    then
-      Syguslib.Solvers.commands_to_file
-        commands
-        (* Assuming gen_only true only for unrealizable problems. *)
-        (Config.new_benchmark_file ~hint:(if gen_only then "unrealizable_" else "") ".sl");
-    (* Call the solver on the generated file. *)
-    if not gen_only
-    then (
-      let solver_kind =
-        if !Config.use_eusolver then SygusSolver.EUSolver else SygusSolver.CVC
+      let answer = RSuccess success_resp, Either.First (psoln @ partial_soln) in
+      Lwt.task () |> fun (_, r) -> Lwt.return answer, r
+      (* Second case: we only got hints or the base grammar. *)
+    | Either.Second synth_objs ->
+      let set_logic = CSetLogic logic in
+      let sort_decls = declare_sorts_of_vars free_vars in
+      let var_decls = declarations_of_vars free_vars in
+      let constraints = constraints_of_eqns eqns in
+      let extra_defs =
+        (if Set.mem all_operators (Binary Max) then [ max_definition ] else [])
+        @ if Set.mem all_operators (Binary Min) then [ min_definition ] else []
       in
-      let t, r = SygusInterface.SygusSolver.solve_commands ~solver_kind commands in
-      ( Lwt.map
-          (function
-            | Some resp -> handle_response resp
-            | None -> RFail, Either.Second [])
-          t
-      , r ))
-    else Lwt.task () |> fun (_, r) -> Lwt.return (RFail, Either.Second []), r
+      let commands =
+        set_logic
+        :: (extra_defs
+           @ sort_decls
+           @ synth_objs
+           @ var_decls
+           @ constraints
+           @ [ CCheckSynth ])
+      in
+      (* Handling the solver response. *)
+      let handle_response (resp : solver_response) =
+        let parse_synth_fun (fname, fargs, _, fbody) =
+          let args =
+            let f (varname, sort) = Variable.mk ~t:(rtype_of_sort sort) varname in
+            List.map ~f fargs
+          in
+          let local_vars = VarSet.of_list args in
+          let body, _ = infer_type (term_of_sygus (VarSet.to_env local_vars) fbody) in
+          fname, args, body
+        in
+        match resp with
+        | RSuccess resps ->
+          let soln = List.map ~f:parse_synth_fun resps in
+          resp, Either.First (psoln @ soln)
+        | RInfeasible -> RInfeasible, Either.Second []
+        | RFail -> RFail, Either.Second []
+        | RUnknown -> RUnknown, Either.Second []
+      in
+      if !Config.generate_benchmarks
+      then
+        Syguslib.Solvers.commands_to_file
+          commands
+          (* Assuming gen_only true only for unrealizable problems. *)
+          (Config.new_benchmark_file
+             ~hint:(if gen_only then "unrealizable_" else "")
+             ".sl");
+      (* Call the solver on the generated file. *)
+      if not gen_only
+      then (
+        let solver_kind =
+          if !Config.use_eusolver then SygusSolver.EUSolver else SygusSolver.CVC
+        in
+        let t, r = SygusInterface.SygusSolver.solve_commands ~solver_kind commands in
+        ( Lwt.map
+            (function
+              | Some resp -> handle_response resp
+              | None -> RFail, Either.Second [])
+            t
+        , r ))
+      else Lwt.task () |> fun (_, r) -> Lwt.return (RFail, Either.Second []), r
   ;;
 
   let solve_eqns (unknowns : VarSet.t) (eqns : equation list)
       : solver_response
         * (partial_soln, Counterexamples.unrealizability_ctex list) Either.t
     =
-    let task_counter = ref 0 in
     let lwt_tasks =
       List.concat_map
         ~f:Option.to_list
@@ -724,11 +786,8 @@ module Solve = struct
                  match ctexs with
                  | [] ->
                    (* It not infeasible, sleep for timeout duration, unless counter is 0 *)
-                   if !task_counter >= 1
-                   then
-                     let* () = Lwt_unix.sleep !Config.wait_parallel_tlimit in
-                     Lwt.return (RFail, Either.Second [])
-                   else Lwt.return (RFail, Either.Second [])
+                   let* () = Lwt_unix.sleep !Config.wait_parallel_tlimit in
+                   Lwt.return (RFail, Either.Second [])
                  | _ ->
                    if !Config.generate_benchmarks
                    then ignore (core_solve ~gen_only:true unknowns eqns);
@@ -745,7 +804,7 @@ module Solve = struct
                 we would end up with a synthesis failure but no counterexamples
                 to decide what to do!
              *)
-             r, wait_on_failure task_counter t)
+             r, wait_on_failure t)
         ; (* Task 3,4: solving system of equations, optimizations / grammar choices.
               If answer is Fail, must stall.
           *)
@@ -756,7 +815,7 @@ module Solve = struct
               (let t, r =
                  core_solve ~predict_constants:(Some false) ~gen_only:false unknowns eqns
                in
-               r, wait_on_failure task_counter t)
+               r, wait_on_failure t)
           else None)
         ; (if !Config.sysfe_opt
               && Set.exists unknowns ~f:(fun v -> RType.is_base (Variable.vtype_or_new v))
@@ -765,11 +824,10 @@ module Solve = struct
               (let t, r =
                  core_solve ~predict_constants:(Some true) ~gen_only:false unknowns eqns
                in
-               r, wait_on_failure task_counter t)
+               r, wait_on_failure t)
           else None)
         ]
     in
-    task_counter := List.length lwt_tasks;
     Log.debug_msg
       Fmt.(
         str "Solving for %a with %i processes." VarSet.pp unknowns (List.length lwt_tasks));

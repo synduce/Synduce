@@ -4,6 +4,7 @@ open Lang.Term
 open Lang.Rewriter
 open Utils
 open Fmt
+open Option.Let_syntax
 
 let as_unknown_app ?(match_functions = fun _ -> false) ~unknowns t : term list option =
   let rec aux t =
@@ -16,16 +17,9 @@ let as_unknown_app ?(match_functions = fun _ -> false) ~unknowns t : term list o
 ;;
 
 let gather_args ~(unknowns : VarSet.t) (t : Term.term) : Expression.t list option =
-  let flatten_args args =
-    List.concat_map
-      ~f:(fun t ->
-        match t.tkind with
-        | TTup tl -> tl
-        | _ -> [ t ])
-      args
-  in
   Option.bind
-    ~f:(fun l -> all_or_none (List.map ~f:Expression.of_term (flatten_args l)))
+    ~f:(fun l ->
+      all_or_none (List.map ~f:Expression.of_term (Projection.simple_flattening l)))
     (as_unknown_app ~unknowns t)
 ;;
 
@@ -310,27 +304,26 @@ module Solver = struct
     gathered from applying the same arg-collecting procedure a in the other deduction
     solving functions.
     *)
-  let guess_application ~(unknowns : VarSet.t) (guess : Expression.t) (rhs : term)
-      : term option
+  let guess_application ~(xi : variable) (guess : Expression.t) (rhs : term) : term option
     =
-    let maybe_args = gather_args ~unknowns rhs in
+    let maybe_args = gather_args ~unknowns:(VarSet.singleton xi) rhs in
     Option.bind ~f:(fun args -> Expression.(apply guess args |> to_term)) maybe_args
   ;;
 
   let best_unification
-      ~(unknowns : VarSet.t)
+      ~(xi : variable)
       (eqns : (term * term option * term * term) list)
       (guesses : Expression.t option list)
-      : Skeleton.t option
+      : [> `First of string * variable list * term | `Second of Skeleton.t | `Third ]
     =
     let validate_via_solver guess =
       let open SmtInterface in
       let equations_to_check =
         let eqns' =
           List.map eqns ~f:(fun (_, pre, lhs, rhs) ->
-              Option.map (guess_application ~unknowns guess rhs) ~f:(fun rhs' ->
-                  let constr = mk_bin Binop.Eq lhs rhs' in
-                  pre, mk_un Unop.Not constr))
+              Option.map (guess_application ~xi guess rhs) ~f:(fun rhs' ->
+                  let constr = Terms.(lhs == rhs') in
+                  pre, Terms.(~!constr)))
         in
         match all_or_none eqns' with
         | Some eqns'' -> eqns''
@@ -344,10 +337,7 @@ module Solver = struct
              ~logic:(SmtLogic.infer_logic (List.map ~f:snd equations_to_check))
              ())
       in
-      List.fold_until
-        ~init:0
-        equations_to_check
-        ~f:(fun _ (pre, constr) ->
+      List.for_all equations_to_check ~f:(fun (pre, constr) ->
           SyncSmt.spush solver;
           let fv = Analysis.free_variables constr in
           SyncSmt.exec_all solver (Commands.decls_of_vars fv);
@@ -358,22 +348,36 @@ module Solver = struct
           match SyncSmt.check_sat solver with
           | Unsat ->
             SyncSmt.spop solver;
-            Continue 0
+            true
           | _ ->
             SyncSmt.close_solver solver;
-            Stop None)
-        ~finish:(fun _ -> Some guess)
+            false)
     in
     let validate_guess guess =
       if List.for_all guesses ~f:(function
              | Some x' -> Poly.equal guess x'
              | _ -> false)
-      then Some guess
+      then true
       else (
         try validate_via_solver guess with
-        | _ -> None)
+        | _ -> false)
     in
-    let guess_1 =
+    let build_soln guess =
+      let arg_types, _ = RType.fun_typ_unpack (Variable.vtype_or_new xi) in
+      let arg_vars =
+        List.map
+          ~f:(fun typ -> Variable.mk ~t:(Some typ) (Alpha.fresh ~s:"_auto" ()))
+          arg_types
+      in
+      let flat_args =
+        List.concat_map ~f:(fun v -> Projection.simple_flattening [ proj_var v ]) arg_vars
+      in
+      let%bind expr_args = all_or_none (List.map ~f:Expression.of_term flat_args) in
+      let expr_body = Expression.apply guess expr_args in
+      let%map final_body = Expression.to_term expr_body in
+      xi.vname, arg_vars, final_body
+    in
+    let maybe_guess =
       let ok_guesses =
         let filter guess =
           match guess with
@@ -388,21 +392,38 @@ module Solver = struct
       | hd :: _ -> Some hd
       | _ -> None
     in
-    Option.(guess_1 >>= validate_guess >>= Skeleton.of_expression)
+    match maybe_guess with
+    | Some guess_1 ->
+      if validate_guess guess_1
+      then (
+        match build_soln guess_1 with
+        | Some (fname, args, body) ->
+          Log.verbose
+            Fmt.(
+              fun fmt () ->
+                pf
+                  fmt
+                  "Found partial solution %s(%a) = %a."
+                  fname
+                  (list ~sep:comma Variable.pp)
+                  args
+                  Term.pp_term
+                  body);
+          `First (fname, args, body)
+        | None ->
+          (match Skeleton.of_expression guess_1 with
+          | Some sk -> `Second sk
+          | None -> `Third))
+      else `Third
+    | _ -> `Third
   ;;
 
-  let solve_eqn
-      ~(unknowns : VarSet.t)
-      (xi : variable)
-      (pre : term option)
-      (lhs : term)
-      (rhs : term)
+  let solve_eqn ~(xi : variable) (pre : term option) (lhs : term) (rhs : term)
       : Expression.t option
     =
-    let open Option.Let_syntax in
     let%bind lhs_expr = Expression.of_term lhs in
     let pre_expr = Option.bind ~f:Expression.of_term pre in
-    let%bind args = gather_args ~unknowns rhs in
+    let%bind args = gather_args ~unknowns:(VarSet.singleton xi) rhs in
     Log.verbose
       Fmt.(
         fun fmt () ->
@@ -426,15 +447,15 @@ module Solver = struct
       None
   ;;
 
-  let presolve_equations
-      ~(unknowns : VarSet.t)
-      (eqns : (term * term option * term * term) list)
-      (xi : variable)
-      : Skeleton.t option
+  (** Returns either:
+    - a partial solution if it could find an expression for
+    *)
+  let presolve_equations ~(xi : variable) (eqns : (term * term option * term * term) list)
+      : [> `First of string * variable list * term | `Second of Skeleton.t | `Third ]
     =
-    let f (_, pre, lhs, rhs) = solve_eqn ~unknowns xi pre lhs rhs in
+    let f (_, pre, lhs, rhs) = solve_eqn ~xi pre lhs rhs in
     let guesses = List.map ~f eqns in
-    best_unification ~unknowns eqns guesses
+    best_unification ~xi eqns guesses
   ;;
 
   (** "solve" a functional equation with lifting.

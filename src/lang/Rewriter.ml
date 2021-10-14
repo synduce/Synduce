@@ -206,6 +206,7 @@ module Expression = struct
     | EVar of int
     | EBox of boxkind
     | ETup of t list
+    | ESel of t * int
     | EIte of t * t * t
     | EData of string * t list
     | EOp of Operator.t * t list
@@ -238,6 +239,7 @@ module Expression = struct
         | Typed t -> pf f ":%a" (styled `Faint RType.pp) t
         | Position i -> pf f "@%a" (styled `Faint int) i)
       | ETup tl -> pf f "@[(%a)@]" (list ~sep:comma pp) tl
+      | ESel (t, i) -> pf f "@[(%a).%i@]" pp t i
       | EIte (a, b, c) ->
         pf
           f
@@ -278,6 +280,7 @@ module Expression = struct
   let mk_e_bool b = if b then mk_e_true else mk_e_false
   let mk_e_var id = EVar id
   let mk_e_tup tl = ETup tl
+  let mk_e_sel t i = ESel (t, i)
 
   let mk_e_assoc op l =
     match l with
@@ -324,6 +327,7 @@ module Expression = struct
         (match e with
         | ETrue | EFalse | EInt _ | EVar _ | EBox _ -> init
         | EIte (a, b, c) -> join (aux a) (join (aux b) (aux c))
+        | ESel (t, _) -> aux t
         | EOp (_, tl) | EData (_, tl) | ETup tl ->
           List.fold ~init ~f:(fun a e' -> join (aux e') a) tl)
     in
@@ -339,6 +343,7 @@ module Expression = struct
         | ETrue | EFalse | EInt _ | EVar _ | EBox _ -> e
         | EIte (a, b, c) -> mk_e_ite (aux a) (aux b) (aux c)
         | EOp (op, tl) -> mk_e_assoc op (List.map ~f:aux tl)
+        | ESel (t, i) -> mk_e_sel (aux t) i
         | EData (c, tl) -> mk_e_data c (List.map ~f:aux tl)
         | ETup tl -> mk_e_tup (List.map ~f:aux tl))
     in
@@ -435,7 +440,7 @@ module Expression = struct
           (match op with
           | Plus -> mk_e_assoc (Binary Plus) [ f t1; f t2 ]
           | Times -> mk_e_assoc (Binary Times) [ f t1; f t2 ]
-          | Div -> mk_e_assoc (Binary Times) [ f t1; mk_e_un Unop.Inv (f t2) ]
+          | Div -> mk_e_assoc (Binary Div) [ f t2; f t1 ]
           | And -> mk_e_assoc (Binary And) [ f t1; f t2 ]
           | Or -> mk_e_assoc (Binary Or) [ f t1; f t2 ]
           | Min -> mk_e_assoc (Binary Min) [ f t1; f t2 ]
@@ -450,11 +455,11 @@ module Expression = struct
       | TUn (op, t) ->
         Unop.(
           (match op with
-          | Inv -> mk_e_un Inv (f t)
           | Neg -> mk_e_un Neg (f t)
           | Not -> mk_e_un Not (f t)
           | Abs -> mk_e_un Abs (f t)))
-      | TMatch _ | TApp _ | TFun _ | TSel _ ->
+      | TSel (t, i) -> mk_e_sel (f t) i
+      | TMatch _ | TApp _ | TFun _ ->
         raise_s (Sexp.Atom "Expressions only for fully reduced terms.")
     in
     try Some (f t0) with
@@ -477,6 +482,7 @@ module Expression = struct
           mk_var v
         | _ -> None)
       | ETup tl -> Option.map ~f:mk_tup (Option.all (List.map ~f tl))
+      | ESel (t, i) -> Option.map ~f:(fun t' -> mk_sel t' i) (f t)
       | EIte (c, tt, tf) ->
         let%map c' = f c
         and tt' = f tt
@@ -708,7 +714,7 @@ module Skeleton = struct
       let%bind b = of_expression b in
       let%map c = of_expression c in
       SIte (a, b, c)
-    | EData _ -> None
+    | ESel _ | EData _ -> None
     | EOp (op, args) ->
       (match op with
       | Unary uop ->

@@ -9,10 +9,12 @@ val as_unknown_app
 
 module Solver : sig
   val presolve_equations
-    :  unknowns:Term.VarSet.t
+    :  xi:Term.variable
     -> (Term.term * Term.term option * Term.term * Term.term) list
-    -> Term.variable
-    -> Skeleton.t option
+    -> [> `First of string * Term.variable list * Term.term
+       | `Second of Skeleton.t
+       | `Third
+       ]
 
   val functional_equation
     :  func_side:Term.term list

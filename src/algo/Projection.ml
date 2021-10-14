@@ -3,6 +3,16 @@ open Base
 open Lang
 open Lang.Term
 
+(** Flatten a list of terms that may be tuples into a flat list with no tuples.  *)
+let rec simple_flattening (tl : term list) =
+  List.concat_map
+    ~f:(fun t ->
+      match t.tkind with
+      | TTup tl -> simple_flattening tl
+      | _ -> [ t ])
+    tl
+;;
+
 (* ============================================================================================= *)
 (*                        PROJECTION : OPTIMIZATION FOR TUPLES                                   *)
 (* ============================================================================================= *)

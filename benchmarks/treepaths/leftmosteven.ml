@@ -13,10 +13,10 @@ type 'c zipper =
   | Zip of sel * 'c * 'c btree * 'c zipper
 
 let rec spec = function
-  | Empty -> false, 1
+  | Empty -> false, 0
   | Node (a, l, r) ->
     let b1, x1 = spec l in
-    if b1 then b1, x1 else if a mod 2 = 1 then true, a else spec r
+    if b1 then b1, x1 else if a mod 2 = 0 then true, a else spec r
 ;;
 
 let rec target = function

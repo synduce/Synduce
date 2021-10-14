@@ -53,6 +53,7 @@ module Expression : sig
     | EVar of int
     | EBox of boxkind
     | ETup of t list
+    | ESel of t * int
     | EIte of t * t * t
     | EData of string * t list
     | EOp of Term.Operator.t * t list

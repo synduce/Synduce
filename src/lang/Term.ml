@@ -357,7 +357,6 @@ module Unop = struct
     | Neg
     | Not
     | Abs
-    | Inv
 
   let compare = Poly.compare
   let equal = Poly.equal
@@ -366,14 +365,14 @@ module Unop = struct
     match op with
     | Neg -> RType.TInt
     | Not -> RType.TBool
-    | Inv | Abs -> RType.TInt
+    | Abs -> RType.TInt
   ;;
 
   let result_type (op : t) =
     match op with
     | Neg -> RType.TInt
     | Not -> RType.TBool
-    | Inv | Abs -> RType.TInt
+    | Abs -> RType.TInt
   ;;
 
   let to_pp_string (op : t) =
@@ -381,7 +380,6 @@ module Unop = struct
     | Neg -> "-"
     | Not -> "¬"
     | Abs -> "abs"
-    | Inv -> "inv"
   ;;
 
   let to_string (op : t) =
@@ -389,7 +387,6 @@ module Unop = struct
     | Neg -> "-"
     | Not -> "not"
     | Abs -> "abs"
-    | Inv -> "inv"
   ;;
 
   let of_string (s : string) : t option =
@@ -397,7 +394,6 @@ module Unop = struct
     | "abs" -> Some Abs
     | "~-" | "-" -> Some Neg
     | "not" -> Some Not
-    | "inv" -> Some Inv
     | _ -> None
   ;;
 

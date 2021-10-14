@@ -30,10 +30,7 @@ let preamble
         | _ -> [])
       | SUn (u, g) ->
         let g_prods = build_prods g in
-        List.map g_prods ~f:(fun prod ->
-            match u with
-            | Unop.Inv -> SyApp (IdSimple "div", [ SyLit (LitNum 1); prod ])
-            | _ -> SyApp (IdSimple (Unop.to_string u), [ prod ]))
+        List.map g_prods ~f:(fun prod -> SyApp (IdSimple (Unop.to_string u), [ prod ]))
       | SBin (b, ta, tb) ->
         let prods_a = build_prods ta
         and prods_b = build_prods tb in
@@ -320,7 +317,9 @@ let generate_grammar
 (*                          GRAMMAR OPTIMIZATION                                                 *)
 (* ============================================================================================= *)
 
-let make_basic_guess (eqns : (term * term option * term * term) list) (xi : variable) =
+let make_basic_guess (eqns : (term * term option * term * term) list) (xi : variable)
+    : [> `First of symbol * variable list * term | `Second of Skeleton.t | `Third ]
+  =
   let lhs_of_xi =
     let f (_, _, lhs, rhs) =
       match rhs.tkind with
@@ -352,29 +351,30 @@ let make_basic_guess (eqns : (term * term option * term * term) list) (xi : vari
     List.filter_map ~f lhs_of_xi
   in
   match guesses with
-  | [] -> None
-  | hd :: tl -> if List.for_all tl ~f:(fun x -> Poly.equal x hd) then Some hd else None
+  | [] -> `Third
+  | hd :: tl ->
+    if List.for_all tl ~f:(fun x -> Poly.equal x hd) then `Second hd else `Third
 ;;
 
 let make_unification_guess
-    ~(unknowns : VarSet.t)
     (eqns : (term * term option * term * term) list)
     (xi : variable)
+    : [> `First of string * variable list * term | `Second of Skeleton.t | `Third ]
   =
-  Option.first_some
-    (Deduction.Solver.presolve_equations ~unknowns eqns xi)
-    (make_basic_guess eqns xi)
+  match Deduction.Solver.presolve_equations ~xi eqns with
+  | `Third -> make_basic_guess eqns xi
+  | _ as l -> l
 ;;
 
 let make_guess
     ?(level = 1)
-    ~(unknowns : VarSet.t)
-    (eqns : (term * term option * term * term) list)
     (xi : variable)
+    (eqns : (term * term option * term * term) list)
+    : [> `First of symbol * variable list * term | `Second of Skeleton.t | `Third ]
   =
   match level with
-  | 0 -> None
+  | 0 -> `Third
   | 1 -> make_basic_guess eqns xi
-  | 2 -> make_unification_guess ~unknowns eqns xi
-  | _ -> None
+  | 2 -> make_unification_guess eqns xi
+  | _ -> `Third
 ;;

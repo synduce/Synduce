@@ -820,6 +820,15 @@ let mk_max_def =
     (mk_ite (mk_ge (mk_var "x") (mk_var "y")) (mk_var "x") (mk_var "y"))
 ;;
 
+(** [mk_inv_def] is the following SMT-LIB command:
+  {v
+  (define-function inv ((x Int)) Int (div 1 x))
+  v}
+*)
+let mk_inv_def =
+  mk_fun_def "inv" [ "x", mk_int_sort ] mk_int_sort (mk_div (mk_int 1) (mk_var "x"))
+;;
+
 (* SmtTerm / command helpers *)
 
 let smtSymbol_of_decl (decl : command) =
