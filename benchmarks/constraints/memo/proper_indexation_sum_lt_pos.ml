@@ -23,10 +23,8 @@ let rec project = function
 ;;
 
 let rec polynome = function
-  | Nil -> 0, 0
-  | Cons (hd, tl) ->
-    let sum, pos = polynome tl in
-    (if hd > pos then sum + hd else max (sum + hd) 0), pos + 1
+  | Nil -> 0
+  | Cons (hd, tl) -> if hd > length tl then hd + polynome tl else polynome tl
 
 and length = function
   | Nil -> 0

@@ -26,7 +26,7 @@ let rec polynome = function
   | Nil -> 0, 0
   | Cons (hd, tl) ->
     let sum, pos = polynome tl in
-    (if hd > pos then sum + hd else max (sum + hd) 0), pos + 1
+    (if hd > pos then max (sum + hd) 0 else sum), pos + 1
 
 and length = function
   | Nil -> 0

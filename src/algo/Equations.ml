@@ -645,6 +645,7 @@ module Solve = struct
 
   let core_solve
       ?(predict_constants = None)
+      ?(use_bools = true)
       ~(gen_only : bool)
       (unknowns : VarSet.t)
       (eqns : equation list)
@@ -692,7 +693,12 @@ module Solve = struct
       (if needs_dt then dt_extend_base_logic base_logic else base_logic), nonlinear
     in
     match
-      synthfuns_of_unknowns ~nonlinear ~bools:has_ite ~eqns ~ops:all_operators unknowns
+      synthfuns_of_unknowns
+        ~nonlinear
+        ~bools:(use_bools || has_ite)
+        ~eqns
+        ~ops:all_operators
+        unknowns
     with
     (* First case: we actually have a partial solution!  *)
     | Either.First partial_soln ->
@@ -773,6 +779,17 @@ module Solve = struct
       : solver_response
         * (partial_soln, Counterexamples.unrealizability_ctex list) Either.t
     =
+    let on_opt opt task =
+      if !Config.sysfe_opt && opt
+      then
+        Some
+          (let t, r = task () in
+           r, wait_on_failure t)
+      else None
+    in
+    let opt_cst =
+      Set.exists unknowns ~f:(fun v -> RType.is_base (Variable.vtype_or_new v))
+    in
     let lwt_tasks =
       List.concat_map
         ~f:Option.to_list
@@ -805,27 +822,15 @@ module Solve = struct
                 to decide what to do!
              *)
              r, wait_on_failure t)
-        ; (* Task 3,4: solving system of equations, optimizations / grammar choices.
+        ; (* Task 3,4, 5: solving system of equations, optimizations / grammar choices.
               If answer is Fail, must stall.
           *)
-          (if !Config.sysfe_opt
-              && Set.exists unknowns ~f:(fun v -> RType.is_base (Variable.vtype_or_new v))
-          then
-            Some
-              (let t, r =
-                 core_solve ~predict_constants:(Some false) ~gen_only:false unknowns eqns
-               in
-               r, wait_on_failure t)
-          else None)
-        ; (if !Config.sysfe_opt
-              && Set.exists unknowns ~f:(fun v -> RType.is_base (Variable.vtype_or_new v))
-          then
-            Some
-              (let t, r =
-                 core_solve ~predict_constants:(Some true) ~gen_only:false unknowns eqns
-               in
-               r, wait_on_failure t)
-          else None)
+          on_opt opt_cst (fun () ->
+              core_solve ~predict_constants:(Some false) ~gen_only:false unknowns eqns)
+        ; on_opt opt_cst (fun () ->
+              core_solve ~predict_constants:(Some true) ~gen_only:false unknowns eqns)
+        ; on_opt true (fun () ->
+              core_solve ~use_bools:false ~gen_only:false unknowns eqns)
         ]
     in
     Log.debug_msg

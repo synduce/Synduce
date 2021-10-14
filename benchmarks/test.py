@@ -123,6 +123,8 @@ constraint_benchmarks = [
     ["constraints/memo/max_contains.ml", "-NB"],
     ["constraints/memo/count_lt.ml", "-NB -n 50"],
     ["constraints/memo/max_sum_gt.ml", "-NB"],
+    ["constraints/memo/proper_indexation_sum_lt_pos_v2.ml", ""],
+    ["constraints/memo/proper_indexation_sum_lt_pos.ml", ""],
     # empty_right
     ["constraints/empty_right_subtree/contains.ml", "-N"],
     # alist
@@ -141,7 +143,12 @@ base_benchmark_set = [
     # Combine
     ["combine/mts.pmrs", ""],
     ["combine/mts_and_mps.pmrs", ""],
-    ["compressed_list/sum.ml", "-f"],
+    # Compressed list
+    ["compressed_list/sum.ml", ""],
+    # Indexed list
+    ["indexed_list/search.ml", ""],
+    ["indexed_list/position_polynomial.ml", ""],
+    ["indexed_list/sum_elts_lt_pos.ml", ""],
     # Misc
     ["misc/count_between.ml", ""],
     ["misc/composed_unkwns.ml", ""],
@@ -206,7 +213,7 @@ base_benchmark_set = [
     ["tree/minmax.pmrs", ""],
     ["tree/mips.pmrs", ""],
     ["tree/mits.pmrs", ""],
-    ["tree/mpps.pmrs", ""],
+    ["tree/mpps.pmrs", "--no-gropt"],
     ["tree/poly.pmrs", ""],
     ["tree/poly2.ml", ""],
     ["tree/sorted.pmrs", "-t"],
@@ -225,6 +232,10 @@ base_benchmark_set = [
 ]
 
 lifting_benchmarks = [
+    # Indexed list
+    ["indexed_list/position_polynomial_no_index.ml", ""],
+    ["indexed_list/search_no_index.ml", ""],
+    ["indexed_list/sum_elts_lt_pos_no_len.ml", ""],
     # Automatic parallelization
     ["list/atoi_no_fac.ml", "--no-gropt"],
     ["list/is_sorted_no_last.ml", ""],
@@ -427,17 +438,17 @@ if __name__ == "__main__":
         cvc = "--cvc5"
     # === Special runs with simplified output ===
     if args.lifting_benchmarks or args.all_benchmarks:
-        algos = [["requation", cvc]]
+        algos = [["partialbounding", cvc]]
         optims = [["all", ""]]
         run_benchmarks(lifting_benchmarks, algos, optims, raw_output)
 
     if args.constraint_benchmarks or args.all_benchmarks:
-        algos = [["requation", cvc]]
+        algos = [["partialbounding", cvc]]
         optims = [["all", ""]]
         run_benchmarks(constraint_benchmarks, algos, optims, raw_output)
 
     if args.base_benchmarks or args.all_benchmarks:
-        algos = [["requation", cvc]]
+        algos = [["partialbounding", cvc]]
         optims = [["all", ""]]
         run_benchmarks(base_benchmark_set, algos, optims, raw_output)
 
@@ -446,14 +457,14 @@ if __name__ == "__main__":
 
     # === TABLES and older runs ===
     if run_test_only:
-        algos = [["requation", ""]]
+        algos = [["partialbounding", ""]]
         optims = [["all", cvc]]
 
     # Table 1 / CAV 21 paper : compare Synduce and Baseline
     elif table_no == 1:
 
         algos = [
-            ["requation", "--no-gropt"],
+            ["partialbounding", "--no-gropt"],
             ["acegis", "--acegis --no-gropt"]
         ]
         optims = [["all", ""]]
@@ -462,7 +473,7 @@ if __name__ == "__main__":
     elif table_no == 2:
 
         algos = [
-            ["requation", "--no-gropt"],
+            ["partialbounding", "--no-gropt"],
             ["acegis", "--acegis --no-gropt"],
             ["ccegis", "--ccegis --no-gropt"]
         ]
@@ -472,7 +483,7 @@ if __name__ == "__main__":
     elif table_no == 3:
 
         algos = [
-            ["requation", "--no-gropt"],
+            ["partialbounding", "--no-gropt"],
             ["acegis", "--acegis --no-gropt"],
         ]
 
@@ -486,17 +497,17 @@ if __name__ == "__main__":
 
     # Table 4 / Test
     elif table_no == 4:
-        algos = [["requation"]]
+        algos = [["partialbounding"]]
         optims = [["all", ""]]
 
     # Table 5 / Test with cvc4 against baseline comparison
     elif table_no == 5:
-        algos = [["requation", "--cvc4"], ["acegis", "--acegis --cvc4"]]
+        algos = [["partialbounding", "--cvc4"], ["acegis", "--acegis --cvc4"]]
         optims = [["all", ""]]
 
     # No table - just run the base algorithm.
     else:
-        algos = [["requation", ""]]
+        algos = [["partialbounding", ""]]
         optims = [["all", ""]]
 
     # Benchmark set selection.
@@ -509,8 +520,10 @@ if __name__ == "__main__":
             input_files = reduced_benchmark_set_table2
         elif table_no == 3:
             input_files = reduced_benchmark_set_table3
-        elif table_no == 4 or table_no == 5:
+        elif table_no == 4:
             input_files = constraint_benchmarks
+        elif table_no == 5:
+            input_files = constraint_benchmarks + lifting_benchmarks
         elif run_test_only:
             input_files = benchmark_set
         else:
