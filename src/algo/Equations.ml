@@ -779,16 +779,19 @@ module Solve = struct
       : solver_response
         * (partial_soln, Counterexamples.unrealizability_ctex list) Either.t
     =
+    let opt_cst =
+      Set.exists unknowns ~f:(fun v -> RType.is_base (Variable.vtype_or_new v))
+    in
+    let task_counter =
+      if !Config.sysfe_opt then ref ((Bool.to_int opt_cst * 2) + 3) else ref 2
+    in
     let on_opt opt task =
       if !Config.sysfe_opt && opt
       then
         Some
           (let t, r = task () in
-           r, wait_on_failure t)
+           r, wait_on_failure task_counter t)
       else None
-    in
-    let opt_cst =
-      Set.exists unknowns ~f:(fun v -> RType.is_base (Variable.vtype_or_new v))
     in
     let lwt_tasks =
       List.concat_map
@@ -804,6 +807,7 @@ module Solve = struct
                  | [] ->
                    (* It not infeasible, sleep for timeout duration, unless counter is 0 *)
                    let* () = Lwt_unix.sleep !Config.wait_parallel_tlimit in
+                   Int.decr task_counter;
                    Lwt.return (RFail, Either.Second [])
                  | _ ->
                    if !Config.generate_benchmarks
@@ -821,7 +825,7 @@ module Solve = struct
                 we would end up with a synthesis failure but no counterexamples
                 to decide what to do!
              *)
-             r, wait_on_failure t)
+             r, wait_on_failure task_counter t)
         ; (* Task 3,4, 5: solving system of equations, optimizations / grammar choices.
               If answer is Fail, must stall.
           *)

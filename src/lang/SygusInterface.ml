@@ -306,12 +306,22 @@ let sorted_vars_of_types (tl : RType.t list) : sorted_var list =
   List.map ~f tl
 ;;
 
-let wait_on_failure (t : (solver_response * 'a) Lwt.t) : (solver_response * 'a) Lwt.t =
+let wait_on_failure (counter : int ref) (t : (solver_response * 'a) Lwt.t)
+    : (solver_response * 'a) Lwt.t
+  =
   Lwt.bind t (fun t ->
       match t with
       (* Wait on failure. *)
       | (RFail | RUnknown | RInfeasible), _ ->
-        Lwt.map (fun _ -> t) (Lwt_unix.sleep !Config.wait_parallel_tlimit)
+        Lwt.map
+          (fun _ -> t)
+          (if !counter > 1
+          then (
+            Int.decr counter;
+            Lwt_unix.sleep !Config.wait_parallel_tlimit)
+          else Lwt.return ())
       (* Continue on success. *)
-      | _ -> Lwt.return t)
+      | _ ->
+        Int.decr counter;
+        Lwt.return t)
 ;;

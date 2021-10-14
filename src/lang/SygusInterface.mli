@@ -84,5 +84,6 @@ val sorted_vars_of_types : RType.t list -> Sygus.sorted_var list
     deferrred by [!Config.wait_parallel_tlimit].
 *)
 val wait_on_failure
-  :  (Sygus.solver_response * 'a) Lwt.t
+  :  int ref
+  -> (Sygus.solver_response * 'a) Lwt.t
   -> (Sygus.solver_response * 'a) Lwt.t
