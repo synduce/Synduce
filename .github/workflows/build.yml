@@ -64,5 +64,5 @@ jobs:
         run: opam exec -- dune build bin/Synduce.exe
         
       - name: Run basic tests
-        run: python3 benchmarks/test.py --run --kick-the-tires
+        run: python3 benchmarks/test.py -b small -n 2
 
