@@ -249,7 +249,9 @@ lifting_benchmarks = [
     ["combine/mts_and_mps_nosum.ml", ""],
     # Switching tree traversals
     ["tree/gradient.ml", ""],
-    ["tree/mits_nosum.ml", ""]
+    ["tree/mits_nosum.ml", ""],
+    # Unimodal lists (might also be due to representation)
+    ["unimodal_lists/prod_needs_aux.ml", ""]
 ]
 
 

@@ -304,6 +304,10 @@ module Expression = struct
     let ( / ) = mk_e_bin Binop.Div
     let ( && ) = mk_e_bin Binop.And
     let ( || ) = mk_e_bin Binop.Or
+    let ( > ) = mk_e_bin Binop.Gt
+    let ( < ) = mk_e_bin Binop.Lt
+    let ( >= ) = mk_e_bin Binop.Ge
+    let ( <= ) = mk_e_bin Binop.Le
     let max = mk_e_bin Binop.Max
     let min = mk_e_bin Binop.Min
     let not e1 = mk_e_un Unop.Not e1
@@ -616,6 +620,23 @@ module Expression = struct
       (* min (abs x) 0 -> 0 *)
       | EOp (Binary Min, [ EOp (Unary Abs, [ _ ]); EInt 0 ])
       | EOp (Binary Min, [ EInt 0; EOp (Unary Abs, [ _ ]) ]) -> Some (EInt 0)
+      (* If-then-elses *)
+      | EIte (_, b, c) when equal b c -> Some b
+      (* Comparisons *)
+      | EOp (Binary Lt, [ EInt a; EInt b ]) -> Some (mk_e_bool (a < b))
+      | EOp (Binary Gt, [ EInt a; EInt b ]) -> Some (mk_e_bool (a > b))
+      | EOp (Binary Le, [ EInt a; EInt b ]) -> Some (mk_e_bool (a <= b))
+      | EOp (Binary Ge, [ EInt a; EInt b ]) -> Some (mk_e_bool (a >= b))
+      (* (a ? x : y) > y -> a && x > y *)
+      | EOp (Binary Gt, [ EIte (a, x, y); y' ]) when equal y y' -> Some Op.(a && x > y)
+      (* (a ? x : y) > x -> !a && x > y *)
+      | EOp (Binary Gt, [ EIte (a, x, y); x' ]) when equal x x' ->
+        Some Op.((not a) || x > y)
+      (* (a ? x : y) < y -> a && x < y *)
+      | EOp (Binary Lt, [ EIte (a, x, y); y' ]) when equal y y' -> Some Op.(a && x < y)
+      (* (a ? x : y) < x -> !a && x < y *)
+      | EOp (Binary Lt, [ EIte (a, x, y); x' ]) when equal x x' ->
+        Some Op.((not a) || x < y)
       | _ -> None
     in
     rewrite_until_stable (fun x -> x |> transform tr_prew |> transform tr_peval) e
@@ -952,6 +973,8 @@ let match_core (bid : boxkind) (sube : t) : t -> t =
         if List.length subargs' = List.length subargs
         then Some (mk_e_assoc op (EBox bid :: rest))
         else None
+      | EInt i1, EInt i2 ->
+        Some (mk_e_assoc (Binary Binop.Plus) [ mk_e_int (i1 - i2); EBox bid ])
       | _ -> None)
   in
   transform transformer

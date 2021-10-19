@@ -71,8 +71,8 @@ let to_string (l : logic) =
   match l with
   | UFDTLIA -> "UFDTLIA"
   | UFDTLRA -> "UFDTLRA"
-  | UFDTNIA -> "UFDTLIA"
-  | UFDTNRA -> "UFDTLIA"
+  | UFDTNIA -> "UFDTNIA"
+  | UFDTNRA -> "UFDTNRA"
   | DTLIA -> "DTLIA"
   | DTNIA -> "DTNIA"
   | QF_AX -> "QF_AX"

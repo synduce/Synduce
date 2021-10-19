@@ -43,7 +43,7 @@ and aux_down pr = function
 (* This is just a sum to test the tool on accepting the unimodal list specification. *)
 let rec f = function
   | Nil -> 0
-  | Cons (hd, tl) -> hd + f tl
+  | Cons (hd, tl) -> hd * f tl
 ;;
 
 let rec g = function

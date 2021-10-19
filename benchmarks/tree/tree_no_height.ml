@@ -11,17 +11,15 @@ let rec repr = function
   | Node (a, l, r) -> HNode (a, 1 + max (height l) (height r), repr l, repr r)
 
 and height = function
-  | Nil -> 0
+  | Nil -> 1
   | Node (_, l, r) -> 1 + max (height l) (height r)
 ;;
 
-let rec spec t = f 0 t
-
-and f s = function
-  | HNil -> s
+let rec spec = function
+  | HNil -> 0
   | HNode (a, h, l, r) ->
-    let sum = f s l in
-    f (max h (sum + a)) r
+    let x = spec l in
+    max h (x + a + spec r)
 ;;
 
 let rec target = function

@@ -633,16 +633,15 @@ let check_tinv_unsat ~(p : psi_def) (tinv : PMRS.t) (ctex : ctex)
     in
     (* Start solving... *)
     let preamble =
-      Commands.mk_preamble
-        ~induction:true
-        ~logic:
-          (SmtLogic.infer_logic
-             ~quantifier_free:false
-             ~for_induction:true
-             ~with_uninterpreted_functions:true
-             ~logic_infos:(AState.psi_def_logics p)
-             [])
-        ()
+      let logic =
+        SmtLogic.infer_logic
+          ~quantifier_free:false
+          ~for_induction:true
+          ~with_uninterpreted_functions:true
+          ~logic_infos:(AState.psi_def_logics p)
+          []
+      in
+      Commands.mk_preamble ~induction:true ~logic ()
     in
     let* () =
       AsyncSmt.exec_all cvc4_instance (preamble @ pmrs_decls @ [ mk_assert formula ])

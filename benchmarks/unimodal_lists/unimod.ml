@@ -2,10 +2,15 @@
    are kept where the list is "split" as opposed to concat-lists where
    all the elements are in the leaves.
 *)
-type 'a ulist = UNil | UElt of 'a | USplit of 'a ulist * 'a * 'a * 'a ulist
+type 'a ulist =
+  | UNil
+  | UElt of 'a
+  | USplit of 'a ulist * 'a * 'a * 'a ulist
 
 (* The usual type of cons-lists *)
-type 'a list = Nil | Cons of 'a * 'a list
+type 'a list =
+  | Nil
+  | Cons of 'a * 'a list
 
 (* Representation function from ulist -> list *)
 let rec r = function
@@ -17,18 +22,36 @@ and aux l = function
   | UNil -> l
   | UElt a -> Cons (a, l)
   | USplit (x, a, b, y) -> aux (Cons (a, Cons (b, aux l y))) x
+;;
 
 (* Invariant: unimodal list *)
 let rec is_unimodal_ulist l = is_unimodal_list (r l)
 
-and is_unimodal_list = function Nil -> true | Cons (x, l) -> aux_up x l
+and is_unimodal_list = function
+  | Nil -> true
+  | Cons (x, l) -> aux_up x l
 
-and aux_up pr = function Nil -> true | Cons (x, l) -> if pr <= x then aux_up x l else aux_down x l
+and aux_up pr = function
+  | Nil -> true
+  | Cons (x, l) -> if pr <= x then aux_up x l else aux_down x l
 
-and aux_down pr = function Nil -> true | Cons (x, l) -> pr >= x && aux_down x l
+and aux_down pr = function
+  | Nil -> true
+  | Cons (x, l) -> pr >= x && aux_down x l
+;;
 
 (* This is just a sum to test the tool on accepting the unimodal list specification. *)
-let rec f = function Nil -> 0 | Cons (hd, tl) -> hd + f tl
+let rec f = function
+  | Nil -> 0, 0
+  | Cons (hd, tl) ->
+    let freq, value = f tl in
+    let freq2 = 1 + freq_of hd tl in
+    if freq > freq2 then freq, value else freq2, hd
+
+and freq_of hd = function
+  | Nil -> 0
+  | Cons (hd2, tl) -> (if hd = hd2 then 0 else 1) + freq_of hd tl
+;;
 
 let rec g = function
   | UNil -> [%synt s0]
