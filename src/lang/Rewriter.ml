@@ -598,8 +598,8 @@ module Expression = struct
           (match op with
           | Binary Plus -> Some (mk_e_assoc op (ieval Binop.Plus ( + ) args))
           | Binary Times -> Some (mk_e_assoc op (ieval Binop.Times ( + ) args))
-          | Binary Max -> Some (mk_e_assoc op (ieval Binop.Max ( + ) args))
-          | Binary Min -> Some (mk_e_assoc op (ieval Binop.Min ( + ) args))
+          | Binary Max -> Some (mk_e_assoc op (ieval Binop.Max max args))
+          | Binary Min -> Some (mk_e_assoc op (ieval Binop.Min min args))
           | Binary And -> Some (mk_e_assoc op (beval Binop.And ( && ) args))
           | Binary Or -> Some (mk_e_assoc op (beval Binop.Or ( || ) args))
           | _ -> Some (mk_e_assoc op args)))
