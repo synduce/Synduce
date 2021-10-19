@@ -12,7 +12,7 @@ timeout_value = 400
 memout_value = 8000 * (2 ** 10)  # 4GB memory limit
 
 if sys.platform.startswith('linux'):
-    timeout = ("./extras/timeout/timeout -t %i --no-info-on-success" %
+    timeout = ("timeout %i" %
                (timeout_value))
 elif sys.platform.startswith('darwin'):
     timeout = ("timelimit -t%i" % timeout_value)
@@ -278,7 +278,91 @@ def summarize():
     print("\t- %i extras benchmarks." % num_extrs)
 
 
-def run_benchmarks(input_files, algos, optims, raw_output=None, exit_err=False):
+def run_one(progress, bench_id, command, algo, optim, filename, extra_opt, errors, raw_output):
+    if raw_output is not None:
+        raw_output.write(f"B:{bench_id}\n")
+
+    print(f"{progress : >11s}  {bench_id} 🏃", end="\r")
+    sys.stdout.flush()
+
+    process = subprocess.Popen(
+        command, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+    buf = ""
+    minor_step_count = 1
+    prev_major_step = 1
+    # Poll process for new output until finished
+    while True:
+        nextline = process.stdout.readline()
+        if process.poll() is not None:
+            break
+        sys.stdout.flush()
+        line = nextline.decode('utf-8')
+        # Decode the line information
+        stats = line.split(",")
+        if len(stats) >= 3:
+            try:
+                major_step_count = int(stats[0])
+            except:
+                major_step_count = None
+        is_result_line = (line == "success") or (
+            (major_step_count is not None) and (major_step_count > 0))
+        if is_result_line:
+            if major_step_count > prev_major_step:
+                minor_step_count = 1
+            else:
+                minor_step_count += 1
+            prev_major_step = major_step_count
+            sp = " "
+            print(
+                f"{progress : >11s}.. benchmarks/{filename} {extra_opt} {algo[1]} {optim[1]} 🏃 at step {major_step_count}:{minor_step_count}", end="\r")
+            buf += line
+        if raw_output is not None and is_result_line:
+            raw_output.write(line)
+
+    print("", end="\r")
+    output = buf.strip().split("\n")
+    elapsed = -1
+    if len(output) >= 2 and output[-1] == "success":
+        elapsed = float(output[-2].split(",")[2])
+    else:
+        errors += [bench_id]
+    return errors, elapsed
+
+
+def run_n(progress, bench_id, command, algo,
+          optim, filename, extra_opt, errors, num_runs, raw_output):
+
+    total_elapsed = 0
+    max_elapsed = 0
+    min_elapsed = timeout_value
+    running_estimate = 0
+    delta = 0
+    sp = " "
+    for i in range(num_runs):
+        errors, elapsed = run_one(progress, bench_id, command, algo,
+                                  optim, filename, extra_opt, errors, raw_output)
+        if elapsed > 0:
+            # Update stats
+            total_elapsed += elapsed
+            max_elapsed = max(elapsed, max_elapsed)
+            min_elapsed = min(elapsed, min_elapsed)
+            running_estimate = float(
+                running_estimate * i + elapsed) / float(i + 1)
+
+            msg = f"{progress : >11s} ✅ {bench_id: <65s}  [estimate: {running_estimate: 4.3f} s] ({i}/{num_runs} runs){sp : <30s}"
+            print(msg, end="\r")
+            sys.stdout.flush()
+        else:
+            print(f"\r{progress : >11s} ❌ {bench_id : <70s}{sp : <10s}", end="r")
+            sys.stdout.flush()
+            return errors,  elapsed, 0
+
+    elapsed = total_elapsed / num_runs
+    delta = 1000 * max(abs(max_elapsed - elapsed), abs(min_elapsed-elapsed))
+    return errors,  elapsed, delta
+
+
+def run_benchmarks(input_files, algos, optims, num_runs=1, raw_output=None, exit_err=False):
     benchmark_cnt = 0
     benchmark_total = len(input_files) * len(algos) * len(optims)
     errors = []
@@ -313,57 +397,17 @@ def run_benchmarks(input_files, algos, optims, raw_output=None, exit_err=False):
                             os.path.realpath(os.path.join(
                                 "benchmarks", filename)),
                             soln_file_opt, gen_opt))
-
-                if raw_output is not None:
-                    raw_output.write(f"B:{bench_id}\n")
-
-                print(f"{progress : >11s}  {bench_id} 🏃", end="\r")
-                sys.stdout.flush()
-
-                process = subprocess.Popen(
-                    command, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
-                buf = ""
-                minor_step_count = 1
-                prev_major_step = 1
-                # Poll process for new output until finished
-                while True:
-                    nextline = process.stdout.readline()
-                    if process.poll() is not None:
-                        break
-                    sys.stdout.flush()
-                    line = nextline.decode('utf-8')
-                    # Decode the line information
-                    stats = line.split(",")
-                    if len(stats) >= 3:
-                        try:
-                            major_step_count = int(stats[0])
-                        except:
-                            major_step_count = None
-                    is_result_line = (line == "success") or (
-                        (major_step_count is not None) and (major_step_count > 0))
-                    if is_result_line:
-                        if major_step_count > prev_major_step:
-                            minor_step_count = 1
-                        else:
-                            minor_step_count += 1
-                        prev_major_step = major_step_count
-                        print(
-                            f"{progress : >11s}./Synduce benchmarks/{filename} {extra_opt} {algo[1]} {optim[1]} 🏃 at step {major_step_count}:{minor_step_count}", end="\r")
-                        buf += line
-                    if raw_output is not None and is_result_line:
-                        raw_output.write(line)
-
-                print("", end="\r")
-                output = buf.strip().split("\n")
-                if len(output) >= 2 and output[-1] == "success":
-                    elapsed = float(output[-2].split(",")[2])
+                # Run the benchmark n times.
+                errors, elapsed, delta = run_n(progress, bench_id, command, algo,
+                                               optim, filename, extra_opt, errors, num_runs, raw_output)
+                if elapsed > 0:
                     sp = " "
-                    msg = f"{progress : >11s} ✅ {bench_id: <70s}  [{elapsed: 4.3f} s]{sp : <10s}"
+                    msg = f"{progress : >11s} ✅ {bench_id: <66s} (×{num_runs})[{elapsed: 4.3f} s ± {delta : .0f}ms]{sp : <30s}"
                     print(msg)
                 else:
-                    errors += [bench_id]
-                    print(f"\r{progress : >11s} ❌ {bench_id : <70s}")
-                sys.stdout.flush()
+                    print(f"\r{progress : >11s} ❌ {bench_id : <120s}")
+                    sys.stdout.flush()
+
     elapsed = time.time() - start
     if len(errors) <= 0:
         print(
@@ -391,11 +435,7 @@ if __name__ == "__main__":
     sys.stdout.flush()
     aparser = argparse.ArgumentParser()
     aparser.add_argument(
-        "-t", "--table", help=table_info, type=int, default=-1)
-    aparser.add_argument(
-        "-o", "--output", help="Dump Synduce output in -i mode to file (appending to file).", type=str, default=-1)
-    aparser.add_argument(
-        "--run", help="Run tests for all benchmarks.", action="store_true")
+        "--cvc5", help="Force use of CVC5 (useful if you can't install CVC4 on Mac M1)", action="store_true")
     aparser.add_argument(
         "--generate-benchmarks", help="Generate SyGuS benchmarks.", action="store_true")
     aparser.add_argument(
@@ -403,24 +443,29 @@ if __name__ == "__main__":
     aparser.add_argument(
         "--kick-the-tires", help="Run a subset of benchmarks.", action="store_true")
     aparser.add_argument(
-        "--lifting-benchmarks", help="Run the lifting benchmarks.", action="store_true")
+        "-o", "--output", help="Dump Synduce output in -i mode to file (appending to file).", type=str, default=-1)
     aparser.add_argument(
-        "--constraint-benchmarks", help="Run the lifting benchmarks.", action="store_true")
+        "-b", "--benchmarks", help="Run the lifting benchmarks.", type=str,
+        choices=["all", "constraint", "lifting", "base", "small"], default="small")
     aparser.add_argument(
-        "--base-benchmarks", help="Run the base benchmarks.", action="store_true")
+        "-n", "--num-runs", help="Run each benchmark NUM times.", type=int, default=1
+    )
     aparser.add_argument(
-        "--all-benchmarks", help="Run all the benchmarks and exit.", action="store_true")
+        "-t", "--table", help=table_info, type=int, default=-1)
     aparser.add_argument(
         "--summary", help="Give a summary of benchmarks.", action="store_true")
+
     aparser.add_argument(
-        "--cvc5", help="Force use of CVC5 (useful if you can't install CVC4 on Mac M1)", action="store_true")
+        "-T", "--timeout", help="Set the timeout in seconds.", type=int, default=600)
     args = aparser.parse_args()
 
     if args.summary:
         summarize()
         exit()
 
+    # Algorithm set selection by table number.
     table_no = args.table
+    # Optional output settings.
     generate_solutions = args.generate_solutions
     generate_benchmarks = args.generate_benchmarks
 
@@ -433,38 +478,74 @@ if __name__ == "__main__":
         except:
             pass
 
+    # Set number of runs and timeout
+    runs = args.num_runs
+    timeout_value = args.timeout
+
+    # Benchmark set selection
+    run_lifting_benchmarks = False
+    run_constraint_benchmarks = False
+    run_base_benchmarks = False
+    run_kick_the_tires_only = False
+
+    if args.benchmarks == "constraint":
+        run_constraint_benchmarks = True
+    elif args.benchmarks == "lifting":
+        run_lifting_benchmarks = True
+    elif args.benchmarks == "base":
+        run_base_benchmarks = True
+    elif args.benchmarks == "small":
+        run_kick_the_tires_only = True
+    elif args.benchmarks is not None:  # e.g. benchmarks = "all"
+        run_lifting_benchmarks = True
+        run_constraint_benchmarks = True
+        run_base_benchmarks = True
+
+    # Background solver selection : cvc4 by default.
     cvc = "--cvc4"
     if args.cvc5:
         cvc = "--cvc5"
-    # === Special runs with simplified output ===
-    if args.lifting_benchmarks or args.all_benchmarks:
-        algos = [["partialbounding", cvc]]
-        optims = [["all", ""]]
-        run_benchmarks(lifting_benchmarks, algos, optims, raw_output)
 
-    if args.constraint_benchmarks or args.all_benchmarks:
-        algos = [["partialbounding", cvc]]
+    # Running specific sets if we're supposed to.
+    if run_kick_the_tires_only:
+        algos = [["partbnd", cvc]]
         optims = [["all", ""]]
-        run_benchmarks(constraint_benchmarks, algos, optims, raw_output)
+        run_benchmarks(kick_the_tires_set, algos,
+                       optims, raw_output=raw_output, num_runs=runs)
+        exit(0)
 
-    if args.base_benchmarks or args.all_benchmarks:
-        algos = [["partialbounding", cvc]]
+    if run_lifting_benchmarks:
+        algos = [["partbnd", cvc]]
         optims = [["all", ""]]
-        run_benchmarks(base_benchmark_set, algos, optims, raw_output)
+        run_benchmarks(lifting_benchmarks, algos,
+                       optims, raw_output=raw_output, num_runs=runs)
 
-    if args.base_benchmarks or args.lifting_benchmarks or args.constraint_benchmarks:
+    if run_constraint_benchmarks:
+        algos = [["partbnd", cvc]]
+        optims = [["all", ""]]
+        run_benchmarks(constraint_benchmarks, algos,
+                       optims, raw_output=raw_output, num_runs=runs)
+
+    if run_base_benchmarks:
+        algos = [["partbnd", cvc]]
+        optims = [["all", ""]]
+        run_benchmarks(base_benchmark_set, algos,
+                       optims, raw_output=raw_output, num_runs=runs)
+
+    # If we were supposed to run a specific set of benchmarks, we're done
+    if run_base_benchmarks or run_constraint_benchmarks or run_lifting_benchmarks:
         exit()
 
-    # === TABLES and older runs ===
+    # === === TABLES and CAV runs === ===
     if run_test_only:
-        algos = [["partialbounding", ""]]
+        algos = [["partbnd", ""]]
         optims = [["all", cvc]]
 
     # Table 1 / CAV 21 paper : compare Synduce and Baseline
     elif table_no == 1:
 
         algos = [
-            ["partialbounding", "--no-gropt"],
+            ["partbnd", "--no-gropt"],
             ["acegis", "--acegis --no-gropt"]
         ]
         optims = [["all", ""]]
@@ -473,7 +554,7 @@ if __name__ == "__main__":
     elif table_no == 2:
 
         algos = [
-            ["partialbounding", "--no-gropt"],
+            ["partbnd", "--no-gropt"],
             ["acegis", "--acegis --no-gropt"],
             ["ccegis", "--ccegis --no-gropt"]
         ]
@@ -483,7 +564,7 @@ if __name__ == "__main__":
     elif table_no == 3:
 
         algos = [
-            ["partialbounding", "--no-gropt"],
+            ["partbnd", "--no-gropt"],
             ["acegis", "--acegis --no-gropt"],
         ]
 
@@ -497,17 +578,17 @@ if __name__ == "__main__":
 
     # Table 4 / Test
     elif table_no == 4:
-        algos = [["partialbounding"]]
+        algos = [["partbnd"]]
         optims = [["all", ""]]
 
     # Table 5 / Test with cvc4 against baseline comparison
     elif table_no == 5:
-        algos = [["partialbounding", "--cvc4"], ["acegis", "--acegis --cvc4"]]
+        algos = [["partbnd", "--cvc4"], ["acegis", "--acegis --cvc4"]]
         optims = [["all", ""]]
 
     # No table - just run the base algorithm.
     else:
-        algos = [["partialbounding", ""]]
+        algos = [["partbnd", ""]]
         optims = [["all", ""]]
 
     # Benchmark set selection.
@@ -529,4 +610,5 @@ if __name__ == "__main__":
         else:
             input_files = kick_the_tires_set
 
-    run_benchmarks(input_files, algos, optims, raw_output, exit_err=True)
+    run_benchmarks(input_files, algos, optims, raw_output=raw_output,
+                   exit_err=True, num_runs=runs)

@@ -22,7 +22,7 @@ caption_optimizations = "Optimization Evaluation Results: We evaluate {\\tool} a
              Experiments are run on a laptop with 16G memory and an i7-8750H 6-core CPU at 2.20GHz running Ubuntu 19.10."
 
 
-algorithms = ["partialbounding", "acegis", "ccegis"]
+algorithms = ["partbnd", "acegis", "ccegis"]
 versions = ["all", "ini", "st", "d", "off"]
 fields = ["synt", "verif", "#i", "last"]
 
@@ -198,15 +198,15 @@ def produce_tex_table(tex_output_file, data):
                 bkey = benchmark_class + "/" + benchmark_file + ".pmrs"
                 acegis_bf = False
 
-                # Pick best optimized version for partialbounding
-                a_data = data[bkey, "partialbounding"]
+                # Pick best optimized version for partbnd
+                a_data = data[bkey, "partbnd"]
                 versions = ["all", "st", "d", "off"]
                 best_v = "all"
 
-                if (bkey, "partialbounding") not in data.keys():
-                    print("No data for %s, partialbounding" % bkey)
+                if (bkey, "partbnd") not in data.keys():
+                    print("No data for %s, partbnd" % bkey)
                 else:
-                    b_data = data[bkey, "partialbounding"][best_v]
+                    b_data = data[bkey, "partbnd"][best_v]
                     if "res" in b_data:
                         req_iters, _, req_time, _ = b_data["res"]
                         req_t = "%3.2f" % float(req_time)
@@ -392,8 +392,8 @@ def produce_versions_tex_table(tex_output_file, data):
             tex.write("\t\t\t\\hline\n")
         for benchmark_file, benchmark_info in benchmarks:
             bkey = benchmark_class + "/" + benchmark_file + ".pmrs"
-            # Collect Data for partialbounding
-            algo = "partialbounding"
+            # Collect Data for partbnd
+            algo = "partbnd"
             csvline = []
             if (bkey, algo) in data.keys():
                 bdata = data[bkey, algo]
