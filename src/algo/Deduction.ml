@@ -53,7 +53,7 @@ let assign_match_box ((bid, bargs) : int * IS.t) ~(of_ : Expression.t)
   let boxed = ref None in
   let box_it (e0 : t) (bid : t) =
     match !boxed with
-    | Some b -> if equal b e0 then Some bid else None
+    | Some b -> if eequals b e0 then Some bid else None
     | None ->
       boxed := Some e0;
       Some bid
@@ -82,7 +82,7 @@ let assign_match_box ((bid, bargs) : int * IS.t) ~(of_ : Expression.t)
 ;;
 
 module Solver = struct
-  let max_deduction_attempts = 10
+  let max_deduction_attempts = 20
 
   type deduction_loop_state =
     { expression : Expression.t
@@ -124,7 +124,7 @@ module Solver = struct
           then
             Log.verbose
               (Log.wrap2
-                 "@[~ ~ Try to %a %a.@]"
+                 "@[~ ~ %a %a.@]"
                  (styled (`Bg `Magenta) string)
                  "match"
                  Expression.pp
@@ -133,7 +133,7 @@ module Solver = struct
              match_as_subexpr ~lemma (Position arg_id) arg_expr ~of_:state.expression
            with
           | Some res' ->
-            (* Some match; Discard the argument and box the subexpression.  *)
+            (* Some match; box the subexpression.  *)
             if verb
             then
               Log.verbose (fun fmt () ->
@@ -167,38 +167,52 @@ module Solver = struct
               Log.verbose (fun fmt () ->
                   pf
                     fmt
-                    "@[~ ~ Try to %a %a.@]@."
+                    "@[~ ~ %a %a.@]@."
                     (styled (`Bg `Cyan) string)
                     "assign"
                     (pair ~sep:comma Expression.pp_ivar Expression.pp_ivarset)
                     hd);
             (match assign_match_box hd ~of_:state.expression with
             | Some (res', (hd_id, hd_e)) ->
+              (match
+                 List.find bound_args ~f:(fun (_, arg_expr) -> eequals hd_e arg_expr)
+               with
+              | Some (arg_pos, _) ->
+                (* A match has been found, but somehow it matches an existing argument. *)
+                let res'' =
+                  Expression.rewrite_until_stable
+                    (function
+                      | EBox (Indexed id) when id = hd_id -> EBox (Position arg_pos)
+                      | _ as t -> t)
+                    res'
+                in
+                floop i' { state with expression = res'' }
               (* Some subexpression has the same free variables as the free box. Box it,
               a bind the box to that subexpression.
              *)
-              if verb
-              then
-                Log.verbose (fun fmt () ->
-                    pf
-                      fmt
-                      "@[~ ~ ✅ λ%a.%a@;%a=@;%a@]"
-                      (box Expression.pp)
-                      (Expression.EBox (Indexed hd_id))
-                      (box Expression.pp)
-                      res'
-                      (box Expression.pp)
-                      hd_e
-                      (box Expression.pp)
-                      state.expression);
-              floop
-                i'
-                { expression = res'
-                ; free_boxes = tl
-                ; full_boxes = (hd_id, hd_e) :: state.full_boxes
-                ; free_bound_exprs = state.queue
-                ; queue = []
-                }
+              | None ->
+                if verb
+                then
+                  Log.verbose (fun fmt () ->
+                      pf
+                        fmt
+                        "@[~ ~ ✅ λ%a.%a@;%a=@;%a@]"
+                        (box Expression.pp)
+                        (Expression.EBox (Indexed hd_id))
+                        (box Expression.pp)
+                        res'
+                        (box Expression.pp)
+                        hd_e
+                        (box Expression.pp)
+                        state.expression);
+                floop
+                  i'
+                  { expression = res'
+                  ; free_boxes = tl
+                  ; full_boxes = (hd_id, hd_e) :: state.full_boxes
+                  ; free_bound_exprs = state.queue
+                  ; queue = []
+                  })
             | None ->
               (* No match; there's a good change this problem has no solution, but try again with arguments.  *)
               if verb then Log.verbose_msg "~ ~ ~ ❌@.";
@@ -316,47 +330,49 @@ module Solver = struct
       (guesses : Expression.t option list)
       : [> `First of string * variable list * term | `Second of Skeleton.t | `Third ]
     =
-    let validate_via_solver guess =
-      let open SmtInterface in
-      let equations_to_check =
-        let eqns' =
-          List.map eqns ~f:(fun (_, pre, lhs, rhs) ->
-              Option.map (guess_application ~xi guess rhs) ~f:(fun rhs' ->
-                  let constr = Terms.(lhs == rhs') in
-                  pre, Terms.(~!constr)))
-        in
-        match all_or_none eqns' with
-        | Some eqns'' -> eqns''
-        | None -> failwith "UNSAT"
-      in
-      let solver = SyncSmt.make_z3_solver () in
-      let () =
-        SyncSmt.exec_all
-          solver
-          (Commands.mk_preamble
-             ~logic:(SmtLogic.infer_logic (List.map ~f:snd equations_to_check))
-             ())
-      in
-      List.for_all equations_to_check ~f:(fun (pre, constr) ->
-          SyncSmt.spush solver;
-          let fv = Analysis.free_variables constr in
-          SyncSmt.exec_all solver (Commands.decls_of_vars fv);
-          (match pre with
-          | Some precond -> SyncSmt.smt_assert solver (smt_of_term precond)
-          | None -> ());
-          SyncSmt.smt_assert solver (smt_of_term constr);
-          match SyncSmt.check_sat solver with
-          | Unsat ->
-            SyncSmt.spop solver;
-            true
-          | _ ->
-            SyncSmt.close_solver solver;
-            false)
-    in
     let validate_guess guess =
-      if List.for_all guesses ~f:(function
-             | Some x' -> Poly.equal guess x'
-             | _ -> false)
+      let validate_via_solver guess =
+        let open SmtInterface in
+        let equations_to_check =
+          let eqns' =
+            List.concat_map eqns ~f:(fun (_, pre, lhs, rhs) ->
+                if Set.mem (Analysis.free_variables rhs) xi
+                then
+                  [ Option.map (guess_application ~xi guess rhs) ~f:(fun rhs' ->
+                        let constr = Terms.(lhs == rhs') in
+                        pre, Terms.(~!constr))
+                  ]
+                else [])
+          in
+          match all_or_none eqns' with
+          | Some eqns'' -> eqns''
+          | None -> failwith "UNSAT"
+        in
+        let solver = SyncSmt.make_z3_solver () in
+        let () =
+          SyncSmt.exec_all
+            solver
+            (Commands.mk_preamble
+               ~logic:(SmtLogic.infer_logic (List.map ~f:snd equations_to_check))
+               ())
+        in
+        List.for_all equations_to_check ~f:(fun (pre, constr) ->
+            SyncSmt.spush solver;
+            let fv = Analysis.free_variables constr in
+            SyncSmt.exec_all solver (Commands.decls_of_vars fv);
+            (match pre with
+            | Some precond -> SyncSmt.smt_assert solver (smt_of_term precond)
+            | None -> ());
+            SyncSmt.smt_assert solver (smt_of_term constr);
+            match SyncSmt.check_sat solver with
+            | Unsat ->
+              SyncSmt.spop solver;
+              true
+            | _ ->
+              SyncSmt.close_solver solver;
+              false)
+      in
+      if List.for_all guesses ~f:(Option.value_map ~default:false ~f:(Poly.equal guess))
       then true
       else (
         try validate_via_solver guess with
@@ -381,7 +397,7 @@ module Solver = struct
       let ok_guesses =
         let filter guess =
           match guess with
-          (* Arbitrary cutoff for guess size *)
+          (* Arbitrary cutoff for guess size (cheap Occam razor)*)
           | Some g -> if Expression.size g > 15 then None else Some g
           | None -> None
         in
@@ -397,19 +413,7 @@ module Solver = struct
       if validate_guess guess_1
       then (
         match build_soln guess_1 with
-        | Some (fname, args, body) ->
-          Log.verbose
-            Fmt.(
-              fun fmt () ->
-                pf
-                  fmt
-                  "Found partial solution %s(%a) = %a."
-                  fname
-                  (list ~sep:comma Variable.pp)
-                  args
-                  Term.pp_term
-                  body);
-          `First (fname, args, body)
+        | Some (fname, args, body) -> `First (fname, args, body)
         | None ->
           (match Skeleton.of_expression guess_1 with
           | Some sk -> `Second sk
@@ -440,11 +444,8 @@ module Solver = struct
     match functionalize ~verb:false ~args ~lemma:pre_expr lhs_expr [] with
     | Ok (_, r) ->
       let r = factorize r in
-      Log.verbose Fmt.(fun fmt () -> pf fmt "Solution =@;%a" (box Expression.pp) r);
       Some r
-    | Error _ ->
-      Log.verbose Fmt.(fun fmt () -> pf fmt "No solution.");
-      None
+    | Error _ -> None
   ;;
 
   (** Returns either:

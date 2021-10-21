@@ -1,5 +1,5 @@
 (executable
  (name Synduce)
- (modes native js)
- (public_name Synduce.Driver)
+ (modes native)
+ (public_name Synduce)
  (libraries Lib fmt getopt base parsexp compiler-libs sexplib))

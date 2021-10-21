@@ -9,6 +9,7 @@ module StringMap = Map.M (Int)
 type z = Z : z
 type 'n s = S : 'n -> 'n s
 
+let identity x = x
 let first (a, _) = a
 let second (_, b) = b
 let ( <| ) (f1 : 'a -> 'b) (f2 : 'c -> 'a) x = f1 (f2 x)

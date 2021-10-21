@@ -104,7 +104,7 @@ constraint_benchmarks = [
     # bst
     ["constraints/bst/contains.ml", ""],
     ["constraints/bst/count_lt.ml", "-NB"],
-    ["constraints/bst/count_between.ml", "-NB"],
+    ["constraints/bst/count_between.ml", "-NB --no-gropt"],
     ["constraints/bst/most_frequent_v1.ml", ""],
     ["constraints/bst/from_list_contains.ml", ""],
     ["constraints/bst/from_list_max.ml", "-NB -n 100"],

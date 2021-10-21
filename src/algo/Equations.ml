@@ -574,7 +574,7 @@ module Solve = struct
         Log.verbose_msg "Partial solution!";
         Either.First (partial_soln, CSynthFun (xi.vname, args, ret_sort, default_grammar))
       | `Second skeleton ->
-        Log.verbose_msg "Got a skeleton!";
+        Log.verbose_msg "Got a skeleton, no partial solution.";
         let opt_grammar =
           Grammars.generate_grammar
             ~nonlinear

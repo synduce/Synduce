@@ -243,7 +243,7 @@ module Expression = struct
       | EIte (a, b, c) ->
         pf
           f
-          "@[%a@;%a %a@ %a@ %a %a@]"
+          "@[(%a@;%a %a@ %a@ %a %a)@]"
           (styled `Faint (styled `Bold string))
           "if"
           pp
@@ -611,6 +611,14 @@ module Expression = struct
     in
     let tr_prew _ e =
       match e with
+      | EOp (Binary And, ETrue :: rest) ->
+        (match rest with
+        | [] -> Some ETrue
+        | _ -> Some (mk_e_assoc (Binary And) rest))
+      | EOp (Binary And, EFalse :: rest) ->
+        (match rest with
+        | [] -> Some ETrue
+        | _ -> Some (mk_e_assoc (Binary And) rest))
       (* not (not x) -> x *)
       | EOp (Unary Not, [ EOp (Unary Not, [ x ]) ]) -> Some x
       (* max (abs x) 0 -> abs x *)
@@ -655,7 +663,12 @@ module Expression = struct
     let rule e0 =
       let g f e' =
         match e' with
-        | EOp (op, args) -> Some (coll op (List.map ~f args))
+        | EOp (op, args) ->
+          Some
+            (coll
+               op
+               ((if is_commutative op then List.sort ~compare else identity)
+                  (List.map ~f args)))
         | _ -> None
       in
       simplify (transform g e0)
@@ -693,13 +706,13 @@ module Expression = struct
       | _ -> mk_e_int 0)
   ;;
 
-  let uses_boxkind (b : boxkind) =
+  let count_boxkind (b : boxkind) =
     let case _ e =
       match e with
-      | EBox b' -> Some (Poly.equal b b')
+      | EBox b' -> if Poly.equal b b' then Some 1 else None
       | _ -> None
     in
-    reduce ~join:( || ) ~case ~init:false
+    reduce ~join:( + ) ~case ~init:0
   ;;
 end
 
@@ -913,6 +926,12 @@ let distrib (op1 : Operator.t) (args : t list) : t =
                    (List.map args ~f:(fun arg -> mk_e_assoc op1 (acc @ [ arg ])))
                ]
              else acc @ [ e' ]
+           | EIte (cond, true_br, false_br) ->
+             [ mk_e_ite
+                 cond
+                 (mk_e_assoc op1 (acc @ [ true_br ]))
+                 (mk_e_assoc op1 (acc @ [ false_br ]))
+             ]
            | _ -> acc @ [ e' ]))
   in
   let args = if is_commutative op1 then List.sort ~compare args else args in
@@ -935,6 +954,10 @@ let expand (e : t) : t =
   rewrite_until_stable expand_rule e
 ;;
 
+let eequals a b =
+  equal (expand (factorize (normalize a))) (expand (factorize (normalize b)))
+;;
+
 (** Rewrite rule out of a lemma. *)
 let rewrite_with_lemma (lemma : t) : t -> t list =
   let conjs =
@@ -947,16 +970,22 @@ let rewrite_with_lemma (lemma : t) : t -> t list =
       let open Operator in
       match e with
       (* a >= x : a -> max a x *)
-      | EOp (Binary Ge, [ a; EInt x ]) -> [ a, mk_e_assoc (Binary Max) [ a; EInt x ] ]
+      | EOp (Binary Ge, [ a; EInt x ]) | EOp (Binary Le, [ EInt x; a ]) ->
+        [ a, mk_e_assoc (Binary Max) [ a; EInt x ] ]
+      | EOp (Binary Gt, [ a; EInt x ]) | EOp (Binary Lt, [ EInt x; a ]) ->
+        [ a, mk_e_assoc (Binary Max) [ a; EInt (x + 1) ] ]
       (* a <= x : a -> min a x *)
-      | EOp (Binary Le, [ a; EInt x ]) -> [ a, mk_e_assoc (Binary Min) [ a; EInt x ] ]
+      | EOp (Binary Le, [ a; EInt x ]) | EOp (Binary Ge, [ EInt x; a ]) ->
+        [ a, mk_e_assoc (Binary Min) [ a; EInt x ] ]
+      | EOp (Binary Lt, [ a; EInt x ]) | EOp (Binary Gt, [ EInt x; a ]) ->
+        [ a, mk_e_assoc (Binary Min) [ a; EInt (x - 1) ] ]
       | _ -> []
     in
     List.concat_map ~f:r conjs
   in
   let apply_dyn_rule e =
     List.map dyn_rules ~f:(fun (lhs, rhs) ->
-        let e' = transform (fun _ e -> if equal lhs e then Some rhs else None) e in
+        let e' = transform (fun _ e -> if eequals lhs e then Some rhs else None) e in
         e')
   in
   apply_dyn_rule
@@ -964,12 +993,14 @@ let rewrite_with_lemma (lemma : t) : t -> t list =
 
 let match_core (bid : boxkind) (sube : t) : t -> t =
   let transformer _ e0 =
-    if equal sube e0
+    if eequals sube e0
     then Some (EBox bid)
     else (
       match e0, sube with
       | EOp (op, args), EOp (subop, subargs) when Operator.equal op subop ->
-        let subargs', rest = List.partition_tf ~f:(List.mem ~equal subargs) args in
+        let subargs', rest =
+          List.partition_tf ~f:(List.mem ~equal:eequals subargs) args
+        in
         if List.length subargs' = List.length subargs
         then Some (mk_e_assoc op (EBox bid :: rest))
         else None
@@ -978,6 +1009,11 @@ let match_core (bid : boxkind) (sube : t) : t -> t =
       | _ -> None)
   in
   transform transformer
+;;
+
+let match_as_is (bid : boxkind) (sube : t) ~(of_ : t) : t option =
+  let res = match_core bid sube of_ in
+  if count_boxkind bid res > 0 then Some res else None
 ;;
 
 (** Matching subexpressions (up to rewriting) *)
@@ -994,23 +1030,25 @@ let match_after_expand ?(lemma = None) (bid : boxkind) (sube : t) ~(of_ : t) : t
            lemma)
         ~default:[ of_ ]
     in
-    List.remove_consecutive_duplicates ~equal choices_from_lemma_r
+    List.remove_consecutive_duplicates ~equal:eequals choices_from_lemma_r
   in
-  let e_choices = List.map ~f:(match_core bid sube) of_choices in
-  match List.filter ~f:(uses_boxkind bid) e_choices with
+  match List.filter_map ~f:(fun of_ -> match_as_is bid sube ~of_) of_choices with
   | hd :: _ -> Some hd
   | _ -> None
-;;
-
-let match_after_factorization (bid : boxkind) (sube : t) ~(of_ : t) : t option =
-  let sube = factorize sube in
-  let of_fac = factorize of_ in
-  let res = match_core bid sube of_fac in
-  if uses_boxkind bid res then Some res else None
 ;;
 
 let match_as_subexpr ?(lemma = None) (bid : boxkind) (sube : t) ~(of_ : t) : t option =
   match match_after_expand ~lemma bid sube ~of_ with
   | Some hd -> Some hd
-  | None -> match_after_factorization bid sube ~of_
+  | None -> match_as_is bid (factorize sube) ~of_:(factorize of_)
+;;
+
+let simplify_term (t : term) : term =
+  let simpl =
+    let%bind expr = of_term t in
+    to_term (simplify expr)
+  in
+  match simpl with
+  | Some s -> s
+  | None -> t
 ;;

@@ -155,7 +155,7 @@ let term_detail_to_lemma ~(p : psi_def) (det : term_state_detail) : term option 
       det.recurs_elim
   in
   let f lem = Term.substitution subst lem in
-  T.mk_assoc Binop.And (List.map ~f det.lemmas)
+  Option.map ~f:Rewriter.simplify_term (T.mk_assoc Binop.And (List.map ~f det.lemmas))
 ;;
 
 let empty_term_state : term_state = Map.empty (module Terms)

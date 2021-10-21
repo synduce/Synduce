@@ -697,7 +697,7 @@ let mk_ite ?(pos = dummy_loc) ?(typ = None) (c : term) (th : term) (el : term) =
   let typ =
     match typ with
     | Some t -> t
-    | None -> RType.get_fresh_tvar ()
+    | None -> th.ttyp
   in
   { tpos = pos; tkind = TIte (c, th, el); ttyp = typ }
 ;;

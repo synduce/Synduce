@@ -80,6 +80,7 @@ let rec refinement_loop (p : psi_def) (lstate : refinement_loop_state) =
     | _ ->
       (* A failure during the bounded check is an error. *)
       Log.error_msg "Solution is incorrect, and synthesized and verifier disagree on why.";
+      Log.error_msg "Try without grammar optimizations (option --no-gropt).";
       Error RFail)
   | _ as synt_failure_info ->
     (* On synthesis failure, start by trying to synthesize lemmas. *)
