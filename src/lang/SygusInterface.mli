@@ -61,18 +61,6 @@ val term_of_sygus
   -> term
 
 (**
-    Given a set of variables, returns a list of commands that correspond to the
-    sort declarations necessary of declare these variables.
-    It is useful especially if the variables as of used-defined variant types.
- *)
-val declare_sorts_of_vars : VarSet.t -> Sygus.command list
-
-(**
-    Returns a list of sygus commands of the form (declare-const v sort) from a set of variables.
-*)
-val declarations_of_vars : VarSet.t -> Sygus.command list
-
-(**
     Given a list of types, returns a list of sorted sygus variables.
     Returns as many variables as there are elements in the input lists,
     and a fresh name is used for each created variable.
@@ -87,3 +75,22 @@ val wait_on_failure
   :  int ref
   -> (Sygus.solver_response * 'a) Lwt.t
   -> (Sygus.solver_response * 'a) Lwt.t
+
+module HLSolver : sig
+  type t =
+    { declared : string Hash_set.t
+    ; logic : string
+    ; constraints : Sygus.command list
+    ; extra_defs : Sygus.command list
+    ; definitions : Sygus.command list
+    ; sorts : Sygus.command list
+    ; objs : Sygus.command list
+    }
+
+  val make : ?extra_defs:Sygus.command list -> unit -> t
+  val synthesize : Sygus.command list -> t -> t
+  val constrain : term list -> t -> t
+  val set_logic : string -> t -> t
+  val solve : t -> Sygus.solver_response option Lwt.t * int Lwt.u
+  val to_file : string -> t -> unit
+end

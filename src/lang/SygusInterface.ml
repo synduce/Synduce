@@ -158,11 +158,17 @@ let id_kind_of_s env s =
   let string_case s =
     match s with
     | "ite" -> IIte
+    (* Old CVC4 Tuples *)
     | "mkTuple" -> ITupleCstr
     | s when String.is_prefix ~prefix:"__cvc4_tuple_" s ->
       let i = Int.of_string (Str.last_chars s 1) in
       ITupleAccessor i
-    | _ -> INotDef
+    (* New tuple repr for CVC5 *)
+    | _ when Tuples.is_constr_name s -> ITupleCstr
+    | _ ->
+      (match Tuples.proj_of_proj_name s with
+      | Some (_, i) -> ITupleAccessor i
+      | None -> INotDef)
   in
   match Map.find env s with
   | Some v -> IVar v
@@ -254,7 +260,9 @@ and let_bindings_of_sygus
 (*                           COMMANDS                                                            *)
 (* ============================================================================================= *)
 
-let declare_sort_of_rtype (sname : string) (variants : (string * RType.t list) list) =
+let declare_sort_of_rtype (sname : string) (variants : (string * RType.t list) list)
+    : command
+  =
   let dt_cons_decs =
     let f (variantname, variantargs) =
       ( variantname
@@ -266,35 +274,37 @@ let declare_sort_of_rtype (sname : string) (variants : (string * RType.t list) l
   CDeclareDataType (sname, dt_cons_decs)
 ;;
 
-let declare_sorts_of_vars (vars : VarSet.t) =
+let declare_sort_of_tuple (tl : RType.t list) : string * command =
+  let name = Tuples.type_name_of_types tl in
+  let dt_cons_decs =
+    let constr_name = Tuples.constr_name_of_types tl in
+    let f i t =
+      let proj_name = Tuples.proj_name_of_types tl i in
+      proj_name, sort_of_rtype t
+    in
+    (* A tuple has a single constructor. *)
+    [ constr_name, List.mapi ~f tl ]
+  in
+  name, CDeclareDataType (name, dt_cons_decs)
+;;
+
+let declare_sorts_of_var (v : variable) =
   let sort_decls = Map.empty (module String) in
   let rec f sort_decls t =
     RType.(
       match t with
       | TInt | TBool | TChar | TString -> sort_decls
-      | TTup tl -> List.fold ~f ~init:sort_decls tl
+      | TTup tl ->
+        let sort_decls' = List.fold ~f ~init:sort_decls tl in
+        let tuple_name, tuple_decl = declare_sort_of_tuple tl in
+        Map.set sort_decls' ~key:tuple_name ~data:tuple_decl
       | TNamed tname ->
         (match get_variants t with
         | [] -> sort_decls
         | l -> Map.set sort_decls ~key:tname ~data:(declare_sort_of_rtype tname l))
       | _ -> sort_decls)
   in
-  let decl_map =
-    List.fold ~f ~init:sort_decls (List.map ~f:Variable.vtype_or_new (Set.elements vars))
-  in
-  snd (List.unzip (Map.to_alist decl_map))
-;;
-
-let declarations_of_vars (vars : VarSet.t) : command list =
-  let compare v1 v2 = String.compare v1.vname v2.vname in
-  let uniquely_named =
-    List.remove_consecutive_duplicates
-      ~equal:(fun v1 v2 -> compare v1 v2 = 0)
-      (List.sort ~compare (Set.elements vars))
-  in
-  List.map
-    ~f:(fun v -> CDeclareVar (v.vname, sort_of_rtype (Variable.vtype_or_new v)))
-    uniquely_named
+  Map.to_alist (f sort_decls (Variable.vtype_or_new v))
 ;;
 
 let sorted_vars_of_types (tl : RType.t list) : sorted_var list =
@@ -325,3 +335,110 @@ let wait_on_failure (counter : int ref) (t : (solver_response * 'a) Lwt.t)
         Int.decr counter;
         Lwt.return t)
 ;;
+
+(* ============================================================================================= *)
+(*                       ABSTRACTION: SOLVER CLASS                                               *)
+(* ============================================================================================= *)
+
+module HLSolver = struct
+  type t =
+    { declared : string Hash_set.t
+    ; logic : string
+    ; constraints : command list
+    ; extra_defs : command list
+    ; definitions : command list
+    ; sorts : command list
+    ; objs : command list
+    }
+
+  let make ?(extra_defs = []) () =
+    { declared = Hash_set.create (module String)
+    ; logic = "LIA"
+    ; constraints = []
+    ; extra_defs
+    ; definitions = []
+    ; sorts = []
+    ; objs = []
+    }
+  ;;
+
+  let declare_sort (solver : t) ((s, command) : string * command) : t =
+    if Hash_set.mem solver.declared s
+    then solver
+    else (
+      Hash_set.add solver.declared s;
+      { solver with sorts = solver.sorts @ [ command ] })
+  ;;
+
+  let warning (v : variable) : unit =
+    if RType.is_function (Variable.vtype_or_new v)
+    then
+      Log.error
+        Fmt.(
+          fun fmt () ->
+            pf
+              fmt
+              "Trying to declare %s in solver. Maybe you forgot do declare a synthesis \
+               objective first?"
+              v.vname)
+  ;;
+
+  let define_var (solver : t) (v : variable) : t =
+    if Hash_set.mem solver.declared v.vname
+    then solver
+    else (
+      warning v;
+      Hash_set.add solver.declared v.vname;
+      let sorts = declare_sorts_of_var v in
+      let solver = List.fold ~f:declare_sort sorts ~init:solver in
+      { solver with
+        definitions =
+          solver.definitions
+          @ [ CDeclareVar (v.vname, sort_of_rtype (Variable.vtype_or_new v)) ]
+      })
+  ;;
+
+  let synthesize (cl : command list) (solver : t) : t =
+    let f solver c =
+      match c with
+      | CSynthFun (name, _, _, _) | CSynthInv (name, _, _) ->
+        Hash_set.add solver.declared name;
+        { solver with objs = solver.objs @ [ c ] }
+      | _ -> solver
+    in
+    List.fold ~f ~init:solver cl
+  ;;
+
+  let constrain (terms : term list) (solver : t) : t =
+    let f solver term =
+      let t' = sygus_of_term term in
+      let solver = Set.fold ~init:solver ~f:define_var (Analysis.free_variables term) in
+      { solver with constraints = solver.constraints @ [ CConstraint t' ] }
+    in
+    List.fold ~init:solver ~f terms
+  ;;
+
+  let set_logic (name : string) (solver : t) : t = { solver with logic = name }
+
+  let all_commands (solver : t) =
+    [ CSetLogic solver.logic ]
+    @ solver.sorts
+    @ solver.extra_defs
+    @ solver.objs
+    @ List.rev solver.definitions
+    @ solver.constraints
+    @ [ CCheckSynth ]
+  ;;
+
+  let solve (solver : t) =
+    let solver_kind =
+      if !Config.use_eusolver then SygusSolver.EUSolver else SygusSolver.CVC
+    in
+    let commands = all_commands solver in
+    SygusSolver.solve_commands ~solver_kind commands
+  ;;
+
+  let to_file (filename : string) (solver : t) : unit =
+    Syguslib.Solvers.commands_to_file (all_commands solver) filename
+  ;;
+end

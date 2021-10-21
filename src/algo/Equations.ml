@@ -602,7 +602,7 @@ module Solve = struct
             | Either.Second g -> g))
   ;;
 
-  let constraints_of_eqns (eqns : equation list) : command list =
+  let constraints_of_eqns (eqns : equation list) : term list =
     let detupled_equations =
       let f eqn =
         let eqs = projection_eqns eqn.elhs eqn.erhs in
@@ -612,9 +612,8 @@ module Solve = struct
     in
     let eqn_to_constraint (pre, lhs, rhs) =
       match pre with
-      | Some precondition ->
-        CConstraint (sygus_of_term Terms.(~!precondition || lhs == rhs))
-      | None -> CConstraint (sygus_of_term Terms.(lhs == rhs))
+      | Some precondition -> Terms.(~!precondition || lhs == rhs)
+      | None -> Terms.(lhs == rhs)
     in
     List.map ~f:eqn_to_constraint detupled_equations
   ;;
@@ -715,22 +714,16 @@ module Solve = struct
       Lwt.task () |> fun (_, r) -> Lwt.return answer, r
       (* Second case: we only got hints or the base grammar. *)
     | Either.Second synth_objs ->
-      let set_logic = CSetLogic logic in
-      let sort_decls = declare_sorts_of_vars free_vars in
-      let var_decls = declarations_of_vars free_vars in
-      let constraints = constraints_of_eqns eqns in
       let extra_defs =
         (if Set.mem all_operators (Binary Max) then [ max_definition ] else [])
         @ if Set.mem all_operators (Binary Min) then [ min_definition ] else []
       in
-      let commands =
-        set_logic
-        :: (extra_defs
-           @ sort_decls
-           @ synth_objs
-           @ var_decls
-           @ constraints
-           @ [ CCheckSynth ])
+      let solver =
+        HLSolver.(
+          make ~extra_defs ()
+          |> set_logic logic
+          |> synthesize synth_objs
+          |> constrain (constraints_of_eqns eqns))
       in
       (* Handling the solver response. *)
       let handle_response (resp : solver_response) =
@@ -753,19 +746,16 @@ module Solve = struct
       in
       if !Config.generate_benchmarks
       then
-        Syguslib.Solvers.commands_to_file
-          commands
-          (* Assuming gen_only true only for unrealizable problems. *)
+        (* Assuming gen_only true only for unrealizable problems. *)
+        HLSolver.to_file
           (Config.new_benchmark_file
              ~hint:(if gen_only then "unrealizable_" else "")
-             ".sl");
+             ".sl")
+          solver;
       (* Call the solver on the generated file. *)
       if not gen_only
       then (
-        let solver_kind =
-          if !Config.use_eusolver then SygusSolver.EUSolver else SygusSolver.CVC
-        in
-        let t, r = SygusInterface.SygusSolver.solve_commands ~solver_kind commands in
+        let t, r = HLSolver.solve solver in
         ( Lwt.map
             (function
               | Some resp -> handle_response resp

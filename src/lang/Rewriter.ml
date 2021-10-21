@@ -973,8 +973,8 @@ let match_core (bid : boxkind) (sube : t) : t -> t =
         if List.length subargs' = List.length subargs
         then Some (mk_e_assoc op (EBox bid :: rest))
         else None
-      | EInt i1, EInt i2 ->
-        Some (mk_e_assoc (Binary Binop.Plus) [ mk_e_int (i1 - i2); EBox bid ])
+      (* | EInt i1, EInt i2 ->
+        Some (mk_e_assoc (Binary Binop.Plus) [ mk_e_int (i2 - i1); EBox bid ]) *)
       | _ -> None)
   in
   transform transformer

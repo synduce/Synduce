@@ -122,7 +122,7 @@ let rec sort_of_rtype (t : RType.t) : smtSort =
   | RType.TString -> SmtSort (Id (SSimple "String"))
   | RType.TChar -> SmtSort (Id (SSimple "Char"))
   | RType.TNamed s -> SmtSort (Id (SSimple s))
-  | RType.TTup tl -> SmtSort (Id (SSimple (RType.get_tuple_type_name tl)))
+  | RType.TTup tl -> SmtSort (Id (SSimple (Tuples.type_name_of_types tl)))
   | RType.TFun (tin, tout) ->
     Comp (Id (SSimple "->"), [ sort_of_rtype tin; sort_of_rtype tout ])
   | RType.TParam (args, t) -> dec_parametric t args
@@ -139,17 +139,17 @@ and dec_parametric t args =
 (* Not really parametric? *)
 
 let decl_of_tup_type (tl : RType.t list) : smtSymbol * command =
-  let name = mk_symb (RType.get_tuple_type_name tl) in
+  let name = mk_symb (Tuples.type_name_of_types tl) in
   ( name
   , DeclareDatatype
       ( name
       , (* type name *)
         DDConstr
           (* one constructor *)
-          [ ( mk_symb (RType.get_tuple_constr_name tl)
+          [ ( mk_symb (Tuples.constr_name_of_types tl)
             , (* one selector per tuple component *)
               List.mapi tl ~f:(fun i t ->
-                  let prof = RType.get_tuple_proj_name tl i in
+                  let prof = Tuples.proj_name_of_types tl i in
                   mk_symb prof, sort_of_rtype t) )
           ] ) )
 ;;
@@ -223,7 +223,7 @@ let smtPattern_of_pattern (p : pattern) =
           t.ttyp)
         pats
     in
-    let cname = RType.get_tuple_constr_name tl in
+    let cname = Tuples.constr_name_of_types tl in
     PatComp (mk_symb cname, smt_pats)
 ;;
 
@@ -254,14 +254,14 @@ let rec smt_of_term (t : term) : smtTerm =
       mk_ite c' a' b'
     | TTup tl ->
       let tuple_constructor =
-        RType.get_tuple_constr_name (List.map ~f:(fun t -> t.ttyp) tl)
+        Tuples.constr_name_of_types (List.map ~f:(fun t -> t.ttyp) tl)
       in
       let%map args = Result.all (List.map ~f:aux tl) in
       mk_simple_app tuple_constructor args
     | TSel (t, i) ->
       (match (fst (infer_type t)).ttyp with
       | TTup tl ->
-        let proj_fun = RType.get_tuple_proj_name tl i in
+        let proj_fun = Tuples.proj_name_of_types tl i in
         let%map t' = aux t in
         mk_simple_app proj_fun [ t' ]
       | _ as typ ->

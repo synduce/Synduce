@@ -422,42 +422,6 @@ let add_type ?(params : ident list = []) ~(typename : string) (tterm : type_term
 ;;
 
 (* ============================================================================================= *)
-(*                        TUPLE TYPES                                                            *)
-(* ============================================================================================= *)
-
-(* Tuple types need to be managed for interfacing with SMT solvers. The following functions provide
-   tools to add datatype declarations to SMTLIB files, parse reponses, and in general manage the tuple
-   types that can be encountered in the program.
-*)
-
-let tuple_map : (t list * string) list ref = ref []
-
-let make_tuple_name (tl : t list) : string =
-  let names =
-    List.map
-      ~f:(fun t -> String.substr_replace_all Fmt.(str "_%a" pp t) ~pattern:" " ~with_:"_")
-      tl
-  in
-  List.fold_left ~f:(fun s v -> s ^ v) ~init:"Tuple" names
-;;
-
-let get_tuple_type_name (tl : t list) : string =
-  let f (tl', x) = if List.equal subtype_of tl tl' then Some x else None in
-  match List.find_map ~f !tuple_map with
-  | Some x -> x
-  | None ->
-    let x = make_tuple_name tl in
-    tuple_map := (tl, x) :: !tuple_map;
-    x
-;;
-
-let get_tuple_constr_name (tl : t list) : string = "mk" ^ get_tuple_type_name tl
-
-let get_tuple_proj_name (tl : t list) (i : int) : string =
-  "proj_" ^ get_tuple_type_name tl ^ Fmt.str "_%i" i
-;;
-
-(* ============================================================================================= *)
 (*                                  REDUCTION / TRANSFORMATION                                   *)
 (* ============================================================================================= *)
 
@@ -482,6 +446,12 @@ let reduce ~(case : (t -> 'a) -> t -> 'a option) ~(init : 'a) ~(join : 'a -> 'a 
 let is_base t =
   match t with
   | TInt | TBool | TChar | TString -> true
+  | _ -> false
+;;
+
+let is_function t =
+  match t with
+  | TFun _ -> true
   | _ -> false
 ;;
 
