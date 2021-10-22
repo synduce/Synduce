@@ -98,6 +98,13 @@ let base s = Caml.Filename.concat root_folder s
 (* There are still bugs with CVC5, leave true for now. *)
 let use_cvc4 = ref true
 
+(** You can use mkTuple and (Tuple ..) types with CVC4, but it doesn't
+ seem to work with CVC5. *)
+let using_cvc4_tuples = ref false
+
+(** Don't generate a special grammar for constants if true. *)
+let no_grammar_for_constants = ref true
+
 let cvc4_binary_path =
   try Some (FileUtil.which "cvc4") with
   | _ -> None
@@ -374,6 +381,7 @@ let options print_usage parse_only =
   ; '\000', "cvc5", set use_cvc4 false, None
   ; '\000', "eusolver", set use_eusolver true, None
   ; '\000', "check-smt-unrealizable", set check_unrealizable_smt_unsatisfiable true, None
+  ; '\000', "const-grammars", set no_grammar_for_constants false, None
   ; '\000', "fuzzing", None, Some set_fuzzing_count
   ; '\000', "generate-benchmarks", None, Some set_benchmark_generation_dir
   ; '\000', "generate-proof", None, Some set_proof_output_file

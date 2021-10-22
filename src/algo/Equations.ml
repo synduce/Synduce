@@ -546,13 +546,13 @@ module Solve = struct
       ?(ops = OpSet.empty)
       (unknowns : VarSet.t)
     =
-    let xi_formals (xi : variable) : sorted_var list * sygus_sort =
+    let xi_formals (xi : variable) : variable list * RType.t =
       let tv = Variable.vtype_or_new xi in
       let targs, tout = RType.fun_typ_unpack tv in
-      sorted_vars_of_types targs, sort_of_rtype tout
+      List.map ~f:(fun typ -> Variable.mk ~t:(Some typ) (Alpha.fresh ())) targs, tout
     in
     let f xi =
-      let args, ret_sort = xi_formals xi in
+      let args, ret_type = xi_formals xi in
       let guess =
         Grammars.make_guess
           xi
@@ -567,12 +567,12 @@ module Solve = struct
           ~special_const_prod:false
           ops
           args
-          ret_sort
+          ret_type
       in
       match guess with
       | `First partial_soln ->
         Log.verbose_msg "Partial solution!";
-        Either.First (partial_soln, CSynthFun (xi.vname, args, ret_sort, default_grammar))
+        Either.First (partial_soln, mk_synthfun xi.vname args ret_type default_grammar)
       | `Second skeleton ->
         Log.verbose_msg "Got a skeleton, no partial solution.";
         let opt_grammar =
@@ -583,10 +583,10 @@ module Solve = struct
             ~special_const_prod:false
             ops
             args
-            ret_sort
+            ret_type
         in
-        Either.Second (CSynthFun (xi.vname, args, ret_sort, opt_grammar))
-      | `Third -> Either.Second (CSynthFun (xi.vname, args, ret_sort, default_grammar))
+        Either.Second (mk_synthfun xi.vname args ret_type opt_grammar)
+      | `Third -> Either.Second (mk_synthfun xi.vname args ret_type default_grammar)
     in
     let synth_objs = List.map ~f (Set.elements unknowns) in
     if List.for_all ~f:Either.is_first synth_objs && List.length synth_objs > 0

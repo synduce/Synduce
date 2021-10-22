@@ -644,7 +644,11 @@ let mk_app ?(pos = dummy_loc) ?(typ = None) (f : term) (x : term list) =
   let typ =
     match typ with
     | Some t -> t
-    | None -> RType.get_fresh_tvar ()
+    | None ->
+      let args_t, ret_t = RType.fun_typ_unpack f.ttyp in
+      (match List.drop args_t (List.length x) with
+      | [] -> ret_t
+      | _ as remaining_args -> RType.fun_typ_pack remaining_args ret_t)
   in
   { tpos = pos; tkind = TApp (f, x); ttyp = typ }
 ;;
@@ -653,7 +657,11 @@ let mk_app_v ?(pos = dummy_loc) ?(typ = None) (f : variable) (x : term list) =
   let typ =
     match typ with
     | Some t -> t
-    | None -> RType.get_fresh_tvar ()
+    | None ->
+      let args_t, ret_t = RType.fun_typ_unpack (Variable.vtype_or_new f) in
+      (match List.drop args_t (List.length x) with
+      | [] -> ret_t
+      | _ as remaining_args -> RType.fun_typ_pack remaining_args ret_t)
   in
   { tpos = pos; tkind = TApp (mk_var f, x); ttyp = typ }
 ;;
@@ -662,7 +670,7 @@ let mk_bin ?(pos = dummy_loc) ?(typ = None) (op : Binop.t) (t1 : term) (t2 : ter
   let typ =
     match typ with
     | Some t -> t
-    | None -> RType.get_fresh_tvar ()
+    | None -> Binop.result_type op
   in
   { tpos = pos; tkind = TBin (op, t1, t2); ttyp = typ }
 ;;
@@ -683,7 +691,7 @@ let mk_data ?(pos = dummy_loc) (c : string) (xs : term list) =
   let typ =
     match RType.type_of_variant c with
     | Some (t, _) -> t
-    | _ -> RType.get_fresh_tvar ()
+    | _ -> failwith (Fmt.str "Trying to construct term with unknown constructor %s" c)
   in
   { tpos = pos; tkind = TData (c, xs); ttyp = typ }
 ;;

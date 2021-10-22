@@ -1,7 +1,8 @@
 open Base
+open Option.Let_syntax
+open Rewriter
 open Syguslib.Sygus
 open Term
-open Option.Let_syntax
 open Utils
 
 (* Instantiate solver functor in interface. *)
@@ -27,13 +28,22 @@ module SygusSolver =
       let using_cvc5 = Config.using_cvc5
     end)
 
+let int_sort = SId (IdSimple "Int")
+let bool_sort = SId (IdSimple "Bool")
+let string_sort = SId (IdSimple "String")
+
 let rec rtype_of_sort (s : sygus_sort) : RType.t option =
   match s with
   | SId (IdSimple sname) ->
-    let%bind x = RType.get_type sname in
-    (match x with
-    | RType.TParam (_, maint) -> Some maint
-    | _ -> Some x)
+    (match RType.get_type sname with
+    | Some x ->
+      (match x with
+      | RType.TParam (_, maint) -> Some maint
+      | _ -> Some x)
+    | None ->
+      (match Tuples.types_of_tuple_name sname with
+      | Some tl -> Some (RType.TTup tl)
+      | None -> None))
   | SApp (IdSimple "Tuple", sorts) ->
     (match all_or_none (List.map ~f:rtype_of_sort sorts) with
     | Some l -> Some (RType.TTup l)
@@ -57,12 +67,15 @@ let rec rtype_of_sort (s : sygus_sort) : RType.t option =
 
 let rec sort_of_rtype (t : RType.t) : sygus_sort =
   match t with
-  | RType.TInt -> SId (IdSimple "Int")
-  | RType.TBool -> SId (IdSimple "Bool")
-  | RType.TString -> SId (IdSimple "String")
+  | RType.TInt -> int_sort
+  | RType.TBool -> bool_sort
+  | RType.TString -> string_sort
   | RType.TChar -> SId (IdSimple "Char")
   | RType.TNamed s -> SId (IdSimple s)
-  | RType.TTup tl -> SApp (IdSimple "Tuple", List.map ~f:sort_of_rtype tl)
+  | RType.TTup tl ->
+    if !Config.using_cvc4_tuples
+    then SApp (IdSimple "Tuple", List.map ~f:sort_of_rtype tl)
+    else SId (IdSimple (Tuples.type_name_of_types tl))
   | RType.TFun (tin, tout) ->
     (* Functions should be unpacked before! *)
     SApp (IdSimple "->", [ sort_of_rtype tin; sort_of_rtype tout ])
@@ -121,7 +134,12 @@ let rec sygus_of_term (t : term) : sygus_term =
   | TConst c -> sygus_term_of_const c
   | TVar x -> SyId (IdSimple x.vname)
   | TIte (c, a, b) -> SyApp (IdSimple "ite", List.map ~f:sygus_of_term [ c; a; b ])
-  | TTup tl -> SyApp (IdSimple "mkTuple", List.map ~f:sygus_of_term tl)
+  | TTup tl ->
+    if !Config.using_cvc4_tuples
+    then SyApp (IdSimple "mkTuple", List.map ~f:sygus_of_term tl)
+    else (
+      let constructor = Tuples.constr_name_of_types (List.map ~f:Term.type_of tl) in
+      SyApp (IdSimple constructor, List.map ~f:sygus_of_term tl))
   | TSel (t, i) -> SyApp (IdIndexed ("tupSel", [ INum i ]), [ sygus_of_term t ])
   | TData (cstr, args) ->
     (match args with
@@ -256,6 +274,52 @@ and let_bindings_of_sygus
           (rename (List.map ~f:(fun (s, var) -> s, var.vname) subs) body)))
 ;;
 
+let grammar_production_of_skeleton
+    (skel : Skeleton.t)
+    ~(ints : sygus_term)
+    ~(bools : sygus_term)
+    (locals : (sygus_term * sygus_sort) list)
+    : sygus_term list
+  =
+  let rec build_prods =
+    Skeleton.(
+      function
+      | SType t ->
+        (match t with
+        | TInt -> [ ints ]
+        | TBool -> [ bools ]
+        | TParam _ -> [ ints ]
+        | _ -> [])
+      | SUn (u, g) ->
+        let g_prods = build_prods g in
+        List.map g_prods ~f:(fun prod -> SyApp (IdSimple (Unop.to_string u), [ prod ]))
+      | SBin (b, ta, tb) ->
+        let prods_a = build_prods ta
+        and prods_b = build_prods tb in
+        let a_x_b = List.cartesian_product prods_a prods_b in
+        List.map a_x_b ~f:(fun (proda, prodb) ->
+            SyApp (IdSimple (Binop.to_string b), [ proda; prodb ]))
+      | SIte (a, b, c) ->
+        let prods_a = build_prods a
+        and prods_b = build_prods b
+        and prods_c = build_prods c in
+        let a_x_b_x_c =
+          List.cartesian_product prods_a (List.cartesian_product prods_b prods_c)
+        in
+        List.map a_x_b_x_c ~f:(fun (a, (b, c)) -> SyApp (IdSimple "ite", [ a; b; c ]))
+      | SChoice c -> List.concat_map ~f:build_prods c
+      | SArg arg_num ->
+        (match List.nth locals arg_num with
+        | Some (arg_term, _) -> [ arg_term ]
+        | None -> [])
+      | STuple elts ->
+        let prods = Utils.cartesian_nary_product (List.map ~f:build_prods elts) in
+        List.map ~f:(fun tuple_args -> SyApp (IdSimple "mkTuple", tuple_args)) prods
+      | SNonGuessable -> [])
+  in
+  build_prods skel
+;;
+
 (* ============================================================================================= *)
 (*                           COMMANDS                                                            *)
 (* ============================================================================================= *)
@@ -316,6 +380,26 @@ let sorted_vars_of_types (tl : RType.t list) : sorted_var list =
   List.map ~f tl
 ;;
 
+let sorted_vars_of_vars (vars : variable list) : sorted_var list =
+  List.map ~f:(fun v -> v.vname, sort_of_rtype (Variable.vtype_or_new v)) vars
+;;
+
+let mk_synthfun
+    (name : string)
+    (args : variable list)
+    (ret_type : RType.t)
+    (grammar : grammar_def option)
+    : command
+  =
+  CSynthFun (name, sorted_vars_of_vars args, sort_of_rtype ret_type, grammar)
+;;
+
+let mk_synthinv (name : string) (args : variable list) (grammar : grammar_def option)
+    : command
+  =
+  CSynthFun (name, sorted_vars_of_vars args, bool_sort, grammar)
+;;
+
 let wait_on_failure (counter : int ref) (t : (solver_response * 'a) Lwt.t)
     : (solver_response * 'a) Lwt.t
   =
@@ -339,6 +423,50 @@ let wait_on_failure (counter : int ref) (t : (solver_response * 'a) Lwt.t)
 (* ============================================================================================= *)
 (*                       ABSTRACTION: SOLVER CLASS                                               *)
 (* ============================================================================================= *)
+
+let collect_tuple_decls (commands : command list) =
+  let rec of_sygus_term (s : sygus_term) =
+    match s with
+    | SyApp (id, tl) ->
+      (match id with
+      | IdSimple s ->
+        (match Tuples.type_name_of_constr s with
+        | Some tname -> [ tname ]
+        | None ->
+          (match Tuples.type_name_of_proj_name s with
+          | Some tname -> [ tname ]
+          | None -> []))
+      | _ -> [])
+      @ List.concat_map ~f:of_sygus_term tl
+    | SyForall (sortedvs, body) | SyExists (sortedvs, body) ->
+      List.filter_map ~f:(fun (_, s) -> of_sort s) sortedvs @ of_sygus_term body
+    | SyLet (bindings, body) ->
+      List.concat_map ~f:(fun (_, t) -> of_sygus_term t) bindings @ of_sygus_term body
+    | _ -> []
+  and of_sort sort =
+    match sort with
+    | SId (IdSimple s) ->
+      if Option.is_some (Tuples.types_of_tuple_name s) then Some s else None
+    | _ -> None
+  in
+  let of_dt_cons (_, arg_sorts) =
+    List.filter_map arg_sorts ~f:(fun ((_, sort) : 'a * sygus_sort) -> of_sort sort)
+  in
+  let of_command (c : command) =
+    match c with
+    | CConstraint c -> of_sygus_term c
+    | CDeclareDataType (_, dts) -> List.concat_map ~f:of_dt_cons dts
+    | CDeclareDataTypes (_, dtss) ->
+      List.concat_map ~f:of_dt_cons (List.concat_map ~f:identity dtss)
+    | CDefineSort (_, sort) -> Option.to_list (of_sort sort)
+    | CSynthFun (_, args, ret_sort, _) ->
+      List.filter_map args ~f:(fun (_, sort) -> of_sort sort)
+      @ Option.to_list (of_sort ret_sort)
+    | CSynthInv (_, args, _) -> List.filter_map args ~f:(fun (_, sort) -> of_sort sort)
+    | _ -> []
+  in
+  Set.of_list (module String) (List.concat_map ~f:of_command commands)
+;;
 
 module HLSolver = struct
   type t =
@@ -421,13 +549,23 @@ module HLSolver = struct
   let set_logic (name : string) (solver : t) : t = { solver with logic = name }
 
   let all_commands (solver : t) =
-    [ CSetLogic solver.logic ]
-    @ solver.sorts
-    @ solver.extra_defs
-    @ solver.objs
-    @ List.rev solver.definitions
-    @ solver.constraints
-    @ [ CCheckSynth ]
+    let core =
+      solver.sorts
+      @ solver.extra_defs
+      @ solver.objs
+      @ List.rev solver.definitions
+      @ solver.constraints
+    in
+    let tuple_decls =
+      let tds = collect_tuple_decls core in
+      List.filter_map
+        ~f:(fun tuplename ->
+          Option.map
+            ~f:(fun x -> snd (declare_sort_of_tuple x))
+            (Tuples.types_of_tuple_name tuplename))
+        (Set.to_list tds)
+    in
+    [ CSetLogic solver.logic ] @ tuple_decls @ core @ [ CCheckSynth ]
   ;;
 
   let solve (solver : t) =

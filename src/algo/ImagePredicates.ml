@@ -204,8 +204,6 @@ let make_ensures_name (id : int) = "ensures_" ^ Int.to_string id
 
 let synthfun_ensures ~(p : psi_def) (id : int) : command * variable * string =
   let var = Variable.mk ~t:(Some p.psi_reference.poutput_typ) (Alpha.fresh ()) in
-  let params = [ var.vname, sort_of_rtype p.psi_reference.poutput_typ ] in
-  let ret_sort = sort_of_rtype RType.TBool in
   let opset =
     List.fold
       ~init:OpSet.empty
@@ -218,9 +216,11 @@ let synthfun_ensures ~(p : psi_def) (id : int) : command * variable * string =
       | Some pmrs -> PMRS.func_of_pmrs pmrs)
   in
   (* OpSet.of_list [ Binary Binop.Mod ] in *)
-  let grammar = Grammars.generate_grammar ~guess:None ~bools:true opset params ret_sort in
+  let grammar =
+    Grammars.generate_grammar ~guess:None ~bools:true opset [ var ] RType.TBool
+  in
   let logic = dt_extend_base_logic (logic_of_operators opset) in
-  CSynthFun (make_ensures_name id, params, ret_sort, grammar), var, logic
+  mk_synthinv (make_ensures_name id) [ var ] grammar, var, logic
 ;;
 
 let constraint_of_neg (id : int) ~(p : psi_def) (ctex : ctex) : command =
@@ -451,7 +451,7 @@ let handle_ensures_verif_response (response : S.solver_response) (ensures : term
         Fmt.(pf f "This ensures has not been proven correct. Refining ensures..."));
     false, Some x
   | Sat ->
-    Log.error_msg "Ensures verification returned Sat, which is weird.";
+    Log.error_msg "Ensures verification returned Sat, which was not expected.";
     false, None
   | Unknown ->
     Log.error_msg "Ensures verification returned Unknown.";

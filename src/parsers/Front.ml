@@ -32,7 +32,12 @@ and term =
 let mk_const pos c = { pos; kind = FTConst c }
 let mk_app pos f args = { pos; kind = FTApp (f, args) }
 let mk_data pos c args = { pos; kind = FTData (c, args) }
-let mk_var pos v = { pos; kind = FTVar v }
+
+let mk_var pos v =
+  Lang.Alpha.check_source_variable_name pos v;
+  { pos; kind = FTVar v }
+;;
+
 let mk_any pos = { pos; kind = FTAny }
 let mk_bin pos op a b = { pos; kind = FTBin (op, a, b) }
 let mk_un pos op a = { pos; kind = FTUn (op, a) }

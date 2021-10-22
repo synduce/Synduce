@@ -77,6 +77,10 @@ let rec refinement_loop (p : psi_def) (lstate : refinement_loop_state) =
          Log.print_ok ();
          Ok { soln_rec_scheme = p.psi_target; soln_implems = sol }
      with
+    | Failure s ->
+      Log.error_msg Fmt.(str "Failure: %s" s);
+      Log.error_msg "Solution cannot be proved correct, solver failed.";
+      Error RFail
     | _ ->
       (* A failure during the bounded check is an error. *)
       Log.error_msg "Solution is incorrect, and synthesized and verifier disagree on why.";

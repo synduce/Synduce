@@ -57,3 +57,35 @@ let mk_with_id (i : int) (s : string) (f : int -> 'a) : 'a =
 ;;
 
 let get_exn (id : int) = Hashtbl.find_exn _IDS id
+let bad_prefixes = [ "synduce"; "tuple"; "function"; "mkTup" ]
+
+(* Check that a variable has an acceptable name. *)
+let check_source_variable_name
+    ((loc1, _) : Lexing.position * Lexing.position)
+    (v : string)
+  =
+  (match List.find ~f:(fun prefix -> String.is_prefix ~prefix v) bad_prefixes with
+  | Some bad_prefix ->
+    Utils.Log.error_msg
+      Fmt.(
+        str
+          "Variable name %s (in %s at %i:%i) cannot start with ``%s''"
+          v
+          loc1.pos_fname
+          loc1.pos_lnum
+          loc1.pos_cnum
+          bad_prefix);
+    failwith "Bad variable name."
+  | None -> ());
+  if String.contains v '\''
+  then (
+    Utils.Log.error_msg
+      Fmt.(
+        str
+          "Variable name %s (in %s at %i:%i) should not contain \' "
+          v
+          loc1.pos_fname
+          loc1.pos_lnum
+          loc1.pos_cnum);
+    failwith "Bad variable name.")
+;;

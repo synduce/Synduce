@@ -60,12 +60,36 @@ val term_of_sygus
   -> Sygus.sygus_term
   -> term
 
+(** Returns a list of terms that corresponds to the Skeleton interpreted as a grammar. *)
+val grammar_production_of_skeleton
+  :  Rewriter.Skeleton.t
+  -> ints:Sygus.sygus_term
+  -> bools:Sygus.sygus_term
+  -> (Sygus.sygus_term * Sygus.sygus_sort) list
+  -> Sygus.sygus_term list
+
 (**
     Given a list of types, returns a list of sorted sygus variables.
     Returns as many variables as there are elements in the input lists,
     and a fresh name is used for each created variable.
 *)
 val sorted_vars_of_types : RType.t list -> Sygus.sorted_var list
+
+(** Create the list of sorted vars corresponding to the list of variables,
+  in the same order.
+  *)
+val sorted_vars_of_vars : variable list -> Sygus.sorted_var list
+
+(** Create a function to synthesize from its name, arguments, return type and optional grammar.  *)
+val mk_synthfun
+  :  string
+  -> variable list
+  -> RType.t
+  -> Sygus.grammar_def option
+  -> Sygus.command
+
+(** Create an invariant to synthesize from its name, arguments and optional grammar.  *)
+val mk_synthinv : string -> variable list -> Sygus.grammar_def option -> Sygus.command
 
 (**
     Bind to the response of a solver to that if that response is a failure, the promise is

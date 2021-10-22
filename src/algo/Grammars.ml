@@ -1,7 +1,10 @@
 open Base
+open Lang
 open Lang.Term
 open Lang.Rewriter
 open Syguslib.Sygus
+open Lang.SygusInterface
+open Utils
 
 type grammar_parameters =
   { g_opset : OpSet.t
@@ -19,120 +22,82 @@ let preamble
     ~(ints : sygus_term)
     ~(bools : sygus_term)
   =
-  let rec build_prods gguess =
-    Skeleton.(
-      match gguess with
-      | SType t ->
-        (match t with
-        | TInt -> [ ints ]
-        | TBool -> [ bools ]
-        | TParam _ -> [ ints ]
-        | _ -> [])
-      | SUn (u, g) ->
-        let g_prods = build_prods g in
-        List.map g_prods ~f:(fun prod -> SyApp (IdSimple (Unop.to_string u), [ prod ]))
-      | SBin (b, ta, tb) ->
-        let prods_a = build_prods ta
-        and prods_b = build_prods tb in
-        let a_x_b = List.cartesian_product prods_a prods_b in
-        List.map a_x_b ~f:(fun (proda, prodb) ->
-            SyApp (IdSimple (Binop.to_string b), [ proda; prodb ]))
-      | SIte (a, b, c) ->
-        let prods_a = build_prods a
-        and prods_b = build_prods b
-        and prods_c = build_prods c in
-        let a_x_b_x_c =
-          List.cartesian_product prods_a (List.cartesian_product prods_b prods_c)
-        in
-        List.map a_x_b_x_c ~f:(fun (a, (b, c)) -> SyApp (IdSimple "ite", [ a; b; c ]))
-      | SChoice c -> List.concat_map ~f:build_prods c
-      | SArg arg_num ->
-        (match List.nth grammar_params.g_locals arg_num with
-        | Some (arg_term, _) -> [ arg_term ]
-        | None -> [])
-      | STuple elts ->
-        let prods = Utils.cartesian_nary_product (List.map ~f:build_prods elts) in
-        List.map ~f:(fun tuple_args -> SyApp (IdSimple "mkTuple", tuple_args)) prods
-      | SNonGuessable -> [])
-  in
-  match build_prods gguess with
+  match grammar_production_of_skeleton ~ints ~bools gguess grammar_params.g_locals with
   | [] -> []
   | guesses -> [ ("IStart", ret_sort), List.map ~f:(fun x -> GTerm x) guesses ]
 ;;
 
 let int_sort = SId (IdSimple "Int")
 let bool_sort = SId (IdSimple "Bool")
+let int_nonterm = SyId (IdSimple "Ix")
+let int_const_nonterm = SyId (IdSimple "Ic")
+let bool_nonterm = SyId (IdSimple "Ipred")
 
 let int_base : grammar_def =
-  let ic = SyId (IdSimple "Ic") in
-  let ix = SyId (IdSimple "Ix") in
-  let ipred = SyId (IdSimple "Ipred") in
   [ ( ("Ix", int_sort)
-    , [ GTerm ic
+    , [ GTerm int_const_nonterm
       ; GVar int_sort
-      ; GTerm (SyApp (IdSimple "-", [ ix ]))
-      ; GTerm (SyApp (IdSimple "+", [ ix ]))
-      ; GTerm (SyApp (IdSimple "min", [ ix; ix ]))
-      ; GTerm (SyApp (IdSimple "max", [ ix; ix ]))
-      ; GTerm (SyApp (IdSimple "*", [ ic; ix ]))
-      ; GTerm (SyApp (IdSimple "div", [ ix; ic ]))
-      ; GTerm (SyApp (IdSimple "abs", [ ix ]))
-      ; GTerm (SyApp (IdSimple "div", [ ix; ic ]))
-      ; GTerm (SyApp (IdSimple "ite", [ ipred; ix; ix ]))
+      ; GTerm (SyApp (IdSimple "-", [ int_nonterm ]))
+      ; GTerm (SyApp (IdSimple "+", [ int_nonterm ]))
+      ; GTerm (SyApp (IdSimple "min", [ int_nonterm; int_nonterm ]))
+      ; GTerm (SyApp (IdSimple "max", [ int_nonterm; int_nonterm ]))
+      ; GTerm (SyApp (IdSimple "*", [ int_const_nonterm; int_nonterm ]))
+      ; GTerm (SyApp (IdSimple "div", [ int_nonterm; int_const_nonterm ]))
+      ; GTerm (SyApp (IdSimple "abs", [ int_nonterm ]))
+      ; GTerm (SyApp (IdSimple "div", [ int_nonterm; int_const_nonterm ]))
+      ; GTerm (SyApp (IdSimple "ite", [ bool_nonterm; int_nonterm; int_nonterm ]))
       ] )
   ; ("Ic", int_sort), [ GConstant int_sort ]
   ; ( ("Ipred", bool_sort)
-    , [ GTerm (SyApp (IdSimple "=", [ ix; ix ]))
-      ; GTerm (SyApp (IdSimple ">", [ ix; ix ]))
-      ; GTerm (SyApp (IdSimple "not", [ ipred ]))
-      ; GTerm (SyApp (IdSimple "and", [ ipred; ipred ]))
-      ; GTerm (SyApp (IdSimple "or", [ ipred; ipred ]))
+    , [ GTerm (SyApp (IdSimple "=", [ int_nonterm; int_nonterm ]))
+      ; GTerm (SyApp (IdSimple ">", [ int_nonterm; int_nonterm ]))
+      ; GTerm (SyApp (IdSimple "not", [ bool_nonterm ]))
+      ; GTerm (SyApp (IdSimple "and", [ bool_nonterm; bool_nonterm ]))
+      ; GTerm (SyApp (IdSimple "or", [ bool_nonterm; bool_nonterm ]))
       ] )
   ]
 ;;
 
 let int_parametric ?(guess = None) (params : grammar_parameters) =
-  let ic = SyId (IdSimple "Ic") in
-  let ix = SyId (IdSimple "Ix") in
-  let ipred = SyId (IdSimple "Ipred") in
   let main_grammar =
     [ ( ("Ix", int_sort)
-      , [ GTerm ic ]
+      , [ GTerm int_const_nonterm ]
         @ List.filter_map params.g_locals ~f:(fun (t, s) ->
               match s with
               | SId (IdSimple "Int") -> Some (GTerm t)
               | _ -> None)
-        @ [ GTerm (SyApp (IdSimple "-", [ ix ])) ]
-        @ [ GTerm (SyApp (IdSimple "+", [ ix; ix ])) ]
+        @ [ GTerm (SyApp (IdSimple "-", [ int_nonterm ])) ]
+        @ [ GTerm (SyApp (IdSimple "+", [ int_nonterm; int_nonterm ])) ]
         @ (if (not params.g_nonlinear) && params.g_mul_constant
           then
-            [ GTerm (SyApp (IdSimple "*", [ ic; ix ]))
-            ; GTerm (SyApp (IdSimple "div", [ ix; ic ]))
+            [ GTerm (SyApp (IdSimple "*", [ int_const_nonterm; int_nonterm ]))
+            ; GTerm (SyApp (IdSimple "div", [ int_nonterm; int_const_nonterm ]))
             ]
           else [])
         @ (if Set.mem params.g_opset (Binary Min)
-          then [ GTerm (SyApp (IdSimple "min", [ ix; ix ])) ]
+          then [ GTerm (SyApp (IdSimple "min", [ int_nonterm; int_nonterm ])) ]
           else [])
         @ (if Set.mem params.g_opset (Binary Max)
-          then [ GTerm (SyApp (IdSimple "max", [ ix; ix ])) ]
+          then [ GTerm (SyApp (IdSimple "max", [ int_nonterm; int_nonterm ])) ]
           else [])
         @ (if Set.mem params.g_opset (Binary Times)
               || Set.mem params.g_opset (Binary Div)
               || params.g_nonlinear
           then
-            [ GTerm (SyApp (IdSimple "*", [ ix; ix ]))
-            ; GTerm (SyApp (IdSimple "div", [ ix; ix ]))
+            [ GTerm (SyApp (IdSimple "*", [ int_nonterm; int_nonterm ]))
+            ; GTerm (SyApp (IdSimple "div", [ int_nonterm; int_nonterm ]))
             ]
           else [])
         @ (if Set.mem params.g_opset (Unary Abs)
-          then [ GTerm (SyApp (IdSimple "abs", [ ix ])) ]
+          then [ GTerm (SyApp (IdSimple "abs", [ int_nonterm ])) ]
           else [])
         @ (if Set.mem params.g_opset (Binary Div)
-          then [ GTerm (SyApp (IdSimple "div", [ ix; ic ])) ]
+          then [ GTerm (SyApp (IdSimple "div", [ int_nonterm; int_const_nonterm ])) ]
           else [])
         @
         if params.g_bools
-        then [ GTerm (SyApp (IdSimple "ite", [ ipred; ix; ix ])) ]
+        then
+          [ GTerm (SyApp (IdSimple "ite", [ bool_nonterm; int_nonterm; int_nonterm ])) ]
         else [] )
     ]
     @ [ ( ("Ic", int_sort)
@@ -148,18 +113,19 @@ let int_parametric ?(guess = None) (params : grammar_parameters) =
               match s with
               | SId (IdSimple "Bool") -> Some (GTerm t)
               | _ -> None)
-          @ [ GTerm (SyApp (IdSimple "=", [ ix; ix ]))
-            ; GTerm (SyApp (IdSimple ">", [ ix; ix ]))
-            ; GTerm (SyApp (IdSimple "not", [ ipred ]))
-            ; GTerm (SyApp (IdSimple "and", [ ipred; ipred ]))
-            ; GTerm (SyApp (IdSimple "or", [ ipred; ipred ]))
+          @ [ GTerm (SyApp (IdSimple "=", [ int_nonterm; int_nonterm ]))
+            ; GTerm (SyApp (IdSimple ">", [ int_nonterm; int_nonterm ]))
+            ; GTerm (SyApp (IdSimple "not", [ bool_nonterm ]))
+            ; GTerm (SyApp (IdSimple "and", [ bool_nonterm; bool_nonterm ]))
+            ; GTerm (SyApp (IdSimple "or", [ bool_nonterm; bool_nonterm ]))
             ] )
       ]
     else []
   in
   match guess with
   | None -> main_grammar
-  | Some gguess -> preamble params int_sort ~ints:ix ~bools:ipred gguess @ main_grammar
+  | Some gguess ->
+    preamble params int_sort ~ints:int_nonterm ~bools:bool_nonterm gguess @ main_grammar
 ;;
 
 let bool_parametric
@@ -173,18 +139,15 @@ let bool_parametric
         | SId (IdSimple "Int") -> true
         | _ -> false)
   in
-  let ic = SyId (IdSimple "Ic") in
-  let ix = SyId (IdSimple "Ix") in
-  let ipred = SyId (IdSimple "Ipred") in
   let bool_section =
     [ ( ("Ipred", bool_sort)
       , List.filter_map params.g_locals ~f:(fun (t, s) ->
             match s with
             | SId (IdSimple "Bool") -> Some (GTerm t)
             | _ -> None)
-        @ [ GTerm (SyApp (IdSimple "not", [ ipred ]))
-          ; GTerm (SyApp (IdSimple "and", [ ipred; ipred ]))
-          ; GTerm (SyApp (IdSimple "or", [ ipred; ipred ]))
+        @ [ GTerm (SyApp (IdSimple "not", [ bool_nonterm ]))
+          ; GTerm (SyApp (IdSimple "and", [ bool_nonterm; bool_nonterm ]))
+          ; GTerm (SyApp (IdSimple "or", [ bool_nonterm; bool_nonterm ]))
           ]
         @ (if List.length params.g_locals <= 0
           then [ GTerm (SyId (IdSimple "true")); GTerm (SyId (IdSimple "false")) ]
@@ -193,48 +156,48 @@ let bool_parametric
         if has_ints
         then
           (if special_const_prod
-          then [ GTerm (SyApp (IdSimple "=", [ ix; ic ])) ]
+          then [ GTerm (SyApp (IdSimple "=", [ int_nonterm; int_const_nonterm ])) ]
           else [])
-          @ [ GTerm (SyApp (IdSimple "=", [ ix; ix ]))
-            ; GTerm (SyApp (IdSimple ">", [ ix; ix ]))
+          @ [ GTerm (SyApp (IdSimple "=", [ int_nonterm; int_nonterm ]))
+            ; GTerm (SyApp (IdSimple ">", [ int_nonterm; int_nonterm ]))
             ]
         else [] )
     ]
   in
   let int_section =
     [ ( ("Ix", int_sort)
-      , [ GTerm ic ]
+      , [ GTerm int_const_nonterm ]
         @ List.filter_map params.g_locals ~f:(fun (t, s) ->
               match s with
               | SId (IdSimple "Int") -> Some (GTerm t)
               | _ -> None)
-        @ [ GTerm (SyApp (IdSimple "-", [ ix ])) ]
-        @ [ GTerm (SyApp (IdSimple "+", [ ix; ix ])) ]
+        @ [ GTerm (SyApp (IdSimple "-", [ int_nonterm ])) ]
+        @ [ GTerm (SyApp (IdSimple "+", [ int_nonterm; int_nonterm ])) ]
         @ (if special_const_prod
-          then [ GTerm (SyApp (IdSimple "+", [ ix; ic ])) ]
+          then [ GTerm (SyApp (IdSimple "+", [ int_nonterm; int_const_nonterm ])) ]
           else [])
         @ (if Set.mem params.g_opset (Binary Min)
-          then [ GTerm (SyApp (IdSimple "min", [ ix; ix ])) ]
+          then [ GTerm (SyApp (IdSimple "min", [ int_nonterm; int_nonterm ])) ]
           else [])
         @ (if Set.mem params.g_opset (Binary Max)
-          then [ GTerm (SyApp (IdSimple "max", [ ix; ix ])) ]
+          then [ GTerm (SyApp (IdSimple "max", [ int_nonterm; int_nonterm ])) ]
           else [])
         @ (if Set.mem params.g_opset (Binary Times)
-          then [ GTerm (SyApp (IdSimple "*", [ ic; ix ])) ]
+          then [ GTerm (SyApp (IdSimple "*", [ int_const_nonterm; int_nonterm ])) ]
           else [])
         @ (if Set.mem params.g_opset (Binary Div)
-          then [ GTerm (SyApp (IdSimple "div", [ ix; ic ])) ]
+          then [ GTerm (SyApp (IdSimple "div", [ int_nonterm; int_const_nonterm ])) ]
           else [])
         @ (if Set.mem params.g_opset (Unary Abs)
-          then [ GTerm (SyApp (IdSimple "abs", [ ix ])) ]
+          then [ GTerm (SyApp (IdSimple "abs", [ int_nonterm ])) ]
           else [])
         @ (if Set.mem params.g_opset (Binary Div)
-          then [ GTerm (SyApp (IdSimple "div", [ ix; ic ])) ]
+          then [ GTerm (SyApp (IdSimple "div", [ int_nonterm; int_const_nonterm ])) ]
           else [])
-        @ [ GTerm (SyApp (IdSimple "ite", [ ipred; ix; ix ])) ]
+        @ [ GTerm (SyApp (IdSimple "ite", [ bool_nonterm; int_nonterm; int_nonterm ])) ]
         @
         if Set.mem params.g_opset (Binary Mod)
-        then [ GTerm (SyApp (IdSimple "mod", [ ix; ic ])) ]
+        then [ GTerm (SyApp (IdSimple "mod", [ int_nonterm; int_const_nonterm ])) ]
         else [] )
     ]
     @ [ ( ("Ic", int_sort)
@@ -246,22 +209,30 @@ let bool_parametric
   let main_grammar = if has_ints then bool_section @ int_section else bool_section in
   match guess with
   | None -> main_grammar
-  | Some gguess -> preamble params bool_sort ~ints:ix ~bools:ipred gguess @ main_grammar
+  | Some gguess ->
+    preamble params bool_sort ~ints:int_nonterm ~bools:bool_nonterm gguess @ main_grammar
 ;;
 
-let tuple_grammar_constr (params : grammar_parameters) (sorts : sygus_sort list) =
+let tuple_grammar_constr (params : grammar_parameters) (types : RType.t list) =
   let use_bool = ref params.g_bools in
   let tuple_args =
-    List.map sorts ~f:(function
-        | SId (IdSimple "Int") -> SyId (IdSimple "Ix")
-        | SId (IdSimple "Bool") ->
+    List.map types ~f:(function
+        | TInt -> int_nonterm
+        | TBool ->
           use_bool := true;
-          SyId (IdSimple "Ipred")
+          bool_nonterm
         | _ -> failwith "TODO: complex tuples not supported.")
   in
   let head_rule =
-    ( ("Tr", SApp (IdSimple "Tuple", sorts))
-    , [ GTerm (SyApp (IdSimple "mkTuple", tuple_args)) ] )
+    if !Config.using_cvc4_tuples
+    then
+      ( ("Tr", SApp (IdSimple "Tuple", List.map ~f:SygusInterface.sort_of_rtype types))
+      , [ GTerm (SyApp (IdSimple "mkTuple", tuple_args)) ] )
+    else (
+      let tuple_type_name = Tuples.type_name_of_types types in
+      let constr_name = Tuples.constr_name_of_types types in
+      ( ("Tr", SId (IdSimple tuple_type_name))
+      , [ GTerm (SyApp (IdSimple constr_name, tuple_args)) ] ))
   in
   head_rule :: int_parametric { params with g_bools = !use_bool }
 ;;
@@ -274,16 +245,26 @@ let grammar_sort_decomp (sort : sygus_sort) =
   | _ -> None
 ;;
 
-let rec project ((v, s) : sorted_var) =
-  match s with
-  | SId (IdSimple _) -> [ SyId (IdSimple v), s ]
-  | SApp (IdSimple "Tuple", sorts) ->
-    let l = List.map ~f:project (List.map ~f:(fun s -> v, s) sorts) in
-    List.concat (List.mapi l ~f:tuple_sel)
-  | _ -> [ SyId (IdSimple v), s ]
+let rec project (v : variable) =
+  let rec aux =
+    RType.(
+      function
+      | (TInt | TBool) as t -> [ SyId (IdSimple v.vname), sort_of_rtype t ]
+      | TParam _ -> [ SyId (IdSimple v.vname), int_sort ]
+      | TTup types ->
+        let l = List.map ~f:aux types in
+        List.concat (List.mapi l ~f:(tuple_sel types))
+      | _ as t -> [ SyId (IdSimple v.vname), sort_of_rtype t ])
+  in
+  aux (Variable.vtype_or_new v)
 
-and tuple_sel i projs =
-  List.map projs ~f:(fun (t, s) -> SyApp (IdIndexed ("tupSel", [ INum i ]), [ t ]), s)
+and tuple_sel types i projs =
+  if !Config.using_cvc4_tuples
+  then
+    List.map projs ~f:(fun (t, s) -> SyApp (IdIndexed ("tupSel", [ INum i ]), [ t ]), s)
+  else (
+    let tuple_selector = Tuples.proj_name_of_types types i in
+    List.map projs ~f:(fun (t, s) -> SyApp (IdSimple tuple_selector, [ t ]), s))
 ;;
 
 let generate_grammar
@@ -292,8 +273,8 @@ let generate_grammar
     ?(bools = false)
     ?(special_const_prod = true)
     (opset : OpSet.t)
-    (args : sorted_var list)
-    (ret_sort : sygus_sort)
+    (args : variable list)
+    (ret_sort : RType.t)
   =
   let locals_of_scalar_type = List.concat (List.map ~f:project args) in
   let params =
@@ -305,12 +286,16 @@ let generate_grammar
     ; g_bools = bools || not (Set.are_disjoint opset OpSet.comparison_operators)
     }
   in
-  match ret_sort with
-  | SId (IdSimple "Int") -> Some (int_parametric ~guess params)
-  | SId (IdSimple "Bool") -> Some (bool_parametric ~guess ~special_const_prod params)
-  (* Ignore guess if it's a tuple that needs to be generated. *)
-  | SApp (IdSimple "Tuple", sorts) -> Some (tuple_grammar_constr params sorts)
-  | _ -> None
+  if !Config.no_grammar_for_constants && List.length args = 0
+  then (* In some cases the default grammar turns out to be faster. *)
+    None
+  else (
+    match ret_sort with
+    | TInt -> Some (int_parametric ~guess params)
+    | TBool -> Some (bool_parametric ~guess ~special_const_prod params)
+    (* Ignore guess if it's a tuple that needs to be generated. *)
+    | TTup types -> Some (tuple_grammar_constr params types)
+    | _ -> None)
 ;;
 
 (* ============================================================================================= *)

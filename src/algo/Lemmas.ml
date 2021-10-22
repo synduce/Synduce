@@ -277,12 +277,6 @@ let ith_synth_fun index = "lemma_" ^ Int.to_string index
 let synthfun_of_ctex ~(p : psi_def) (det : term_state_detail) (lem_id : int)
     : command * (string * sygus_sort) list * string
   =
-  let params =
-    List.map
-      ~f:(fun scalar -> scalar.vname, sort_of_rtype (Variable.vtype_or_new scalar))
-      det.scalar_vars
-  in
-  let ret_sort = sort_of_rtype RType.TBool in
   let opset =
     List.fold
       ~init:OpSet.empty
@@ -295,9 +289,12 @@ let synthfun_of_ctex ~(p : psi_def) (det : term_state_detail) (lem_id : int)
       | Some pmrs -> PMRS.func_of_pmrs pmrs)
   in
   (* OpSet.of_list [ Binary Binop.Mod ] in *)
-  let grammar = Grammars.generate_grammar ~guess:None ~bools:true opset params ret_sort in
+  let grammar =
+    Grammars.generate_grammar ~guess:None ~bools:true opset det.scalar_vars RType.TBool
+  in
   let logic = logic_of_operators opset in
-  CSynthFun (ith_synth_fun lem_id, params, ret_sort, grammar), params, logic
+  let params = sorted_vars_of_vars det.scalar_vars in
+  mk_synthinv (ith_synth_fun lem_id) det.scalar_vars grammar, params, logic
 ;;
 
 let term_var_string term : string =

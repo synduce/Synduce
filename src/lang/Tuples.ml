@@ -11,8 +11,9 @@ open RType
 *)
 
 let tuple_map : (t list * string) list ref = ref []
-let projection_prefix = "synduce_tuple_proj_"
-let constructor_prefix = "mk"
+let projection_prefix = "proj_"
+let constructor_prefix = "mk_"
+let tuple_type_name_init = "synd_tup"
 
 let make_tuple_name (tl : t list) : string =
   let names =
@@ -20,7 +21,7 @@ let make_tuple_name (tl : t list) : string =
       ~f:(fun t -> String.substr_replace_all Fmt.(str "_%a" pp t) ~pattern:" " ~with_:"_")
       tl
   in
-  List.fold_left ~f:(fun s v -> s ^ v) ~init:"Tuple" names
+  List.fold_left ~f:(fun s v -> s ^ v) ~init:tuple_type_name_init names
 ;;
 
 let type_name_of_types (tl : t list) : string =
@@ -42,9 +43,30 @@ let constr_name_of_types (tl : t list) : string =
   constructor_prefix ^ type_name_of_types tl
 ;;
 
+let is_type_name (name : string) =
+  List.exists ~f:(fun (_, x) -> String.equal name x) !tuple_map
+;;
+
 let is_constr_name (name : string) =
   let f (_, x) = String.is_suffix ~suffix:x name in
   List.exists ~f !tuple_map && String.is_prefix ~prefix:constructor_prefix name
+;;
+
+let type_name_of_constr (name : string) =
+  let f (_, x) = String.is_suffix ~suffix:x name in
+  Option.map ~f:snd (List.find ~f !tuple_map)
+;;
+
+let type_name_of_proj_name (s : string) : string option =
+  match String.chop_prefix s ~prefix:projection_prefix with
+  | Some rest ->
+    let parts = String.split rest ~on:'_' in
+    (match List.drop_last parts with
+    | Some tuple_type_name ->
+      let s = String.concat ~sep:"_" tuple_type_name in
+      if is_type_name s then Some s else None
+    | _ -> None)
+  | None -> None
 ;;
 
 let proj_of_proj_name (s : string) : (t list * int) option =

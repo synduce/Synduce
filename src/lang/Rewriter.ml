@@ -726,7 +726,7 @@ module Skeleton = struct
     | SUn of Unop.t * t (** A unary expression.  *)
     | SIte of t * t * t (** An if-then-else.  *)
     | SType of RType.t
-        (** A guess of some type (to be filled with the appropriate non-terminal.  *)
+        (** A guess of some type (to be filled with the appropriate non-terminal).  *)
     | SArg of int (** A direct reference to a function argument.  *)
     | STuple of t list
     | SNonGuessable

@@ -23,3 +23,6 @@ val mk_with_id : int -> string -> (int -> 'a) -> 'a
 
 (** Get the name that corresponds to a given id. *)
 val get_exn : int -> string
+
+(** Check that a variable name from the source file obeys some basic restriction with synduce. *)
+val check_source_variable_name : Lexing.position * Lexing.position -> string -> unit

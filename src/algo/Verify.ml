@@ -39,7 +39,12 @@ let check_eqn solver has_sat eqn =
   let x =
     match SyncSmt.check_sat solver with
     | Sat -> Continue_or_stop.Stop true
-    | _ -> Continue_or_stop.Continue has_sat
+    | Success | Unsat -> Continue_or_stop.Continue has_sat
+    | Unknown -> failwith "Solver answered unknown during verification."
+    | Error _ -> failwith "Solver encountered an error during verification."
+    | Unsupported | SExps _ ->
+      failwith
+        "Solver returned unexpected answer during verification. Please inspect logs."
   in
   SyncSmt.spop solver;
   x
