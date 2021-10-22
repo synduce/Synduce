@@ -1,3 +1,5 @@
+open Base
+
 val get_id_const : Term.Binop.t -> Term.term option
 val is_id_int_const : Term.Binop.t -> int -> bool
 val is_and : Term.Binop.t -> bool
@@ -34,12 +36,14 @@ module IS : sig
   val ( ?. ) : ('a, 'b) Base.Set.t -> bool
 
   val ( ~$ ) : elt -> (elt, Base.Int.comparator_witness) Base.Set.t
-  val pp : Format.formatter -> t -> unit
+  val pp : Formatter.t -> t -> unit
 end
 
 module Expression : sig
   val box_id : int ref
   val new_box_id : unit -> int
+
+  type comparator_witness
 
   type boxkind =
     | Indexed of int
@@ -60,8 +64,8 @@ module Expression : sig
 
   val register_var : Term.variable -> unit
   val get_var : int -> Term.variable option
-  val pp_ivar : Format.formatter -> int -> unit
-  val pp_ivarset : Format.formatter -> IS.t -> unit
+  val pp_ivar : Formatter.t -> int -> unit
+  val pp_ivarset : Formatter.t -> IS.t -> unit
   val pp : t Fmt.t
   val mk_e_true : t
   val mk_e_false : t
@@ -107,6 +111,7 @@ module Expression : sig
   val size_compare : t -> t -> int
   val compare : t -> t -> int
   val equal : t -> t -> bool
+  val comparator : (t, comparator_witness) Comparator.t
   val free_variables : t -> (int, Base.Int.comparator_witness) Base.Set.t
   val alpha_equal : t -> t -> bool
   val of_term : Term.term -> t option
@@ -116,6 +121,7 @@ module Expression : sig
   val normalize : t -> t
   val get_id_const : Term.Operator.t -> t option
   val get_ty_const : RType.t -> t
+  val contains_ebox : t -> bool
 end
 
 module Skeleton : sig

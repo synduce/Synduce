@@ -7,6 +7,10 @@ val as_unknown_app
   -> Term.term
   -> Term.term list option
 
+val subexpressions_without_boxes
+  :  Expression.t
+  -> (Expression.t, Expression.comparator_witness) Base.Set.t
+
 module Solver : sig
   val presolve_equations
     :  xi:Term.variable

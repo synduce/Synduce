@@ -27,21 +27,9 @@ let gather_args ~(unknowns : VarSet.t) (t : Term.term) : Expression.t list optio
 (*                           BOXING / UNBOXING                                                   *)
 (* ============================================================================================= *)
 
-let contains_ebox (e : Expression.t) : bool =
-  Expression.(
-    reduce
-      ~init:false
-      ~join:( || )
-      ~case:(fun _ e ->
-        match e with
-        | EBox _ -> Some true
-        | _ -> None)
-      e)
-;;
-
 let is_boxable_expr ((_, box_args) : int * IS.t) (t : Expression.t) : bool =
   let fv = Expression.free_variables t in
-  if contains_ebox t
+  if Expression.contains_ebox t
   then false
   else (not (Set.is_empty fv)) && Set.is_subset fv ~of_:box_args
 ;;
@@ -79,6 +67,29 @@ let assign_match_box ((bid, bargs) : int * IS.t) ~(of_ : Expression.t)
   match !boxed with
   | Some b -> Some (e', (bid, b))
   | None -> None
+;;
+
+let (subexpressions_without_boxes :
+      Expression.t -> (Expression.t, Expression.comparator_witness) Base.Set.t)
+  =
+  let case f (e : Expression.t) =
+    if (not (Expression.contains_ebox e)) && Set.length (Expression.free_variables e) > 0
+    then Some (Set.singleton (module Expression) e)
+    else (
+      match e with
+      | Expression.EOp (op, args) ->
+        (match
+           List.partition_tf ~f:(fun e' -> not (Expression.contains_ebox e')) args
+         with
+        | [], _ -> None
+        | hd :: tl, rest ->
+          Some
+            (Set.add
+               (f (Expression.mk_e_assoc op rest))
+               (Expression.mk_e_assoc op (hd :: tl))))
+      | _ -> None)
+  in
+  Expression.reduce ~init:(Set.empty (module Expression)) ~case ~join:Set.union
 ;;
 
 module Solver = struct

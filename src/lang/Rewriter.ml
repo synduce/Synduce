@@ -198,6 +198,7 @@ module Expression = struct
     | Indexed of int
     | Typed of RType.t
     | Position of int
+  [@@deriving sexp]
 
   type t =
     | ETrue
@@ -210,6 +211,7 @@ module Expression = struct
     | EIte of t * t * t
     | EData of string * t list
     | EOp of Operator.t * t list
+  [@@deriving sexp]
 
   let _VARS : (int, variable) Hashtbl.t = Hashtbl.create (module Int)
   let register_var (v : variable) = Hashtbl.set _VARS ~key:v.vid ~data:v
@@ -404,6 +406,8 @@ module Expression = struct
   ;;
 
   let equal a b = compare a b = 0
+
+  include (val Comparator.make ~compare ~sexp_of_t)
 
   let free_variables (e : t) =
     IS.(
@@ -704,6 +708,15 @@ module Expression = struct
       | TInt -> mk_e_int 0
       | TBool -> mk_e_true
       | _ -> mk_e_int 0)
+  ;;
+
+  let contains_ebox (e : t) : bool =
+    let case _ e =
+      match e with
+      | EBox _ -> Some true
+      | _ -> None
+    in
+    reduce e ~init:false ~join:( || ) ~case
   ;;
 
   let count_boxkind (b : boxkind) =

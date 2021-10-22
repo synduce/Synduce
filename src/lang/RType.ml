@@ -42,11 +42,12 @@ type t =
   | TBool
   | TString
   | TChar
-  | TNamed of ident
+  | TNamed of string
   | TTup of t list
   | TFun of t * t
   | TParam of t list * t
   | TVar of int
+[@@deriving sexp]
 
 let get_fresh_tvar () =
   Int.incr _tvar_idx;
