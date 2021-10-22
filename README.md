@@ -1,5 +1,9 @@
 # Synduce
 
+*Synduce* is a program synthesizer: you specify a reference function, and a target recursion skeleton, and *Synduce* completes it for you.
+
+![Synduce output](https://github.com/victornicolet/Synduce/blob/dev/extras/output.png?raw=true)
+
 ## Building the tool
 
 Synduce is mainly written in OCaml using the `dune` build system and `opam` to install package dependencies.

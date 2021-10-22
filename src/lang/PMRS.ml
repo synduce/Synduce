@@ -131,7 +131,7 @@ let pp_rewrite_rule (frmt : Formatter.t) ((nt, vargs, pat, t) : rewrite_rule) : 
       t)
 ;;
 
-let pp (frmt : Formatter.t) (pmrs : t) : unit =
+let pp (frmt : Formatter.t) ?(short = false) (pmrs : t) : unit =
   let pp_rules frmt () =
     Map.iteri
       ~f:(fun ~key:_ ~data:(nt, args, pat, res) ->
@@ -143,7 +143,7 @@ let pp (frmt : Formatter.t) (pmrs : t) : unit =
   Fmt.(
     pf
       frmt
-      "@[<hov> %s⟨%a⟩(%a): %a -> %a@;%a@;= @;@[<v 2>{@;%a@;}@]@]"
+      "@[<hov> %s⟨%a⟩(%a): %a -> %a@;%a@;= @;@[<v 2>%a@]@]"
       pmrs.pvar.vname
       VarSet.pp_var_names
       pmrs.psyntobjs
@@ -155,14 +155,15 @@ let pp (frmt : Formatter.t) (pmrs : t) : unit =
       pmrs.poutput_typ
       (option (box pp_spec))
       (Specifications.get_spec pmrs.pvar)
-      pp_rules
+      (if short then fun _ _ -> () else braces pp_rules)
       ())
 ;;
 
 (**
   Pretty-print a PMRS as a set of OCaml functions.
 *)
-let pp_ocaml (frmt : Formatter.t) (pmrs : t) : unit =
+let pp_ocaml (frmt : Formatter.t) ?(short = false) (pmrs : t) : unit =
+  let _ = short in
   let print_caml_def (frmt : Formatter.t) (nt, args, cases) =
     let pp_case f (opat, rhs) =
       match opat with

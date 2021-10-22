@@ -295,15 +295,21 @@ let solve_problem
           repr_fname
           target_fname);
   (* Print reference function. *)
-  Log.info Fmt.(fun fmt () -> pf fmt "%a" (box PMRS.pp) problem.psi_reference);
+  Log.info
+    Fmt.(
+      fun fmt () ->
+        pf fmt "%a" (box (PMRS.pp ~short:(not !Config.verbose))) problem.psi_reference);
   (* Print target recursion skeleton. *)
-  Log.info Fmt.(fun fmt () -> pf fmt "%a" (box PMRS.pp) problem.psi_target);
+  Log.info
+    Fmt.(
+      fun fmt () ->
+        pf fmt "%a" (box (PMRS.pp ~short:(not !Config.verbose))) problem.psi_target);
   (* Print representation function. *)
   Log.info
     Fmt.(
       fun fmt () ->
         match repr with
-        | Either.First pmrs -> pf fmt "%a" PMRS.pp pmrs
+        | Either.First pmrs -> pf fmt "%a" (PMRS.pp ~short:(not !Config.verbose)) pmrs
         | Either.Second (fv, args, body) ->
           pf
             fmt
@@ -316,7 +322,9 @@ let solve_problem
   Log.verbose Specifications.dump_all;
   (* Print the condition on the reference function's input, if there is one. *)
   (match problem.psi_tinv with
-  | Some tinv -> Log.info (fun formt () -> Fmt.(pf formt "%a" PMRS.pp tinv))
+  | Some tinv ->
+    Log.info (fun formt () ->
+        Fmt.(pf formt "%a" (PMRS.pp ~short:(not !Config.verbose)) tinv))
   | None -> ());
   (* Set global information. *)
   AState._tau := tau;

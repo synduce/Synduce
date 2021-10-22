@@ -276,6 +276,6 @@ let pp_soln ?(use_ocaml_syntax = false) (frmt : Formatter.t) (solution : soln) =
       "@.%a@.@.@[%a@]@."
       pp_implems
       solution.soln_implems
-      (if use_ocaml_syntax then PMRS.pp_ocaml else PMRS.pp)
+      (if use_ocaml_syntax then PMRS.pp_ocaml ~short:false else PMRS.pp ~short:false)
       solution.soln_rec_scheme)
 ;;

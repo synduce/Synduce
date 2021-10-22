@@ -326,7 +326,8 @@ let apply_lifting ~(p : psi_def) (new_lifting : RType.t list) : psi_def =
     PMRS.infer_pmrs_types target'
   in
   (* ⚠️ !TODO! : updates all the "ensures" *)
-  Log.debug (fun ft () -> Fmt.(pf ft "@[After lifting:@;%a@]" (box PMRS.pp) target'));
+  Log.debug (fun ft () ->
+      Fmt.(pf ft "@[After lifting:@;%a@]" (box (PMRS.pp ~short:true)) target'));
   { p with psi_target = target'; psi_lifting = p.psi_lifting @ new_lifting }
 ;;
 
