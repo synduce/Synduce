@@ -2,41 +2,18 @@ open AState
 open Base
 open Lang
 open Lang.Term
+open Option.Let_syntax
+open PmrsAlgoShow
 open Syguslib.Sygus
 open Utils
-open Option.Let_syntax
 
 let rec refinement_loop (p : psi_def) (lstate : refinement_loop_state) =
   Int.incr refinement_steps;
   (* Output status information before entering process. *)
   let elapsed = Stats.get_glob_elapsed () in
-  Log.info
-    Fmt.(
-      fun frmt () ->
-        (styled
-           (`Fg `Black)
-           (styled
-              (`Bg (`Hi `Green))
-              (fun frmt (i, j) -> pf frmt "\t\t Refinement step %i - %i " i j)))
-          frmt
-          (!refinement_steps, !secondary_refinement_steps));
-  (if not !Config.info
-  then
-    Fmt.(
-      pf
-        stdout
-        "%i,%3.3f,%3.3f,%i,%i@."
-        !refinement_steps
-        !Stats.verif_time
-        elapsed
-        (Set.length lstate.t_set)
-        (Set.length lstate.u_set)));
-  Log.debug_msg
-    Fmt.(
-      str
-        "Start refinement loop with %i terms in T, %i terms in U."
-        (Set.length lstate.t_set)
-        (Set.length lstate.u_set));
+  let tsize, usize = Set.length lstate.t_set, Set.length lstate.u_set in
+  if !Config.info then show_steps tsize usize else show_stat elapsed tsize usize;
+  (* Add lemmas interactively if the option is set. *)
   let lstate =
     if !Config.interactive_lemmas
     then Lemmas.add_lemmas_interactively ~p lstate
@@ -46,8 +23,8 @@ let rec refinement_loop (p : psi_def) (lstate : refinement_loop_state) =
   let eqns, lifting =
     Equations.make ~p ~term_state:lstate.term_state ~lifting:lstate.lifting lstate.t_set
   in
-  (* The solve the set of constraints. *)
-  let s_resp, solution = Equations.solve ~p eqns in
+  (* The solve the set of constraints with the assumption equations. *)
+  let s_resp, solution = Equations.solve ~p (eqns @ lstate.assumptions) in
   match s_resp, solution with
   | RSuccess _, First sol ->
     (* Synthesis has succeeded, now we need to verify the solution. *)
@@ -60,13 +37,7 @@ let rec refinement_loop (p : psi_def) (lstate : refinement_loop_state) =
                verification failed. The generalized counterexamples have been added to new_t_set,
                which is also a superset of t_set.
             *)
-         Log.debug (fun frmt () ->
-             Fmt.(
-               pf
-                 frmt
-                 "@[<hov 2>Counterexample terms:@;@[<hov 2>%a@]"
-                 (list ~sep:comma pp_term)
-                 (Set.elements (Set.diff t_set lstate.t_set))));
+         show_counterexamples lstate t_set;
          secondary_refinement_steps := 0;
          (* Continue looping with the new sets. *)
          refinement_loop p { lstate with t_set; u_set; lifting }
@@ -135,6 +106,7 @@ let psi (p : psi_def) =
       ; u_set
       ; term_state = Lemmas.empty_term_state
       ; lifting = Lifting.empty_lifting
+      ; assumptions = []
       })
 ;;
 
@@ -142,7 +114,10 @@ let psi (p : psi_def) =
 (*                                                 MAIN ENTRY POINTS                             *)
 (* ============================================================================================= *)
 
-let no_synth () = failwith "No synthesis objective found."
+let no_synth () =
+  Log.info (fun fmt () -> Fmt.pf fmt "No synthesis objective found, nothing to do!");
+  Caml.exit 0
+;;
 
 let sync_args p : psi_def =
   let subs =
@@ -158,29 +133,14 @@ let sync_args p : psi_def =
   { p with psi_target = target' }
 ;;
 
-(**
-  [solve_problem (Some (target, reference, representation))] solves the synthesis problem
-  associated with the target function named [target], the reference function named
-  [reference] and the representation function named [representation] that have
-  been parsed in the file.
-  If None is passed as argument, the default values are ("target", "spec", "repr").
-  If the functions cannot be found, it will exit the program.
-*)
-let solve_problem
-    (psi_comps : (string * string * string) option)
-    (pmrs : (string, PMRS.t, Base.String.comparator_witness) Map.t)
-    : psi_def * (soln, solver_response) Result.t
+let find_problem_components
+    ((target_fname, spec_fname, repr_fname) : string * string * string)
+    (pmrs_map : (string, PMRS.t, String.comparator_witness) Map.t)
+    : psi_def
   =
-  let target_fname, spec_fname, repr_fname =
-    match psi_comps with
-    | Some names -> names
-    | None ->
-      Utils.Log.debug_msg "Using default names.";
-      "target", "spec", "repr"
-  in
   (* Representation function. *)
   let repr, theta_to_tau =
-    match Map.find pmrs repr_fname with
+    match Map.find pmrs_map repr_fname with
     | Some pmrs -> Either.First pmrs, Variable.vtype_or_new pmrs.pmain_symb
     | None ->
       let reprs =
@@ -199,7 +159,7 @@ let solve_problem
   in
   (* Reference function. *)
   let reference_f, tau =
-    match Map.find pmrs spec_fname with
+    match Map.find pmrs_map spec_fname with
     | Some pmrs ->
       (try pmrs, PMRS.extract_rec_input_typ pmrs with
       | _ ->
@@ -213,7 +173,7 @@ let solve_problem
   (* Target recursion scheme. *)
   let target_f, theta =
     let target_f =
-      match Map.find pmrs target_fname with
+      match Map.find pmrs_map target_fname with
       | Some pmrs -> pmrs
       | None ->
         Log.error_msg Fmt.(str "No recursion skeleton named %s found." target_fname);
@@ -256,7 +216,6 @@ let solve_problem
   in
   let target_f = PMRS.infer_pmrs_types target_f in
   let reference_f = PMRS.infer_pmrs_types reference_f in
-  let args_t = target_f.pinput_typ in
   let t_out = reference_f.poutput_typ in
   let repr_pmrs =
     match repr with
@@ -281,35 +240,17 @@ let solve_problem
       }
   in
   (* Print summary information about the problem, before solving.*)
-  Log.info
-    Fmt.(
-      fun fmt () ->
-        pf
-          fmt
-          " Ψ (%a) := ∀ x : %a. (%s o %s)(x) = %s(x)"
-          (list ~sep:comma Term.Variable.pp)
-          (Set.elements target_f.psyntobjs)
-          (list ~sep:sp RType.pp)
-          args_t
-          spec_fname
-          repr_fname
-          target_fname);
+  show_summary (spec_fname, repr_fname, target_fname) target_f;
   (* Print reference function. *)
-  Log.info
-    Fmt.(
-      fun fmt () ->
-        pf fmt "%a" (box (PMRS.pp ~short:(not !Config.verbose))) problem.psi_reference);
+  show_pmrs problem.psi_reference;
   (* Print target recursion skeleton. *)
-  Log.info
-    Fmt.(
-      fun fmt () ->
-        pf fmt "%a" (box (PMRS.pp ~short:(not !Config.verbose))) problem.psi_target);
+  show_pmrs problem.psi_target;
   (* Print representation function. *)
   Log.info
     Fmt.(
       fun fmt () ->
         match repr with
-        | Either.First pmrs -> pf fmt "%a" (PMRS.pp ~short:(not !Config.verbose)) pmrs
+        | Either.First pmrs -> show_pmrs pmrs
         | Either.Second (fv, args, body) ->
           pf
             fmt
@@ -322,9 +263,7 @@ let solve_problem
   Log.verbose Specifications.dump_all;
   (* Print the condition on the reference function's input, if there is one. *)
   (match problem.psi_tinv with
-  | Some tinv ->
-    Log.info (fun formt () ->
-        Fmt.(pf formt "%a" (PMRS.pp ~short:(not !Config.verbose)) tinv))
+  | Some tinv -> show_pmrs tinv
   | None -> ());
   (* Set global information. *)
   AState._tau := tau;
@@ -332,6 +271,31 @@ let solve_problem
   AState._alpha := t_out;
   AState._span := List.length (Analysis.terms_of_max_depth 1 theta);
   AState.refinement_steps := 0;
+  problem
+;;
+
+(**
+  [solve_problem (Some (target, reference, representation))] solves the synthesis problem
+  associated with the target function named [target], the reference function named
+  [reference] and the representation function named [representation] that have
+  been parsed in the file.
+  If None is passed as argument, the default values are ("target", "spec", "repr").
+  If the functions cannot be found, it will exit the program.
+*)
+let solve_problem
+    (psi_comps : (string * string * string) option)
+    (pmrs : (string, PMRS.t, Base.String.comparator_witness) Map.t)
+    : psi_def * (soln, solver_response) Result.t
+  =
+  (*  Find problem components *)
+  let target_fname, spec_fname, repr_fname =
+    match psi_comps with
+    | Some names -> names
+    | None ->
+      Utils.Log.debug_msg "Using default names.";
+      "target", "spec", "repr"
+  in
+  let problem = find_problem_components (target_fname, spec_fname, repr_fname) pmrs in
   (* Solve the problem. *)
   ( problem
   , if !Config.use_acegis

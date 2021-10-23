@@ -1,5 +1,6 @@
 open AState
 open Base
+open EquationShow
 open Lang
 open Lang.Term
 open Projection
@@ -179,17 +180,7 @@ let make
   let applic x =
     x |> substitution all_subs |> Reduce.reduce_term |> substitution all_subs
   in
-  if Set.length invariants > 0
-  then
-    Log.verbose
-      Fmt.(
-        fun frmt () ->
-          pf
-            frmt
-            "Imᵢₙᵥ: @[<hov 2>%a@]"
-            (styled `Italic (list ~sep:comma pp_term))
-            (Set.elements invariants))
-  else Log.verbose_msg "No image invariants.";
+  show_invariants invariants;
   let pure_eqns, lifting =
     let f (eqns_accum, lifting) (eterm, lhs, rhs) =
       (* Compute the lhs and rhs of the equations. *)
@@ -248,11 +239,7 @@ let make
     in
     List.fold ~init:([], lifting) ~f eqns
   in
-  Log.verbose (fun f () ->
-      let print_less = List.take pure_eqns !Config.pp_eqn_count in
-      Fmt.(
-        pf f "Equations (%i) @." (Set.length tset);
-        List.iter ~f:(fun eqn -> Fmt.pf f "@[%a@]@." pp_equation eqn) print_less));
+  show_equations tset pure_eqns;
   (* Phase 2 of the equation generation.
      Generate the equations corresponding to the lifting constraints. *)
   let lifting_eqns =
@@ -278,11 +265,7 @@ let make
     in
     List.map ~f:constraint_of_lift_expr lifting.tmap
   in
-  Log.verbose (fun f () ->
-      let print_less = List.take lifting_eqns !Config.pp_eqn_count in
-      Fmt.(
-        pf f "Lifting constraints (%i) @." (List.length lifting_eqns);
-        List.iter ~f:(fun eqn -> Fmt.pf f "@[%a@]@." pp_equation eqn) print_less));
+  show_lifting_constraints lifting_eqns;
   match
     List.find ~f:(fun eq -> not (check_equation ~p eq)) (pure_eqns @ lifting_eqns)
   with
@@ -303,15 +286,7 @@ let revert_projs
     match List.find ~f:(fun (s', _, _) -> String.equal s.vname s') soln with
     | Some s -> s
     | None ->
-      Log.error
-        Fmt.(
-          fun fmt () ->
-            pf
-              fmt
-              "Unexpected: did not find %s in %a."
-              s.vname
-              (list ~sep:sp (parens string))
-              (List.map soln ~f:(fun (a, _, _) -> a)));
+      error_msg_comp_not_found s soln;
       raise (Not_found_s (Sexp.Atom "no solution found"))
   in
   let join_bodies main_args first_body rest =

@@ -161,6 +161,7 @@ type refinement_loop_state =
   ; u_set : TermSet.t
   ; term_state : term_state
   ; lifting : lifting
+  ; assumptions : equation list
   }
 
 (* ============================================================================================= *)

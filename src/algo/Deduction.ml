@@ -455,6 +455,7 @@ module Solver = struct
     match functionalize ~verb:false ~args ~lemma:pre_expr lhs_expr [] with
     | Ok (_, r) ->
       let r = factorize r in
+      Log.verbose Fmt.(fun fmt () -> pf fmt "Found solution %a" Expression.pp r);
       Some r
     | Error _ -> None
   ;;
