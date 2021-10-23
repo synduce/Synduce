@@ -615,14 +615,23 @@ module Expression = struct
     in
     let tr_prew _ e =
       match e with
+      (* and and or *)
       | EOp (Binary And, ETrue :: rest) ->
         (match rest with
         | [] -> Some ETrue
         | _ -> Some (mk_e_assoc (Binary And) rest))
-      | EOp (Binary And, EFalse :: rest) ->
+      | EOp (Binary And, EFalse :: _) -> Some EFalse
+      | EOp (Binary Or, EFalse :: rest) ->
         (match rest with
-        | [] -> Some ETrue
-        | _ -> Some (mk_e_assoc (Binary And) rest))
+        | [] -> Some EFalse
+        | _ -> Some (mk_e_assoc (Binary Or) rest))
+      | EOp (Binary Or, ETrue :: _) -> Some ETrue
+      (* - (i) -> (-i) *)
+      | EOp (Unary Neg, [ EInt x ]) -> Some (EInt (-x))
+      | EOp (Binary Minus, x :: EInt 0 :: rest) ->
+        (match rest with
+        | [] -> Some x
+        | _ -> Some (EOp (Binary Minus, x :: rest)))
       (* not (not x) -> x *)
       | EOp (Unary Not, [ EOp (Unary Not, [ x ]) ]) -> Some x
       (* max (abs x) 0 -> abs x *)

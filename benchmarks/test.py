@@ -290,6 +290,7 @@ def run_one(progress, bench_id, command, algo, optim, filename, extra_opt, error
     process = subprocess.Popen(
         command, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
     buf = ""
+    major_step_count = 1
     minor_step_count = 1
     prev_major_step = 1
     # Poll process for new output until finished

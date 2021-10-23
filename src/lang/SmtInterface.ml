@@ -258,12 +258,12 @@ let rec smt_of_term (t : term) : smtTerm =
       in
       let%map args = Result.all (List.map ~f:aux tl) in
       mk_simple_app tuple_constructor args
-    | TSel (t, i) ->
-      (match (fst (infer_type t)).ttyp with
+    | TSel (tup, i) ->
+      (match (fst (infer_type tup)).ttyp with
       | TTup tl ->
         let proj_fun = Tuples.proj_name_of_types tl i in
-        let%map t' = aux t in
-        mk_simple_app proj_fun [ t' ]
+        let%map tup' = aux tup in
+        mk_simple_app proj_fun [ tup' ]
       | _ as typ ->
         Log.error_msg
           Fmt.(str "SMT: tuple projection %a is not correctly typed." pp_term t);
@@ -342,12 +342,17 @@ let rec smt_of_term (t : term) : smtTerm =
     in
     Result.map bindings ~f:(fun b -> b, subs)
   in
-  match aux t with
-  | Ok smt_t -> smt_t
-  | Error s ->
-    Log.error_msg Fmt.(str "Error when trying to convert %a." pp_term t);
-    Log.error_msg s;
-    failwith "Smt term conversion failure."
+  try
+    match aux t with
+    | Ok smt_t -> smt_t
+    | Error s ->
+      Log.error_msg Fmt.(str "Error when trying to convert %a." pp_term t);
+      Log.error_msg s;
+      failwith "Smt term conversion failure."
+  with
+  | e ->
+    Log.error_msg "Failure when converting to smt";
+    raise e
 
 and smt_of_case ((p, t) : Term.match_case) : match_case =
   smtPattern_of_pattern p, smt_of_term t
@@ -677,7 +682,7 @@ let build_match_cases pmrs _nont vars (relevant_rules : PMRS.rewrite_rule list)
               if Set.mem pmrs.pnon_terminals fv
               then (
                 let args' = List.map ~f args in
-                Some (mk_app (Term.mk_var fv) (extra_param_args @ args')))
+                Some Term.(mk_app (mk_var fv) (extra_param_args @ args')))
               else None
             | _ -> None
           in
@@ -806,7 +811,6 @@ let _smt_of_pmrs (pmrs : PMRS.t) : (smtSymbol list * command) list * command lis
 let mk_assert = mk_assert
 
 let smt_of_pmrs (pmrs : PMRS.t) : command list =
-  (* TODO : order of declarations matters. *)
   let deps = PMRS.depends pmrs in
   let sort_decls_of_deps, decls_of_deps = List.unzip (List.map ~f:_smt_of_pmrs deps) in
   let sort_decls, main_decl =

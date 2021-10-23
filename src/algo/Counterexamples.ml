@@ -353,7 +353,7 @@ let check_image_sat ~p ctex : AsyncSmt.response * int u =
       (* Build equations of the form (f t) != (value of elimination var in model) *)
       let term_eqs =
         List.map ctex.ctex_eqn.eelim ~f:(fun (_, elimv) ->
-            mk_bin Binop.Eq (f_compose_r t) (Eval.in_model ctex.ctex_model elimv))
+            Terms.(f_compose_r t == Eval.in_model ctex.ctex_model elimv))
       in
       let rec aux accum tlist =
         let f binder eqn =
@@ -448,16 +448,10 @@ let check_image_unsat ~p ctex : AsyncSmt.response * int u =
             match elimv.tkind with
             | TTup comps ->
               List.mapi comps ~f:(fun i t ->
-                  mk_bin
-                    Binop.Eq
-                    (Eval.in_model ctex.ctex_model t)
-                    (mk_sel (f_compose_r orig_rec_var) i))
+                  Terms.(
+                    Eval.in_model ctex.ctex_model t == mk_sel (f_compose_r orig_rec_var) i))
             | _ ->
-              [ mk_bin
-                  Binop.Eq
-                  (Eval.in_model ctex.ctex_model elimv)
-                  (f_compose_r orig_rec_var)
-              ])
+              Terms.[ Eval.in_model ctex.ctex_model elimv == f_compose_r orig_rec_var ])
           ctex.ctex_eqn.eelim
       in
       ( VarSet.union_list

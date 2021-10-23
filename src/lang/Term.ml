@@ -1188,7 +1188,7 @@ let term_height_compare (t1 : term) (t2 : term) =
 let proj_var (v : variable) : term =
   let rec p t =
     match t with
-    | RType.TTup tl -> mk_tup (List.mapi ~f:(fun i t -> mk_sel (p t) i) tl)
+    | RType.TTup tl -> mk_tup (List.mapi ~f:(fun i ti -> mk_sel (p ti) i) tl)
     | _ -> mk_var v
   in
   p (Variable.vtype_or_new v)
@@ -1199,7 +1199,7 @@ let proj_var (v : variable) : term =
   (t.1, t.2, .., t.n).
 *)
 let tuplify (t : term) =
-  let case f t =
+  let case _ t =
     match t.tkind with
     | TVar v ->
       (match Variable.vtype_or_new v with
@@ -1207,7 +1207,7 @@ let tuplify (t : term) =
       | _ -> None)
     | _ ->
       (match t.ttyp with
-      | RType.TTup tl -> Some (mk_tup (List.mapi ~f:(fun i _ -> f (mk_sel t i)) tl))
+      | RType.TTup tl -> Some (mk_tup (List.mapi ~f:(fun i _ -> mk_sel t i) tl))
       | _ -> None)
   in
   transform ~case t

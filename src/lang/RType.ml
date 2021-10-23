@@ -55,37 +55,27 @@ let get_fresh_tvar () =
 ;;
 
 let rec pp (frmt : Formatter.t) (typ : t) =
-  if !Config.math_display
-  then (
-    match typ with
-    | TInt -> Fmt.(pf frmt "ℤ")
-    | TBool -> Fmt.(pf frmt "𝐁")
-    | TString -> Fmt.(pf frmt "String")
-    | TChar -> Fmt.(pf frmt "𝐂")
-    | TNamed s -> Fmt.(pf frmt "%s" s)
-    | TTup tl -> Fmt.(pf frmt "%a" (parens (list ~sep:Utils.ast pp)) tl)
-    | TFun (tin, tout) -> Fmt.(pf frmt "(%a ⟶  %a)" pp tin pp tout)
-    | TParam (alpha, t') ->
-      (match alpha with
-      | [] -> Fmt.(pf frmt "ɑ? %a" pp t')
-      | [ a ] -> Fmt.(pf frmt "%a %a" pp a pp t')
-      | _ -> Fmt.(pf frmt "(%a) %a" (list ~sep:comma pp) alpha pp t'))
-    | TVar i -> Fmt.(pf frmt "α%s" (to_subscript_unicode i)))
-  else (
-    match typ with
-    | TInt -> Fmt.(pf frmt "int")
-    | TBool -> Fmt.(pf frmt "bool")
-    | TString -> Fmt.(pf frmt "string")
-    | TChar -> Fmt.(pf frmt "char")
-    | TNamed s -> Fmt.(pf frmt "%s" s)
-    | TTup tl -> Fmt.(pf frmt "%a" (parens (list ~sep:Utils.ast pp)) tl)
-    | TFun (tin, tout) -> Fmt.(pf frmt "(%a -> %a)" pp tin pp tout)
-    | TParam (alpha, t') ->
-      (match alpha with
-      | [] -> Fmt.(pf frmt "param? %a" pp t')
-      | [ a ] -> Fmt.(pf frmt "%a %a" pp a pp t')
-      | _ -> Fmt.(pf frmt "(%a) %a" (list ~sep:comma pp) alpha pp t'))
-    | TVar i -> Fmt.(pf frmt "param%i" i))
+  match typ with
+  | TInt -> if !Config.math_display then Fmt.(pf frmt "ℤ") else Fmt.(pf frmt "int")
+  | TBool -> if !Config.math_display then Fmt.(pf frmt "𝐁") else Fmt.(pf frmt "bool")
+  | TString ->
+    if !Config.math_display then Fmt.(pf frmt "String") else Fmt.(pf frmt "string")
+  | TChar -> if !Config.math_display then Fmt.(pf frmt "𝐂") else Fmt.(pf frmt "char")
+  | TNamed s -> Fmt.(pf frmt "%s" s)
+  | TTup tl -> Fmt.(pf frmt "%a" (parens (list ~sep:Utils.ast pp)) tl)
+  | TFun (tin, tout) -> Fmt.(pf frmt "(%a ⟶  %a)" pp tin pp tout)
+  | TParam (alpha, t') ->
+    (match alpha with
+    | [] ->
+      if !Config.math_display
+      then Fmt.(pf frmt "ɑ? %a" pp t')
+      else Fmt.(pf frmt "param? %a" pp t')
+    | [ a ] -> Fmt.(pf frmt "%a %a" pp a pp t')
+    | _ -> Fmt.(pf frmt "(%a) %a" (list ~sep:comma pp) alpha pp t'))
+  | TVar i ->
+    if !Config.math_display
+    then Fmt.(pf frmt "α%s" (to_subscript_unicode i))
+    else Fmt.(pf frmt "param%i" i)
 ;;
 
 (**
@@ -122,6 +112,18 @@ let rec base_name (typ : t) : string option =
   | TBool -> Some "Bool"
   | TChar -> Some "Char"
   | TString -> Some "String"
+  | _ -> None
+;;
+
+let rec smt_name (typ : t) : string option =
+  match typ with
+  | TParam (_, t) -> smt_name t
+  | TNamed s -> Some s
+  | TInt -> Some "Int"
+  | TBool -> Some "Bool"
+  | TChar -> Some "Char"
+  | TString -> Some "String"
+  | TVar _ -> Some "Int"
   | _ -> None
 ;;
 

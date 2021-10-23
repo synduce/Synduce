@@ -81,11 +81,11 @@ let rec refinement_loop (p : psi_def) (lstate : refinement_loop_state) =
       Log.error_msg Fmt.(str "Failure: %s" s);
       Log.error_msg "Solution cannot be proved correct, solver failed.";
       Error RFail
-    | _ ->
+    | e ->
       (* A failure during the bounded check is an error. *)
       Log.error_msg "Solution is incorrect, and synthesized and verifier disagree on why.";
       Log.error_msg "Try without grammar optimizations (option --no-gropt).";
-      Error RFail)
+      raise e)
   | _ as synt_failure_info ->
     (* On synthesis failure, start by trying to synthesize lemmas. *)
     (match Lemmas.synthesize_lemmas ~p synt_failure_info lstate with

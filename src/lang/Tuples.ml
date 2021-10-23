@@ -18,7 +18,10 @@ let tuple_type_name_init = "synd_tup"
 let make_tuple_name (tl : t list) : string =
   let names =
     List.map
-      ~f:(fun t -> String.substr_replace_all Fmt.(str "_%a" pp t) ~pattern:" " ~with_:"_")
+      ~f:(fun t ->
+        match RType.smt_name t with
+        | Some n -> String.substr_replace_all ("_" ^ n) ~pattern:" " ~with_:"_"
+        | None -> String.substr_replace_all "_unknown" ~pattern:" " ~with_:"_")
       tl
   in
   List.fold_left ~f:(fun s v -> s ^ v) ~init:tuple_type_name_init names
