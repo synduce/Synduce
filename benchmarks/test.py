@@ -235,7 +235,7 @@ lifting_benchmarks = [
     # Indexed list
     ["indexed_list/position_polynomial_no_index.ml", ""],
     ["indexed_list/search_no_index.ml", ""],
-    ["indexed_list/sum_elts_lt_pos_no_len.ml", ""],
+    ["indexed_list/sum_elts_lt_pos_no_len.ml", "--no-assumptions"],
     # Automatic parallelization
     ["list/atoi_no_fac.ml", "--no-gropt"],
     ["list/is_sorted_no_last.ml", ""],

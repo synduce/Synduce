@@ -675,6 +675,9 @@ let mk_bin ?(pos = dummy_loc) ?(typ = None) (op : Binop.t) (t1 : term) (t2 : ter
   { tpos = pos; tkind = TBin (op, t1, t2); ttyp = typ }
 ;;
 
+(** Applies an associative operator to a list of terms recursively.
+  Returns None if the list of arguments is empty.
+*)
 let mk_assoc (op : Binop.t) (tl : term list) : term option =
   let rec aux t rest =
     match rest with
@@ -1494,9 +1497,17 @@ let infer_type (t : term) : term * RType.substitution =
           Log.error_msg Fmt.(str "Error: %a" Sexp.pp_hum e);
           failwith "Type inference failure.")
       | _ as tf ->
-        Log.loc_fatal_errmsg
-          eloc
-          (Fmt.str "Type inference failure: could not type %a as function." RType.pp tf))
+        if List.length fargs > 0
+        then
+          Log.loc_fatal_errmsg
+            eloc
+            (Fmt.str
+               "Type inference failure: in %a, could not type %a as function."
+               pp_term
+               t
+               RType.pp
+               tf)
+        else t_func, c_func)
     | TData (cstr, args) ->
       (match RType.type_of_variant cstr with
       | Some (tout, targs) ->

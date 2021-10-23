@@ -38,3 +38,10 @@ val solve
   -> AState.equation list
   -> Syguslib.Sygus.solver_response
      * (partial_soln, Counterexamples.unrealizability_ctex list) Either.t
+
+val update_assumptions
+  :  p:AState.psi_def
+  -> AState.refinement_loop_state
+  -> partial_soln
+  -> Term.TermSet.t
+  -> AState.refinement_loop_state

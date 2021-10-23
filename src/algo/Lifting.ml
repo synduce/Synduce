@@ -454,5 +454,5 @@ let scalar
     for the equation systems.
    *)
   let p' = apply_lifting ~p lifting_type in
-  Ok (p', l)
+  Ok (p', { l with assumptions = [] })
 ;;

@@ -214,6 +214,12 @@ let detupling_on = ref true
  *)
 let use_syntactic_definitions = ref true
 
+(**
+  Partial correctenss asumptions: don't throw away partial solutions
+  Turn off with --no-assumptions
+ *)
+let make_partial_correctness_assumption = ref true
+
 (** Separate systems of equations into subsystems, and solve independently each subsystem.
   Use option -s or --split-solving-off to turn off.
 *)
@@ -388,6 +394,7 @@ let options print_usage parse_only =
   ; '\000', "set-gropt", None, Some set_grammar_optimization_level
   ; '\000', "parse-only", set parse_only true, None
   ; '\000', "max-lifting", None, Some set_max_lifting_attempts
+  ; '\000', "no-assumptions", set make_partial_correctness_assumption false, None
   ; '\000', "no-gropt", set optimize_grammars 0, None
   ; '\000', "no-lifting", set attempt_lifting false, None
   ; '\000', "no-simplify", set simplify_eqns false, None

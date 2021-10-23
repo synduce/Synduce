@@ -26,6 +26,7 @@ let print_usage () =
     \    -c --simple-init               Initialize T naively.\n\
     \       --acegis                    Use the Abstract CEGIS algorithm. Turns bmc on.\n\
     \       --ccegis                    Use the Concrete CEGIS algorithm. Turns bmc on.\n\
+    \       --no-assumptions            Don't  partial correctness assumptions.\n\
     \       --no-simplify               Don't simplify equations with partial evaluation.\n\
     \       --no-gropt                  Don't optimize grammars (level 0)\n\
     \       --set-gropt=NUM             Set grammar optimization level (NUM=0,1 or 2)\n\

@@ -1059,3 +1059,46 @@ let solve ~(p : psi_def) (eqns : equation list)
     | _ -> ());
   soln_final
 ;;
+
+(* ============================================================================================= *)
+(*                               ASSUMPTIONS SYSTEM                                              *)
+(* ============================================================================================= *)
+
+let update_assumptions
+    ~(p : psi_def)
+    (lstate : refinement_loop_state)
+    (sol : partial_soln)
+    (t_set : TermSet.t)
+  =
+  let new_ctexs = Set.diff t_set lstate.t_set in
+  let t0 = Set.max_elt_exn t_set in
+  let not_appearing =
+    let free_vars =
+      List.fold
+        ~init:VarSet.empty
+        ~f:(fun vs t -> Set.union vs (Analysis.free_variables (compute_rhs p t)))
+        (Set.elements new_ctexs)
+    in
+    Set.diff p.psi_target.psyntobjs free_vars
+  in
+  let assumptions =
+    let f (fname, f_args, f_body) =
+      match VarSet.find_by_name not_appearing fname with
+      | Some fvar ->
+        Some
+          { elhs = f_body
+          ; erhs = mk_app_v fvar (List.map ~f:mk_var f_args)
+          ; eprecond = None
+          ; (* Dummy term; this equation forces a syntactic definition. *) eterm = t0
+          ; eelim = []
+          }
+      | None -> None
+    in
+    List.filter_map sol ~f
+  in
+  Log.verbose
+    Fmt.(
+      fun fmt () ->
+        pf fmt "New assumptions:@;%a" (list ~sep:sp (box pp_equation)) assumptions);
+  { lstate with assumptions }
+;;

@@ -39,6 +39,11 @@ let rec refinement_loop (p : psi_def) (lstate : refinement_loop_state) =
             *)
          show_counterexamples lstate t_set;
          secondary_refinement_steps := 0;
+         let lstate =
+           if !Config.make_partial_correctness_assumption
+           then Equations.update_assumptions ~p lstate sol t_set
+           else lstate
+         in
          (* Continue looping with the new sets. *)
          refinement_loop p { lstate with t_set; u_set; lifting }
        | None ->

@@ -17,15 +17,18 @@ let constr_eqn (eqn : equation) =
     (* If terms are tuples, equate each tuple component and take conjunction. *)
     | TTup ltl, TTup rtl ->
       (match List.zip ltl rtl with
-      | Ok rt_lt -> SmtLib.mk_assoc_and (List.map ~f:mk_equality rt_lt)
+      | Ok rt_lt ->
+        (match mk_assoc Binop.And (List.map ~f:mk_equality rt_lt) with
+        | Some e -> e
+        | None -> mk_const Constant.CTrue)
       | _ -> failwith "Verification failed: trying to equate tuples of different sizes?")
-    (* Otherwise just make a smt terms corresponding to the equation. *)
-    | _ -> SmtLib.mk_eq (smt_of_term lhs) (smt_of_term rhs)
+    (* Otherwise just make a smt term corresponding to the equation. *)
+    | _ -> Terms.(lhs == rhs)
   in
   let equality = mk_equality (eqn.elhs, eqn.erhs) in
   match eqn.eprecond with
-  | Some inv -> SmtLib.mk_or (SmtLib.mk_not (smt_of_term inv)) equality
-  | None -> equality
+  | Some inv -> smt_of_term Terms.(~!inv || equality)
+  | None -> smt_of_term equality
 ;;
 
 (* ============================================================================================= *)
