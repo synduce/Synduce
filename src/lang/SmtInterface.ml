@@ -682,7 +682,8 @@ let build_match_cases pmrs _nont vars (relevant_rules : PMRS.rewrite_rule list)
               if Set.mem pmrs.pnon_terminals fv
               then (
                 let args' = List.map ~f args in
-                Some Term.(mk_app (mk_var fv) (extra_param_args @ args')))
+                Some
+                  Term.(mk_app (mk_var (Variable.mk fv.vname)) (extra_param_args @ args')))
               else None
             | _ -> None
           in
@@ -721,7 +722,8 @@ let single_rule_case (pmrs : PMRS.t) nont vars (args, body) : smtTerm =
         if Set.mem pmrs.pnon_terminals fv
         then (
           let args' = List.map ~f args in
-          Some (mk_app ~typ:(Some tout) (Term.mk_var fv) (extra_param_args @ args')))
+          let all_args = extra_param_args @ args' in
+          Some (mk_app ~typ:(Some tout) (Term.mk_var (Variable.mk fv.vname)) all_args))
         else None
       | _ -> None
     in
@@ -816,7 +818,7 @@ let smt_of_pmrs (pmrs : PMRS.t) : command list =
   let sort_decls, main_decl =
     try _smt_of_pmrs pmrs with
     | Failure s ->
-      Log.error_msg "Failed to translate PMRS as smt.";
+      Log.error_msg "Failed to translate PMRS to SMT definitions.";
       failwith s
   in
   let datatype_decls = List.map ~f:snd (List.concat sort_decls_of_deps @ sort_decls) in

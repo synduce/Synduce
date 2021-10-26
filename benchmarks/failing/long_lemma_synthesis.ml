@@ -47,7 +47,7 @@ let rec drop_index_list = function
 let count_lt param l =
   let rec f = function
     | Elt x -> if x < param then 1 else 0
-    | Cons (hd, tl) -> if hd > param then hd + f tl else f tl - hd
+    | Cons (hd, tl) -> if hd < param then hd + f tl else 0
   in
   f l
 ;;

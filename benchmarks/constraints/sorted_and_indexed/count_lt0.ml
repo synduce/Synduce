@@ -44,22 +44,20 @@ let rec drop_index_list = function
   | ICons (hd, ids, tl) -> Cons (hd, drop_index_list tl)
 ;;
 
-let count_lt param l =
-  let rec f = function
-    | Elt x -> if x < param then 1 else 0
-    | Cons (hd, tl) -> if hd > param then hd + f tl else f tl - hd
-  in
-  f l
+let rec count_lt0 = function
+  | Elt x -> if x < 0 then 1 else 0
+  | Cons (hd, tl) -> (if hd < 0 then 1 else 0) + count_lt0 tl
+
+and len = function
+  | Elt x -> 1
+  | Cons (hd, tl) -> 1 + len tl
 ;;
 
-let target param l =
-  let rec h = function
-    | IElt x -> [%synt base_case] param x
-    | ICons (hd, idx, tl) ->
-      if hd < param then [%synt rec_stop] idx else [%synt rec_cont] (h tl)
-  in
-  h l
+let rec h = function
+  | IElt x -> [%synt base_case] x
+  | ICons (hd, idx, tl) ->
+    if hd < 0 then [%synt rec_stop] hd idx else [%synt rec_cont] hd (h tl)
   [@@requires is_sorted_and_indexed]
 ;;
 
-assert (target = drop_index_list @@ count_lt)
+assert (h = drop_index_list @@ count_lt0)

@@ -93,9 +93,14 @@ constraint_benchmarks = [
     ["constraints/sortedlist/is_intersection_empty.ml", ""],
     ["constraints/sortedlist/largest_diff.ml", ""],
     ["constraints/sortedlist/smallest_diff.ml", ""],
+    # Sorted and indexed
+    ["constraints/sorted_and_indexed/count_lt0.ml", "-NB -n 20"],
+    ["constraints/sorted_and_indexed/count_lt.ml", "-NB -n 20"],
     # constantlist
     ["constraints/constantlist/index_of.ml", ""],
     ["constraints/constantlist/contains.ml", ""],
+    # all positive
+    ["constraints/all_positive/list_mps.ml", ""],
     # evenlist
     ["constraints/evenlist/parity_of_first.ml", ""],
     ["constraints/evenlist/parity_of_last.ml", ""],

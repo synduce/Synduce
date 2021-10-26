@@ -460,6 +460,7 @@ let check_image_unsat ~p ctex : AsyncSmt.response * int u =
         SmtLib.mk_assoc_and (List.map ~f:smt_of_term eqns) )
     in
     let* _ =
+      let fv = Set.union fv (VarSet.of_list p.psi_reference.pargs) in
       AsyncSmt.smt_assert solver (SmtLib.mk_exists (sorted_vars_of_vars fv) formula)
     in
     let* resp = AsyncSmt.check_sat solver in
@@ -774,6 +775,8 @@ let classify_ctexs ~(p : psi_def) (ctexs : ctex list) : ctex list =
   in
   let classify_wrt_ref b = List.map ~f:(check_ctex_in_image ~ignore_unknown:b ~p) in
   Log.start_section "Classify counterexamples...";
+  (* First pass ignoring unknowns. *)
+  (* let ctexs = classify_wrt_ref true ctexs in *)
   let ctexs_c1, ignore_further_unknowns =
     match p.psi_tinv with
     | Some tinv ->
