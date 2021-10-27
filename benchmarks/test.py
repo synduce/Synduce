@@ -125,6 +125,7 @@ constraint_benchmarks = [
     # memo
     ["constraints/memo/tree_size.ml", "-NB"],
     ["constraints/memo/constant.ml", ""],
+    ["constraints/memo/mts_memo_sum.ml", ""],
     ["constraints/memo/max_contains.ml", "-NB"],
     ["constraints/memo/count_lt.ml", "-NB -n 50"],
     ["constraints/memo/max_sum_gt.ml", "-NB"],
@@ -148,6 +149,7 @@ base_benchmark_set = [
     # Combine
     ["combine/mts.pmrs", ""],
     ["combine/mts_and_mps.pmrs", ""],
+    ["combine/mss_with_sum.ml", ""],
     # Compressed list
     ["compressed_list/sum.ml", ""],
     # Indexed list

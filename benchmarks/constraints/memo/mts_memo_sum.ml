@@ -23,12 +23,10 @@ let rec drop_sum_list = function
 ;;
 
 let rec mts = function
-  | Elt x -> if x > 0 then x, x, x else 0, 0, 0
+  | Elt x -> if x > 0 then x else 0
   | Cons (hd, tl) ->
-    let mts_tl, mps_tl, mss_tl = mts tl in
-    let sum_tl = hsum tl in
-    let new_mps = max (mps_tl + hd) 0 in
-    max mss_tl sum_tl, new_mps, max new_mps mss_tl
+    let mts_tl = mts tl in
+    max mts_tl (hd + hsum tl)
 
 and hsum = function
   | Elt x -> x
@@ -38,6 +36,7 @@ and hsum = function
 let rec target = function
   | IElt x -> [%synt base_case] x
   | ICons (hd, idx, tl) -> [%synt oplus] hd idx (target tl)
+  [@@requires is_memo_sum]
 ;;
 
 assert (target = drop_sum_list @@ mts)
