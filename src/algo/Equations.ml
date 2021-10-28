@@ -644,7 +644,14 @@ module Solve = struct
         in
         Analysis.(
           ( Set.union fvs set'
-          , Set.union ops (Set.union (operators_of lhs) (operators_of rhs))
+          , Set.union
+              ops
+              (Set.union
+                 (Set.union (operators_of lhs) (operators_of rhs))
+                 (Option.value_map
+                    ~default:(Set.empty (module Operator))
+                    ~f:operators_of
+                    precond))
           , hi || has_ite lhs || has_ite rhs ))
       in
       let fvs, ops, hi =

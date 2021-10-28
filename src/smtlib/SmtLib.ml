@@ -744,7 +744,13 @@ let mk_sub t1 t2 = mk_simple_app "-" [ t1; t2 ]
 let mk_mul t1 t2 = mk_simple_app "*" [ t1; t2 ]
 let mk_div t1 t2 = mk_simple_app "/" [ t1; t2 ]
 let mk_and t1 t2 = mk_simple_app "and" [ t1; t2 ]
-let mk_assoc_and tl = mk_simple_app "and" tl
+
+let mk_assoc_and tl =
+  match tl with
+  | [] -> mk_true
+  | _ -> mk_simple_app "and" tl
+;;
+
 let mk_or t1 t2 = mk_simple_app "or" [ t1; t2 ]
 let mk_eq t1 t2 = mk_simple_app "=" [ t1; t2 ]
 let mk_lt t1 t2 = mk_simple_app "<" [ t1; t2 ]

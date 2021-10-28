@@ -93,6 +93,9 @@ constraint_benchmarks = [
     ["constraints/sortedlist/is_intersection_empty.ml", ""],
     ["constraints/sortedlist/largest_diff.ml", ""],
     ["constraints/sortedlist/smallest_diff.ml", ""],
+    ["constraints/sortedlist/parallel_min.ml", "-NB"],
+    ["constraints/sortedlist/parallel_max.ml", "-NB"],
+    ["constraints/sortedlist/parallel_max2.ml", "-NB"],
     # Sorted and indexed
     ["constraints/sorted_and_indexed/count_lt0.ml", "-NB -n 20"],
     ["constraints/sorted_and_indexed/count_lt.ml", "-NB -n 20"],

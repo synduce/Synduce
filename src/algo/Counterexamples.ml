@@ -556,15 +556,15 @@ let mk_model_sat_asserts ctex f_o_r instantiate =
         if proj >= 0
         then (
           let t = Reduce.reduce_term (mk_sel (f_o_r instantiation) proj) in
-          smt_of_term (mk_bin Binop.Eq t v_val))
+          smt_of_term Terms.(t == v_val))
         else (
           let t = f_o_r instantiation in
-          smt_of_term (mk_bin Binop.Eq t v_val))
+          smt_of_term Terms.(t == v_val))
       | _ ->
         Log.error_msg
           Fmt.(str "Warning: skipped instantiating %a." pp_term original_recursion_var);
         SmtLib.mk_true)
-    | None -> smt_of_term (mk_bin Binop.Eq (mk_var v) v_val)
+    | None -> smt_of_term Terms.(mk_var v == v_val)
   in
   List.map ~f (Map.keys ctex.ctex_model)
 ;;

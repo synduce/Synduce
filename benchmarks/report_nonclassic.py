@@ -138,6 +138,10 @@ show_benchmarks = [
                                     "largest diff ", "no", "no", "ldiff", 0]],
         ["smallest_diff",          ["        ",
                                     "smallest diff ", "no", "no", "sdiff", 0]],
+        ["parallel_min",          ["        ",
+                                   "parallel min", "yes", "yes", "||min", 0]],
+        ["parallel_max",          ["        ",
+                                   "parallel max", "yes", "yes", "||max", 0]],
     ]],
     # Sorted and indexed
     ["constraint/sorted_and_indexed", [

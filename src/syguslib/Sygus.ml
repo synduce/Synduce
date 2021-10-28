@@ -495,14 +495,20 @@ let sexp_of_command (c : command) : Sexp.t =
     | Some body ->
       let decls, gramm = sexp_of_grammar_def body in
       List
-        [ Atom "synth-inv"
+        [ Atom "synth-fun"
         ; Atom name
         ; List (List.map ~f:sexp_of_sorted_var args)
+        ; sexp_of_sygus_sort (SId (IdSimple "Bool"))
         ; decls
         ; gramm
         ]
     | None ->
-      List [ Atom "synth-inv"; Atom name; List (List.map ~f:sexp_of_sorted_var args) ])
+      List
+        [ Atom "synth-inv"
+        ; Atom name
+        ; List (List.map ~f:sexp_of_sorted_var args)
+        ; sexp_of_sygus_sort (SId (IdSimple "Bool"))
+        ])
   | CDeclareDataType (name, dtdecls) ->
     List
       [ Atom "declare-datatype"
