@@ -192,7 +192,7 @@ let make
         | None -> rhs'
       in
       let lhs'', rhs'' =
-        if !Config.simplify_eqns
+        if !Config.Optims.simplify_eqns
         then Eval.simplify lhs', Eval.simplify rhs'
         else lhs', rhs'
       in
@@ -531,7 +531,7 @@ module Solve = struct
       let guess =
         Grammars.make_guess
           xi
-          ~level:!Config.optimize_grammars
+          ~level:!Config.Optims.optimize_grammars
           (List.map ~f:(fun eqn -> eqn.eterm, eqn.eprecond, eqn.elhs, eqn.erhs) eqns)
       in
       let default_grammar =
@@ -778,7 +778,7 @@ module Solve = struct
                  match ctexs with
                  | [] ->
                    (* It not infeasible, sleep for timeout duration, unless counter is 0 *)
-                   let* () = Lwt_unix.sleep !Config.wait_parallel_tlimit in
+                   let* () = Lwt_unix.sleep !Config.Optims.wait_parallel_tlimit in
                    Int.decr task_counter;
                    Lwt.return (RFail, Either.Second [])
                  | _ ->
@@ -822,7 +822,7 @@ module Solve = struct
   ;;
 
   let solve_eqns_proxy (unknowns : VarSet.t) (eqns : equation list) =
-    if !Config.use_syntactic_definitions
+    if !Config.Optims.use_syntactic_definitions
     then (
       let partial_soln, new_unknowns, new_eqns =
         solve_syntactic_definitions unknowns eqns
@@ -881,7 +881,7 @@ module Solve = struct
 
   let solve_stratified (unknowns : VarSet.t) (eqns : equation list) =
     let psol, u, e =
-      if !Config.use_syntactic_definitions
+      if !Config.Optims.use_syntactic_definitions
       then (
         let c_soln, no_c_unknowns, no_c_eqns = solve_constant_eqns unknowns eqns in
         let partial_soln', new_unknowns, new_eqns =
@@ -890,7 +890,7 @@ module Solve = struct
         c_soln @ partial_soln', new_unknowns, new_eqns)
       else [], unknowns, eqns
     in
-    if !Config.split_solve_on
+    if !Config.Optims.split_solve_on
     then split_solve psol u e
     else
       Either.(
@@ -1035,7 +1035,7 @@ let solve ~(p : psi_def) (eqns : equation list)
   let preprocessing_actions =
     Preprocess.
       [ preprocess_deconstruct_if
-      ; (if !Config.detupling_on then preprocess_detuple else preprocess_none)
+      ; (if !Config.Optims.detupling_on then preprocess_detuple else preprocess_none)
       ; preprocess_factor_subexpressions
       ]
   in

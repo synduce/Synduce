@@ -126,6 +126,7 @@ let loc_fatal_errmsg loc msg =
   fatal ()
 ;;
 
+(** Info messaging is the lowest verbose output, activated by default.  *)
 let info (msg : Formatter.t -> unit -> unit) : unit =
   if !Config.info
   then
@@ -140,6 +141,7 @@ let info (msg : Formatter.t -> unit -> unit) : unit =
   else ()
 ;;
 
+(** Debug messaging is used mostly for printing status of interactions with external solvers.  *)
 let debug (msg : Formatter.t -> unit -> unit) : unit =
   if !Config.debug
   then
@@ -164,6 +166,7 @@ let print_ok () =
   else ()
 ;;
 
+(** Verbose output for printing status of internal methods.  *)
 let verb msg =
   if !Config.verbose
   then

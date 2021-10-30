@@ -412,7 +412,7 @@ let wait_on_failure (counter : int ref) (t : (solver_response * 'a) Lwt.t)
           (if !counter > 1
           then (
             Int.decr counter;
-            Lwt_unix.sleep !Config.wait_parallel_tlimit)
+            Lwt_unix.sleep !Config.Optims.wait_parallel_tlimit)
           else Lwt.return ())
       (* Continue on success. *)
       | _ ->

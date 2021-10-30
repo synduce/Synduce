@@ -1,7 +1,13 @@
 open Base
 
+let timed (f : unit -> 'a) : float * 'a =
+  let t0 = Unix.gettimeofday () in
+  let res = f () in
+  Unix.gettimeofday () -. t0, res
+;;
+
 (* ============================================================================================= *)
-(*                                GLOBAL TIMING INFO                                             *)
+(*                                SUBPROCESS TIMING INFO                                         *)
 (* ============================================================================================= *)
 
 type proc_time_info =
@@ -135,4 +141,65 @@ let log_solver_start (pid : int) (name : string) =
   log_proc_start pid;
   Hashtbl.set _PID_TABLE_ ~key:pid ~data:name;
   Hashtbl.add_multi solver_kind_pids ~key:name ~data:pid
+;;
+
+(* ============================================================================================= *)
+(*                               SYNDUCE ALGORITHM TIMING                                        *)
+(* ============================================================================================= *)
+
+let refinement_log : (string * Yojson.t) list Stack.t = Stack.create ()
+let major_step_counter = ref 0
+
+let log_new_major_step ~tsize ~usize () =
+  Int.incr major_step_counter;
+  let starttime = get_glob_elapsed () in
+  Stack.push
+    refinement_log
+    [ "step_no", `Int !major_step_counter
+    ; ( "start_info"
+      , `Assoc
+          [ "start_time", `Float starttime
+          ; "count_in_t", `Int tsize
+          ; "count_in_u", `Int usize
+          ] )
+    ]
+;;
+
+let log_major_step_end
+    ~(synth_time : float)
+    ~(verif_time : float)
+    ~(t : int)
+    ~(u : int)
+    (verified : bool)
+    : unit
+  =
+  let elapsed = get_glob_elapsed () in
+  let json : Yojson.t =
+    `Assoc
+      [ "elapsed", `Float elapsed
+      ; "syth_time", `Float synth_time
+      ; "verif_time", `Float verif_time
+      ; "count_in_t", `Int t
+      ; "count_in_u", `Int u
+      ; "verified", `Bool verified
+      ]
+  in
+  match Stack.pop refinement_log with
+  | Some x -> Stack.push refinement_log (x @ [ "synt_success", json ])
+  | None -> Stack.push refinement_log [ "synt_success", json ]
+;;
+
+let log_minor_step ~(synth_time : float) ~(auxtime : float) (lifted : bool) : unit =
+  let elapsed = get_glob_elapsed () in
+  let json : Yojson.t =
+    `Assoc
+      [ "elapsed", `Float elapsed
+      ; "synth_time", `Float synth_time
+      ; "aux_time", `Float auxtime
+      ; "lifted", `Bool lifted
+      ]
+  in
+  match Stack.pop refinement_log with
+  | Some x -> Stack.push refinement_log (x @ [ "synt_failure", json ])
+  | None -> Stack.push refinement_log [ "synt_failure", json ]
 ;;

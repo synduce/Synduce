@@ -147,14 +147,14 @@ let check_solution
   in
   let rec find_ctex num_checks terms_to_expand =
     Log.verbose_msg Fmt.(str "Check %i." num_checks);
-    if num_checks > !Config.num_expansions_check
+    if num_checks > !Config.Optims.num_expansions_check
     then (
       Log.debug_msg Fmt.(str "Hit unfolding limit.");
       None)
     else (
       let next =
         List.filter
-          ~f:(fun t -> term_height t <= !Config.check_depth + 1)
+          ~f:(fun t -> term_height t <= !Config.Optims.check_depth + 1)
           (Set.elements terms_to_expand)
       in
       match List.sort ~compare:term_height_compare next with
@@ -272,17 +272,17 @@ let bounded_check
     (match ctex_or_none with
     | Some eqn ->
       let ctex_height = term_height eqn.eterm in
-      let current_check_depth = !Config.check_depth in
+      let current_check_depth = !Config.Optims.check_depth in
       let update = max current_check_depth (ctex_height - 1) in
-      Config.check_depth := update;
-      Log.verbose_msg Fmt.(str "Check depth: %i." !Config.check_depth)
+      Config.Optims.check_depth := update;
+      Log.verbose_msg Fmt.(str "Check depth: %i." !Config.Optims.check_depth)
     | None -> ());
     ctex_or_none
   in
   let tset =
     List.sort
       ~compare:term_size_compare
-      (Lang.Analysis.terms_of_max_depth (!Config.check_depth - 1) !AState._theta)
+      (Lang.Analysis.terms_of_max_depth (!Config.Optims.check_depth - 1) !AState._theta)
   in
   Log.debug_msg Fmt.(str "%i terms to check" (List.length tset));
   let ctex_or_none =

@@ -1,6 +1,6 @@
 module Parsers = Parsers
 module Utils = Utils
-module Algos = Algo.PmrsAlgos
+module Algos = Algo.Refinement
 
 (* Expose part of the functionality of the executable in the Lib.  *)
 open Algo
@@ -19,9 +19,11 @@ let reinit () =
   RType.reinit ();
   PMRS.reinit ();
   Specifications.reinit ()
+;;
 
 let solve_file ?(print_info = false) (filename : string) : problem_descr * soln option =
-  Utils.Config.problem_name := Caml.Filename.basename (Caml.Filename.chop_extension filename);
+  Utils.Config.problem_name
+    := Caml.Filename.basename (Caml.Filename.chop_extension filename);
   Utils.Config.info := print_info;
   Utils.Config.timings := false;
   let is_ocaml_syntax = Caml.Filename.check_suffix filename ".ml" in
@@ -31,16 +33,22 @@ let solve_file ?(print_info = false) (filename : string) : problem_descr * soln 
   Parsers.seek_types prog;
   let all_pmrs = Parsers.translate prog in
   let problem, maybe_soln =
-    match PmrsAlgos.solve_problem psi_comps all_pmrs with
-    | problem, Ok soln -> (problem, Some soln)
-    | problem, Error _ -> (problem, None)
+    match Refinement.solve_problem psi_comps all_pmrs with
+    | problem, Ok soln -> problem, Some soln
+    | problem, Error _ -> problem, None
   in
-  (problem_descr_of_psi_def problem, maybe_soln)
+  problem_descr_of_psi_def problem, maybe_soln
+;;
 
 (**
   Call [get_lemma_hints ()] after [solve_file] to get a list of potential useful lemmas for
   the proof of correctness.
 *)
 let get_lemma_hints () =
-  let eqns = match !AState.solved_eqn_system with Some eqns -> eqns | None -> [] in
+  let eqns =
+    match !AState.solved_eqn_system with
+    | Some eqns -> eqns
+    | None -> []
+  in
   eqns
+;;
