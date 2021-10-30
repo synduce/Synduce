@@ -5,11 +5,10 @@ import sys
 import time
 import argparse
 import subprocess
+from termcolor import colored
 
 # Timeout for all experiments.
 timeout_value = 400
-# Maximum 4gb memory - this should not be limiting!
-memout_value = 8000 * (2 ** 10)  # 4GB memory limit
 
 if sys.platform.startswith('linux'):
     timeout = ("timeout %i" %
@@ -351,6 +350,11 @@ def run_n(progress, bench_id, command, algo,
     running_estimate = 0
     delta = 0
     sp = " "
+    bench_parts = bench_id.split(".")[0].split("/")
+    bench_category = "->".join(bench_parts[:-1])
+    bench_name = bench_parts[-1]
+    print(
+        f"{progress : >11s} {bench_name: <25s}", end="\r")
     for i in range(num_runs):
         errors, elapsed = run_one(progress, bench_id, command, algo,
                                   optim, filename, extra_opt, errors, raw_output)
@@ -362,16 +366,27 @@ def run_n(progress, bench_id, command, algo,
             running_estimate = float(
                 running_estimate * i + elapsed) / float(i + 1)
 
-            msg = f"{progress : >11s} ✅ {bench_id: <65s}  [estimate: {running_estimate: 4.3f} s] ({i}/{num_runs} runs){sp : <30s}"
+            msg = f"[estimate: {running_estimate: 4.3f} s] ({i}/{num_runs} runs){sp : <30s}"
             print(msg, end="\r")
             sys.stdout.flush()
         else:
-            print(f"\r{progress : >11s} ❌ {bench_id : <70s}{sp : <10s}", end="r")
+            print(f"\r{progress : >11s} ❌ {bench_id : <70s}{sp : <10s}", end="\r")
             sys.stdout.flush()
             return errors,  elapsed, 0
 
     elapsed = total_elapsed / num_runs
     delta = 1000 * max(abs(max_elapsed - elapsed), abs(min_elapsed-elapsed))
+    sp = " "
+    if elapsed > 0:
+        delta_str = f"{delta : .0f}ms"
+        if (float(delta) / (1000.0 * elapsed)) > 0.05:
+            delta_str = colored(delta_str, 'red')
+        msg = f"{progress : >11s} ✅ {bench_name : <40s} ×{num_runs} runs,  average : {elapsed: 4.3f} s ±{delta_str} {sp : <60s}"
+        print(msg)
+    else:
+        print(f"\r{progress: >11s} ❌ {bench_id : <120s}")
+    sys.stdout.flush()
+
     return errors,  elapsed, delta
 
 
@@ -380,6 +395,7 @@ def run_benchmarks(input_files, algos, optims, num_runs=1, raw_output=None, exit
     benchmark_total = len(input_files) * len(algos) * len(optims)
     errors = []
     start = time.time()
+    prev_bench_cat = "x"
     for filename_with_opt in input_files:
         filename = filename_with_opt[0]
         category = os.path.dirname(filename)
@@ -410,16 +426,15 @@ def run_benchmarks(input_files, algos, optims, num_runs=1, raw_output=None, exit
                             os.path.realpath(os.path.join(
                                 "benchmarks", filename)),
                             soln_file_opt, gen_opt))
+                bench_cat = "->".join(bench_id.split(".")[0].split("/")[:-1])
+                if not bench_cat == prev_bench_cat:
+                    catkw = colored("Category: ", 'red',
+                                    attrs=["underline"])
+                    print(f"\n⏺ {catkw} {bench_cat}")
+                    prev_bench_cat = bench_cat
                 # Run the benchmark n times.
                 errors, elapsed, delta = run_n(progress, bench_id, command, algo,
                                                optim, filename, extra_opt, errors, num_runs, raw_output)
-                if elapsed > 0:
-                    sp = " "
-                    msg = f"{progress : >11s} ✅ {bench_id: <66s} (×{num_runs})[{elapsed: 4.3f} s ± {delta : .0f}ms]{sp : <30s}"
-                    print(msg)
-                else:
-                    print(f"\r{progress : >11s} ❌ {bench_id : <120s}")
-                    sys.stdout.flush()
 
     elapsed = time.time() - start
     if len(errors) <= 0:
@@ -519,6 +534,7 @@ if __name__ == "__main__":
     if args.cvc5:
         cvc = "--cvc5"
 
+    bench_set = []
     # Running specific sets if we're supposed to.
     if run_kick_the_tires_only:
         algos = [["partbnd", cvc]]
@@ -530,23 +546,22 @@ if __name__ == "__main__":
     if run_lifting_benchmarks:
         algos = [["partbnd", cvc]]
         optims = [["all", ""]]
-        run_benchmarks(lifting_benchmarks, algos,
-                       optims, raw_output=raw_output, num_runs=runs)
+        bench_set += lifting_benchmarks
 
     if run_constraint_benchmarks:
         algos = [["partbnd", cvc]]
         optims = [["all", ""]]
-        run_benchmarks(constraint_benchmarks, algos,
-                       optims, raw_output=raw_output, num_runs=runs)
+        bench_set += constraint_benchmarks
 
     if run_base_benchmarks:
         algos = [["partbnd", cvc]]
         optims = [["all", ""]]
-        run_benchmarks(base_benchmark_set, algos,
-                       optims, raw_output=raw_output, num_runs=runs)
+        bench_set += base_benchmark_set
 
     # If we were supposed to run a specific set of benchmarks, we're done
     if run_base_benchmarks or run_constraint_benchmarks or run_lifting_benchmarks:
+        run_benchmarks(bench_set, algos,
+                       optims, raw_output=raw_output, num_runs=runs)
         exit()
 
     # === === TABLES and CAV runs === ===
