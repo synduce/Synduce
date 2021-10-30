@@ -5,14 +5,13 @@ import sys
 import time
 import argparse
 import subprocess
+from termcolor import colored
 
 # Timeout for all experiments.
 timeout_value = 400
-# Maximum 4gb memory - this should not be limiting!
-memout_value = 8000 * (2 ** 10)  # 4GB memory limit
 
 if sys.platform.startswith('linux'):
-    timeout = ("./extras/timeout/timeout -t %i --no-info-on-success" %
+    timeout = ("timeout %i" %
                (timeout_value))
 elif sys.platform.startswith('darwin'):
     timeout = ("timelimit -t%i" % timeout_value)
@@ -41,8 +40,8 @@ kick_the_tires_set = [
     ["list/last.pmrs", ""],
     ["constraints/sortedlist/count_lt.ml", ""],
     ["constraints/bst/count_lt.ml", "-NB"],
-    ["lifting/largest_diff_sorted_list_nohead.ml", ""],
-    ["lifting/poly.ml", ""],
+    ["list/largest_diff_sorted_list_nohead.ml", ""],
+    ["list/poly_no_fac.ml", ""],
 ]
 
 reduced_benchmark_set_table2 = [
@@ -93,9 +92,17 @@ constraint_benchmarks = [
     ["constraints/sortedlist/is_intersection_empty.ml", ""],
     ["constraints/sortedlist/largest_diff.ml", ""],
     ["constraints/sortedlist/smallest_diff.ml", ""],
+    ["constraints/sortedlist/parallel_min.ml", "-NB"],
+    ["constraints/sortedlist/parallel_max.ml", "-NB"],
+    ["constraints/sortedlist/parallel_max2.ml", "-NB"],
+    # Sorted and indexed
+    ["constraints/sorted_and_indexed/count_lt0.ml", "-NB -n 20"],
+    ["constraints/sorted_and_indexed/count_lt.ml", "-NB -n 20"],
     # constantlist
     ["constraints/constantlist/index_of.ml", ""],
     ["constraints/constantlist/contains.ml", ""],
+    # all positive
+    ["constraints/all_positive/list_mps.ml", ""],
     # evenlist
     ["constraints/evenlist/parity_of_first.ml", ""],
     ["constraints/evenlist/parity_of_last.ml", ""],
@@ -104,7 +111,7 @@ constraint_benchmarks = [
     # bst
     ["constraints/bst/contains.ml", ""],
     ["constraints/bst/count_lt.ml", "-NB"],
-    ["constraints/bst/count_between.ml", "-NB"],
+    ["constraints/bst/count_between.ml", "-NB --no-gropt"],
     ["constraints/bst/most_frequent_v1.ml", ""],
     ["constraints/bst/from_list_contains.ml", ""],
     ["constraints/bst/from_list_max.ml", "-NB -n 100"],
@@ -120,9 +127,12 @@ constraint_benchmarks = [
     # memo
     ["constraints/memo/tree_size.ml", "-NB"],
     ["constraints/memo/constant.ml", ""],
+    ["constraints/memo/mts_memo_sum.ml", ""],
     ["constraints/memo/max_contains.ml", "-NB"],
     ["constraints/memo/count_lt.ml", "-NB -n 50"],
     ["constraints/memo/max_sum_gt.ml", "-NB"],
+    ["constraints/memo/proper_indexation_sum_lt_pos_v2.ml", ""],
+    ["constraints/memo/proper_indexation_sum_lt_pos.ml", ""],
     # empty_right
     ["constraints/empty_right_subtree/contains.ml", "-N"],
     # alist
@@ -141,91 +151,116 @@ base_benchmark_set = [
     # Combine
     ["combine/mts.pmrs", ""],
     ["combine/mts_and_mps.pmrs", ""],
-    ["compressed_list/sum.ml", "-f"],
+    ["combine/mss_with_sum.ml", ""],
+    # Compressed list
+    ["compressed_list/sum.ml", ""],
+    # Indexed list
+    ["indexed_list/search.ml", ""],
+    ["indexed_list/position_polynomial.ml", ""],
+    ["indexed_list/sum_elts_lt_pos.ml", ""],
     # Misc
     ["misc/count_between.ml", ""],
     ["misc/composed_unkwns.ml", ""],
     ["misc/simple_nnf.ml", ""],
     ["misc/unknowns_are_ids.ml", ""],
     # List
+    ["list/alist_sum.ml", ""],
+    ["list/atoi.ml", ""],
+    ["list/bal.ml", ""],
+    ["list/hamming.pmrs", ""],
+    ["list/last.pmrs", ""],
+    ["list/lenhom.pmrs", ""],
+    ["list/line_of_sight.pmrs", ""],
+    ["list/maxcount.pmrs", ""],
+    ["list/maxhom.pmrs", ""],
+    ["list/mincount.pmrs", ""],
+    ["list/minhom.pmrs", ""],
+    ["list/mpshom.pmrs", ""],
+    ["list/mtshom.pmrs", ""],
+    ["list/mts_and_mps_hom.pmrs", ""],
+    ["list/msshom.pmrs", ""],
+    ["list/prodhom.pmrs", ""],
+    ["list/polyhom.pmrs", ""],
+    ["list/search.pmrs", ""],
+    ["list/sndminhom.pmrs", ""],
+    ["list/sumgt.ml", ""],
+    ["list/sumhom.pmrs", ""],
+    ["list/sumodds.pmrs", ""],
+    ["list/sumevens.pmrs", ""],
+    ["list/zero_after_one.ml", ""],
+    ["list/zeros_ones.ml", ""],
+    # List to tree
     ["list/issorted.pmrs", "-t"],
     ["list_to_tree/search.pmrs", ""],
     ["list_to_tree/search_v2.pmrs", ""],
     ["list_to_tree/search_v3.pmrs", ""],
     ["list_to_tree/mls.pmrs", ""],
-    ["list/atoi.ml", ""],
-    ["list/line_of_sight.pmrs", ""],
-    ["list/mts_and_mps_hom.pmrs", ""],
-    ["list/sumhom.pmrs", ""],
-    ["list/sumevens.pmrs", ""],
-    ["list/zero_after_one.ml", ""],
-    ["list/last.pmrs", ""],
-    ["list/lenhom.pmrs", ""],
-    ["list/maxcount.pmrs", ""],
-    ["list/minhom.pmrs", ""],
-    ["list/prodhom.pmrs", ""],
-    ["list/polyhom.pmrs", ""],
-    ["list/hamming.pmrs", ""],
-    ["list/mtshom.pmrs", ""],
-    ["list/mpshom.pmrs", ""],
-    ["list/msshom.pmrs", ""],
-    ["list/search.pmrs", ""],
-    ["list/alist_sum.ml", ""],
-    ["list/maxhom.pmrs", ""],
-    ["list/sumodds.pmrs", ""],
-    ["list/sumgt.ml", ""],
-    ["list/sndminhom.pmrs", ""],
-    ["list/mincount.pmrs", ""],
-    ["list/zeros_ones.ml", ""],
     # Numbers
-    ["numbers/int_nat_twosum.ml", ""],
     ["numbers/int_nat_toint.ml", ""],
+    ["numbers/int_nat_twosum.ml", ""],
     # Ptrees
-    ["ptree/mul.pmrs", ""],
     ["ptree/maxheads.pmrs", ""],
     ["ptree/maxlast.pmrs", ""],
     ["ptree/maxsum.pmrs", ""],
+    ["ptree/mul.pmrs", ""],
     ["ptree/sum.pmrs", ""],
     # Sorting lists
     ["sort_list/min.ml", ""],
     ["sort_list/max.ml", ""],
     ["sort_list/sumgtz.ml", ""],
     # Tail optimization
-    ["tailopt/sum.pmrs", ""],
     ["tailopt/mts.pmrs", ""],
     ["tailopt/mps.pmrs", ""],
+    ["tailopt/sum.pmrs", ""],
     # Terms
     ["terms/height.ml", ""],
     # Trees
+    ["tree/maxPathWeight.pmrs", ""],
     ["tree/maxtree.pmrs", ""],
+    ["tree/maxtree2.pmrs", ""],
     ["tree/min.pmrs", ""],
     ["tree/minmax.pmrs", ""],
-    ["tree/maxtree2.pmrs", ""],
-    ["tree/poly.pmrs", ""],
-    ["tree/maxPathWeight.pmrs", ""],
-    ["tree/sorted.pmrs", "-t"],
-    ["tree/sumtree.pmrs", ""],
     ["tree/mips.pmrs", ""],
     ["tree/mits.pmrs", ""],
     ["tree/mpps.pmrs", "--no-gropt"],
+    ["tree/poly.pmrs", ""],
+    ["tree/poly2.ml", ""],
+    ["tree/sorted.pmrs", "-t"],
+    ["tree/sorted_2.ml", ""],
+    ["tree/sumtree.pmrs", ""],
     # Tree paths
-    ["treepaths/sum.pmrs", ""],
     ["treepaths/height.pmrs", ""],
-    ["treepaths/mips.pmrs", ""],
     ["treepaths/leftmostodd.pmrs", "-b 6"],
     ["treepaths/maxPathWeight.pmrs", ""],
     ["treepaths/maxPathWeight2.pmrs", ""],
+    ["treepaths/mips.pmrs", ""],
+    ["treepaths/sum.pmrs", ""],
     # Zippers
-    ["zippers/list_sum_basic.ml", ""],
     ["zippers/list_sum.ml", ""],
+    ["zippers/list_sum_basic.ml", ""],
 ]
 
 lifting_benchmarks = [
-    ["lifting/mpsl.ml", ""],
-    ["lifting/poly.ml", ""],
-    ["lifting/atoi_no.ml", "--no-gropt"],
-    ["lifting/largest_diff_sorted_list_nohead.ml", ""],
-    ["lifting/mits_nosum.ml", ""]
+    # Indexed list
+    ["indexed_list/position_polynomial_no_index.ml", ""],
+    ["indexed_list/search_no_index.ml", ""],
+    ["indexed_list/sum_elts_lt_pos_no_len.ml", "--no-assumptions"],
+    # Automatic parallelization
+    ["list/atoi_no_fac.ml", "--no-gropt"],
+    ["list/is_sorted_no_last.ml", ""],
+    ["list/largest_diff_sorted_list_nohead.ml", ""],
+    ["list/mps_no_sum.ml", ""],
+    ["list/poly_no_fac.ml", ""],
+    ["list/zero_after_one_no.ml", ""],
+    # Tail optimizations
+    ["tailopt/mps_no_sum.ml", ""],
+    # Combining traversals
+    ["combine/mts_and_mps_nosum.ml", ""],
+    # Switching tree traversals
+    ["tree/gradient.ml", ""],
+    ["tree/mits_nosum.ml", ""],
+    # Unimodal lists (might also be due to representation)
+    ["unimodal_lists/prod_needs_aux.ml", ""]
 ]
 
 
@@ -254,11 +289,113 @@ def summarize():
     print("\t- %i extras benchmarks." % num_extrs)
 
 
-def run_benchmarks(input_files, algos, optims, raw_output=None, exit_err=False):
+def run_one(progress, bench_id, command, algo, optim, filename, extra_opt, errors, raw_output):
+    if raw_output is not None:
+        raw_output.write(f"B:{bench_id}\n")
+
+    print(f"{progress : >11s}  {bench_id} 🏃", end="\r")
+    sys.stdout.flush()
+
+    process = subprocess.Popen(
+        command, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+    buf = ""
+    major_step_count = 1
+    minor_step_count = 1
+    prev_major_step = 1
+    # Poll process for new output until finished
+    while True:
+        nextline = process.stdout.readline()
+        if process.poll() is not None:
+            break
+        sys.stdout.flush()
+        line = nextline.decode('utf-8')
+        # Decode the line information
+        stats = line.split(",")
+        if len(stats) >= 3:
+            try:
+                major_step_count = int(stats[0])
+            except:
+                major_step_count = None
+        is_result_line = (line == "success") or (
+            (major_step_count is not None) and (major_step_count > 0))
+        if is_result_line:
+            if major_step_count > prev_major_step:
+                minor_step_count = 1
+            else:
+                minor_step_count += 1
+            prev_major_step = major_step_count
+            sp = " "
+            print(
+                f"{progress : >11s}.. benchmarks/{filename} {extra_opt} {algo[1]} {optim[1]} 🏃 at step {major_step_count}:{minor_step_count}", end="\r")
+            buf += line
+        if raw_output is not None and is_result_line:
+            raw_output.write(line)
+
+    print("", end="\r")
+    output = buf.strip().split("\n")
+    elapsed = -1
+    if len(output) >= 2 and output[-1] == "success":
+        elapsed = float(output[-2].split(",")[2])
+    else:
+        errors += [bench_id]
+    return errors, elapsed
+
+
+def run_n(progress, bench_id, command, algo,
+          optim, filename, extra_opt, errors, num_runs, raw_output):
+
+    total_elapsed = 0
+    max_elapsed = 0
+    min_elapsed = timeout_value
+    running_estimate = 0
+    delta = 0
+    sp = " "
+    bench_parts = bench_id.split(".")[0].split("/")
+    bench_category = "->".join(bench_parts[:-1])
+    bench_name = bench_parts[-1]
+    print(
+        f"{progress : >11s} {bench_name: <25s}", end="\r")
+    for i in range(num_runs):
+        errors, elapsed = run_one(progress, bench_id, command, algo,
+                                  optim, filename, extra_opt, errors, raw_output)
+        if elapsed > 0:
+            # Update stats
+            total_elapsed += elapsed
+            max_elapsed = max(elapsed, max_elapsed)
+            min_elapsed = min(elapsed, min_elapsed)
+            running_estimate = float(
+                running_estimate * i + elapsed) / float(i + 1)
+
+            msg = f"[estimate: {running_estimate: 4.3f} s] ({i}/{num_runs} runs){sp : <30s}"
+            print(msg, end="\r")
+            sys.stdout.flush()
+        else:
+            print(f"\r{progress : >11s} ❌ {bench_id : <70s}{sp : <10s}", end="\r")
+            sys.stdout.flush()
+            return errors,  elapsed, 0
+
+    elapsed = total_elapsed / num_runs
+    delta = 1000 * max(abs(max_elapsed - elapsed), abs(min_elapsed-elapsed))
+    sp = " "
+    if elapsed > 0:
+        delta_str = f"{delta : .0f}ms"
+        if (float(delta) / (1000.0 * elapsed)) > 0.05:
+            delta_str = colored(delta_str, 'red')
+        msg = f"{progress : >11s} ✅ {bench_name : <40s} ×{num_runs} runs,  average : {elapsed: 4.3f} s ±{delta_str} {sp : <60s}"
+        print(msg)
+    else:
+        print(f"\r{progress: >11s} ❌ {bench_id : <120s}")
+    sys.stdout.flush()
+
+    return errors,  elapsed, delta
+
+
+def run_benchmarks(input_files, algos, optims, num_runs=1, raw_output=None, exit_err=False):
     benchmark_cnt = 0
     benchmark_total = len(input_files) * len(algos) * len(optims)
     errors = []
     start = time.time()
+    prev_bench_cat = "x"
     for filename_with_opt in input_files:
         filename = filename_with_opt[0]
         category = os.path.dirname(filename)
@@ -289,42 +426,16 @@ def run_benchmarks(input_files, algos, optims, raw_output=None, exit_err=False):
                             os.path.realpath(os.path.join(
                                 "benchmarks", filename)),
                             soln_file_opt, gen_opt))
+                bench_cat = "->".join(bench_id.split(".")[0].split("/")[:-1])
+                if not bench_cat == prev_bench_cat:
+                    catkw = colored("Category: ", 'red',
+                                    attrs=["underline"])
+                    print(f"\n⏺ {catkw} {bench_cat}")
+                    prev_bench_cat = bench_cat
+                # Run the benchmark n times.
+                errors, elapsed, delta = run_n(progress, bench_id, command, algo,
+                                               optim, filename, extra_opt, errors, num_runs, raw_output)
 
-                if raw_output is not None:
-                    raw_output.write(f"B:{bench_id}\n")
-
-                print(f"{progress : >11s}  {bench_id} 🏃", end="\r")
-                sys.stdout.flush()
-
-                process = subprocess.Popen(
-                    command, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
-                buf = ""
-                i = 1
-                # Poll process for new output until finished
-                while True:
-                    nextline = process.stdout.readline()
-                    if process.poll() is not None:
-                        break
-                    print(
-                        f"{progress : >11s}./Synduce benchmarks/{filename} {extra_opt} {algo[1]} {optim[1]} 🏃 at step {i}", end="\r")
-                    i += 1
-                    sys.stdout.flush()
-                    line = nextline.decode('utf-8')
-                    buf += line
-                    if raw_output is not None:
-                        raw_output.write(line)
-
-                print("", end="\r")
-                output = buf.strip().split("\n")
-                if len(output) >= 2 and output[-1] == "success":
-                    elapsed = float(output[-2].split(",")[2])
-                    sp = " "
-                    msg = f"{progress : >11s} ✅ {bench_id: <70s}  [{elapsed: 4.3f} s]{sp : <10s}"
-                    print(msg)
-                else:
-                    errors += [bench_id]
-                    print(f"\r{progress : >11s} ❌ {bench_id : <70s}")
-                sys.stdout.flush()
     elapsed = time.time() - start
     if len(errors) <= 0:
         print(
@@ -352,11 +463,7 @@ if __name__ == "__main__":
     sys.stdout.flush()
     aparser = argparse.ArgumentParser()
     aparser.add_argument(
-        "-t", "--table", help=table_info, type=int, default=-1)
-    aparser.add_argument(
-        "-o", "--output", help="Dump Synduce output in -i mode to file (appending to file).", type=str, default=-1)
-    aparser.add_argument(
-        "--run", help="Run tests for all benchmarks.", action="store_true")
+        "--cvc5", help="Force use of CVC5 (useful if you can't install CVC4 on Mac M1)", action="store_true")
     aparser.add_argument(
         "--generate-benchmarks", help="Generate SyGuS benchmarks.", action="store_true")
     aparser.add_argument(
@@ -364,24 +471,29 @@ if __name__ == "__main__":
     aparser.add_argument(
         "--kick-the-tires", help="Run a subset of benchmarks.", action="store_true")
     aparser.add_argument(
-        "--lifting-benchmarks", help="Run the lifting benchmarks.", action="store_true")
+        "-o", "--output", help="Dump Synduce output in -i mode to file (appending to file).", type=str, default=-1)
     aparser.add_argument(
-        "--constraint-benchmarks", help="Run the lifting benchmarks.", action="store_true")
+        "-b", "--benchmarks", help="Run the lifting benchmarks.", type=str,
+        choices=["all", "constraint", "lifting", "base", "small"], default="small")
     aparser.add_argument(
-        "--base-benchmarks", help="Run the base benchmarks.", action="store_true")
+        "-n", "--num-runs", help="Run each benchmark NUM times.", type=int, default=1
+    )
     aparser.add_argument(
-        "--all-benchmarks", help="Run all the benchmarks and exit.", action="store_true")
+        "-t", "--table", help=table_info, type=int, default=-1)
     aparser.add_argument(
         "--summary", help="Give a summary of benchmarks.", action="store_true")
+
     aparser.add_argument(
-        "--cvc5", help="Force use of CVC5 (useful if you can't install CVC4 on Mac M1)", action="store_true")
+        "-T", "--timeout", help="Set the timeout in seconds.", type=int, default=600)
     args = aparser.parse_args()
 
     if args.summary:
         summarize()
         exit()
 
+    # Algorithm set selection by table number.
     table_no = args.table
+    # Optional output settings.
     generate_solutions = args.generate_solutions
     generate_benchmarks = args.generate_benchmarks
 
@@ -394,38 +506,74 @@ if __name__ == "__main__":
         except:
             pass
 
+    # Set number of runs and timeout
+    runs = args.num_runs
+    timeout_value = args.timeout
+
+    # Benchmark set selection
+    run_lifting_benchmarks = False
+    run_constraint_benchmarks = False
+    run_base_benchmarks = False
+    run_kick_the_tires_only = False
+
+    if args.benchmarks == "constraint":
+        run_constraint_benchmarks = True
+    elif args.benchmarks == "lifting":
+        run_lifting_benchmarks = True
+    elif args.benchmarks == "base":
+        run_base_benchmarks = True
+    elif args.benchmarks == "small":
+        run_kick_the_tires_only = True
+    elif args.benchmarks is not None:  # e.g. benchmarks = "all"
+        run_lifting_benchmarks = True
+        run_constraint_benchmarks = True
+        run_base_benchmarks = True
+
+    # Background solver selection : cvc4 by default.
     cvc = "--cvc4"
     if args.cvc5:
         cvc = "--cvc5"
-    # === Special runs with simplified output ===
-    if args.lifting_benchmarks or args.all_benchmarks:
-        algos = [["requation", cvc]]
-        optims = [["all", ""]]
-        run_benchmarks(lifting_benchmarks, algos, optims, raw_output)
 
-    if args.constraint_benchmarks or args.all_benchmarks:
-        algos = [["requation", cvc]]
+    bench_set = []
+    # Running specific sets if we're supposed to.
+    if run_kick_the_tires_only:
+        algos = [["partbnd", cvc]]
         optims = [["all", ""]]
-        run_benchmarks(constraint_benchmarks, algos, optims, raw_output)
+        run_benchmarks(kick_the_tires_set, algos,
+                       optims, raw_output=raw_output, num_runs=runs)
+        exit(0)
 
-    if args.base_benchmarks or args.all_benchmarks:
-        algos = [["requation", cvc]]
+    if run_lifting_benchmarks:
+        algos = [["partbnd", cvc]]
         optims = [["all", ""]]
-        run_benchmarks(base_benchmark_set, algos, optims, raw_output)
+        bench_set += lifting_benchmarks
 
-    if args.base_benchmarks or args.lifting_benchmarks or args.constraint_benchmarks:
+    if run_constraint_benchmarks:
+        algos = [["partbnd", cvc]]
+        optims = [["all", ""]]
+        bench_set += constraint_benchmarks
+
+    if run_base_benchmarks:
+        algos = [["partbnd", cvc]]
+        optims = [["all", ""]]
+        bench_set += base_benchmark_set
+
+    # If we were supposed to run a specific set of benchmarks, we're done
+    if run_base_benchmarks or run_constraint_benchmarks or run_lifting_benchmarks:
+        run_benchmarks(bench_set, algos,
+                       optims, raw_output=raw_output, num_runs=runs)
         exit()
 
-    # === TABLES and older runs ===
+    # === === TABLES and CAV runs === ===
     if run_test_only:
-        algos = [["requation", ""]]
+        algos = [["partbnd", ""]]
         optims = [["all", cvc]]
 
     # Table 1 / CAV 21 paper : compare Synduce and Baseline
     elif table_no == 1:
 
         algos = [
-            ["requation", "--no-gropt"],
+            ["partbnd", "--no-gropt"],
             ["acegis", "--acegis --no-gropt"]
         ]
         optims = [["all", ""]]
@@ -434,7 +582,7 @@ if __name__ == "__main__":
     elif table_no == 2:
 
         algos = [
-            ["requation", "--no-gropt"],
+            ["partbnd", "--no-gropt"],
             ["acegis", "--acegis --no-gropt"],
             ["ccegis", "--ccegis --no-gropt"]
         ]
@@ -444,7 +592,7 @@ if __name__ == "__main__":
     elif table_no == 3:
 
         algos = [
-            ["requation", "--no-gropt"],
+            ["partbnd", "--no-gropt"],
             ["acegis", "--acegis --no-gropt"],
         ]
 
@@ -458,17 +606,17 @@ if __name__ == "__main__":
 
     # Table 4 / Test
     elif table_no == 4:
-        algos = [["requation"]]
+        algos = [["partbnd"]]
         optims = [["all", ""]]
 
     # Table 5 / Test with cvc4 against baseline comparison
     elif table_no == 5:
-        algos = [["requation", "--cvc4"], ["acegis", "--acegis --cvc4"]]
+        algos = [["partbnd", "--cvc4"], ["acegis", "--acegis --cvc4"]]
         optims = [["all", ""]]
 
     # No table - just run the base algorithm.
     else:
-        algos = [["requation", ""]]
+        algos = [["partbnd", ""]]
         optims = [["all", ""]]
 
     # Benchmark set selection.
@@ -481,11 +629,14 @@ if __name__ == "__main__":
             input_files = reduced_benchmark_set_table2
         elif table_no == 3:
             input_files = reduced_benchmark_set_table3
-        elif table_no == 4 or table_no == 5:
+        elif table_no == 4:
             input_files = constraint_benchmarks
+        elif table_no == 5:
+            input_files = constraint_benchmarks + lifting_benchmarks
         elif run_test_only:
             input_files = benchmark_set
         else:
             input_files = kick_the_tires_set
 
-    run_benchmarks(input_files, algos, optims, raw_output, exit_err=True)
+    run_benchmarks(input_files, algos, optims, raw_output=raw_output,
+                   exit_err=True, num_runs=runs)

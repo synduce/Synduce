@@ -9,31 +9,34 @@ open Utils
    definitions and printing functions for displaying solutions.
  *)
 
-type psi_def = {
-  psi_target : PMRS.t;  (**
-  The target recursion skeleton in the problem.
-  *)
-  psi_reference : PMRS.t;  (**
-   The reference function in the problem.
-  *)
-  psi_repr : PMRS.t;  (**
-    The representation function in the problem.
-  *)
-  psi_tinv : PMRS.t option;  (**
-  The requires predicate of the target recursion skeleton.
-  *)
-  psi_repr_is_identity : bool;  (**
-  A boolean that is true iff psi_repr is identity.
-  *)
-  psi_lifting : RType.t list;
-      (** The current lifting: the output type of psi_target
-  should be !_alpha extended with the tuple of types psi_lifting. *)
-}
-
 (**
   psi_def is the definition of the problem: the goal is to synthesize the unknowns in target such
   that target = orig ∘ repr
 *)
+type psi_def =
+  { psi_target : PMRS.t (**
+  The target recursion skeleton in the problem.
+  *)
+  ; psi_reference : PMRS.t (**
+   The reference function in the problem.
+  *)
+  ; psi_repr : PMRS.t (**
+    The representation function in the problem.
+  *)
+  ; psi_tinv : PMRS.t option
+        (**
+  The requires predicate of the target recursion skeleton.
+  *)
+  ; psi_repr_is_identity : bool
+        (**
+  A boolean that is true iff psi_repr is identity.
+  *)
+  ; psi_lifting : RType.t list
+        (** The current lifting: the output type of psi_target
+  should be !_alpha extended with the tuple of types psi_lifting. *)
+  }
+
+let psi_def_logics p = [ p.psi_repr.plogic; p.psi_reference.plogic; p.psi_target.plogic ]
 
 (* State variables for the algorithm. *)
 
@@ -54,7 +57,6 @@ let _alpha : RType.t ref = ref RType.TInt
 let _span = ref 1
 
 let refinement_steps = ref 0
-
 let secondary_refinement_steps = ref 0
 
 let reinit () =
@@ -63,32 +65,33 @@ let reinit () =
   _alpha := RType.TInt;
   _tau := RType.TInt;
   _theta := RType.TInt
+;;
 
 (* ============================================================================================= *)
 (*       Types for intermediate representations of solutions, lemmas, counterexamples, etc.      *)
 (* ============================================================================================= *)
 
-type soln = {
-  soln_rec_scheme : PMRS.t;  (** The recursion scheme this object is a solution of. *)
-  soln_implems : (symbol * variable list * term) list;
-      (** The association list containing the implementation of each unknown. Each element of the
-      list is a triple of unknown name, list of arguments, and body of the unknown implementation.
-  *)
-}
 (** Representation of a solution, i.e. a function (as a PMRS) together with an association list
 from unknown name to its implementation.
 *)
+type soln =
+  { soln_rec_scheme : PMRS.t (** The recursion scheme this object is a solution of. *)
+  ; soln_implems : (symbol * variable list * term) list
+        (** The association list containing the implementation of each unknown. Each element of the
+      list is a triple of unknown name, list of arguments, and body of the unknown implementation.
+  *)
+  }
 
-type equation = {
-  eterm : term;  (** The term from which the equation originates. *)
-  eprecond : term option;  (** An optional precondition to the equation. *)
-  elhs : term;  (** The left-hand side of the equation, containing no unknowns. *)
-  erhs : term;  (** The right-hand side of the equation, possibly with unknowns. *)
-  eelim : (term * term) list;  (** The substitution used to eliminate recursion. *)
-}
 (**
   Represents an equational constraint.
 *)
+type equation =
+  { eterm : term (** The term from which the equation originates. *)
+  ; eprecond : term option (** An optional precondition to the equation. *)
+  ; elhs : term (** The left-hand side of the equation, containing no unknowns. *)
+  ; erhs : term (** The right-hand side of the equation, possibly with unknowns. *)
+  ; eelim : (term * term) list (** The substitution used to eliminate recursion. *)
+  }
 
 type spurious_cause =
   | ViolatesTargetRequires
@@ -101,36 +104,37 @@ type spurious_cause =
 type ctex_stat =
   | Valid
   | Spurious of spurious_cause list
-  | Unknown  (**
+  | Unknown
+      (**
   A counterexample is either valid, or spurious with some reason, or unknown.
 *)
 
-type ctex = {
-  ctex_eqn : equation;  (** The equation the counterexample relates to. *)
-  ctex_vars : VarSet.t;  (** The variables in the model.*)
-  ctex_model : term VarMap.t;
-      (** The model of the counterexample, mapping variables to terms. The terms should be
-        constants. *)
-  ctex_stat : ctex_stat;  (** The spuriousness status of the counterexample. *)
-}
 (** A counterexample related to an equation and some info on the validity of the counterexample.
 *)
+type ctex =
+  { ctex_eqn : equation (** The equation the counterexample relates to. *)
+  ; ctex_vars : VarSet.t (** The variables in the model.*)
+  ; ctex_model : term VarMap.t
+        (** The model of the counterexample, mapping variables to terms. The terms should be
+        constants. *)
+  ; ctex_stat : ctex_stat (** The spuriousness status of the counterexample. *)
+  }
 
 type equation_system = equation list
 
 (** Contains the last equation system used to solved the problem when a solution is found. *)
 let solved_eqn_system : equation_system option ref = ref None
 
-type term_state_detail = {
-  term : term;
-  lemmas : term list;
-  lemma_candidate : (string * variable list * term) option;
-  negative_ctexs : ctex list;
-  positive_ctexs : ctex list;
-  recurs_elim : (term * term) list;
-  scalar_vars : variable list;
-  current_preconds : term option;
-}
+type term_state_detail =
+  { term : term
+  ; lemmas : term list
+  ; lemma_candidate : (string * variable list * term) option
+  ; negative_ctexs : ctex list
+  ; positive_ctexs : ctex list
+  ; recurs_elim : (term * term) list
+  ; scalar_vars : variable list
+  ; current_preconds : term option
+  }
 
 type term_state = (term, term_state_detail, Terms.comparator_witness) Map.t
 (*
@@ -143,21 +147,22 @@ type term_state = (term, term_state_detail, Terms.comparator_witness) Map.t
   during the constraint generation).
  *)
 
-type lifting = { tmap : ((int * term) * term) list }
 (**
   The type to describe liftings.
   tmap is a map from terms to the expression of the lifting.
 *)
+type lifting = { tmap : ((int * term) * term) list }
 
-type refinement_loop_state = {
-  t_set : TermSet.t;
-  u_set : TermSet.t;
-  term_state : term_state;
-  lifting : lifting;
-}
 (** The state of the main refinement loop. Currently, it is entirely determined by the sets T and U,
   accompanied with a set of lemmas that can be used during the generation of constraints.
  *)
+type refinement_loop_state =
+  { t_set : TermSet.t
+  ; u_set : TermSet.t
+  ; term_state : term_state
+  ; lifting : lifting
+  ; assumptions : equation list
+  }
 
 (* ============================================================================================= *)
 (*          Pretty printing functions.                                                           *)
@@ -166,29 +171,58 @@ type refinement_loop_state = {
 let pp_equation (f : Formatter.t) (eqn : equation) =
   match eqn.eprecond with
   | Some inv ->
-      Fmt.(
-        pf f "@[<hov 2>E(%a)<%a> := @;@[<hov 2>%a %a@;@[%a@;%a@;%a@]@]@]"
-          (styled `Italic pp_term)
-          eqn.eterm pp_subs eqn.eelim pp_term inv
-          (styled (`Fg `Red) string)
-          "=>" pp_term eqn.elhs
-          (styled (`Fg `Red) string)
-          "=" pp_term eqn.erhs)
+    Fmt.(
+      pf
+        f
+        "@[<hov 2>E(%a)<%a> := @;@[<hov 2>%a %a@;@[%a@;%a@;%a@]@]@]"
+        (styled `Italic pp_term)
+        eqn.eterm
+        pp_subs
+        eqn.eelim
+        pp_term
+        inv
+        (styled (`Fg `Red) string)
+        "=>"
+        pp_term
+        eqn.elhs
+        (styled (`Fg `Red) string)
+        "="
+        pp_term
+        eqn.erhs)
   | None ->
-      Fmt.(
-        pf f "@[<hov 2>E(%a)<%a> := @;@[<hov 2>%a %a %a@]@]"
-          (styled `Italic pp_term)
-          eqn.eterm pp_subs eqn.eelim pp_term eqn.elhs
-          (styled (`Fg `Red) string)
-          "=" pp_term eqn.erhs)
+    Fmt.(
+      pf
+        f
+        "@[<hov 2>E(%a)<%a> := @;@[<hov 2>%a %a %a@]@]"
+        (styled `Italic pp_term)
+        eqn.eterm
+        pp_subs
+        eqn.eelim
+        pp_term
+        eqn.elhs
+        (styled (`Fg `Red) string)
+        "="
+        pp_term
+        eqn.erhs)
+;;
 
 let pp_ctex (f : Formatter.t) (ctex : ctex) : unit =
   let pp_model frmt model =
     (* Print as comma-separated list of variable -> term *)
-    Fmt.(list ~sep:comma (pair ~sep:Utils.rightarrow Variable.pp pp_term)) frmt (Map.to_alist model)
+    Fmt.(list ~sep:comma (pair ~sep:Utils.rightarrow Variable.pp pp_term))
+      frmt
+      (Map.to_alist model)
   in
-  Fmt.pf f "@[M = [%a]@]@;@[for %a@]@;@[with elim. %a@]" pp_model ctex.ctex_model pp_term
-    ctex.ctex_eqn.eterm pp_subs ctex.ctex_eqn.eelim
+  Fmt.pf
+    f
+    "@[M = [%a]@]@;@[for %a@]@;@[with elim. %a@]"
+    pp_model
+    ctex.ctex_model
+    pp_term
+    ctex.ctex_eqn.eterm
+    pp_subs
+    ctex.ctex_eqn.eelim
+;;
 
 let pp_implems (frmt : Formatter.t) (implems : (symbol * variable list * term) list) =
   let pp_single_or_tup frmt l =
@@ -196,36 +230,53 @@ let pp_implems (frmt : Formatter.t) (implems : (symbol * variable list * term) l
     | [] -> ()
     | [ (_, v) ] -> pp_term frmt v
     | _ :: _ ->
-        Fmt.(pf frmt "(%a)" (list ~sep:(fun _f () -> pf _f ", ") pp_term) (List.map ~f:second l))
+      Fmt.(
+        pf
+          frmt
+          "(%a)"
+          (list ~sep:(fun _f () -> pf _f ", ") pp_term)
+          (List.map ~f:second l))
   in
   let pp_implem frmt (s, args, t) =
     let f v =
       match Variable.vtype_or_new v with
       | TTup tl ->
-          let f i typ =
-            let v' = Variable.mk ~t:(Some typ) (Alpha.fresh ~s:v.vname ()) in
-            (mk_sel (mk_var v) i, mk_var v')
-          in
-          let subs1 = List.mapi ~f tl in
-          let _, vars = List.unzip subs1 in
-          ((mk_var v, mk_tup vars) :: subs1, subs1)
-      | _ -> ([], [ (mk_var v, mk_var v) ])
+        let f i typ =
+          let v' = Variable.mk ~t:(Some typ) (Alpha.fresh ~s:v.vname ()) in
+          mk_sel (mk_var v) i, mk_var v'
+        in
+        let subs1 = List.mapi ~f tl in
+        let _, vars = List.unzip subs1 in
+        (mk_var v, mk_tup vars) :: subs1, subs1
+      | _ -> [], [ mk_var v, mk_var v ]
     in
     let subs, args = List.unzip (List.map ~f args) in
     let t' = substitution (List.concat subs) t in
     Fmt.(
-      pf frmt "@[<hov 2>%a %a @[%a@] %a@;%a@]"
+      pf
+        frmt
+        "@[<hov 2>%a %a @[%a@] %a@;%a@]"
         (styled (`Fg `Red) string)
         "let"
         (styled (`Fg `Cyan) string)
-        s (list ~sep:sp pp_single_or_tup) args
+        s
+        (list ~sep:sp pp_single_or_tup)
+        args
         (styled (`Fg `Red) string)
-        "=" pp_term t')
+        "="
+        pp_term
+        t')
   in
   Fmt.((list ~sep:(fun _f () -> pf _f "@.@.") pp_implem) frmt implems)
+;;
 
 let pp_soln ?(use_ocaml_syntax = false) (frmt : Formatter.t) (solution : soln) =
   Fmt.(
-    pf frmt "@.%a@.@.@[%a@]@." pp_implems solution.soln_implems
-      (if use_ocaml_syntax then PMRS.pp_ocaml else PMRS.pp)
+    pf
+      frmt
+      "@.%a@.@.@[%a@]@."
+      pp_implems
+      solution.soln_implems
+      (if use_ocaml_syntax then PMRS.pp_ocaml ~short:false else PMRS.pp ~short:false)
       solution.soln_rec_scheme)
+;;

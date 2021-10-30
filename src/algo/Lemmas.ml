@@ -155,7 +155,7 @@ let term_detail_to_lemma ~(p : psi_def) (det : term_state_detail) : term option 
       det.recurs_elim
   in
   let f lem = Term.substitution subst lem in
-  T.mk_assoc Binop.And (List.map ~f det.lemmas)
+  Option.map ~f:Rewriter.simplify_term (T.mk_assoc Binop.And (List.map ~f det.lemmas))
 ;;
 
 let empty_term_state : term_state = Map.empty (module Terms)
@@ -208,7 +208,7 @@ let create_or_update_term_state_for_ctex
             })
 ;;
 
-let update_term_state_for_ctexs
+let pre_refinement_update_term_state
     ~(p : psi_def)
     (ts : term_state)
     ~(pos_ctexs : ctex list)
@@ -259,7 +259,7 @@ let add_lemmas_interactively ~(p : psi_def) (lstate : refinement_loop_state)
         with
         | Failure _ -> None
       in
-      let pred_term = SmtInterface.term_of_smt env in
+      let pred_term = Smt.term_of_smt env in
       let term x =
         match get_lemma ~p existing_lemmas ~key:t with
         | None -> pred_term x
@@ -277,12 +277,6 @@ let ith_synth_fun index = "lemma_" ^ Int.to_string index
 let synthfun_of_ctex ~(p : psi_def) (det : term_state_detail) (lem_id : int)
     : command * (string * sygus_sort) list * string
   =
-  let params =
-    List.map
-      ~f:(fun scalar -> scalar.vname, sort_of_rtype (Variable.vtype_or_new scalar))
-      det.scalar_vars
-  in
-  let ret_sort = sort_of_rtype RType.TBool in
   let opset =
     List.fold
       ~init:OpSet.empty
@@ -295,9 +289,12 @@ let synthfun_of_ctex ~(p : psi_def) (det : term_state_detail) (lem_id : int)
       | Some pmrs -> PMRS.func_of_pmrs pmrs)
   in
   (* OpSet.of_list [ Binary Binop.Mod ] in *)
-  let grammar = Grammars.generate_grammar ~guess:None ~bools:true opset params ret_sort in
+  let grammar =
+    Grammars.generate_grammar ~guess:None ~bools:true opset det.scalar_vars RType.TBool
+  in
   let logic = logic_of_operators opset in
-  CSynthFun (ith_synth_fun lem_id, params, ret_sort, grammar), params, logic
+  let params = sorted_vars_of_vars det.scalar_vars in
+  mk_synthinv (ith_synth_fun lem_id) det.scalar_vars grammar, params, logic
 ;;
 
 let term_var_string term : string =
@@ -560,28 +557,31 @@ let smt_of_lemma_validity ~(p : psi_def) lemma (det : term_state_detail) =
 ;;
 
 let set_up_lemma_solver solver ~(p : psi_def) lemma_candidate =
-  let%lwt () = Smt.AsyncSmt.set_logic solver "ALL" in
-  let%lwt () = Smt.AsyncSmt.set_option solver "quant-ind" "true" in
-  let%lwt () = Smt.AsyncSmt.set_option solver "produce-models" "true" in
-  let%lwt () = Smt.AsyncSmt.set_option solver "incremental" "true" in
-  let%lwt () =
-    if !Config.induction_proof_tlimit >= 0
-    then
-      Smt.AsyncSmt.set_option
-        solver
-        "tlimit"
-        (Int.to_string !Config.induction_proof_tlimit)
-    else return ()
+  let preamble =
+    Smt.Commands.mk_preamble
+      ~logic:
+        (SmtLogic.infer_logic
+           ~quantifier_free:false
+           ~with_uninterpreted_functions:true
+           ~for_induction:true
+           ~logic_infos:(AState.psi_def_logics p)
+           [])
+      ~incremental:false
+      ~induction:true
+      ~models:true
+      ()
   in
-  let%lwt () = Smt.AsyncSmt.load_min_max_defs solver in
+  let%lwt () = Smt.AsyncSmt.exec_all solver preamble in
   let%lwt () =
     Lwt_list.iter_p
       (fun x ->
         let%lwt _ = Smt.AsyncSmt.exec_command solver x in
         return ())
-      ((match p.psi_tinv with
+      ((* Start by defining tinv. *)
+       (match p.psi_tinv with
        | None -> []
        | Some tinv -> Smt.smt_of_pmrs tinv)
+      (* PMRS definitions.*)
       @ (if p.psi_repr_is_identity
         then Smt.smt_of_pmrs p.psi_reference
         else Smt.smt_of_pmrs p.psi_reference @ Smt.smt_of_pmrs p.psi_repr)
@@ -590,32 +590,12 @@ let set_up_lemma_solver solver ~(p : psi_def) lemma_candidate =
       (* Declare lemmas. *)
       @ [ (match lemma_candidate with
           | name, vars, body ->
-            Smt.mk_def_fun_command
+            Smt.Commands.mk_def_fun
               name
               (List.map ~f:(fun v -> v.vname, Variable.vtype_or_new v) vars)
               RType.TBool
               body)
         ])
-  in
-  return ()
-;;
-
-let set_up_bounded_solver (logic : string) (vars : VarSet.t) solver =
-  let%lwt () = SmtInterface.AsyncSmt.set_logic solver logic in
-  let%lwt () = SmtInterface.AsyncSmt.set_option solver "produce-models" "true" in
-  let%lwt () = SmtInterface.AsyncSmt.set_option solver "incremental" "true" in
-  let%lwt () =
-    if !Config.induction_proof_tlimit >= 0
-    then
-      SmtInterface.AsyncSmt.set_option
-        solver
-        "tlimit"
-        (Int.to_string !Config.induction_proof_tlimit)
-    else return ()
-  in
-  let%lwt () = SmtInterface.AsyncSmt.load_min_max_defs solver in
-  let%lwt () =
-    SmtInterface.AsyncSmt.declare_all solver (SmtInterface.decls_of_vars vars)
   in
   return ()
 ;;
@@ -660,12 +640,14 @@ let smt_of_disallow_ctex_values (det : term_state_detail) : S.smtTerm =
 let set_up_to_get_model solver ~(p : psi_def) lemma (det : term_state_detail) =
   (* Step 1. Declare vars for term, and assert that term satisfies tinv. *)
   let%lwt () =
-    Smt.AsyncSmt.declare_all solver (Smt.decls_of_vars (Analysis.free_variables det.term))
+    Smt.(
+      AsyncSmt.exec_all solver (Commands.decls_of_vars (Analysis.free_variables det.term)))
   in
   let%lwt _ = Smt.AsyncSmt.exec_command solver (S.mk_assert (smt_of_tinv_app ~p det)) in
   (* Step 2. Declare scalars (vars for recursion elimination & spec param) and their constraints (preconds & recurs elim eqns) *)
   let%lwt () =
-    Smt.AsyncSmt.declare_all solver (Smt.decls_of_vars (VarSet.of_list det.scalar_vars))
+    Smt.(
+      AsyncSmt.exec_all solver (Commands.decls_of_vars (VarSet.of_list det.scalar_vars)))
   in
   let%lwt _ =
     Smt.AsyncSmt.exec_command
@@ -720,14 +702,24 @@ let mk_model_sat_asserts det f_o_r instantiate =
 let verify_lemma_bounded ~(p : psi_def) (det : term_state_detail) lemma_candidate
     : Smt.AsyncSmt.response * int Lwt.u
   =
+  let logic = SmtLogic.infer_logic ~logic_infos:(AState.psi_def_logics p) [] in
   let task (solver, starter) =
     let%lwt _ = starter in
-    let%lwt _ = set_up_bounded_solver "LIA" (VarSet.of_list det.scalar_vars) solver in
+    let%lwt () =
+      Smt.AsyncSmt.exec_all
+        solver
+        Smt.Commands.(
+          mk_preamble
+            ~incremental:(String.is_prefix ~prefix:"CVC" solver.s_name)
+            ~logic
+            ()
+          @ decls_of_vars (VarSet.of_list det.scalar_vars))
+    in
     let steps = ref 0 in
     let rec check_bounded_sol accum terms =
       let f accum t =
         let rec_instantation =
-          Option.value ~default:VarMap.empty (Analysis.matches t ~pattern:det.term)
+          Option.value ~default:VarMap.empty (Matching.matches t ~pattern:det.term)
         in
         let%lwt _ = accum in
         let f_compose_r t =
@@ -756,13 +748,14 @@ let verify_lemma_bounded ~(p : psi_def) (det : term_state_detail) lemma_candidat
         let%lwt () = Smt.AsyncSmt.spush solver in
         (* Assert that preconditions hold and map original term's recurs elim variables to the variables that they reduce to for this concrete term. *)
         let%lwt _ =
-          Smt.AsyncSmt.declare_all
-            solver
-            (Smt.decls_of_vars
-               (List.fold
-                  ~init:VarSet.empty
-                  ~f:(fun acc t -> Set.union acc (Analysis.free_variables t))
-                  (preconds @ Map.data rec_instantation)))
+          Smt.(
+            AsyncSmt.exec_all
+              solver
+              (Commands.decls_of_vars
+                 (List.fold
+                    ~init:VarSet.empty
+                    ~f:(fun acc t -> Set.union acc (Analysis.free_variables t))
+                    (preconds @ Map.data rec_instantation))))
         in
         let%lwt () =
           Smt.AsyncSmt.smt_assert
@@ -776,9 +769,10 @@ let verify_lemma_bounded ~(p : psi_def) (det : term_state_detail) lemma_candidat
           | Some tinv ->
             let tinv_t = Reduce.reduce_pmrs tinv t in
             let%lwt _ =
-              Smt.AsyncSmt.declare_all
-                solver
-                (Smt.decls_of_vars (Analysis.free_variables tinv_t))
+              Smt.(
+                AsyncSmt.exec_all
+                  solver
+                  (Commands.decls_of_vars (Analysis.free_variables tinv_t)))
             in
             let%lwt _ = Smt.AsyncSmt.smt_assert solver (Smt.smt_of_term tinv_t) in
             return ()
@@ -836,7 +830,7 @@ let verify_lemma_bounded ~(p : psi_def) (det : term_state_detail) lemma_candidat
     let%lwt res = expand_loop (TermSet.singleton det.term) in
     return res
   in
-  Smt.AsyncSmt.(cancellable_task (make_cvc_solver ()) task)
+  Smt.AsyncSmt.(cancellable_task (make_solver "cvc") task)
 ;;
 
 let verify_lemma_unbounded ~(p : psi_def) (det : term_state_detail) lemma_candidate
@@ -866,7 +860,7 @@ let verify_lemma_unbounded ~(p : psi_def) (det : term_state_detail) lemma_candid
     Log.debug_msg "Unbounded lemma verification is complete.";
     return final_response
   in
-  Smt.AsyncSmt.(cancellable_task (Smt.AsyncSmt.make_cvc_solver ()) build_task)
+  Smt.AsyncSmt.(cancellable_task (Smt.AsyncSmt.make_solver "cvc") build_task)
 ;;
 
 let verify_lemma_candidate ~(p : psi_def) (det : term_state_detail)
@@ -1189,9 +1183,49 @@ let add_ensures_to_term_state
       Map.add_exn ~key ~data:new_det acc)
 ;;
 
+let refine_ensures_predicates
+    ~(p : psi_def)
+    ~(neg_ctexs : ctex list)
+    ~(pos_ctexs : ctex list)
+    (lstate : refinement_loop_state)
+  =
+  Log.info
+    Fmt.(
+      fun fmt () ->
+        pf fmt "%i counterexamples violate image assumption." (List.length neg_ctexs));
+  let maybe_pred = ImagePredicates.synthesize ~p pos_ctexs neg_ctexs [] in
+  match maybe_pred with
+  | None -> lstate.term_state, false
+  | Some ensures ->
+    (match Specifications.get_ensures p.psi_reference.pvar with
+    | None -> Specifications.set_ensures p.psi_reference.pvar ensures
+    | Some old_ensures ->
+      let var : variable =
+        Variable.mk ~t:(Some p.psi_reference.poutput_typ) (Alpha.fresh ())
+      in
+      Specifications.set_ensures
+        p.psi_reference.pvar
+        (mk_fun
+           [ FPatVar var ]
+           (mk_bin
+              Binop.And
+              (mk_app old_ensures [ mk_var var ])
+              (mk_app ensures [ mk_var var ]))));
+    lstate.term_state, true
+;;
+
 let synthesize_lemmas ~(p : psi_def) synt_failure_info (lstate : refinement_loop_state)
     : (refinement_loop_state, solver_response) Result.t
   =
+  let interactive_synthesis () =
+    !Config.interactive_lemmas_loop
+    &&
+    (Log.info (fun frmt () -> Fmt.pf frmt "No luck. Try again? (Y/N)");
+     match Stdio.In_channel.input_line Stdio.stdin with
+     | None | Some "" | Some "N" -> false
+     | Some "Y" -> true
+     | _ -> false)
+  in
   (*
     Example: the synt_failure_info should be a list of unrealizability counterexamples, which
     are pairs of counterexamples.
@@ -1199,52 +1233,44 @@ let synthesize_lemmas ~(p : psi_def) synt_failure_info (lstate : refinement_loop
     The lemma corresponding to a particular term should be refined to eliminate the counterexample
     (a counterexample cex is also associated to a particular term through cex.ctex_eqn.eterm)
    *)
-  let new_state, success =
+  let new_state, lemma_synthesis_success =
     match synt_failure_info with
     | _, Either.Second unrealizability_ctexs ->
       (* Forget about the specific association in pairs. *)
       let ctexs = List.concat_map unrealizability_ctexs ~f:(fun uc -> [ uc.ci; uc.cj ]) in
       let classified_ctexs = classify_ctexs_opt ~p ctexs in
+      (* Positive and negatives for the ensures predicates. *)
       let ensures_positives, ensures_negatives, _ =
         List.partition3_map ~f:ctexs_for_ensures_synt classified_ctexs
       in
+      (* Positive and negatives for the requires of the target function. *)
+      let lemma_synt_positives, lemma_synt_negatives, _ =
+        List.partition3_map ~f:ctexs_for_lemma_synt classified_ctexs
+      in
       if List.length ensures_negatives > 0
-      then (
-        Log.info
-          Fmt.(
-            fun fmt () ->
-              pf
-                fmt
-                "%i counterexamples violate image assumption."
-                (List.length ensures_negatives));
-        let maybe_pred =
-          ImagePredicates.synthesize ~p ensures_positives ensures_negatives []
-        in
-        match maybe_pred with
-        | None -> lstate.term_state, false
-        | Some ensures ->
-          (match Specifications.get_ensures p.psi_reference.pvar with
-          | None -> Specifications.set_ensures p.psi_reference.pvar ensures
-          | Some old_ensures ->
-            let var : variable =
-              Variable.mk ~t:(Some p.psi_reference.poutput_typ) (Alpha.fresh ())
-            in
-            Specifications.set_ensures
-              p.psi_reference.pvar
-              (mk_fun
-                 [ FPatVar var ]
-                 (mk_bin
-                    Binop.And
-                    (mk_app old_ensures [ mk_var var ])
-                    (mk_app ensures [ mk_var var ]))));
-          lstate.term_state, true)
+      then
+        refine_ensures_predicates
+          ~p
+          ~neg_ctexs:ensures_negatives
+          ~pos_ctexs:ensures_positives
+          lstate
       else (
-        (* Classify in negative and positive cexs. *)
-        let lemma_synt_positives, lemma_synt_negatives, _ =
-          List.partition3_map ~f:ctexs_for_lemma_synt classified_ctexs
+        let ts : term_state =
+          pre_refinement_update_term_state
+            ~p
+            lstate.term_state
+            ~neg_ctexs:lemma_synt_negatives
+            ~pos_ctexs:lemma_synt_positives
         in
-        if List.length lemma_synt_negatives > 0
-        then
+        if List.is_empty lemma_synt_negatives
+        then (
+          (* lemma_synt_negatives and ensures_negatives are empty; all ctexs spurious! *)
+          Log.info
+            Fmt.(
+              fun fmt () ->
+                pf fmt "All counterexamples are non-spurious: nothing to refine.");
+          ts, false)
+        else (
           Log.info
             Fmt.(
               fun fmt () ->
@@ -1252,16 +1278,6 @@ let synthesize_lemmas ~(p : psi_def) synt_failure_info (lstate : refinement_loop
                   fmt
                   "%i counterexamples violate requires."
                   (List.length lemma_synt_negatives));
-        let ts : term_state =
-          update_term_state_for_ctexs
-            ~p
-            lstate.term_state
-            ~neg_ctexs:lemma_synt_negatives
-            ~pos_ctexs:lemma_synt_positives
-        in
-        if List.is_empty lemma_synt_negatives
-        then ts, false
-        else
           Map.fold
             ts
             ~init:(Map.empty (module Terms), true)
@@ -1273,17 +1289,10 @@ let synthesize_lemmas ~(p : psi_def) synt_failure_info (lstate : refinement_loop
               else (
                 match lemma_refinement_loop det ~p with
                 | None -> acc, false
-                | Some det -> Map.add_exn ~key ~data:det acc, status)))
+                | Some det -> Map.add_exn ~key ~data:det acc, status))))
     | _ -> failwith "There is no synt_failure_info in synthesize_lemmas."
   in
-  if success
-     || (!Config.interactive_lemmas_loop
-        &&
-        (Log.info (fun frmt () -> Fmt.pf frmt "No luck. Try again? (Y/N)");
-         match Stdio.In_channel.input_line Stdio.stdin with
-         | None | Some "" | Some "N" -> false
-         | Some "Y" -> true
-         | _ -> false))
+  if lemma_synthesis_success || interactive_synthesis ()
   then Ok { lstate with term_state = new_state }
   else (
     match synt_failure_info with
@@ -1292,7 +1301,7 @@ let synthesize_lemmas ~(p : psi_def) synt_failure_info (lstate : refinement_loop
       Error RFail
     | RInfeasible, _ ->
       (* Rare - but the synthesis solver can answer "infeasible", in which case it can give
-           counterexamples. *)
+             counterexamples. *)
       Log.info
         Fmt.(
           fun frmt () ->
@@ -1304,10 +1313,8 @@ let synthesize_lemmas ~(p : psi_def) synt_failure_info (lstate : refinement_loop
       Error RInfeasible
     | RUnknown, _ ->
       (* In most cases if the synthesis solver does not find a solution and terminates, it will
-           answer unknowns. We interpret it as "no solution can be found". *)
+             answer unknowns. We interpret it as "no solution can be found". *)
       Log.error_msg "SyGuS solver returned unknown.";
       Error RUnknown
-    | s_resp, _ ->
-      Log.error_msg "SyGuS solver did not succeed.";
-      Error s_resp)
+    | s_resp, _ -> Error s_resp)
 ;;

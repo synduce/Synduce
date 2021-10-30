@@ -5,7 +5,7 @@ import datetime
 timeout_time = 600.0
 
 
-algorithms = ["requation", "acegis", "ccegis"]
+algorithms = ["partbnd", "acegis", "ccegis"]
 versions = ["all", "ini", "st", "d", "off"]
 fields = ["synt", "verif", "#i", "last"]
 
@@ -212,11 +212,11 @@ def produce_txt_table(tex_output_file, data):
                 bkey = benchmark_class + "/" + benchmark_file + ".pmrs"
                 acegis_bf = False
 
-                if (bkey, "requation") not in data.keys():
-                    #print("No data for %s, requation" % bkey)
+                if (bkey, "partbnd") not in data.keys():
+                    #print("No data for %s, partbnd" % bkey)
                     pass
                 else:
-                    b_data = data[bkey, "requation"]["all"]
+                    b_data = data[bkey, "partbnd"]["all"]
                     if "res" in b_data:
                         req_iters, _, req_time, _ = b_data["res"]
                         req_t = "%3.2f" % float(req_time)
@@ -374,8 +374,8 @@ def table3(tex_output_file, data):
 
         for benchmark_file, benchmark_info in benchmarks:
             bkey = benchmark_class + "/" + benchmark_file + ".pmrs"
-            # Collect Data for requation
-            algo = "requation"
+            # Collect Data for partbnd
+            algo = "partbnd"
             csvline = []
             if (bkey, algo) in data.keys():
                 bdata = data[bkey, algo]

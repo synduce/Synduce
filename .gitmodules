@@ -1,3 +1,0 @@
-[submodule "timeout"]
-path = extras/timeout
-url = https://github.com/pshved/timeout.git

@@ -2,7 +2,7 @@
 
 (name Synduce)
 
-(version 0.2)
+(version cb3ec7f-dirty)
 
 (license MIT)
 
