@@ -1104,7 +1104,7 @@ let rec lemma_refinement_loop (det : term_state_detail) ~(p : psi_def)
         let lemma =
           match det.current_preconds with
           | None -> lemma_term
-          | Some pre -> mk_bin Binop.Or (mk_un Unop.Not pre) lemma_term
+          | Some _pre -> lemma_term (* mk_bin Binop.And (mk_un Unop.Not pre) lemma_term *)
         in
         Some { det with lemma_candidate = None; lemmas = lemma :: det.lemmas }
       | SmtLib.SExps x ->

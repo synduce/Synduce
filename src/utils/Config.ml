@@ -289,7 +289,7 @@ let set_num_expansions_check (s : string) =
 let use_bmc = ref false
 
 (** Depth of bounded model checking. *)
-let check_depth = ref 5
+let check_depth = ref 7
 
 (** Bounded model checking depth is set by the -b or --bmc option of the CLI. *)
 let set_check_depth (s : string) =

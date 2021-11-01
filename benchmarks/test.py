@@ -5,7 +5,6 @@ import sys
 import time
 import argparse
 import subprocess
-from termcolor import colored
 
 # Timeout for all experiments.
 timeout_value = 400
@@ -119,7 +118,7 @@ constraint_benchmarks = [
     # balanced_tree
     ["constraints/balanced_tree/node_count.ml", "-N"],
     ["constraints/balanced_tree/height.ml", "-N"],
-    ["constraints/balanced_tree/height_v2.ml", "-NB"],
+    # ["constraints/balanced_tree/height_v2.ml", "-NB"],
     # symmetric tree
     ["constraints/symmetric_tree/sum.ml", "-N"],
     ["constraints/symmetric_tree/height.ml", "-N"],
@@ -380,7 +379,7 @@ def run_n(progress, bench_id, command, algo,
     if elapsed > 0:
         delta_str = f"{delta : .0f}ms"
         if (float(delta) / (1000.0 * elapsed)) > 0.05:
-            delta_str = colored(delta_str, 'red')
+            delta_str = f"{delta_str} !!"
         msg = f"{progress : >11s} ✅ {bench_name : <40s} ×{num_runs} runs,  average : {elapsed: 4.3f} s ±{delta_str} {sp : <60s}"
         print(msg)
     else:
@@ -428,9 +427,7 @@ def run_benchmarks(input_files, algos, optims, num_runs=1, raw_output=None, exit
                             soln_file_opt, gen_opt))
                 bench_cat = "->".join(bench_id.split(".")[0].split("/")[:-1])
                 if not bench_cat == prev_bench_cat:
-                    catkw = colored("Category: ", 'red',
-                                    attrs=["underline"])
-                    print(f"\n⏺ {catkw} {bench_cat}")
+                    print(f"\n⏺ Category: {bench_cat}")
                     prev_bench_cat = bench_cat
                 # Run the benchmark n times.
                 errors, elapsed, delta = run_n(progress, bench_id, command, algo,
