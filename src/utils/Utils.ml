@@ -3,6 +3,7 @@ open Sexplib
 module Config = Config
 module Stats = Stats
 module Log = Log
+module LogJson = LogJson
 module IntMap = Map.M (Int)
 module StringMap = Map.M (Int)
 

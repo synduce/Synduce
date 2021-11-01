@@ -216,7 +216,7 @@ let replace_rhs_of_mains (p : psi_def) (t0 : term) : term =
 (*                                   acegis TERM EXPANSION                                       *)
 (* ============================================================================================= *)
 
-let simple ?(verbose = false) ?(max_height = !Config.expand_cut) (t0 : term) =
+let simple ?(verbose = false) ?(max_height = !Config.Optims.expand_cut) (t0 : term) =
   if verbose then Log.verbose_msg Fmt.(str "@[Simple expansion of %a.@]" pp_term t0);
   let rec aux d (t, u) =
     if d >= max_height
@@ -486,7 +486,7 @@ let expand_loop
       | _ -> tlist_check accum' tl)
   in
   let rec aux u =
-    match Set.min_elt u, !counter < !Config.num_expansions_check with
+    match Set.min_elt u, !counter < !Config.Optims.num_expansions_check with
     | Some t0, true ->
       let tset, u' = simple t0 in
       let check_result = tlist_check SmtLib.Unknown (Set.elements tset) in
@@ -528,7 +528,7 @@ let lwt_expand_loop
   in
   let rec aux u =
     let%lwt u = u in
-    match Set.min_elt u, !counter < !Config.num_expansions_check with
+    match Set.min_elt u, !counter < !Config.Optims.num_expansions_check with
     | Some t0, true ->
       let tset, u' = simple t0 in
       let%lwt check_result = tlist_check (return SmtLib.Unknown) (Set.elements tset) in

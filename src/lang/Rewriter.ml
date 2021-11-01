@@ -358,7 +358,7 @@ module Expression = struct
 
   let rewrite_until_stable (rule : t -> t) (e : t) : t =
     let rec aux i e0 =
-      if i > !Config.rewrite_limit
+      if i > !Config.Optims.rewrite_limit
       then e0
       else (
         let e0' = rule e0 in

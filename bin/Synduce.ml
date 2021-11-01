@@ -73,52 +73,10 @@ let print_usage () =
   Caml.exit 0
 ;;
 
-let on_success
-    ~(is_ocaml_syntax : bool)
-    (source_filename : string ref)
-    (pb : Algo.AState.psi_def)
-    (soln : Algo.AState.soln)
-    : unit
-  =
-  let elapsed = Stats.get_glob_elapsed () in
-  let verif_ratio = 100.0 *. (!Stats.verif_time /. elapsed) in
-  Log.(verbose print_solvers_summary);
-  Log.info
-    Fmt.(
-      fun frmt () ->
-        pf
-          frmt
-          "Solution found in %4.4fs (%3.1f%% verifying):@.%a@]"
-          elapsed
-          verif_ratio
-          (box (Algo.AState.pp_soln ~use_ocaml_syntax:is_ocaml_syntax))
-          soln);
-  (* If output specified, write the solution in file. *)
-  (match Config.get_output_file !source_filename with
-  | Some out_file ->
-    Utils.Log.to_file out_file (fun frmt () ->
-        (box (Algo.AState.pp_soln ~use_ocaml_syntax:is_ocaml_syntax)) frmt soln)
-  | None -> ());
-  (* If specified, output a Dafny proof skeleton. *)
-  if !Config.generate_proof
-  then
-    Codegen.(
-      Generation.gen_proof
-        (Commons.problem_descr_of_psi_def pb, Some soln)
-        !Config.proof_generation_file)
-  else ();
-  (* If no info required, output timing information. *)
-  if not !Config.info
-  then (
-    Fmt.(
-      pf stdout "%i,%.4f,%.4f@." !Algo.AState.refinement_steps !Stats.verif_time elapsed);
-    Fmt.(pf stdout "success@."))
-;;
-
 let main () =
   let filename = ref None in
-  Getopt.parse_cmdline (Config.options print_usage parse_only) (fun s ->
-      filename := Some s);
+  let options = Config.options print_usage parse_only in
+  Getopt.parse_cmdline options (fun s -> filename := Some s);
   let filename =
     match !filename with
     | Some f -> ref f
@@ -141,7 +99,9 @@ let main () =
   let prog, psi_comps =
     if is_ocaml_syntax then parse_ocaml !filename else parse_pmrs !filename
   in
+  (* Populate types.  *)
   let _ = seek_types prog in
+  (* Translate the Caml or PRMS file into pmrs representation. *)
   let all_pmrs =
     try translate prog with
     | e ->
@@ -149,8 +109,9 @@ let main () =
       raise e
   in
   if !parse_only then Caml.exit 1;
-  (match Algo.PmrsAlgos.solve_problem psi_comps all_pmrs with
-  | pb, Ok soln -> on_success ~is_ocaml_syntax filename pb soln
+  (* Solve the problem proper. *)
+  (match Algo.Refinement.solve_problem psi_comps all_pmrs with
+  | pb, Ok soln -> ToolMessages.on_success ~is_ocaml_syntax filename pb soln
   | _, Error _ -> Utils.Log.error_msg "No solution found.");
   if !Config.show_vars then Term.Variable.print_summary stdout ()
 ;;

@@ -261,11 +261,11 @@ let check_unrealizable (unknowns : VarSet.t) (eqns : equation_system)
               let model = model_to_constmap (SExps s) in
               (* Search for a few additional models. *)
               let* other_models =
-                if !Config.fuzzing_count > 0
+                if !Config.Optims.fuzzing_count > 0
                 then
                   request_different_models_async
                     (return model)
-                    !Config.fuzzing_count
+                    !Config.Optims.fuzzing_count
                     solver
                 else return []
               in

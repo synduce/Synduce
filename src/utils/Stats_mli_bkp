@@ -1,3 +1,4 @@
+val timed : (unit -> 'a) -> float * 'a
 val log_proc_start : int -> unit
 val log_proc_restart : int -> unit
 val log_alive : int -> unit
@@ -10,3 +11,5 @@ val get_glob_elapsed : unit -> float
 val verif_time : float ref
 val add_verif_time : float -> unit
 val log_solver_start : int -> string -> unit
+val log_major_step : unit -> unit
+val log_minor_step : unit -> unit

@@ -387,7 +387,7 @@ let verify_ensures_bounded ~(p : psi_def) (ensures : term) (var : variable)
         | _ -> check_bounded_sol (return accum') tl)
     in
     let rec expand_loop u =
-      match Set.min_elt u, !steps < !Config.num_expansions_check with
+      match Set.min_elt u, !steps < !Config.Optims.num_expansions_check with
       | Some t0, true ->
         let tset, u' = Expand.simple t0 in
         let%lwt check_result =

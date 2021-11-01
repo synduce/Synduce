@@ -4,15 +4,18 @@ open Lang
 open Utils
 
 let show_stat elapsed tsize usize =
-  Fmt.(
-    pf
-      stdout
-      "%i,%3.3f,%3.3f,%i,%i@."
-      !refinement_steps
-      !Stats.verif_time
-      elapsed
-      tsize
-      usize)
+  if !Config.timings
+  then
+    Fmt.(
+      pf
+        stdout
+        "%i,%3.3f,%3.3f,%i,%i@."
+        !refinement_steps
+        !Stats.verif_time
+        elapsed
+        tsize
+        usize)
+  else ()
 ;;
 
 let show_steps tsize usize =

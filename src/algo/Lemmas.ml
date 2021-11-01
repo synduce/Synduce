@@ -805,7 +805,7 @@ let verify_lemma_bounded ~(p : psi_def) (det : term_state_detail) lemma_candidat
         | _ -> check_bounded_sol (return accum') tl)
     in
     let rec expand_loop u =
-      match Set.min_elt u, !steps < !Config.num_expansions_check with
+      match Set.min_elt u, !steps < !Config.Optims.num_expansions_check with
       | Some t0, true ->
         let tset, u' = Expand.simple t0 in
         let%lwt check_result =

@@ -625,8 +625,9 @@ module Commands = struct
     and models_commands =
       mk_set_option "produce-models" (if models then "true" else "false")
     and tlimit_opt =
-      if induction && !Config.induction_proof_tlimit >= 0
-      then [ mk_set_option "tlimit" (Int.to_string !Config.induction_proof_tlimit) ]
+      if induction && !Config.Optims.induction_proof_tlimit >= 0
+      then
+        [ mk_set_option "tlimit" (Int.to_string !Config.Optims.induction_proof_tlimit) ]
       else []
     and induction_on = if induction then [ mk_set_option "quant-ind" "true" ] else []
     and proofs_on = if proofs then [ mk_set_option "produce-proofs" "true" ] else []

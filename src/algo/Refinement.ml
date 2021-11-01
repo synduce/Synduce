@@ -3,15 +3,18 @@ open Base
 open Lang
 open Lang.Term
 open Option.Let_syntax
-open PmrsAlgoShow
+open AlgoLog
 open Syguslib.Sygus
 open Utils
 
-let rec refinement_loop (p : psi_def) (lstate : refinement_loop_state) =
-  Int.incr refinement_steps;
+let rec refinement_loop ?(major = true) (p : psi_def) (lstate : refinement_loop_state) =
+  let tsize, usize = Set.length lstate.t_set, Set.length lstate.u_set in
+  if major
+  then (
+    Int.incr refinement_steps;
+    Stats.log_new_major_step ~tsize ~usize ());
   (* Output status information before entering process. *)
   let elapsed = Stats.get_glob_elapsed () in
-  let tsize, usize = Set.length lstate.t_set, Set.length lstate.u_set in
   if !Config.info then show_steps tsize usize else show_stat elapsed tsize usize;
   (* Add lemmas interactively if the option is set. *)
   let lstate =
@@ -24,13 +27,17 @@ let rec refinement_loop (p : psi_def) (lstate : refinement_loop_state) =
     Equations.make ~p ~term_state:lstate.term_state ~lifting:lstate.lifting lstate.t_set
   in
   (* The solve the set of constraints with the assumption equations. *)
-  let s_resp, solution = Equations.solve ~p (eqns @ lstate.assumptions) in
+  let synth_time, (s_resp, solution) =
+    Stats.timed (fun () -> Equations.solve ~p (eqns @ lstate.assumptions))
+  in
   match s_resp, solution with
   | RSuccess _, First sol ->
     (* Synthesis has succeeded, now we need to verify the solution. *)
     (try
        (* The solution is verified with a bounded check.  *)
-       let check_r = Verify.check_solution ~p lstate sol in
+       let verif_time, check_r =
+         Stats.timed (fun () -> Verify.check_solution ~p lstate sol)
+       in
        match check_r with
        | Some (t_set, u_set) ->
          (* If check_r is some new set of MR-terms t_set, and terms u_set, this means
@@ -38,17 +45,19 @@ let rec refinement_loop (p : psi_def) (lstate : refinement_loop_state) =
                which is also a superset of t_set.
             *)
          show_counterexamples lstate t_set;
+         Stats.log_major_step_end ~synth_time ~verif_time ~t:tsize ~u:usize false;
          secondary_refinement_steps := 0;
          let lstate =
-           if !Config.make_partial_correctness_assumption
+           if !Config.Optims.make_partial_correctness_assumption
            then Equations.update_assumptions ~p lstate sol t_set
            else lstate
          in
          (* Continue looping with the new sets. *)
-         refinement_loop p { lstate with t_set; u_set; lifting }
+         refinement_loop ~major:true p { lstate with t_set; u_set; lifting }
        | None ->
          (* This case happens when verification succeeded.
                Store the equation system, return the solution. *)
+         Stats.log_major_step_end ~synth_time ~verif_time ~t:tsize ~u:usize true;
          AState.solved_eqn_system := Some eqns;
          Log.print_ok ();
          Ok { soln_rec_scheme = p.psi_target; soln_implems = sol }
@@ -64,21 +73,25 @@ let rec refinement_loop (p : psi_def) (lstate : refinement_loop_state) =
       raise e)
   | _ as synt_failure_info ->
     (* On synthesis failure, start by trying to synthesize lemmas. *)
-    (match Lemmas.synthesize_lemmas ~p synt_failure_info lstate with
-    | Ok new_lstate ->
+    (match
+       Stats.timed (fun () -> Lemmas.synthesize_lemmas ~p synt_failure_info lstate)
+     with
+    | lsynt_time, Ok new_lstate ->
       Int.decr refinement_steps;
       Int.incr secondary_refinement_steps;
-      refinement_loop p new_lstate
-    | Error _synt_failure
-      when !Config.attempt_lifting
-           && Lifting.lifting_count p < !Config.max_lifting_attempts ->
+      Stats.log_minor_step ~synth_time ~auxtime:lsynt_time false;
+      refinement_loop ~major:false p new_lstate
+    | lsynt_time, Error _synt_failure
+      when !Config.Optims.attempt_lifting
+           && Lifting.lifting_count p < !Config.Optims.max_lifting_attempts ->
       (* If all no counterexample is spurious, lemma synthesis fails, we need lifting. *)
       (match Lifting.scalar ~p lstate synt_failure_info with
       | Ok (p', lstate') ->
         Int.decr refinement_steps;
         Int.incr secondary_refinement_steps;
         Lifting.msg_lifting ();
-        refinement_loop p' lstate'
+        Stats.log_minor_step ~synth_time ~auxtime:lsynt_time true;
+        refinement_loop ~major:false p' lstate'
       | Error r' -> Error r')
     | _ -> Error RFail)
 ;;
@@ -86,7 +99,7 @@ let rec refinement_loop (p : psi_def) (lstate : refinement_loop_state) =
 let psi (p : psi_def) =
   (* Initialize sets with the most general terms. *)
   let t_set, u_set =
-    if !Config.simple_init
+    if !Config.Optims.simple_init
     then (
       let x0 = mk_var (Variable.mk ~t:(Some !AState._theta) (Alpha.fresh ())) in
       let s = TermSet.of_list (Analysis.expand_once x0) in
@@ -303,9 +316,9 @@ let solve_problem
   let problem = find_problem_components (target_fname, spec_fname, repr_fname) pmrs in
   (* Solve the problem. *)
   ( problem
-  , if !Config.use_acegis
+  , if !Config.Optims.use_acegis
     then Baselines.algo_acegis problem
-    else if !Config.use_ccegis
+    else if !Config.Optims.use_ccegis
     then Baselines.algo_ccegis problem
     else psi problem )
 ;;
