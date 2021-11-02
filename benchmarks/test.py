@@ -215,6 +215,8 @@ if __name__ == "__main__":
         "-b", "--benchmarks", help="Run the lifting benchmarks.", type=str,
         choices=["all", "constraint", "lifting", "base", "small"], default="small")
     aparser.add_argument(
+        "--single", help="Run the lifting benchmark in benchmarks/[FILE]", type=str, default="small")
+    aparser.add_argument(
         "-n", "--num-runs", help="Run each benchmark NUM times.", type=int, default=1
     )
     aparser.add_argument(
@@ -272,6 +274,17 @@ if __name__ == "__main__":
     cvc = "--cvc4"
     if args.cvc5:
         cvc = "--cvc5"
+
+    # Run a single file if --single has an argument
+    if args.single:
+        algos = [["partbnd", cvc]]
+        optims = [["all", ""]]
+        binfo = str(args.single).split("+")
+        if len(binfo) == 1:
+            binfo = [str(binfo[0]), ""]
+        run_benchmarks([binfo], algos, optims,
+                       raw_output=raw_output, num_runs=runs)
+        exit()
 
     bench_set = []
     # Running specific sets if we're supposed to.

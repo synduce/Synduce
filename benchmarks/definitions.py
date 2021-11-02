@@ -85,6 +85,7 @@ constraint_benchmarks = [
     ["constraints/sortedlist/is_intersection_empty.ml", ""],
     ["constraints/sortedlist/largest_diff.ml", ""],
     ["constraints/sortedlist/smallest_diff.ml", ""],
+    ["constraints/sortedlist/sndmind.ml", ""],
     ["constraints/sortedlist/parallel_min.ml", "-NB"],
     ["constraints/sortedlist/parallel_max.ml", "-NB"],
     ["constraints/sortedlist/parallel_max2.ml", "-NB"],
@@ -137,7 +138,10 @@ constraint_benchmarks = [
     ["constraints/even_tree/sum_of_parities.ml", "-NB"],
     ["constraints/even_tree/parity_of_max.ml", ""],
     # program
-    ["constraints/program/typecheck.ml", ""]
+    ["constraints/program/typecheck.ml", ""],
+    # unimodal
+    ["constraints/unimodal_list/max_logn.ml", "B"],
+    ["constraints/unimodal_list/max_in_um_pos.ml", ""],
 ]
 
 base_benchmark_set = [
@@ -228,6 +232,9 @@ base_benchmark_set = [
     ["treepaths/maxPathWeight2.pmrs", ""],
     ["treepaths/mips.pmrs", ""],
     ["treepaths/sum.pmrs", ""],
+    # Split lists
+    ["unimodal_lists/sm.ml", ""],
+    ["unimodal_lists/search_no_optim.ml", ""],
     # Zippers
     ["zippers/list_sum.ml", ""],
     ["zippers/list_sum_basic.ml", ""],

@@ -100,3 +100,10 @@
   (14 / 14) ✅ prod_needs_aux                           ×10 runs, average:  1.182s ± 8ms         R: +^✓
 
 ✅ All 14 benchmarks passed in  1388.1 s.
+
+Additional benchmarks:
+⏺ Category: constraints->sortedlist
+    (1 / 1) ✅ sndmind                                  ×02 runs, average:  89.585s ± 60ms       R: +...✓
+⏺ Category: constraints->unimodal_list
+    (1 / 1) ✅ max_logn                                 ×10 runs, average:  3.206s ± 72ms        R: +..✓
+    (1 / 1) ✅ max_in_um_pos                            ×10 runs, average:  0.504s ± 8ms         R: +.✓

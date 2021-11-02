@@ -3,20 +3,23 @@
    all the elements are in the leaves.
 *)
 type ulist =
+  | UNil
   | UElt of int
   | USplit of ulist * int * int * ulist
 
 (* The usual type of cons-lists *)
 type list =
-  | Elt of int
+  | Nil
   | Cons of int * list
 
 (* Representation function from ulist -> list *)
 let rec repr = function
-  | UElt a -> Elt a
+  | UNil -> Nil
+  | UElt a -> Cons (a, Nil)
   | USplit (x, a, b, y) -> aux (Cons (a, Cons (b, repr y))) x
 
 and aux l = function
+  | UNil -> l
   | UElt a -> Cons (a, l)
   | USplit (x, a, b, y) -> aux (Cons (a, Cons (b, aux l y))) x
 ;;
@@ -25,27 +28,33 @@ and aux l = function
 let rec is_unimodal_ulist l = is_unimodal_list (repr l)
 
 and is_unimodal_list = function
-  | Elt x -> true
+  | Nil -> true
   | Cons (x, l) -> aux_up x l
 
 and aux_up pr = function
-  | Elt x -> pr < x
-  | Cons (x, l) -> if pr < x then aux_up x l else aux_down x l
+  | Nil -> true
+  | Cons (x, l) -> if pr <= x then aux_up x l else aux_down x l
 
 and aux_down pr = function
-  | Elt x -> pr > x
-  | Cons (x, l) -> pr > x && aux_down x l
+  | Nil -> true
+  | Cons (x, l) -> pr >= x && aux_down x l
 ;;
 
 (* This is just a sum to test the tool on accepting the unimodal list specification. *)
-let rec spec = function
-  | Elt x -> x
-  | Cons (hd, tl) -> max hd (spec tl)
+let spec x l =
+  let rec f = function
+    | Nil -> false
+    | Cons (hd, tl) -> hd = x || f tl
+  in
+  f l
 ;;
 
-let rec target = function
-  | UElt a -> [%synt f0] a
-  | USplit (l, a, b, r) ->
-    if a > b then [%synt joina] a (target l) else [%synt joinb] b (target r)
+let target x l =
+  let rec g = function
+    | UNil -> [%synt s0]
+    | UElt a -> [%synt f0] x a
+    | USplit (l, a, b, r) -> [%synt join] (x = a) (x = b) (g l) (g r)
+  in
+  g l
   [@@requires is_unimodal_ulist]
 ;;
