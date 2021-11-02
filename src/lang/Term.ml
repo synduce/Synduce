@@ -927,6 +927,11 @@ module VarMap = struct
 
   let empty = Map.empty (module Variable)
   let keyset (m : 'a t) : VarSet.t = VarSet.of_list (Map.keys m)
+
+  let assigns_varname (m : 'a t) (s : string) =
+    Map.existsi ~f:(fun ~key ~data:_ -> String.equal key.vname s) m
+  ;;
+
   let singleton (v : variable) (elt : 'a) = Map.singleton (module Variable) v elt
   let of_alist (al : (variable * 'a) list) = Map.of_alist (module Variable) al
   let of_alist_exn (al : (variable * 'a) list) = Map.of_alist_exn (module Variable) al

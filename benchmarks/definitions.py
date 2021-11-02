@@ -138,10 +138,11 @@ constraint_benchmarks = [
     ["constraints/even_tree/sum_of_parities.ml", "-NB"],
     ["constraints/even_tree/parity_of_max.ml", ""],
     # program
-    ["constraints/program/typecheck.ml", ""],
+    #["constraints/program/typecheck.ml", ""],
     # unimodal
-    ["constraints/unimodal_list/max_logn.ml", "B"],
-    ["constraints/unimodal_list/max_in_um_pos.ml", ""],
+    ["constraints/unimodal_list/max_logn.ml", "-B"],
+    ["constraints/unimodal_list/max_logn_v2.ml", "-kNB"],
+    ["constraints/unimodal_list/max_in_um_pos.ml", ""]
 ]
 
 base_benchmark_set = [

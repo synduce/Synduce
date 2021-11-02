@@ -95,20 +95,32 @@ let pp_unrealizability_ctex (frmt : Formatter.t) (uc : unrealizability_ctex) : u
       uc.cj.ctex_model)
 ;;
 
-let reinterpret_model (m0i, m0j') var_subst =
-  List.fold var_subst ~init:(VarMap.empty, VarMap.empty) ~f:(fun (m, m') (v, v') ->
-      let primed_name = v'.vname in
-      Variable.free v';
-      match Map.find m0i v.vname with
-      | Some data ->
-        let new_m = Map.set m ~key:v ~data in
-        (match Map.find m0j' primed_name with
-        | Some data -> new_m, Map.set m' ~key:v ~data
-        | None -> new_m, m')
-      | None ->
-        (match Map.find m0j' primed_name with
-        | Some data -> m, Map.set m' ~key:v ~data
-        | None -> m, m'))
+let reinterpret_model vseti (m0i, m0j') var_subst =
+  let mi, mj =
+    List.fold var_subst ~init:(VarMap.empty, VarMap.empty) ~f:(fun (mi, mj) (v, v') ->
+        let primed_name = v'.vname in
+        Variable.free v';
+        match Map.find m0i v.vname with
+        | Some data ->
+          let new_m = Map.set mi ~key:v ~data in
+          (match Map.find m0j' primed_name with
+          | Some data -> new_m, Map.set mj ~key:v ~data
+          | None -> new_m, mj)
+        | None ->
+          (match Map.find m0j' primed_name with
+          | Some data -> mi, Map.set mj ~key:v ~data
+          | None -> mi, mj))
+  in
+  let mi =
+    Map.fold m0i ~init:mi ~f:(fun ~key:vname ~data:v_val m ->
+        if VarMap.assigns_varname m vname
+        then m
+        else (
+          match VarSet.find_by_name vseti vname with
+          | Some vi -> Map.set m ~key:vi ~data:v_val
+          | None -> m))
+  in
+  mi, mj
 ;;
 
 let unrealizability_ctex_of_constmap (i, j) (eqn_i, eqn_j) (vseti, vsetj) var_subst model =
@@ -118,7 +130,7 @@ let unrealizability_ctex_of_constmap (i, j) (eqn_i, eqn_j) (vseti, vsetj) var_su
       model
   in
   (* Remap the names to ids of the original variables in m' *)
-  let m_i, m_j = reinterpret_model (m0i, m0j) var_subst in
+  let m_i, m_j = reinterpret_model vseti (m0i, m0j) var_subst in
   let vset = Set.union vseti vsetj in
   let ctex_i : ctex =
     { ctex_eqn = eqn_i; ctex_model = m_i; ctex_vars = vset; ctex_stat = Unknown }
@@ -149,14 +161,7 @@ let components_of_unrealizability ~unknowns (eqn1 : equation) (eqn2 : equation)
   match skeleton_match ~unknowns eqn1.erhs eqn2.erhs with
   | Some args_1_2 -> Some (args_1_2, (eqn1.elhs, eqn2.elhs))
   | None ->
-    if Terms.equal eqn1.erhs eqn2.erhs
-    then Some ([], (eqn1.elhs, eqn2.erhs))
-    else
-      (* Log.verbose_msg
-           Fmt.(
-             str "Unrealizability check: %a is not in normal form (no match with %a)" pp_term
-               eqn1.erhs pp_term eqn2.erhs); *)
-      None
+    if Terms.equal eqn1.erhs eqn2.erhs then Some ([], (eqn1.elhs, eqn2.erhs)) else None
 ;;
 
 let gen_info (eqn_i, eqn_j) unknowns =

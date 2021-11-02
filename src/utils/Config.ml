@@ -237,6 +237,7 @@ let options print_usage parse_only =
   ; 'I', "interactive", set interactive_lemmas true, None
   ; 'j', "json", Some set_json_out, None
   ; 'J', "interactive-lifting", set interactive_lifting true, None
+  ; 'k', "skip-lemmas", set bound_after_verif true, None
   ; 'L', "interactive-loop", set interactive_lemmas_loop true, None
   ; 'm', "style-math", set math_display true, None
   ; 'n', "verification", None, Some set_num_expansions_check

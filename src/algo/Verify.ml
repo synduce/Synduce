@@ -138,9 +138,10 @@ let check_solution
         List.fold_until ~finish:(fun x -> x) ~init:false ~f:(check_eqn solver) smt_eqns
       in
       SyncSmt.spop solver;
+      let select_unbound = if !Config.Optims.bound_after_verif then snd else fst in
       (* Result of solver calls. *)
       if has_ctex
-      then true, TermSet.of_list (List.map ~f:fst t_set), u_set, i + 1
+      then true, TermSet.of_list (List.map ~f:select_unbound t_set), u_set, i + 1
       else false, TermSet.empty, u_set, i + num_terms_to_check)
     else (* set is empty *)
       false, TermSet.empty, u_set, i

@@ -215,7 +215,7 @@ if __name__ == "__main__":
         "-b", "--benchmarks", help="Run the lifting benchmarks.", type=str,
         choices=["all", "constraint", "lifting", "base", "small"], default="small")
     aparser.add_argument(
-        "--single", help="Run the lifting benchmark in benchmarks/[FILE]", type=str, default="small")
+        "--single", help="Run the lifting benchmark in benchmarks/[FILE]", type=str, default=None)
     aparser.add_argument(
         "-n", "--num-runs", help="Run each benchmark NUM times.", type=int, default=1
     )
@@ -276,7 +276,8 @@ if __name__ == "__main__":
         cvc = "--cvc5"
 
     # Run a single file if --single has an argument
-    if args.single:
+    if args.single and args.single != "":
+        print("Running single file")
         algos = [["partbnd", cvc]]
         optims = [["all", ""]]
         binfo = str(args.single).split("+")
