@@ -1,4 +1,4 @@
-(** @synduce --set-gropt=2 *)
+(** @synduce *)
 
 type 'a tree =
   | Leaf of 'a

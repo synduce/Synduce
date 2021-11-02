@@ -15,6 +15,10 @@ let show_stat elapsed tsize usize =
         elapsed
         tsize
         usize)
+  else if !Config.json_progressive && !Config.json_out
+  then (
+    let json = `Assoc [ "progress", LogJson.refinement_steps_summary () ] in
+    Fmt.(pf stdout "%s@." (Yojson.to_string ~std:false json)))
   else ()
 ;;
 

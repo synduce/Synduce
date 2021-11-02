@@ -5,290 +5,13 @@ import sys
 import time
 import argparse
 import subprocess
-
-# Timeout for all experiments.
-timeout_value = 400
-
-if sys.platform.startswith('linux'):
-    timeout = ("timeout %i" %
-               (timeout_value))
-elif sys.platform.startswith('darwin'):
-    timeout = ("timelimit -t%i" % timeout_value)
-else:
-    print("Platform %s not supported" % sys.platform)
-    exit(-1)
-
-kick_the_tires_set = [
-    ["list/sumhom.pmrs", ""],
-    ["ptree/sum.pmrs", ""],
-    ["tree/sumtree.pmrs", ""],
-    ["tailopt/sum.pmrs", ""],
-    ["treepaths/sum.pmrs", ""],
-    ["treepaths/height.pmrs", ""],
-    ["treepaths/maxPathWeight.pmrs", ""],
-    ["ptree/mul.pmrs", ""],
-    ["tree/maxtree.pmrs", ""],
-    ["tree/min.pmrs", ""],
-    ["tree/maxtree2.pmrs", ""],
-    ["list/sumodds.pmrs", ""],
-    ["list/prodhom.pmrs", ""],
-    ["list/polyhom.pmrs", ""],
-    ["list/hamming.pmrs", ""],
-    ["list/sumevens.pmrs", ""],
-    ["list/lenhom.pmrs", ""],
-    ["list/last.pmrs", ""],
-    ["constraints/sortedlist/count_lt.ml", ""],
-    ["constraints/bst/count_lt.ml", "-NB"],
-    ["list/largest_diff_sorted_list_nohead.ml", ""],
-    ["list/poly_no_fac.ml", ""],
-]
-
-reduced_benchmark_set_table2 = [
-    ["list/sumhom.pmrs", ""],
-    ["ptree/sum.pmrs", ""],
-    ["tree/sumtree.pmrs", ""],
-    ["tailopt/sum.pmrs", ""],
-    ["tailopt/mps.pmrs", ""],
-    ["treepaths/sum.pmrs", ""],
-    ["treepaths/height.pmrs", ""],
-    ["treepaths/leftmostodd.pmrs", "-b 6"],
-    ["ptree/mul.pmrs", ""],
-    ["tree/maxtree.pmrs", ""],
-    ["tree/min.pmrs", ""],
-    ["tree/poly.pmrs", ""],
-    ["list/sumevens.pmrs", ""],
-    ["list/polyhom.pmrs", ""],
-    ["list/minhom.pmrs", ""],
-    ["list/last.pmrs", ""],
-    ["list/msshom.pmrs", ""],
-    ["tree/sorted.pmrs", "-t"],
-    ["tree/mips.pmrs", ""],
-]
-
-reduced_benchmark_set_table3 = [
-    ["list/sumhom.pmrs", ""],
-    ["ptree/sum.pmrs", ""],
-    ["tree/sumtree.pmrs", ""],
-    ["tailopt/sum.pmrs", ""],
-    ["tailopt/mps.pmrs", ""],
-    ["treepaths/sum.pmrs", ""],
-    ["treepaths/height.pmrs", ""],
-    ["ptree/mul.pmrs", ""],
-    ["tree/maxtree.pmrs", ""],
-    ["tree/min.pmrs", ""],
-    ["list/polyhom.pmrs", ""],
-    ["list/minhom.pmrs", ""],
-    ["list/mtshom.pmrs", ""],
-    ["tree/mips.pmrs", ""],
-]
-
-constraint_benchmarks = [
-    # sortedlist
-    ["constraints/sortedlist/min.ml", ""],
-    ["constraints/sortedlist/max.ml", ""],
-    ["constraints/sortedlist/count_lt.ml", ""],
-    ["constraints/sortedlist/index_of.ml", ""],
-    ["constraints/sortedlist/is_intersection_empty.ml", ""],
-    ["constraints/sortedlist/largest_diff.ml", ""],
-    ["constraints/sortedlist/smallest_diff.ml", ""],
-    ["constraints/sortedlist/parallel_min.ml", "-NB"],
-    ["constraints/sortedlist/parallel_max.ml", "-NB"],
-    ["constraints/sortedlist/parallel_max2.ml", "-NB"],
-    # Sorted and indexed
-    ["constraints/sorted_and_indexed/count_lt0.ml", "-NB -n 20"],
-    ["constraints/sorted_and_indexed/count_lt.ml", "-NB -n 20"],
-    # constantlist
-    ["constraints/constantlist/index_of.ml", ""],
-    ["constraints/constantlist/contains.ml", ""],
-    # all positive
-    ["constraints/all_positive/list_mps.ml", ""],
-    # evenlist
-    ["constraints/evenlist/parity_of_first.ml", ""],
-    ["constraints/evenlist/parity_of_last.ml", ""],
-    ["constraints/evenlist/first_odd.ml", ""],
-    ["constraints/evenlist/parity_of_sum.ml", ""],
-    # bst
-    ["constraints/bst/contains.ml", ""],
-    ["constraints/bst/count_lt.ml", "-NB"],
-    ["constraints/bst/count_between.ml", "-NB --no-gropt"],
-    ["constraints/bst/most_frequent_v1.ml", ""],
-    ["constraints/bst/from_list_contains.ml", ""],
-    ["constraints/bst/from_list_max.ml", "-NB -n 100"],
-    ["constraints/bst/sum_gt_by_key.ml", "-NB -n 100"],
-    # balanced_tree
-    ["constraints/balanced_tree/node_count.ml", "-N"],
-    ["constraints/balanced_tree/height.ml", "-N"],
-    # ["constraints/balanced_tree/height_v2.ml", "-NB"],
-    # symmetric tree
-    ["constraints/symmetric_tree/sum.ml", "-N"],
-    ["constraints/symmetric_tree/height.ml", "-N"],
-    ["constraints/symmetric_tree/min.ml", "-N"],
-    # memo
-    ["constraints/memo/tree_size.ml", "-NB"],
-    ["constraints/memo/constant.ml", ""],
-    ["constraints/memo/mts_memo_sum.ml", ""],
-    ["constraints/memo/max_contains.ml", "-NB"],
-    ["constraints/memo/count_lt.ml", "-NB -n 50"],
-    ["constraints/memo/max_sum_gt.ml", "-NB"],
-    ["constraints/memo/proper_indexation_sum_lt_pos_v2.ml", ""],
-    ["constraints/memo/proper_indexation_sum_lt_pos.ml", ""],
-    # empty_right
-    ["constraints/empty_right_subtree/contains.ml", "-N"],
-    # alist
-    ["constraints/alist/count_eq2.ml", "-NB"],
-    ["constraints/alist/count_eq.ml", ""],
-    ["constraints/alist/sums.ml", ""],
-    ["constraints/alist/most_frequent.ml", ""],
-    # even_tree
-    ["constraints/even_tree/sum_of_parities.ml", "-NB"],
-    ["constraints/even_tree/parity_of_max.ml", ""],
-    # program
-    ["constraints/program/typecheck.ml", ""]
-]
-
-base_benchmark_set = [
-    # Combine
-    ["combine/mts.pmrs", ""],
-    ["combine/mts_and_mps.pmrs", ""],
-    ["combine/mss_with_sum.ml", ""],
-    # Compressed list
-    ["compressed_list/sum.ml", ""],
-    # Indexed list
-    ["indexed_list/search.ml", ""],
-    ["indexed_list/position_polynomial.ml", ""],
-    ["indexed_list/sum_elts_lt_pos.ml", ""],
-    # Misc
-    ["misc/count_between.ml", ""],
-    ["misc/composed_unkwns.ml", ""],
-    ["misc/simple_nnf.ml", ""],
-    ["misc/unknowns_are_ids.ml", ""],
-    # List
-    ["list/alist_sum.ml", ""],
-    ["list/atoi.ml", ""],
-    ["list/bal.ml", ""],
-    ["list/hamming.pmrs", ""],
-    ["list/last.pmrs", ""],
-    ["list/lenhom.pmrs", ""],
-    ["list/line_of_sight.pmrs", ""],
-    ["list/maxcount.pmrs", ""],
-    ["list/maxhom.pmrs", ""],
-    ["list/mincount.pmrs", ""],
-    ["list/minhom.pmrs", ""],
-    ["list/mpshom.pmrs", ""],
-    ["list/mtshom.pmrs", ""],
-    ["list/mts_and_mps_hom.pmrs", ""],
-    ["list/msshom.pmrs", ""],
-    ["list/prodhom.pmrs", ""],
-    ["list/polyhom.pmrs", ""],
-    ["list/search.pmrs", ""],
-    ["list/sndminhom.pmrs", ""],
-    ["list/sumgt.ml", ""],
-    ["list/sumhom.pmrs", ""],
-    ["list/sumodds.pmrs", ""],
-    ["list/sumevens.pmrs", ""],
-    ["list/zero_after_one.ml", ""],
-    ["list/zeros_ones.ml", ""],
-    # List to tree
-    ["list/issorted.pmrs", "-t"],
-    ["list_to_tree/search.pmrs", ""],
-    ["list_to_tree/search_v2.pmrs", ""],
-    ["list_to_tree/search_v3.pmrs", ""],
-    ["list_to_tree/mls.pmrs", ""],
-    # Numbers
-    ["numbers/int_nat_toint.ml", ""],
-    ["numbers/int_nat_twosum.ml", ""],
-    # Ptrees
-    ["ptree/maxheads.pmrs", ""],
-    ["ptree/maxlast.pmrs", ""],
-    ["ptree/maxsum.pmrs", ""],
-    ["ptree/mul.pmrs", ""],
-    ["ptree/sum.pmrs", ""],
-    # Sorting lists
-    ["sort_list/min.ml", ""],
-    ["sort_list/max.ml", ""],
-    ["sort_list/sumgtz.ml", ""],
-    # Tail optimization
-    ["tailopt/mts.pmrs", ""],
-    ["tailopt/mps.pmrs", ""],
-    ["tailopt/sum.pmrs", ""],
-    # Terms
-    ["terms/height.ml", ""],
-    # Trees
-    ["tree/maxPathWeight.pmrs", ""],
-    ["tree/maxtree.pmrs", ""],
-    ["tree/maxtree2.pmrs", ""],
-    ["tree/min.pmrs", ""],
-    ["tree/minmax.pmrs", ""],
-    ["tree/mips.pmrs", ""],
-    ["tree/mits.pmrs", ""],
-    ["tree/mpps.pmrs", "--no-gropt"],
-    ["tree/poly.pmrs", ""],
-    ["tree/poly2.ml", ""],
-    ["tree/sorted.pmrs", "-t"],
-    ["tree/sorted_2.ml", ""],
-    ["tree/sumtree.pmrs", ""],
-    # Tree paths
-    ["treepaths/height.pmrs", ""],
-    ["treepaths/leftmostodd.pmrs", "-b 6"],
-    ["treepaths/maxPathWeight.pmrs", ""],
-    ["treepaths/maxPathWeight2.pmrs", ""],
-    ["treepaths/mips.pmrs", ""],
-    ["treepaths/sum.pmrs", ""],
-    # Zippers
-    ["zippers/list_sum.ml", ""],
-    ["zippers/list_sum_basic.ml", ""],
-]
-
-lifting_benchmarks = [
-    # Indexed list
-    ["indexed_list/position_polynomial_no_index.ml", ""],
-    ["indexed_list/search_no_index.ml", ""],
-    ["indexed_list/sum_elts_lt_pos_no_len.ml", "--no-assumptions"],
-    # Automatic parallelization
-    ["list/atoi_no_fac.ml", "--no-gropt"],
-    ["list/is_sorted_no_last.ml", ""],
-    ["list/largest_diff_sorted_list_nohead.ml", ""],
-    ["list/mps_no_sum.ml", ""],
-    ["list/poly_no_fac.ml", ""],
-    ["list/zero_after_one_no.ml", ""],
-    # Tail optimizations
-    ["tailopt/mps_no_sum.ml", ""],
-    # Combining traversals
-    ["combine/mts_and_mps_nosum.ml", ""],
-    # Switching tree traversals
-    ["tree/gradient.ml", ""],
-    ["tree/mits_nosum.ml", ""],
-    # Unimodal lists (might also be due to representation)
-    ["unimodal_lists/prod_needs_aux.ml", ""]
-]
+import json
+# Local helper modules
+import definitions
+from parsing import DataObj
 
 
-benchmark_set = constraint_benchmarks + base_benchmark_set + lifting_benchmarks
-
-# Extra extra benchmarks (takes extra time..)
-extra_benchmarks = [
-    ["list/bal.ml", ""],
-    ["list/lpeak.ml", ""],
-
-]
-
-
-def summarize():
-    num_constraint = len(constraint_benchmarks)
-    num_base = len(base_benchmark_set)
-    num_lifting = len(lifting_benchmarks)
-    num_extrs = len(extra_benchmarks)
-    total = num_constraint + num_base + num_lifting + num_extrs
-    print("%i benchmarks in total:" % total)
-    print("\t- %i basic benchmarks (run with --base)." % num_base)
-    print("\t\tincluding %i in kick-the-tires set (run with --kick-the-tires)." %
-          len(kick_the_tires_set))
-    print("\t- %i benchmarks with requires constraints (run with --constraint-benchmarks)." % num_constraint)
-    print("\t- %i benchmarks with lifting (run with --lifting-benchmarks)." % num_lifting)
-    print("\t- %i extras benchmarks." % num_extrs)
-
-
-def run_one(progress, bench_id, command, algo, optim, filename, extra_opt, errors, raw_output):
+def run_one_old(progress, bench_id, command, algo, optim, filename, extra_opt, errors, raw_output):
     if raw_output is not None:
         raw_output.write(f"B:{bench_id}\n")
 
@@ -340,13 +63,31 @@ def run_one(progress, bench_id, command, algo, optim, filename, extra_opt, error
     return errors, elapsed
 
 
+def run_one(progress, bench_id, command, algo, optim, filename, extra_opt):
+    print(f"{progress : >11s}  {bench_id} 🏃", end="\r")
+    sys.stdout.flush()
+
+    process = subprocess.Popen(
+        command, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+    info = None
+    # Poll process for new output until finished
+    while True:
+        info = DataObj(json.loads(process.stdout.readline()))
+        if process.poll() is not None or info.is_successful:
+            break
+        print(
+            f"{progress : >11s}.. benchmarks/{filename} {extra_opt} {algo[1]} {optim[1]} 🏃 at step {info.major_step_count}:{info.minor_step_count}", end="\r")
+
+    return info
+
+
 def run_n(progress, bench_id, command, algo,
-          optim, filename, extra_opt, errors, num_runs, raw_output):
+          optim, filename, extra_opt, errors, num_runs, csv_output):
 
     total_elapsed = 0
-    max_elapsed = 0
-    min_elapsed = timeout_value
-    running_estimate = 0
+    max_e = 0
+    min_e = timeout_value
+    estim = 0
     delta = 0
     sp = " "
     bench_parts = bench_id.split(".")[0].split("/")
@@ -355,35 +96,36 @@ def run_n(progress, bench_id, command, algo,
     print(
         f"{progress : >11s} {bench_name: <25s}", end="\r")
     for i in range(num_runs):
-        errors, elapsed = run_one(progress, bench_id, command, algo,
-                                  optim, filename, extra_opt, errors, raw_output)
-        if elapsed > 0:
-            # Update stats
-            total_elapsed += elapsed
-            max_elapsed = max(elapsed, max_elapsed)
-            min_elapsed = min(elapsed, min_elapsed)
-            running_estimate = float(
-                running_estimate * i + elapsed) / float(i + 1)
+        info = run_one(progress, bench_id, command,
+                       algo, optim, filename, extra_opt)
+        if info.is_successful:
+            total_elapsed += info.elapsed
+            max_e = max(info.elapsed, max_e)
+            min_e = min(info.elapsed, min_e)
+            estim = float(estim * i + info.elapsed) / float(i + 1)
 
-            msg = f"[estimate: {running_estimate: 4.3f} s] ({i}/{num_runs} runs){sp : <30s}"
+            msg = f"[estimate: {estim: 4.3f} s] ({i}/{num_runs} runs){sp : <30s}"
             print(msg, end="\r")
             sys.stdout.flush()
         else:
-            print(f"\r{progress : >11s} ❌ {bench_id : <70s}{sp : <10s}", end="\r")
+            print(f"{progress : >11s} ❌ {bench_id : <70s}{sp : <10s}", end="\r")
             sys.stdout.flush()
-            return errors,  elapsed, 0
+            return (errors + [bench_id]),  info.elapsed, 0
 
     elapsed = total_elapsed / num_runs
-    delta = 1000 * max(abs(max_elapsed - elapsed), abs(min_elapsed-elapsed))
+    delta = 1000 * max(abs(max_e - elapsed), abs(min_e-elapsed))
     sp = " "
     if elapsed > 0:
         delta_str = f"{delta : .0f}ms"
         if (float(delta) / (1000.0 * elapsed)) > 0.05:
-            delta_str = f"{delta_str} !!"
-        msg = f"{progress : >11s} ✅ {bench_name : <40s} ×{num_runs} runs,  average : {elapsed: 4.3f} s ±{delta_str} {sp : <60s}"
+            delta_str = f"{delta_str} !"
+        else:
+            delta_str = f"{delta_str}  "
+        timing = f"average: {elapsed: 4.3f}s ±{delta_str}"
+        msg = f"{progress : >11s} ✅ {bench_name : <40s} ×{num_runs} runs, {str(timing): <30s} R: {info.get_refinement_summary()} {sp : <40s} "
         print(msg)
     else:
-        print(f"\r{progress: >11s} ❌ {bench_id : <120s}")
+        print(f"{progress: >11s} ❌ {bench_id : <120s}")
     sys.stdout.flush()
 
     return errors,  elapsed, delta
@@ -420,8 +162,8 @@ def run_benchmarks(input_files, algos, optims, num_runs=1, raw_output=None, exit
                 # Print benchmark name, algorithm used and optimization options.
                 bench_id = "%s,%s+%s" % (filename, algo[0], optim[0])
                 progress = f"({benchmark_cnt} / {benchmark_total})"
-                command = ("%s %s %s -i %s %s %s %s %s" %
-                           (timeout, exec_path, algo[1], optim[1], extra_opt,
+                command = ("%s %s %s -j --json-progress %s %s %s %s %s" %
+                           (definitions.timeout, exec_path, algo[1], optim[1], extra_opt,
                             os.path.realpath(os.path.join(
                                 "benchmarks", filename)),
                             soln_file_opt, gen_opt))
@@ -485,7 +227,7 @@ if __name__ == "__main__":
     args = aparser.parse_args()
 
     if args.summary:
-        summarize()
+        definitions.summarize()
         exit()
 
     # Algorithm set selection by table number.
@@ -536,24 +278,24 @@ if __name__ == "__main__":
     if run_kick_the_tires_only:
         algos = [["partbnd", cvc]]
         optims = [["all", ""]]
-        run_benchmarks(kick_the_tires_set, algos,
+        run_benchmarks(definitions.kick_the_tires_set, algos,
                        optims, raw_output=raw_output, num_runs=runs)
         exit(0)
 
     if run_lifting_benchmarks:
         algos = [["partbnd", cvc]]
         optims = [["all", ""]]
-        bench_set += lifting_benchmarks
+        bench_set += definitions.lifting_benchmarks
 
     if run_constraint_benchmarks:
         algos = [["partbnd", cvc]]
         optims = [["all", ""]]
-        bench_set += constraint_benchmarks
+        bench_set += definitions.constraint_benchmarks
 
     if run_base_benchmarks:
         algos = [["partbnd", cvc]]
         optims = [["all", ""]]
-        bench_set += base_benchmark_set
+        bench_set += definitions.base_benchmark_set
 
     # If we were supposed to run a specific set of benchmarks, we're done
     if run_base_benchmarks or run_constraint_benchmarks or run_lifting_benchmarks:
@@ -619,21 +361,21 @@ if __name__ == "__main__":
     # Benchmark set selection.
 
     if args.kick_the_tires:
-        input_files = kick_the_tires_set
+        input_files = definitions.kick_the_tires_set
 
     else:
         if table_no == 2:
-            input_files = reduced_benchmark_set_table2
+            input_files = definitions.reduced_benchmark_set_table2
         elif table_no == 3:
-            input_files = reduced_benchmark_set_table3
+            input_files = definitions.reduced_benchmark_set_table3
         elif table_no == 4:
-            input_files = constraint_benchmarks
+            input_files = definitions.constraint_benchmarks
         elif table_no == 5:
-            input_files = constraint_benchmarks + lifting_benchmarks
+            input_files = definitions.constraint_benchmarks + definitions.lifting_benchmarks
         elif run_test_only:
-            input_files = benchmark_set
+            input_files = definitions.benchmark_set
         else:
-            input_files = kick_the_tires_set
+            input_files = definitions.kick_the_tires_set
 
     run_benchmarks(input_files, algos, optims, raw_output=raw_output,
                    exit_err=True, num_runs=runs)

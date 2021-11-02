@@ -12,6 +12,6 @@ tests/*.txt
 test/tmp_benchmarks
 benchmarks/*.csv
 *.messages
-
+__pycache__
 *.dll
 *runtimeconfig.json
