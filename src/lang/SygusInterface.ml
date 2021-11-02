@@ -147,10 +147,52 @@ let rec sygus_of_term (t : term) : sygus_term =
     | _ -> SyApp (IdSimple cstr, List.map ~f:sygus_of_term args))
   | TApp ({ tkind = TVar v; _ }, args) ->
     SyApp (IdSimple v.vname, List.map ~f:sygus_of_term args)
-  | TApp (_, _) ->
-    failwith "Sygus: application function can only be variable. TODO: add let-conversion."
+  | TApp ({ tkind = TFun (formal_args, fun_body); _ }, args) ->
+    (match List.zip formal_args args with
+    | Ok pre_bindings ->
+      let bindings, subs = make_bindings pre_bindings in
+      let fbody' = sygus_of_term (substitution subs fun_body) in
+      SyLet (bindings, fbody')
+    | Unequal_lengths ->
+      failwith "Sygus: cannot translate application with wrong number of arguments.")
+  | TApp (_, _) -> failwith "Sygus: application function cannot be translated."
   | TMatch (_, _) -> failwith "Sygus: match cases not supported."
   | TFun (_, _) -> failwith "Sygus: functions in terms not supported."
+
+and make_bindings pre_bindings =
+  let bindings_of_varmap varmap =
+    List.map ~f:(fun (v, t) -> v.vname, sygus_of_term t) (Map.to_alist varmap)
+  in
+  let make_one_binding bto bdg =
+    let tto = fpat_to_term bto in
+    (* Try to transform the function into a let-binding, by first creating a tuple. *)
+    match Matching.matches ~pattern:tto (tuplify bdg) with
+    | Some varmap -> bindings_of_varmap varmap, []
+    | None ->
+      (match Matching.matches ~pattern:tto bdg with
+      | Some varmap -> bindings_of_varmap varmap, []
+      | None ->
+        (match tto.tkind with
+        | TTup tl ->
+          (* Replace tuple parts that are bound by a single variable. *)
+          let tl_typ = RType.TTup (List.map ~f:type_of tl) in
+          let tup_var = Variable.mk ~t:(Some tl_typ) (Alpha.fresh ~s:"tup" ()) in
+          ( [ tup_var.vname, sygus_of_term bdg ]
+          , List.mapi ~f:(fun i t -> t, mk_sel (Term.mk_var tup_var) i) tl )
+        | _ ->
+          failwith
+            (Fmt.str
+               "%a cannot match %a or %a in sygus conversion."
+               pp_term
+               (fpat_to_term bto)
+               pp_term
+               (tuplify bdg)
+               pp_term
+               bdg)))
+  in
+  List.fold ~init:([], []) pre_bindings ~f:(fun (binds, subs) (bto, bdg) ->
+      let new_binds, new_subs = make_one_binding bto bdg in
+      binds @ new_binds, subs @ new_subs)
 ;;
 
 let constant_of_literal (l : literal) : Constant.t =
