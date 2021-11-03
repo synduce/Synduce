@@ -927,6 +927,11 @@ module VarMap = struct
 
   let empty = Map.empty (module Variable)
   let keyset (m : 'a t) : VarSet.t = VarSet.of_list (Map.keys m)
+
+  let assigns_varname (m : 'a t) (s : string) =
+    Map.existsi ~f:(fun ~key ~data:_ -> String.equal key.vname s) m
+  ;;
+
   let singleton (v : variable) (elt : 'a) = Map.singleton (module Variable) v elt
   let of_alist (al : (variable * 'a) list) = Map.of_alist (module Variable) al
   let of_alist_exn (al : (variable * 'a) list) = Map.of_alist_exn (module Variable) al
@@ -1176,9 +1181,23 @@ let term_size (t : term) =
 
 let term_size_compare (t1 : term) (t2 : term) = compare (term_size t1) (term_size t2)
 
-let term_height =
-  let case _ _ = None in
-  reduce ~init:0 ~case ~join:(fun a b -> 1 + max a b)
+let term_height (t : term) : int =
+  let rec aux (t : term) : 'a =
+    match t.tkind with
+    | TBin (_, t1, t2) -> 1 + max (aux t1) (aux t2)
+    | TUn (_, t1) -> 1 + aux t1
+    | TConst _ -> 1
+    | TVar _ -> 1
+    | TBox t -> aux t
+    | TIte (c, a, b) -> 1 + max (aux c) (max (aux a) (aux b))
+    | TTup tl -> aux_l tl + 1
+    | TSel (t, _) -> aux t
+    | TFun (_, body) -> aux body
+    | TApp (func, args) -> 1 + max (aux func) (aux_l args)
+    | TData (_, args) -> 1 + aux_l args
+    | TMatch (tm, cases) -> 1 + max (aux tm) (aux_l (snd (List.unzip cases)))
+  and aux_l l = List.fold ~init:0 ~f:(fun a t -> max a (aux t)) l in
+  aux t
 ;;
 
 let term_height_compare (t1 : term) (t2 : term) =

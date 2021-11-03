@@ -61,7 +61,7 @@ let partial_bounding_checker
     ~(p : psi_def)
     (lstate : refinement_loop_state)
     (t_set : TermSet.t)
-    : TermSet.t * refinement_loop_state
+    : (term * term) list * refinement_loop_state
   =
   let f (acc_tset, acc_lstate) t =
     match Specifications.get_requires p.psi_target.pvar with
@@ -69,7 +69,7 @@ let partial_bounding_checker
       (match Lemmas.get_lemma ~p acc_lstate.term_state ~key:t with
       | Some _ ->
         (* Everything ok, a lemma has been computed *)
-        Set.add acc_tset t, acc_lstate
+        acc_tset @ [ t, t ], acc_lstate
       | None ->
         (* There is a requires and no lemma, the term has to be bounded. *)
         let bt = Expand.make_bounded t in
@@ -77,10 +77,10 @@ let partial_bounding_checker
         let lem_info =
           Lemmas.set_term_lemma ~p acc_lstate.term_state ~key:bt ~lemma:lem_t
         in
-        Set.add acc_tset bt, { acc_lstate with term_state = lem_info })
-    | None -> Set.add acc_tset t, acc_lstate
+        acc_tset @ [ t, bt ], { acc_lstate with term_state = lem_info })
+    | None -> acc_tset @ [ t, t ], acc_lstate
   in
-  List.fold ~init:(TermSet.empty, lstate) ~f (Set.elements t_set)
+  List.fold ~init:([], lstate) ~f (Set.elements t_set)
 ;;
 
 let check_solution
@@ -115,7 +115,7 @@ let check_solution
   let expand_and_check i (t0 : term) =
     let t_set, u_set = Expand.to_maximally_reducible p t0 in
     let t_set, tmp_lstate = partial_bounding_checker ~p lstate t_set in
-    let num_terms_to_check = Set.length t_set in
+    let num_terms_to_check = List.length t_set in
     if num_terms_to_check > 0
     then (
       let sys_eqns, _ =
@@ -124,7 +124,7 @@ let check_solution
           ~p:{ p with psi_target = target_inst }
           ~term_state:tmp_lstate.term_state
           ~lifting:lstate.lifting
-          t_set
+          (TermSet.of_list (List.map ~f:snd t_set))
       in
       let smt_eqns = List.map sys_eqns ~f:constr_eqn in
       (* Solver calls. *)
@@ -138,9 +138,10 @@ let check_solution
         List.fold_until ~finish:(fun x -> x) ~init:false ~f:(check_eqn solver) smt_eqns
       in
       SyncSmt.spop solver;
+      let select_unbound = if !Config.Optims.bound_after_verif then snd else fst in
       (* Result of solver calls. *)
       if has_ctex
-      then true, t_set, u_set, i + 1
+      then true, TermSet.of_list (List.map ~f:select_unbound t_set), u_set, i + 1
       else false, TermSet.empty, u_set, i + num_terms_to_check)
     else (* set is empty *)
       false, TermSet.empty, u_set, i
@@ -154,7 +155,7 @@ let check_solution
     else (
       let next =
         List.filter
-          ~f:(fun t -> term_height t <= !Config.Optims.check_depth + 1)
+          ~f:(fun t -> term_height t <= !Config.Optims.check_depth)
           (Set.elements terms_to_expand)
       in
       match List.sort ~compare:term_height_compare next with
@@ -169,9 +170,9 @@ let check_solution
   in
   (* Declare all variables *)
   SyncSmt.exec_all solver preamble;
-  (match find_ctex 0 lstate.t_set with
+  (* (match find_ctex 0 lstate.t_set with
   | Some _ -> failwith "Synthesizer and solver disagree on solution. That's unexpected!"
-  | None -> ());
+  | None -> ()); *)
   let ctex_or_none = find_ctex 0 lstate.u_set in
   SyncSmt.close_solver solver;
   let elapsed = Unix.gettimeofday () -. start_time in

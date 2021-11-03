@@ -34,6 +34,11 @@ let split_solve_on = ref true
 *)
 let simple_init = ref false
 
+(** In some cases, synthesizing lemmas nca be too hard; the algorithm can revert to bounded
+  mode after a failed round of solution synthesis.
+*)
+let bound_after_verif = ref false
+
 (**
   Not an optimization. Set to true to use the base abstract cegis algorithm.
   Option --use-acegis sets this flag to true.

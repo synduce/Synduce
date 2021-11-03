@@ -227,8 +227,6 @@ let get_lemma ~(p : psi_def) (ts : term_state) ~(key : term) : term option =
   | Some det -> term_detail_to_lemma ~p det
 ;;
 
-let get_term_state_detail (ts : term_state) ~(key : term) = Map.find ts key
-
 let add_lemmas_interactively ~(p : psi_def) (lstate : refinement_loop_state)
     : refinement_loop_state
   =
@@ -377,10 +375,9 @@ let ctex_model_to_args
     ctex
     : sygus_term list
   =
-  List.map
-    ~f:(fun (name_, _) ->
+  List.map params ~f:(fun (param_name, _) ->
       match
-        let name = convert_term_rec_to_ctex_rec ~p det ctex name_ in
+        let name = convert_term_rec_to_ctex_rec ~p det ctex param_name in
         Map.find
           ctex.ctex_model
           (match
@@ -398,9 +395,11 @@ let ctex_model_to_args
                  name)
           | Some v -> v)
       with
-      | None -> failwith "Failed to extract argument list from ctex model."
+      | None ->
+        Log.error Fmt.(fun fmt () -> pf fmt "I was looking for %s" param_name);
+        Log.error Fmt.(fun fmt () -> pf fmt "The ctex: %a" pp_ctex ctex);
+        failwith "Failed to extract argument list from ctex model."
       | Some t -> sygus_of_term t)
-    params
 ;;
 
 let constraint_of_neg_ctex
@@ -996,27 +995,7 @@ let interactive_get_positive_examples (det : term_state_detail) =
 let synthesize_new_lemma ~(p : psi_def) (det : term_state_detail)
     : (string * variable list * term) option
   =
-  Log.debug (fun f () ->
-      Fmt.(
-        match det.current_preconds with
-        | None ->
-          pf
-            f
-            "Synthesizing a new lemma candidate for term %a[%a]."
-            pp_term
-            det.term
-            pp_subs
-            det.recurs_elim
-        | Some pre ->
-          pf
-            f
-            "Synthesizing a new lemma candidate for term %a[%a] with precondition %a"
-            pp_term
-            det.term
-            pp_subs
-            det.recurs_elim
-            pp_term
-            pre));
+  AlgoLog.announce_new_lemma_synthesis det;
   let lem_id = 0 in
   let synth_objs, params, logic = synthfun_of_ctex ~p det lem_id in
   let neg_constraints =
@@ -1104,7 +1083,8 @@ let rec lemma_refinement_loop (det : term_state_detail) ~(p : psi_def)
         let lemma =
           match det.current_preconds with
           | None -> lemma_term
-          | Some _pre -> lemma_term (* mk_bin Binop.And (mk_un Unop.Not pre) lemma_term *)
+          | Some _pre -> lemma_term
+          (* mk_bin Binop.And (mk_un Unop.Not pre) lemma_term *)
         in
         Some { det with lemma_candidate = None; lemmas = lemma :: det.lemmas }
       | SmtLib.SExps x ->
@@ -1132,6 +1112,11 @@ let rec lemma_refinement_loop (det : term_state_detail) ~(p : psi_def)
         None)
 ;;
 
+(** Partitioning function to partitiion a list into (a,b,c) where a are
+  examples that satisfy the invariant,
+  b are examples that do not satisfy the invariant,
+  c are examples that are spurious for other reasons.
+*)
 let ctexs_for_lemma_synt ctex =
   match ctex.ctex_stat with
   | Valid -> `Fst ctex
@@ -1140,47 +1125,17 @@ let ctexs_for_lemma_synt ctex =
   | _ -> `Trd ctex
 ;;
 
+(** Partitioning function to partitiion a list into (a,b,c) where a are
+  examples that are not in the reference function's image,
+  b are examples that are in the reference function's image,
+  c are examples that are spurious for other reasons.
+*)
 let ctexs_for_ensures_synt ctex =
   match ctex.ctex_stat with
   | Valid -> `Fst ctex
   | Spurious causes ->
     if Caml.List.mem NotInReferenceImage causes then `Snd ctex else `Trd ctex
   | _ -> `Trd ctex
-;;
-
-let add_ensures_to_term_state_detail
-    ~(p : psi_def)
-    (det : term_state_detail)
-    (_ctex_elim : (term * term) list)
-    (ensures : term)
-    : term_state_detail
-  =
-  let new_ensures =
-    List.map det.recurs_elim ~f:(fun (t, _) ->
-        let f_compose_r t_ =
-          let repr_of_v =
-            if p.psi_repr_is_identity then t_ else Reduce.reduce_pmrs p.psi_repr t_
-          in
-          Reduce.reduce_term (Reduce.reduce_pmrs p.psi_reference repr_of_v)
-        in
-        Reduce.reduce_term (mk_app ensures [ f_compose_r t ]))
-  in
-  { det with lemmas = new_ensures @ det.lemmas }
-;;
-
-let add_ensures_to_term_state
-    ~(p : psi_def)
-    (ensures : term)
-    (ctex_elim : (term * term) list)
-    (ts : term_state)
-    : term_state
-  =
-  Map.fold
-    ts
-    ~init:(Map.empty (module Terms))
-    ~f:(fun ~key ~data:det acc ->
-      let new_det = add_ensures_to_term_state_detail ~p det ctex_elim ensures in
-      Map.add_exn ~key ~data:new_det acc)
 ;;
 
 let refine_ensures_predicates
@@ -1265,19 +1220,10 @@ let synthesize_lemmas ~(p : psi_def) synt_failure_info (lstate : refinement_loop
         if List.is_empty lemma_synt_negatives
         then (
           (* lemma_synt_negatives and ensures_negatives are empty; all ctexs spurious! *)
-          Log.info
-            Fmt.(
-              fun fmt () ->
-                pf fmt "All counterexamples are non-spurious: nothing to refine.");
+          AlgoLog.no_spurious_ctex ();
           ts, false)
         else (
-          Log.info
-            Fmt.(
-              fun fmt () ->
-                pf
-                  fmt
-                  "%i counterexamples violate requires."
-                  (List.length lemma_synt_negatives));
+          AlgoLog.spurious_violates_requires (List.length lemma_synt_negatives);
           Map.fold
             ts
             ~init:(Map.empty (module Terms), true)
@@ -1302,14 +1248,7 @@ let synthesize_lemmas ~(p : psi_def) synt_failure_info (lstate : refinement_loop
     | RInfeasible, _ ->
       (* Rare - but the synthesis solver can answer "infeasible", in which case it can give
              counterexamples. *)
-      Log.info
-        Fmt.(
-          fun frmt () ->
-            pf
-              frmt
-              "@[<hov 2>This problem has no solution. Counterexample set:@;%a@]"
-              (list ~sep:sp pp_term)
-              (Set.elements lstate.t_set));
+      AlgoLog.print_infeasible_message lstate.t_set;
       Error RInfeasible
     | RUnknown, _ ->
       (* In most cases if the synthesis solver does not find a solution and terminates, it will

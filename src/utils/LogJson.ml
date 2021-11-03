@@ -1,5 +1,7 @@
 open Base
 
+(** Outputs a JSON summarizing the time spent in each solver as well as the number
+  of solver instances used during the execution of the algorithm.  *)
 let solvers_summary () : Yojson.t =
   let total_solvers_time = ref 0.0 in
   let total_instances = ref 0 in
@@ -14,6 +16,9 @@ let solvers_summary () : Yojson.t =
   `Assoc l
 ;;
 
+(** Outputs a summary of the refinement steps taken by the algorithm in
+    the form of a JSON.
+  *)
 let refinement_steps_summary () : Yojson.t =
   let steps = List.rev (Stack.to_list Stats.refinement_log) in
   `Assoc (List.mapi steps ~f:(fun i s -> Fmt.str "step_%i" i, `Assoc s))

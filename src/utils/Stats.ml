@@ -185,8 +185,15 @@ let log_major_step_end
       ]
   in
   match Stack.pop refinement_log with
-  | Some x -> Stack.push refinement_log (x @ [ "synt_success", json ])
-  | None -> Stack.push refinement_log [ "synt_success", json ]
+  | Some x ->
+    (match x with
+    (* We should always have a step_no and a start_info entr *)
+    | step_no :: start_info :: failures ->
+      Stack.push
+        refinement_log
+        ([ step_no; start_info; "failures", `Assoc failures ] @ [ "success", json ])
+    | _ -> Stack.push refinement_log (x @ [ "success", json ]))
+  | None -> Stack.push refinement_log [ "success", json ]
 ;;
 
 let log_minor_step ~(synth_time : float) ~(auxtime : float) (lifted : bool) : unit =
@@ -200,6 +207,8 @@ let log_minor_step ~(synth_time : float) ~(auxtime : float) (lifted : bool) : un
       ]
   in
   match Stack.pop refinement_log with
-  | Some x -> Stack.push refinement_log (x @ [ "synt_failure", json ])
-  | None -> Stack.push refinement_log [ "synt_failure", json ]
+  | Some x ->
+    let entry_name = Fmt.(str "failure_%i" (List.length x - 2)) in
+    Stack.push refinement_log (x @ [ entry_name, json ])
+  | None -> Stack.push refinement_log [ "failure_0", json ]
 ;;

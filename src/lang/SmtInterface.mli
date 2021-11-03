@@ -113,6 +113,7 @@ type id_kind =
   | IBinop of Term.Binop.t
   | IUnop of Term.Unop.t
   | IBool of bool
+  | ITupCstr
   | INotDef
 
 val term_of_smt

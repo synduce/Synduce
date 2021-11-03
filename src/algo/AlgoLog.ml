@@ -1,6 +1,7 @@
 open AState
 open Base
 open Lang
+open Term
 open Utils
 
 let show_stat elapsed tsize usize =
@@ -15,6 +16,10 @@ let show_stat elapsed tsize usize =
         elapsed
         tsize
         usize)
+  else if !Config.json_progressive && !Config.json_out
+  then (
+    let json = `Assoc [ "progress", LogJson.refinement_steps_summary () ] in
+    Fmt.(pf stdout "%s@." (Yojson.to_string ~std:false json)))
   else ()
 ;;
 
@@ -62,4 +67,82 @@ let show_summary (spec_fname, repr_fname, target_fname) target_f =
 let show_pmrs pmrs =
   Log.info
     Fmt.(fun fmt () -> pf fmt "%a" (box (PMRS.pp ~short:(not !Config.verbose))) pmrs)
+;;
+
+(* Messages from the Lemmas  *)
+
+let no_spurious_ctex () =
+  Log.info
+    Fmt.(fun fmt () -> pf fmt "All counterexamples are non-spurious: nothing to refine.")
+;;
+
+let spurious_violates_requires i =
+  Log.info Fmt.(fun fmt () -> pf fmt "%i counterexamples violate requires." i)
+;;
+
+let print_infeasible_message t_set =
+  Log.info
+    Fmt.(
+      fun frmt () ->
+        pf
+          frmt
+          "@[<hov 2>This problem has no solution. Counterexample set:@;%a@]"
+          (list ~sep:sp Term.pp_term)
+          (Set.elements t_set))
+;;
+
+let announce_new_lemma_synthesis (det : term_state_detail) =
+  Log.debug (fun f () ->
+      Fmt.(
+        match det.current_preconds with
+        | None ->
+          pf
+            f
+            "Synthesizing a new lemma candidate for term@;@[%a[%a]@]."
+            pp_term
+            det.term
+            pp_subs
+            det.recurs_elim
+        | Some pre ->
+          pf
+            f
+            "Synthesizing a new lemma candidate for term@;\
+             @[%a[%a]@]@;\
+             with precondition@;\
+             @[%a@]"
+            pp_term
+            det.term
+            pp_subs
+            det.recurs_elim
+            pp_term
+            pre))
+;;
+
+(* Messages from ImagePredicates *)
+
+let violates_ensures p ctexs =
+  List.iter ctexs ~f:(fun ctex ->
+      List.iter ctex.ctex_eqn.eelim ~f:(fun (_, elimv) ->
+          let tval = Eval.in_model ctex.ctex_model elimv in
+          Log.verbose
+            Fmt.(
+              fun fmt () ->
+                pf
+                  fmt
+                  "%a should not be in the image of %s"
+                  pp_term
+                  tval
+                  p.psi_reference.pvar.vname)))
+;;
+
+let positives_ensures p positives =
+  Log.verbose
+    Fmt.(
+      fun fmt () ->
+        pf
+          fmt
+          "@[These examples are in the image of %s:@;%a@]"
+          p.psi_reference.pvar.vname
+          (list ~sep:comma pp_term)
+          positives)
 ;;

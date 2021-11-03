@@ -1,3 +1,9 @@
+(** [Baselines] contains two alternative synthesis algorithms:
+  [acegis_loop] is a refinement loop using symbolic counterexample without partial bounding,
+  [ccegis_loop] is a refinement loop using concrete couternexamples (and therefore fully
+  bounded counterexamples).
+*)
+
 open Base
 open Lang
 open Lang.Term
@@ -9,6 +15,11 @@ open Syguslib.Sygus
 (*                             ACEGIS REFINEMENT LOOP                                            *)
 (* ============================================================================================= *)
 
+(** [acegis_loop p t_set] solves the synthesis problem defined by [p] starting with the set of
+    equations [Equations.make t]. The terms in [t] must be bounded terms, and only bounded terms
+    will be taken as counterexamples during the refinement loop.
+    Use the option [--acegis] in the executable to use this synthesis algorithm.
+*)
 let rec acegis_loop (p : psi_def) (t_set : TermSet.t) =
   Int.incr refinement_steps;
   let elapsed = Stats.get_glob_elapsed () in
@@ -80,6 +91,11 @@ let algo_acegis (p : psi_def) =
 (*                             CCEGIS REFINEMENT LOOP                                            *)
 (* ============================================================================================= *)
 
+(** [ccegis_loop p t_set] solves the synthesis problem defined by [p] starting with the set of
+    equations [Equations.make t]. The terms in [t] must be *concrete* terms, and only concrete terms
+    will be taken as counterexamples during the refinement loop: this is a concrete CEGIS algorithm.
+    Use the option [--acegis] in the executable to use this synthesis algorithm.
+*)
 let rec ccegis_loop (p : psi_def) (t_set : TermSet.t) =
   Int.incr refinement_steps;
   let elapsed = Stats.get_glob_elapsed () in

@@ -15,6 +15,9 @@ let info = ref true
 (** Json output toggle.  *)
 let json_out = ref false
 
+(** When Json output is on, set true to get partial updates in Json format. *)
+let json_progressive = ref false
+
 (** Toggle printing timing info when info is off. Set to true by default. *)
 let timings = ref true
 
@@ -234,6 +237,7 @@ let options print_usage parse_only =
   ; 'I', "interactive", set interactive_lemmas true, None
   ; 'j', "json", Some set_json_out, None
   ; 'J', "interactive-lifting", set interactive_lifting true, None
+  ; 'k', "skip-lemmas", set bound_after_verif true, None
   ; 'L', "interactive-loop", set interactive_lemmas_loop true, None
   ; 'm', "style-math", set math_display true, None
   ; 'n', "verification", None, Some set_num_expansions_check
@@ -249,20 +253,21 @@ let options print_usage parse_only =
   ; '\000', "ccegis", set use_ccegis true, None
   ; '\000', "cvc4", set use_cvc4 true, None
   ; '\000', "cvc5", set use_cvc4 false, None
-  ; '\000', "eusolver", set use_eusolver true, None
   ; '\000', "check-smt-unrealizable", set check_unrealizable_smt_unsatisfiable true, None
   ; '\000', "const-grammars", set no_grammar_for_constants false, None
+  ; '\000', "eusolver", set use_eusolver true, None
   ; '\000', "fuzzing", None, Some set_fuzzing_count
+  ; '\000', "gropt-level", None, Some set_grammar_optimization_level
   ; '\000', "generate-benchmarks", None, Some set_benchmark_generation_dir
   ; '\000', "generate-proof", None, Some set_proof_output_file
-  ; '\000', "set-gropt", None, Some set_grammar_optimization_level
-  ; '\000', "parse-only", set parse_only true, None
+  ; '\000', "json-progress", set json_progressive true, None
   ; '\000', "max-lifting", None, Some set_max_lifting_attempts
   ; '\000', "no-assumptions", set make_partial_correctness_assumption false, None
   ; '\000', "no-gropt", set optimize_grammars 0, None
   ; '\000', "no-lifting", set attempt_lifting false, None
   ; '\000', "no-simplify", set simplify_eqns false, None
   ; '\000', "no-syndef", set use_syntactic_definitions false, None
+  ; '\000', "parse-only", set parse_only true, None
   ; '\000', "show-vars", set show_vars true, None
   ; '\000', "sysfe-opt-off", set sysfe_opt false, None
   ; '\000', "use-bmc", set use_bmc true, None

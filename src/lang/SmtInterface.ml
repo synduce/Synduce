@@ -188,6 +188,7 @@ let rec declare_datatype_of_rtype (t0 : RType.t) : (smtSymbol list * command) li
     [ [ fst smt_sort ], DeclareDatatypes ([ smt_sort ], [ smt_constrs ]) ]
   in
   match t0 with
+  (* No declaration needed for base types. *)
   | _ when RType.is_base t0 -> []
   | RType.TTup tl ->
     let s, decl = decl_of_tup_type tl in
@@ -372,6 +373,7 @@ type id_kind =
   | IBinop of Binop.t
   | IUnop of Unop.t
   | IBool of bool
+  | ITupCstr
   | INotDef
 
 let id_kind_of_s env s =
@@ -394,7 +396,7 @@ let id_kind_of_s env s =
             (* Last possibility: a global function or a pmrs. *)
             (match Option.first_some (PMRS.find_by_name s) (Term.find_global s) with
             | Some v -> IVar v
-            | _ -> INotDef)))))
+            | _ -> if Tuples.is_constr_name s then ITupCstr else INotDef)))))
 ;;
 
 let rec term_of_smt
@@ -419,6 +421,7 @@ let rec term_of_smt
     else (
       match id_kind_of_s env s with
       | ICstr c -> mk_data c args'
+      | ITupCstr -> mk_tup args'
       | IVar v -> mk_app (Term.mk_var v) args'
       | IBinop op ->
         (match args' with
@@ -762,8 +765,14 @@ let vars_and_formals (pmrs : PMRS.t) (fvar : variable) =
 let _smt_of_pmrs (pmrs : PMRS.t) : (smtSymbol list * command) list * command list =
   (* Sort declarations. *)
   let datatype_decls =
-    List.concat_map ~f:declare_datatype_of_rtype pmrs.PMRS.pinput_typ
-    @ declare_datatype_of_rtype pmrs.PMRS.poutput_typ
+    List.concat_map
+      ~f:declare_datatype_of_rtype
+      (* All the types that can contain dataypes, including tuples. *)
+      PMRS.(
+        (pmrs.poutput_typ :: pmrs.pinput_typ)
+        @ List.concat_map (Set.elements pmrs.pnon_terminals) ~f:(fun v ->
+              let int, out = RType.fun_typ_unpack (Variable.vtype_or_new v) in
+              out :: int))
   in
   (* Define recursive functions. *)
   let fun_of_nont (nont : variable) : (func_dec * smtTerm) option =
