@@ -17,9 +17,9 @@ let rec allpos = function
 let rec spec = function
   | Nil -> 0, 0
   | Cons (hd, tl) ->
-    let amax, sec_max = spec tl in
-    max hd amax, max sec_max (min hd amax)
-  [@@ensures fun (x, y) -> x >= y]
+    let amin, sec_min = spec tl in
+    min hd amin, min sec_min (max hd amin)
+  [@@ensures fun (x, y) -> x <= y]
 ;;
 
 let rec target = function

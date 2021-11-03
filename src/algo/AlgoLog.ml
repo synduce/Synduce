@@ -117,3 +117,32 @@ let announce_new_lemma_synthesis (det : term_state_detail) =
             pp_term
             pre))
 ;;
+
+(* Messages from ImagePredicates *)
+
+let violates_ensures p ctexs =
+  List.iter ctexs ~f:(fun ctex ->
+      List.iter ctex.ctex_eqn.eelim ~f:(fun (_, elimv) ->
+          let tval = Eval.in_model ctex.ctex_model elimv in
+          Log.verbose
+            Fmt.(
+              fun fmt () ->
+                pf
+                  fmt
+                  "%a should not be in the image of %s"
+                  pp_term
+                  tval
+                  p.psi_reference.pvar.vname)))
+;;
+
+let positives_ensures p positives =
+  Log.verbose
+    Fmt.(
+      fun fmt () ->
+        pf
+          fmt
+          "@[These examples are in the image of %s:@;%a@]"
+          p.psi_reference.pvar.vname
+          (list ~sep:comma pp_term)
+          positives)
+;;

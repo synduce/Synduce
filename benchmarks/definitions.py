@@ -33,6 +33,7 @@ kick_the_tires_set = [
     ["list/last.pmrs", ""],
     ["constraints/sortedlist/count_lt.ml", ""],
     ["constraints/bst/count_lt.ml", "-NB"],
+    ["constraints/ensures/mps_no_ensures.ml", "-B"],
     ["list/largest_diff_sorted_list_nohead.ml", ""],
     ["list/poly_no_fac.ml", ""],
 ]
@@ -77,6 +78,10 @@ reduced_benchmark_set_table3 = [
 ]
 
 constraint_benchmarks = [
+    # Ensures
+    ["constraints/ensures/mps_no_ensures.ml", "-B"],
+    ["constraints/ensures/mts_no_ensures.ml", ""],
+    ["constraints/ensures/mss_no_ensures.ml", "-B"],
     # sortedlist
     ["constraints/sortedlist/min.ml", ""],
     ["constraints/sortedlist/max.ml", ""],
@@ -97,6 +102,8 @@ constraint_benchmarks = [
     ["constraints/constantlist/contains.ml", ""],
     # all positive
     ["constraints/all_positive/list_mps.ml", ""],
+    ["constraints/all_positive/sndmin.ml", ""],
+    ["constraints/all_positive/sndmax.ml", "-NB"],
     # evenlist
     ["constraints/evenlist/parity_of_first.ml", ""],
     ["constraints/evenlist/parity_of_last.ml", ""],
@@ -180,7 +187,8 @@ base_benchmark_set = [
     ["list/prodhom.pmrs", ""],
     ["list/polyhom.pmrs", ""],
     ["list/search.pmrs", ""],
-    ["list/sndminhom.pmrs", ""],
+    ["list/sndmax.ml", ""],
+    ["list/sndmin.ml", ""],
     ["list/sumgt.ml", ""],
     ["list/sumhom.pmrs", ""],
     ["list/sumodds.pmrs", ""],

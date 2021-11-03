@@ -373,6 +373,7 @@ type id_kind =
   | IBinop of Binop.t
   | IUnop of Unop.t
   | IBool of bool
+  | ITupCstr
   | INotDef
 
 let id_kind_of_s env s =
@@ -395,7 +396,7 @@ let id_kind_of_s env s =
             (* Last possibility: a global function or a pmrs. *)
             (match Option.first_some (PMRS.find_by_name s) (Term.find_global s) with
             | Some v -> IVar v
-            | _ -> INotDef)))))
+            | _ -> if Tuples.is_constr_name s then ITupCstr else INotDef)))))
 ;;
 
 let rec term_of_smt
@@ -420,6 +421,7 @@ let rec term_of_smt
     else (
       match id_kind_of_s env s with
       | ICstr c -> mk_data c args'
+      | ITupCstr -> mk_tup args'
       | IVar v -> mk_app (Term.mk_var v) args'
       | IBinop op ->
         (match args' with

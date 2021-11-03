@@ -223,19 +223,6 @@ let synthfun_ensures ~(p : psi_def) (id : int) : command * variable * string =
   mk_synthinv (make_ensures_name id) [ var ] grammar, var, logic
 ;;
 
-let constraint_of_neg (id : int) ~(p : psi_def) (ctex : ctex) : command =
-  ignore p;
-  let params =
-    List.concat_map
-      ~f:(fun (_, elimv) -> [ Eval.in_model ctex.ctex_model elimv ])
-      ctex.ctex_eqn.eelim
-  in
-  CConstraint
-    (SyApp
-       ( IdSimple "not"
-       , [ SyApp (IdSimple (make_ensures_name id), List.map ~f:sygus_of_term params) ] ))
-;;
-
 let set_up_ensures_solver solver ~(p : psi_def) (ensures : term) =
   ignore ensures;
   let preamble = Commands.mk_preamble ~logic:Logics.ALL ~induction:true ~models:true () in
@@ -256,10 +243,6 @@ let set_up_ensures_solver solver ~(p : psi_def) (ensures : term) =
       @ List.map ~f:S.mk_assert (smt_of_aux_ensures ~p))
   in
   return ()
-;;
-
-let constraint_of_pos (id : int) (term : term) : command =
-  CConstraint (SyApp (IdSimple (make_ensures_name id), [ sygus_of_term term ]))
 ;;
 
 let verify_ensures_unbounded ~(p : psi_def) (ensures : term)
@@ -301,7 +284,7 @@ let verify_ensures_bounded ~(p : psi_def) (ensures : term) (var : variable)
   in
   let task (solver, starter) =
     let%lwt _ = starter in
-    let%lwt _ = set_up_bounded_solver Logics.LIA VarSet.empty solver in
+    let%lwt _ = set_up_bounded_solver Logics.ALL VarSet.empty solver in
     let steps = ref 0 in
     let rec check_bounded_sol accum terms =
       let f accum t =
@@ -461,6 +444,20 @@ let handle_ensures_verif_response (response : S.solver_response) (ensures : term
     false, None
 ;;
 
+let constraint_of_neg (id : int) ~(p : psi_def) (ctex : ctex) : term =
+  ignore p;
+  let params =
+    List.concat_map
+      ~f:(fun (_, elimv) -> [ Eval.in_model ctex.ctex_model elimv ])
+      ctex.ctex_eqn.eelim
+  in
+  mk_un Unop.Not (mk_app (mk_var (Variable.mk (make_ensures_name id))) params)
+;;
+
+let constraint_of_pos (id : int) (term : term) : term =
+  mk_app (mk_var (Variable.mk (make_ensures_name id))) [ term ]
+;;
+
 let rec synthesize
     ~(p : psi_def)
     (positives : ctex list)
@@ -468,45 +465,27 @@ let rec synthesize
     (prev_positives : term list)
     : term option
   =
-  Log.debug_msg "Synthesize predicates..";
-  let vals ctex =
-    List.iter ctex.ctex_eqn.eelim ~f:(fun (_, elimv) ->
-        let tval = Eval.in_model ctex.ctex_model elimv in
-        Log.debug_msg
-          Fmt.(
-            str
-              "%a should not be in the image of %s"
-              pp_term
-              tval
-              p.psi_reference.pvar.vname))
-  in
-  List.iter ~f:vals negatives;
+  Log.(info (wrap "Synthesize predicates.."));
+  AlgoLog.violates_ensures p negatives;
   let new_positives =
     match prev_positives with
     | [] -> gen_pmrs_positive_examples p.psi_reference
     | _ -> prev_positives
   in
-  Log.debug
-    Fmt.(
-      fun fmt () ->
-        pf
-          fmt
-          "These examples are in the image of %s:@;%a"
-          p.psi_reference.pvar.vname
-          (list ~sep:comma pp_term)
-          new_positives);
+  AlgoLog.positives_ensures p new_positives;
   let id = 0 in
-  let synth_objs, var, logic = synthfun_ensures ~p id in
-  let neg_constraints = List.map ~f:(constraint_of_neg id ~p) negatives in
-  let pos_constraints = List.map ~f:(constraint_of_pos id) new_positives in
+  let synth_objs, var, _logic = synthfun_ensures ~p id in
   let extra_defs = [ max_definition; min_definition ] in
-  let commands =
-    CSetLogic logic
-    :: (extra_defs @ [ synth_objs ] @ neg_constraints @ pos_constraints @ [ CCheckSynth ])
+  let solver =
+    HLSolver.(
+      make ~extra_defs ()
+      |> set_logic _logic
+      |> synthesize [ synth_objs ]
+      |> constrain
+           (List.map ~f:(constraint_of_neg id ~p) negatives
+           @ List.map ~f:(constraint_of_pos id) new_positives))
   in
-  match
-    handle_ensures_synth_response (SygusInterface.SygusSolver.solve_commands commands) var
-  with
+  match handle_ensures_synth_response (HLSolver.solve solver) var with
   | None -> None
   | Some solns ->
     let _, _, body = List.nth_exn solns 0 in

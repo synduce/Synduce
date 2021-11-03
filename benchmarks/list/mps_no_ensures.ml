@@ -12,7 +12,6 @@ let rec mps = function
   | Cons (hd, tl) ->
     let amps, asum = mps tl in
     max (amps + hd) 0, asum + hd
-  [@@ensures fun (x, _) -> x >= 0]
 ;;
 
 let rec clist_to_list = function

@@ -7,12 +7,12 @@ type 'a list =
   | Nil
   | Cons of 'a * 'a list
 
-let rec mps = function
+let rec mts = function
   | Nil -> 0, 0
   | Cons (hd, tl) ->
-    let amps, asum = mps tl in
-    max (amps + hd) 0, asum + hd
-  [@@ensures fun (x, _) -> x >= 0]
+    let amts, asum = mts tl in
+    let new_sum = asum + hd in
+    max amts new_sum, new_sum
 ;;
 
 let rec clist_to_list = function
@@ -32,4 +32,4 @@ let rec hom = function
   | Concat (x, y) -> [%synt join] (hom x) (hom y)
 ;;
 
-assert (hom = clist_to_list @@ mps)
+assert (hom = clist_to_list @@ mts)

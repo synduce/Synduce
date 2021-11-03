@@ -393,7 +393,7 @@ let check_image_sat ~p ctex : AsyncSmt.response * int u =
         solver_instance
         (Commands.mk_preamble
            ~incremental:(String.is_prefix ~prefix:"CVC" solver_instance.s_name)
-           ~logic:(SmtLogic.infer_logic ~logic_infos:(AState.psi_def_logics p) [])
+           ~logic:Logics.ALL (* TODO: fix this, we have datatypes leaking. *)
            ())
     in
     let* () = AsyncSmt.exec_all solver_instance t_decl in

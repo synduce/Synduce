@@ -9,9 +9,9 @@ type 'a list =
 let rec spec l = f l
 
 and f = function
-  | Two (a, b) -> min a b, max a b
+  | Two (a, b) -> max a b, min a b
   | Cons (hd, tl) ->
-    (fun (amin, sec_min) -> min hd amin, min sec_min (max hd amin)) (f tl)
+    (fun (amax, sec_max) -> max hd amax, max sec_max (min hd amax)) (f tl)
   [@@ensures fun (x, y) -> x <= y]
 ;;
 
