@@ -1,3 +1,5 @@
+(** @synduce --no-syndef *)
+
 type 'a list =
   | Elt of 'a
   | Cons of 'a * 'a list

@@ -155,7 +155,8 @@ constraint_benchmarks = [
     ["constraints/unimodal_list/max_logn_v2.ml", "-kNB"],
     ["constraints/unimodal_list/max_in_um_pos.ml", ""],
     # Size constraint
-    ["constraints/size/obfuscated_length.ml", ""]
+    ["constraints/size/obfuscated_length.ml", ""],
+    ["constraints/size/obfuscated_length_3.ml", ""]
 ]
 
 base_benchmark_set = [

@@ -166,9 +166,6 @@ let check_solution
   in
   (* Declare all variables *)
   SyncSmt.exec_all solver preamble;
-  (* (match find_ctex 0 lstate.t_set with
-  | Some _ -> failwith "Synthesizer and solver disagree on solution. That's unexpected!"
-  | None -> ()); *)
   let ctex_or_none = find_ctex 0 lstate.u_set in
   SyncSmt.close_solver solver;
   let elapsed = Unix.gettimeofday () -. start_time in

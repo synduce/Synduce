@@ -887,6 +887,7 @@ module Solve = struct
         let partial_soln', new_unknowns, new_eqns =
           solve_syntactic_definitions no_c_unknowns no_c_eqns
         in
+        (* (if Set.is_empty new_unknowns then Fmt.(pf stdout "All solved with syntax.@.")); *)
         c_soln @ partial_soln', new_unknowns, new_eqns)
       else [], unknowns, eqns
     in
