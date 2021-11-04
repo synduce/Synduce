@@ -16,8 +16,11 @@ val check_solution
   :  p:AState.psi_def
   -> refinement_loop_state
   -> (string * variable list * term) list
-  -> ((term, Terms.comparator_witness) Set.t * (term, Terms.comparator_witness) Set.t)
-     option
+  -> [ `Incorrect_assumptions
+     | `Ctexs of
+       (term, Terms.comparator_witness) Set.t * (term, Terms.comparator_witness) Set.t
+     | `Correct
+     ]
 
 (** Perform a bounded check of the solution. As opposed to check_solution this does not take advantage
     of partial bounding techniques.

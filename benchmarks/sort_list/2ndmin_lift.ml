@@ -1,4 +1,4 @@
-(** @synduce --no-syndef *)
+(** @synduce *)
 
 type 'a list =
   | Elt of 'a

@@ -87,6 +87,11 @@ let check_solution
     ~(p : psi_def)
     (lstate : refinement_loop_state)
     (soln : (string * variable list * term) list)
+    : [ `Incorrect_assumptions
+      | `Ctexs of
+        (term, Terms.comparator_witness) Set.t * (term, Terms.comparator_witness) Set.t
+      | `Correct
+      ]
   =
   Log.info (fun f () -> Fmt.(pf f "Checking solution..."));
   (* Turn of verbosity for bounded verification, otherwise too many messages appear. *)
@@ -164,15 +169,22 @@ let check_solution
         then Some (Set.union lstate.t_set t_set, elts)
         else find_ctex num_checks elts)
   in
-  (* Declare all variables *)
+  (* Execute the preamble. *)
   SyncSmt.exec_all solver preamble;
-  let ctex_or_none = find_ctex 0 lstate.u_set in
-  SyncSmt.close_solver solver;
-  let elapsed = Unix.gettimeofday () -. start_time in
-  Stats.add_verif_time elapsed;
-  Log.info (fun f () -> Fmt.(pf f "... finished in %3.4fs" elapsed));
-  Config.verbose := verb;
-  ctex_or_none
+  (* Check that the solution is correct on current set T. If it is not, this is because of some wrong
+  assumption made for optimization. *)
+  match find_ctex 0 lstate.t_set with
+  | Some _ -> `Incorrect_assumptions
+  | None ->
+    let ctex_or_none = find_ctex 0 lstate.u_set in
+    SyncSmt.close_solver solver;
+    let elapsed = Unix.gettimeofday () -. start_time in
+    Stats.add_verif_time elapsed;
+    Log.info (fun f () -> Fmt.(pf f "... finished in %3.4fs" elapsed));
+    Config.verbose := verb;
+    (match ctex_or_none with
+    | Some ctex -> `Ctexs ctex
+    | None -> `Correct)
 ;;
 
 (* ============================================================================================= *)

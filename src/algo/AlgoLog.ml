@@ -69,6 +69,16 @@ let show_pmrs pmrs =
     Fmt.(fun fmt () -> pf fmt "%a" (box (PMRS.pp ~short:(not !Config.verbose))) pmrs)
 ;;
 
+let msg_too_many_opts () =
+  Log.info
+    Fmt.(
+      fun fmt () ->
+        pf
+          fmt
+          "@[It seems some optimizations caused an error.@;\
+           Turning them off and trying again.@]")
+;;
+
 (* ============================================================================================= *)
 (*                           Messages from the Lemma Synthesis                                   *)
 (* ============================================================================================= *)

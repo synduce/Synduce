@@ -1,3 +1,5 @@
+(** @synduce --no-gropt *)
+
 type 'a list =
   | Elt of 'a
   | Cons of 'a * 'a list
@@ -26,7 +28,7 @@ let rec spec = function
 ;;
 
 let rec target = function
-  | Elt x -> x
+  | Elt x -> 0
   | Cons (hd, tl) -> [%synt join] hd (target tl)
   [@@requires is_length_lt2]
 ;;
