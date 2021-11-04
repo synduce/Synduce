@@ -1,110 +1,223 @@
-⏺ Category: constraints->sortedlist
-   (1 / 47) ✅ min                                      ×10 runs, average:  0.068s ± 1ms         R: +.✓
-   (2 / 47) ✅ max                                      ×10 runs, average:  0.068s ± 1ms         R: +.✓
-   (3 / 47) ✅ count_lt                                 ×10 runs, average:  0.048s ± 4ms !       R: +.✓
-   (4 / 47) ✅ index_of                                 ×10 runs, average:  0.854s ± 74ms !      R: +.✓
-   (5 / 47) ✅ is_intersection_empty                    ×10 runs, average:  0.084s ± 9ms !       R: +✓
-   (6 / 47) ✅ largest_diff                             ×10 runs, average:  0.069s ± 2ms         R: ++✓
-   (7 / 47) ✅ smallest_diff                            ×10 runs, average:  0.041s ± 2ms         R: +✓
-   (8 / 47) ✅ parallel_min                             ×10 runs, average:  3.638s ± 173ms       R: +.✓
-   (9 / 47) ✅ parallel_max                             ×10 runs, average:  7.736s ± 155ms       R: +.✓
-  (10 / 47) ✅ parallel_max2                            ×10 runs, average:  3.557s ± 62ms        R: +.✓
-
-⏺ Category: constraints->sorted_and_indexed
-  (11 / 47) ✅ count_lt0                                ×10 runs, average:  0.324s ± 12ms        R: +.✓
-  (12 / 47) ✅ count_lt                                 ×10 runs, average:  0.387s ± 20ms !      R: +.✓
-
-⏺ Category: constraints->constantlist
-  (13 / 47) ✅ index_of                                 ×10 runs, average:  0.966s ± 9ms         R: +.✓
-  (14 / 47) ✅ contains                                 ×10 runs, average:  1.254s ± 19ms        R: +.✓
-
-⏺ Category: constraints->all_positive
-  (15 / 47) ✅ list_mps                                 ×10 runs, average:  0.391s ± 15ms        R: +.✓
-
-⏺ Category: constraints->evenlist
-  (16 / 47) ✅ parity_of_first                          ×10 runs, average:  0.101s ± 9ms !       R: +.✓
-  (17 / 47) ✅ parity_of_last                           ×10 runs, average:  0.056s ± 2ms         R: +.✓
-  (18 / 47) ✅ first_odd                                ×10 runs, average:  0.206s ± 16ms !      R: +..✓
-  (19 / 47) ✅ parity_of_sum                            ×10 runs, average:  0.026s ± 1ms         R: +✓
-
-⏺ Category: constraints->bst
-  (20 / 47) ✅ contains                                 ×10 runs, average:  0.201s ± 33ms !      R: +.✓
-  (21 / 47) ✅ count_lt                                 ×10 runs, average:  0.600s ± 14ms        R: +.✓
-  (22 / 47) ✅ count_between                            ×10 runs, average:  22.650s ± 605ms      R: +...✓
-  (23 / 47) ✅ most_frequent_v1                         ×10 runs, average:  16.129s ± 746ms      R: ++++++✓
-  (24 / 47) ✅ from_list_contains                       ×10 runs, average:  0.138s ± 5ms         R: +.✓
-  (25 / 47) ✅ from_list_max                            ×10 runs, average:  3.055s ± 140ms       R: +..✓
-  (26 / 47) ✅ sum_gt_by_key                            ×10 runs, average:  61.602s ± 2345ms     R: +.✓
-
-⏺ Category: constraints->balanced_tree
-  (27 / 47) ✅ node_count                               ×10 runs, average:  0.392s ± 16ms        R: +.✓
-  (28 / 47) ✅ height                                   ×10 runs, average:  0.192s ± 10ms !      R: +.✓
-
-⏺ Category: constraints->symmetric_tree
-  (29 / 47) ✅ sum                                      ×10 runs, average:  0.316s ± 4ms         R: +.✓
-  (30 / 47) ✅ height                                   ×10 runs, average:  0.328s ± 11ms        R: +.✓
-  (31 / 47) ✅ min                                      ×10 runs, average:  0.291s ± 32ms !      R: +.✓
-
-⏺ Category: constraints->memo
-  (32 / 47) ✅ tree_size                                ×10 runs, average:  1.607s ± 52ms        R: +.✓
-  (33 / 47) ✅ constant                                 ×10 runs, average:  0.004s ± 0ms !       R: +✓
-  (34 / 47) ✅ mts_memo_sum                             ×10 runs, average:  0.031s ± 1ms         R: +✓
-  (35 / 47) ✅ max_contains                             ×10 runs, average:  1.609s ± 24ms        R: +...✓
-  (36 / 47) ✅ count_lt                                 ×10 runs, average:  11.978s ± 880ms !    R: +.✓
-  (37 / 47) ✅ max_sum_gt                               ×10 runs, average:  2.884s ± 143ms       R: +...✓
-  (38 / 47) ✅ proper_indexation_sum_lt_pos_v2          ×10 runs, average:  0.004s ± 0ms !       R: +✓
-  (39 / 47) ✅ proper_indexation_sum_lt_pos             ×10 runs, average:  0.153s ± 3ms         R: ++✓
-
-⏺ Category: constraints->empty_right_subtree
-  (40 / 47) ✅ contains                                 ×10 runs, average:  2.052s ± 30ms        R: +.✓
-
-⏺ Category: constraints->alist
-  (41 / 47) ✅ count_eq2                                ×10 runs, average:  0.519s ± 99ms !      R: +.✓
-  (42 / 47) ✅ count_eq                                 ×10 runs, average:  0.063s ± 1ms         R: +.✓
-  (43 / 47) ✅ sums                                     ×10 runs, average:  0.061s ± 1ms         R: +.✓
-  (44 / 47) ✅ most_frequent                            ×10 runs, average:  9.057s ± 382ms       R: ++++✓
-
-⏺ Category: constraints->even_tree
-  (45 / 47) ✅ sum_of_parities                          ×10 runs, average:  1.273s ± 348ms !     R: +...✓
-  (46 / 47) ✅ parity_of_max                            ×10 runs, average:  0.582s ± 13ms        R: +✓
-
-⏺ Category: constraints->program
-  (47 / 47) ✅ typecheck                                ×10 runs, average:  1.259s ± 296ms !     R: +✓
-
-✅ All 47 benchmarks passed in  1596.6 s.
-
 ⏺ Category: indexed_list
-   (1 / 14) ✅ position_polynomial_no_index             ×10 runs, average:  0.620s ± 4ms         R: ++^+✓
-   (2 / 14) ✅ search_no_index                          ×10 runs, average:  1.363s ± 48ms        R: ++^+✓
-   (3 / 14) ✅ sum_elts_lt_pos_no_len                   ×10 runs, average:  74.267s ± 1456ms     R: ++^+✓
+  (1 / 149) ✅ position_polynomial_no_index             ×10 runs, average:  0.619s ± 5ms         R: ++^+✓
+  (2 / 149) ✅ search_no_index                          ×10 runs, average:  1.352s ± 21ms        R: ++^+✓
+  (3 / 149) ✅ sum_elts_lt_pos_no_len                   ×10 runs, average:  73.878s ± 3136ms     R: ++^+✓
 
 ⏺ Category: list
-   (4 / 14) ✅ atoi_no_fac                              ×10 runs, average:  1.718s ± 10ms        R: +^++✓
-   (5 / 14) ✅ is_sorted_no_last                        ×10 runs, average:  16.310s ± 433ms      R: ++^+✓
-   (6 / 14) ✅ largest_diff_sorted_list_nohead          ×10 runs, average:  0.082s ± 3ms         R: +^+✓
-   (7 / 14) ✅ mps_no_sum                               ×10 runs, average:  1.780s ± 78ms        R: +^++✓
-   (8 / 14) ✅ poly_no_fac                              ×10 runs, average:  0.249s ± 1ms         R: +^+✓
-   (9 / 14) ✅ zero_after_one_no                        ×10 runs, average:  1.149s ± 9ms         R: +^++✓
+  (4 / 149) ✅ atoi_no_fac                              ×10 runs, average:  1.821s ± 9ms         R: +^++✓
+  (5 / 149) ✅ is_sorted_no_last                        ×10 runs, average:  15.603s ± 39ms       R: ++^+✓
+  (6 / 149) ✅ largest_diff_sorted_list_nohead          ×10 runs, average:  0.058s ± 1ms         R: +^+✓
+  (7 / 149) ✅ mps_no_sum                               ×10 runs, average:  2.096s ± 4ms         R: +^++✓
+  (8 / 149) ✅ poly_no_fac                              ×10 runs, average:  0.364s ± 3ms         R: +^+✓
+  (9 / 149) ✅ zero_after_one_no                        ×10 runs, average:  1.396s ± 6ms         R: +^++✓
 
 ⏺ Category: tailopt
-  (10 / 14) ✅ mps_no_sum                               ×10 runs, average:  10.002s ± 520ms !    R: ++^+✓
+ (10 / 149) ✅ mps_no_sum                               ×10 runs, average:  9.913s ± 22ms        R: ++^+✓
 
 ⏺ Category: combine
-  (11 / 14) ✅ mts_and_mps_nosum                        ×10 runs, average:  26.031s ± 1580ms !   R: ++^+✓
+ (11 / 149) ✅ mts_and_mps_nosum                        ×10 runs, average:  25.034s ± 64ms       R: ++^+✓
 
 ⏺ Category: tree
-  (12 / 14) ✅ gradient                                 ×10 runs, average:  0.070s ± 1ms         R: +^✓
-  (13 / 14) ✅ mits_nosum                               ×10 runs, average:  3.781s ± 182ms       R: ++^++✓
+ (12 / 149) ✅ gradient                                 ×10 runs, average:  1.176s ± 49ms        R: +^✓
+ (13 / 149) ✅ mits_nosum                               ×10 runs, average:  3.819s ± 18ms        R: ++^++✓
 
 ⏺ Category: unimodal_lists
-  (14 / 14) ✅ prod_needs_aux                           ×10 runs, average:  1.182s ± 8ms         R: +^✓
+ (14 / 149) ✅ prod_needs_aux                           ×10 runs, average:  2.066s ± 21ms        R: +^✓
 
-✅ All 14 benchmarks passed in  1388.1 s.
+⏺ Category: constraints->ensures
+ (15 / 149) ✅ mps_no_ensures                           ×10 runs, average:  0.944s ± 6ms         R: +..✓
+ (16 / 149) ✅ mts_no_ensures                           ×10 runs, average:  0.793s ± 15ms        R: +.+✓
+ (17 / 149) ✅ mss_no_ensures                           ×10 runs, average:  29.736s ± 1293ms     R: +.....++✓
 
-Additional benchmarks:
 ⏺ Category: constraints->sortedlist
-    (1 / 4) ✅ sndmind                                  ×02 runs, average:  89.585s ± 60ms       R: +...✓
+ (18 / 149) ✅ min                                      ×10 runs, average:  0.067s ± 1ms         R: +.✓
+ (19 / 149) ✅ max                                      ×10 runs, average:  0.067s ± 1ms         R: +.✓
+ (20 / 149) ✅ count_lt                                 ×10 runs, average:  0.046s ± 1ms         R: +.✓
+ (21 / 149) ✅ index_of                                 ×10 runs, average:  0.811s ± 3ms         R: +.✓
+ (22 / 149) ✅ is_intersection_empty                    ×10 runs, average:  0.055s ± 0ms         R: +✓
+ (23 / 149) ✅ largest_diff                             ×10 runs, average:  0.040s ± 1ms         R: ++✓
+ (24 / 149) ✅ smallest_diff                            ×10 runs, average:  0.024s ± 0ms         R: +✓
+ (25 / 149) ✅ sndmind                                  ×10 runs, average:  79.845s ± 166ms      R: +...✓
+ (26 / 149) ✅ sndmax_empty_base_case                   ×10 runs, average:  10.052s ± 98ms       R: +.+..✓
+ (27 / 149) ✅ parallel_min                             ×10 runs, average:  59.872s ± 589ms      R: +.✓
+ (28 / 149) ✅ parallel_max                             ×10 runs, average:  140.515s ± 1538ms    R: +.✓
+ (29 / 149) ✅ parallel_max2                            ×10 runs, average:  60.043s ± 429ms      R: +.✓
+
+⏺ Category: constraints->sorted_and_indexed
+ (30 / 149) ✅ count_lt0                                ×10 runs, average:  0.697s ± 10ms        R: +.✓
+ (31 / 149) ✅ count_lt                                 ×10 runs, average:  0.771s ± 9ms         R: +.✓
+
+⏺ Category: constraints->constantlist
+ (32 / 149) ✅ index_of                                 ×10 runs, average:  0.953s ± 17ms        R: +.✓
+ (33 / 149) ✅ contains                                 ×10 runs, average:  1.234s ± 3ms         R: +.✓
+
+⏺ Category: constraints->all_positive
+ (34 / 149) ✅ list_mps                                 ×10 runs, average:  0.718s ± 17ms        R: +.✓
+ (35 / 149) ✅ sndmin                                   ×10 runs, average:  2.225s ± 36ms        R: +.✓
+
+⏺ Category: constraints->evenlist
+ (36 / 149) ✅ parity_of_first                          ×10 runs, average:  0.094s ± 7ms !       R: +.✓
+ (37 / 149) ✅ parity_of_last                           ×10 runs, average:  0.054s ± 1ms         R: +.✓
+ (38 / 149) ✅ first_odd                                ×10 runs, average:  0.193s ± 11ms !      R: +..✓
+ (39 / 149) ✅ parity_of_sum                            ×10 runs, average:  0.020s ± 0ms         R: +✓
+
+⏺ Category: constraints->bst
+ (40 / 149) ✅ contains                                 ×10 runs, average:  0.136s ± 1ms         R: +.✓
+ (41 / 149) ✅ count_lt                                 ×10 runs, average:  0.952s ± 6ms         R: +.✓
+ (42 / 149) ✅ count_between                            ×10 runs, average:  47.724s ± 394ms      R: +...✓
+ (43 / 149) ✅ most_frequent_v1                         ×10 runs, average:  8.728s ± 78ms        R: ++++++✓
+ (44 / 149) ✅ from_list_contains                       ×10 runs, average:  0.148s ± 3ms         R: +.✓
+ (45 / 149) ✅ from_list_max                            ×10 runs, average:  4.843s ± 30ms        R: +..✓
+ (46 / 149) ✅ sum_gt_by_key                            ×10 runs, average:  283.876s ± 1832ms    R: +.✓
+
+⏺ Category: constraints->balanced_tree
+ (47 / 149) ✅ node_count                               ×10 runs, average:  0.268s ± 5ms         R: +.✓
+ (48 / 149) ✅ height                                   ×10 runs, average:  0.148s ± 2ms         R: +.✓
+
+⏺ Category: constraints->symmetric_tree
+ (49 / 149) ✅ sum                                      ×10 runs, average:  0.204s ± 19ms !      R: +.✓
+ (50 / 149) ✅ height                                   ×10 runs, average:  0.213s ± 1ms         R: +.✓
+ (51 / 149) ✅ min                                      ×10 runs, average:  0.383s ± 4ms         R: +.✓
+
+⏺ Category: constraints->memo
+ (52 / 149) ✅ tree_size                                ×10 runs, average:  2.954s ± 49ms        R: +.✓
+ (53 / 149) ✅ constant                                 ×10 runs, average:  0.003s ± 0ms !       R: +✓
+ (54 / 149) ✅ mts_memo_sum                             ×10 runs, average:  0.029s ± 0ms         R: +✓
+ (55 / 149) ✅ max_contains                             ×10 runs, average:  2.259s ± 13ms        R: +...✓
+ (56 / 149) ✅ count_lt                                 ×10 runs, average:  14.144s ± 79ms       R: +.✓
+ (57 / 149) ✅ max_sum_gt                               ×10 runs, average:  4.842s ± 65ms        R: +...✓
+ (58 / 149) ✅ proper_indexation_sum_lt_pos_v2          ×10 runs, average:  0.003s ± 0ms !       R: +✓
+ (59 / 149) ✅ proper_indexation_sum_lt_pos             ×10 runs, average:  0.144s ± 1ms         R: ++✓
+
+⏺ Category: constraints->empty_right_subtree
+ (60 / 149) ✅ contains                                 ×10 runs, average:  1.999s ± 7ms         R: +.✓
+
+⏺ Category: constraints->alist
+ (61 / 149) ✅ count_eq2                                ×10 runs, average:  0.460s ± 4ms         R: +.✓
+ (62 / 149) ✅ count_eq                                 ×10 runs, average:  0.061s ± 2ms         R: +.✓
+ (63 / 149) ✅ sums                                     ×10 runs, average:  0.059s ± 1ms         R: +.✓
+ (64 / 149) ✅ most_frequent                            ×10 runs, average:  10.199s ± 50ms       R: ++++✓
+
+⏺ Category: constraints->even_tree
+ (65 / 149) ✅ sum_of_parities                          ×10 runs, average:  1.632s ± 33ms        R: +...✓
+ (66 / 149) ✅ parity_of_max                            ×10 runs, average:  9.217s ± 104ms       R: +✓
+
 ⏺ Category: constraints->unimodal_list
-    (2 / 4) ✅ max_logn                                 ×10 runs, average:  3.206s ± 72ms        R: +..✓
-    (3 / 4) ✅ max_in_um_pos                            ×10 runs, average:  0.504s ± 8ms         R: +.✓
-    (4 / 4) ✅ max_logn_v2                              ×10 runs, average:  15.592s ± 151ms      R: +..+✓
+ (67 / 149) ✅ max_logn                                 ×10 runs, average:  7.974s ± 15ms        R: +..✓
+ (68 / 149) ✅ max_logn_v2                              ×10 runs, average:  15.353s ± 127ms      R: +..+✓
+ (69 / 149) ✅ max_in_um_pos                            ×10 runs, average:  6.631s ± 22ms        R: +.✓
+
+⏺ Category: constraints->size
+ (70 / 149) ✅ obfuscated_length                        ×10 runs, average:  0.087s ± 1ms         R: ++++✓
+
+⏺ Category: combine
+ (71 / 149) ✅ mts                                      ×10 runs, average:  0.036s ± 0ms         R: ++✓
+ (72 / 149) ✅ mts_and_mps                              ×10 runs, average:  0.348s ± 2ms         R: +++✓
+ (73 / 149) ✅ mss_with_sum                             ×10 runs, average:  0.722s ± 8ms         R: ++✓
+
+⏺ Category: compressed_list
+ (74 / 149) ✅ sum                                      ×10 runs, average:  0.135s ± 6ms         R: +++✓
+
+⏺ Category: indexed_list
+ (75 / 149) ✅ search                                   ×10 runs, average:  0.019s ± 1ms         R: ++✓
+ (76 / 149) ✅ position_polynomial                      ×10 runs, average:  0.033s ± 1ms         R: +++✓
+ (77 / 149) ✅ sum_elts_lt_pos                          ×10 runs, average:  0.708s ± 3ms         R: ++✓
+
+⏺ Category: misc
+ (78 / 149) ✅ count_between                            ×10 runs, average:  0.963s ± 2ms         R: +✓
+ (79 / 149) ✅ composed_unkwns                          ×10 runs, average:  0.082s ± 1ms         R: +✓
+ (80 / 149) ✅ simple_nnf                               ×10 runs, average:  0.003s ± 0ms !       R: +✓
+ (81 / 149) ✅ unknowns_are_ids                         ×10 runs, average:  0.083s ± 1ms         R: +✓
+
+⏺ Category: list
+ (82 / 149) ✅ alist_sum                                ×10 runs, average:  0.083s ± 1ms         R: +✓
+ (83 / 149) ✅ atoi                                     ×10 runs, average:  0.191s ± 2ms         R: +✓
+ (84 / 149) ✅ bal                                      ×10 runs, average:  30.002s ± 91ms       R: ++✓
+ (85 / 149) ✅ hamming                                  ×10 runs, average:  0.119s ± 1ms         R: +✓
+ (86 / 149) ✅ last                                     ×10 runs, average:  0.010s ± 0ms         R: +✓
+ (87 / 149) ✅ lenhom                                   ×10 runs, average:  0.087s ± 0ms         R: +✓
+ (88 / 149) ✅ line_of_sight                            ×10 runs, average:  0.654s ± 6ms         R: ++✓
+ (89 / 149) ✅ maxcount                                 ×10 runs, average:  0.136s ± 1ms         R: +✓
+ (90 / 149) ✅ maxhom                                   ×10 runs, average:  0.144s ± 1ms         R: +✓
+ (91 / 149) ✅ mincount                                 ×10 runs, average:  0.133s ± 6ms         R: +✓
+ (92 / 149) ✅ minhom                                   ×10 runs, average:  0.032s ± 0ms         R: +✓
+ (93 / 149) ✅ mpshom                                   ×10 runs, average:  0.456s ± 3ms         R: +✓
+ (94 / 149) ✅ mtshom                                   ×10 runs, average:  0.608s ± 7ms         R: ++✓
+ (95 / 149) ✅ mts_and_mps_hom                          ×10 runs, average:  1.371s ± 3ms         R: ++✓
+ (96 / 149) ✅ msshom                                   ×10 runs, average:  11.665s ± 20ms       R: +++✓
+ (97 / 149) ✅ prodhom                                  ×10 runs, average:  0.095s ± 2ms         R: +✓
+ (98 / 149) ✅ polyhom                                  ×10 runs, average:  0.181s ± 1ms         R: +✓
+ (99 / 149) ✅ search                                   ×10 runs, average:  0.111s ± 1ms         R: +✓
+(100 / 149) ✅ sndmax                                   ×10 runs, average:  0.921s ± 4ms         R: +✓
+(101 / 149) ✅ sndmin                                   ×10 runs, average:  0.950s ± 5ms         R: +✓
+(102 / 149) ✅ sumgt                                    ×10 runs, average:  0.099s ± 1ms         R: +✓
+(103 / 149) ✅ sumhom                                   ×10 runs, average:  0.093s ± 2ms         R: +✓
+(104 / 149) ✅ sumodds                                  ×10 runs, average:  0.125s ± 2ms         R: +✓
+(105 / 149) ✅ sumevens                                 ×10 runs, average:  0.124s ± 2ms         R: +✓
+(106 / 149) ✅ zero_after_one                           ×10 runs, average:  0.574s ± 12ms        R: ++✓
+(107 / 149) ✅ zeros_ones                               ×10 runs, average:  0.472s ± 6ms         R: ++✓
+(108 / 149) ✅ issorted                                 ×10 runs, average:  3.172s ± 8ms         R: ++✓
+
+⏺ Category: list_to_tree
+(109 / 149) ✅ search                                   ×10 runs, average:  1.109s ± 4ms         R: ++✓
+(110 / 149) ✅ search_v2                                ×10 runs, average:  2.511s ± 4ms         R: ++✓
+(111 / 149) ✅ search_v3                                ×10 runs, average:  3.041s ± 8ms         R: ++✓
+(112 / 149) ✅ mls                                      ×10 runs, average:  15.406s ± 42ms       R: +++✓
+
+⏺ Category: numbers
+(113 / 149) ✅ int_nat_toint                            ×10 runs, average:  0.049s ± 1ms         R: +++✓
+(114 / 149) ✅ int_nat_twosum                           ×10 runs, average:  0.961s ± 3ms         R: ++++++✓
+
+⏺ Category: ptree
+(115 / 149) ✅ maxheads                                 ×10 runs, average:  0.905s ± 8ms         R: ++✓
+(116 / 149) ✅ maxlast                                  ×10 runs, average:  0.895s ± 11ms        R: ++✓
+(117 / 149) ✅ maxsum                                   ×10 runs, average:  0.032s ± 0ms         R: ++✓
+(118 / 149) ✅ mul                                      ×10 runs, average:  0.077s ± 1ms         R: +++✓
+(119 / 149) ✅ sum                                      ×10 runs, average:  0.054s ± 1ms         R: +++✓
+
+⏺ Category: sort_list
+(120 / 149) ✅ min                                      ×10 runs, average:  0.019s ± 0ms         R: +✓
+(121 / 149) ✅ max                                      ×10 runs, average:  0.091s ± 1ms         R: +✓
+(122 / 149) ✅ sumgtz                                   ×10 runs, average:  2.855s ± 6ms         R: +✓
+
+⏺ Category: tailopt
+(123 / 149) ✅ mts                                      ×10 runs, average:  0.037s ± 0ms         R: ++✓
+(124 / 149) ✅ mps                                      ×10 runs, average:  0.036s ± 1ms         R: ++✓
+(125 / 149) ✅ sum                                      ×10 runs, average:  0.006s ± 0ms         R: ++✓
+
+⏺ Category: terms
+(126 / 149) ✅ height                                   ×10 runs, average:  0.006s ± 0ms         R: +✓
+
+⏺ Category: tree
+(127 / 149) ✅ maxPathWeight                            ×10 runs, average:  1.261s ± 48ms        R: ++✓
+(128 / 149) ✅ maxtree                                  ×10 runs, average:  0.519s ± 3ms         R: +✓
+(129 / 149) ✅ maxtree2                                 ×10 runs, average:  0.362s ± 8ms         R: ++✓
+(130 / 149) ✅ min                                      ×10 runs, average:  0.360s ± 5ms         R: ++✓
+(131 / 149) ✅ minmax                                   ×10 runs, average:  0.831s ± 8ms         R: ++✓
+(132 / 149) ✅ mips                                     ×10 runs, average:  1.325s ± 14ms        R: ++✓
+(133 / 149) ✅ mits                                     ×10 runs, average:  1.267s ± 8ms         R: ++✓
+(134 / 149) ✅ mpps                                     ×10 runs, average:  128.227s ± 275ms     R: ++++✓
+(135 / 149) ✅ poly                                     ×10 runs, average:  8.213s ± 30ms        R: ++✓
+(136 / 149) ✅ poly2                                    ×10 runs, average:  10.420s ± 36ms       R: ++✓
+(137 / 149) ✅ sorted                                   ×10 runs, average:  0.003s ± 0ms !       R: +✓
+(138 / 149) ✅ sorted_2                                 ×10 runs, average:  1.082s ± 11ms        R: +✓
+(139 / 149) ✅ sumtree                                  ×10 runs, average:  0.040s ± 0ms         R: ++✓
+
+⏺ Category: treepaths
+(140 / 149) ✅ height                                   ×10 runs, average:  0.007s ± 0ms         R: +✓
+(141 / 149) ✅ leftmostodd                              ×10 runs, average:  0.004s ± 0ms         R: +✓
+(142 / 149) ✅ maxPathWeight                            ×10 runs, average:  0.004s ± 0ms         R: +✓
+(143 / 149) ✅ maxPathWeight2                           ×10 runs, average:  0.003s ± 0ms !       R: +✓
+(144 / 149) ✅ mips                                     ×10 runs, average:  4.748s ± 29ms        R: ++✓
+(145 / 149) ✅ sum                                      ×10 runs, average:  0.003s ± 0ms         R: +✓
+
+⏺ Category: unimodal_lists
+(147 / 149) ✅ search_no_optim                          ×10 runs, average:  0.958s ± 9ms         R: +✓
+
+⏺ Category: zippers
+(148 / 149) ✅ list_sum                                 ×10 runs, average:  0.071s ± 1ms         R: +++✓
+(149 / 149) ✅ list_sum_basic                           ×10 runs, average:  0.019s ± 0ms         R: ++✓
+
+❌ 1 errors out of 149 benchmarks in  12006.6 s.
+Problematic benchmarks with algorithm:
+unimodal_lists/sm.ml,partbnd+all

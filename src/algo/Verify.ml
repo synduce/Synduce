@@ -147,11 +147,8 @@ let check_solution
       false, TermSet.empty, u_set, i
   in
   let rec find_ctex num_checks terms_to_expand =
-    Log.verbose_msg Fmt.(str "Check %i." num_checks);
     if num_checks > !Config.Optims.num_expansions_check
-    then (
-      Log.debug_msg Fmt.(str "Hit unfolding limit.");
-      None)
+    then None (* Hit the unfolding limit. *)
     else (
       let next =
         List.filter
@@ -162,11 +159,10 @@ let check_solution
       | [] -> None
       | hd :: tl ->
         let has_ctex, t_set, u_set, num_checks = expand_and_check num_checks hd in
+        let elts = Set.union u_set (TermSet.of_list tl) in
         if has_ctex
-        then Some (Set.union lstate.t_set t_set, terms_to_expand)
-        else (
-          let elts = Set.union u_set (TermSet.of_list tl) in
-          find_ctex num_checks elts))
+        then Some (Set.union lstate.t_set t_set, elts)
+        else find_ctex num_checks elts)
   in
   (* Declare all variables *)
   SyncSmt.exec_all solver preamble;

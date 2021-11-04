@@ -11,58 +11,6 @@ import definitions
 from parsing import DataObj
 
 
-def run_one_old(progress, bench_id, command, algo, optim, filename, extra_opt, errors, raw_output):
-    if raw_output is not None:
-        raw_output.write(f"B:{bench_id}\n")
-
-    print(f"{progress : >11s}  {bench_id} 🏃", end="\r")
-    sys.stdout.flush()
-
-    process = subprocess.Popen(
-        command, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
-    buf = ""
-    major_step_count = 1
-    minor_step_count = 1
-    prev_major_step = 1
-    # Poll process for new output until finished
-    while True:
-        nextline = process.stdout.readline()
-        if process.poll() is not None:
-            break
-        sys.stdout.flush()
-        line = nextline.decode('utf-8')
-        # Decode the line information
-        stats = line.split(",")
-        if len(stats) >= 3:
-            try:
-                major_step_count = int(stats[0])
-            except:
-                major_step_count = None
-        is_result_line = (line == "success") or (
-            (major_step_count is not None) and (major_step_count > 0))
-        if is_result_line:
-            if major_step_count > prev_major_step:
-                minor_step_count = 1
-            else:
-                minor_step_count += 1
-            prev_major_step = major_step_count
-            sp = " "
-            print(
-                f"{progress : >11s}.. benchmarks/{filename} {extra_opt} {algo[1]} {optim[1]} 🏃 at step {major_step_count}:{minor_step_count}", end="\r")
-            buf += line
-        if raw_output is not None and is_result_line:
-            raw_output.write(line)
-
-    print("", end="\r")
-    output = buf.strip().split("\n")
-    elapsed = -1
-    if len(output) >= 2 and output[-1] == "success":
-        elapsed = float(output[-2].split(",")[2])
-    else:
-        errors += [bench_id]
-    return errors, elapsed
-
-
 def run_one(progress, bench_id, command, algo, optim, filename, extra_opt):
     print(f"{progress : >11s}  {bench_id} 🏃", end="\r")
     sys.stdout.flush()
@@ -96,8 +44,13 @@ def run_n(progress, bench_id, command, algo,
     print(
         f"{progress : >11s} {bench_name: <25s}", end="\r")
     for i in range(num_runs):
-        info = run_one(progress, bench_id, command,
-                       algo, optim, filename, extra_opt)
+        try:
+            info = run_one(progress, bench_id, command,
+                           algo, optim, filename, extra_opt)
+        except:
+            info = DataObj({})
+            info.is_successful = False
+
         if info.is_successful:
             total_elapsed += info.elapsed
             max_e = max(info.elapsed, max_e)

@@ -1,7 +1,7 @@
 import sys
 
 # Timeout for all experiments.
-timeout_value = 400
+timeout_value = 700
 
 if sys.platform.startswith('linux'):
     timeout = ("timeout %i" %
@@ -91,19 +91,20 @@ constraint_benchmarks = [
     ["constraints/sortedlist/largest_diff.ml", ""],
     ["constraints/sortedlist/smallest_diff.ml", ""],
     ["constraints/sortedlist/sndmind.ml", ""],
+    ["constraints/sortedlist/sndmax_empty_base_case.ml", "-NB"],
     ["constraints/sortedlist/parallel_min.ml", "-NB"],
     ["constraints/sortedlist/parallel_max.ml", "-NB"],
     ["constraints/sortedlist/parallel_max2.ml", "-NB"],
     # Sorted and indexed
-    ["constraints/sorted_and_indexed/count_lt0.ml", "-NB -n 20"],
-    ["constraints/sorted_and_indexed/count_lt.ml", "-NB -n 20"],
+    ["constraints/sorted_and_indexed/count_lt0.ml", "-NB -n 30"],
+    ["constraints/sorted_and_indexed/count_lt.ml", "-NB -n 30"],
     # constantlist
     ["constraints/constantlist/index_of.ml", ""],
     ["constraints/constantlist/contains.ml", ""],
     # all positive
     ["constraints/all_positive/list_mps.ml", ""],
-    ["constraints/all_positive/sndmin.ml", ""],
-    ["constraints/all_positive/sndmax.ml", "-NB"],
+    ["constraints/all_positive/sndmin.ml", "-NB"],
+    # ["constraints/all_positive/sndmax.ml", "-NB"], Unsafe for now, sometimes takes 10min
     # evenlist
     ["constraints/evenlist/parity_of_first.ml", ""],
     ["constraints/evenlist/parity_of_last.ml", ""],
@@ -149,7 +150,9 @@ constraint_benchmarks = [
     # unimodal
     ["constraints/unimodal_list/max_logn.ml", "-B"],
     ["constraints/unimodal_list/max_logn_v2.ml", "-kNB"],
-    ["constraints/unimodal_list/max_in_um_pos.ml", ""]
+    ["constraints/unimodal_list/max_in_um_pos.ml", ""],
+    # Size constraint
+    ["constraints/size/obfuscated_length.ml", ""]
 ]
 
 base_benchmark_set = [
