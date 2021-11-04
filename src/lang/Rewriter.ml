@@ -641,6 +641,19 @@ module Expression = struct
       (* min (abs x) 0 -> 0 *)
       | EOp (Binary Min, [ EOp (Unary Abs, [ _ ]); EInt 0 ])
       | EOp (Binary Min, [ EInt 0; EOp (Unary Abs, [ _ ]) ]) -> Some (EInt 0)
+      (* If to min / max *)
+      (* a < b ? a : b -> min (a,b) *)
+      | EIte (EOp (Binary (Lt | Le), [ a; b ]), a', b') when equal a a' && equal b b' ->
+        Some (EOp (Binary Min, [ a; b ]))
+      (* a > b ? b : a -> min (a,b) *)
+      | EIte (EOp (Binary (Gt | Ge), [ a; b ]), a', b') when equal a b' && equal b a' ->
+        Some (EOp (Binary Min, [ a; b ]))
+      (* a > b ? a : b -> max (a,b) *)
+      | EIte (EOp (Binary (Gt | Ge), [ a; b ]), a', b') when equal a a' && equal b b' ->
+        Some (EOp (Binary Max, [ a; b ]))
+      (* a < b ? b : a -> max (a,b) *)
+      | EIte (EOp (Binary (Lt | Le), [ a; b ]), a', b') when equal a b' && equal b a' ->
+        Some (EOp (Binary Max, [ a; b ]))
       (* If-then-elses *)
       | EIte (_, b, c) when equal b c -> Some b
       (* Comparisons *)

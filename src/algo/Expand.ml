@@ -308,15 +308,6 @@ let expand_max (p : psi_def) (f : PMRS.t) (t0 : term) : (term * term) list * ter
     | First x -> x :: mr_terms
     | _ -> mr_terms
   in
-  Log.verbose (fun frmt () ->
-      Fmt.(
-        pf
-          frmt
-          "Expand > Result:@;@[%a ->@;@[%a@]@]"
-          pp_term
-          t0
-          (list ~sep:comma (parens (pair ~sep:comma pp_term pp_term)))
-          mr_terms));
   (* Expand and replace in term *)
   mr_terms, rest
 ;;
@@ -350,7 +341,6 @@ let expand_max_main (p : psi_def) (f : PMRS.t) (g : PMRS.t) (t0 : term)
     in
     List.fold ~f:collect ~init:VarSet.empty nr
   in
-  Log.verbose_msg Fmt.(str "@[Expand > Reqs: %a@]" VarSet.pp expand_reqs);
   let substs =
     let expansions =
       List.map
@@ -360,28 +350,8 @@ let expand_max_main (p : psi_def) (f : PMRS.t) (g : PMRS.t) (t0 : term)
     in
     cartesian_nary_product (List.filter ~f:(not <| List.is_empty) expansions)
   in
-  List.iteri substs ~f:(fun i sub ->
-      Log.verbose_msg Fmt.(str "@[Expand > Substs %i: %a@]" i Term.pp_subs sub));
   let all_ts = List.map substs ~f:(fun s -> substitution s t0) in
-  Log.verbose (fun frmt () ->
-      Fmt.(
-        pf
-          frmt
-          "Expand > All ts:@;@[%a ->@;@[%a@]@]"
-          pp_term
-          t0
-          (list ~sep:comma pp_term)
-          all_ts));
   let mr_terms, rest = List.partition_map all_ts ~f:(check_max_exp p f g) in
-  Log.verbose (fun frmt () ->
-      Fmt.(
-        pf
-          frmt
-          "Expand > Result:@;@[%a ->@;@[%a@]@]"
-          pp_term
-          t0
-          (list ~sep:comma (parens (pair ~sep:comma pp_term pp_term)))
-          mr_terms));
   mr_terms, rest
 ;;
 
@@ -408,18 +378,12 @@ let expand_max2 (p : psi_def) (f : PMRS.t) (g : PMRS.t) (t0 : term)
 ;;
 
 let is_mr (p : psi_def) (f : PMRS.t) (t0 : term) nt : bool =
-  Log.verbose_msg
-    Fmt.(str "@[Is %a maximally reducible by %s?@]" pp_term t0 f.PMRS.pvar.vname);
   let f_t0 = Reduce.reduce_pmrs f t0 in
   let f_t0 = replace_rhs_of_main p f f_t0 in
   let nr = nonreduced_terms p nt f_t0 in
   match nr with
-  | [] ->
-    Log.verbose_msg "Yes.";
-    true
-  | _ ->
-    Log.verbose_msg "No.";
-    false
+  | [] -> true
+  | _ -> false
 ;;
 
 let is_mr_all (p : psi_def) (t0 : term) =

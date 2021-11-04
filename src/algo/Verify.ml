@@ -87,6 +87,11 @@ let check_solution
     ~(p : psi_def)
     (lstate : refinement_loop_state)
     (soln : (string * variable list * term) list)
+    : [ `Incorrect_assumptions
+      | `Ctexs of
+        (term, Terms.comparator_witness) Set.t * (term, Terms.comparator_witness) Set.t
+      | `Correct
+      ]
   =
   Log.info (fun f () -> Fmt.(pf f "Checking solution..."));
   (* Turn of verbosity for bounded verification, otherwise too many messages appear. *)
@@ -147,11 +152,8 @@ let check_solution
       false, TermSet.empty, u_set, i
   in
   let rec find_ctex num_checks terms_to_expand =
-    Log.verbose_msg Fmt.(str "Check %i." num_checks);
     if num_checks > !Config.Optims.num_expansions_check
-    then (
-      Log.debug_msg Fmt.(str "Hit unfolding limit.");
-      None)
+    then None (* Hit the unfolding limit. *)
     else (
       let next =
         List.filter
@@ -162,24 +164,27 @@ let check_solution
       | [] -> None
       | hd :: tl ->
         let has_ctex, t_set, u_set, num_checks = expand_and_check num_checks hd in
+        let elts = Set.union u_set (TermSet.of_list tl) in
         if has_ctex
-        then Some (Set.union lstate.t_set t_set, terms_to_expand)
-        else (
-          let elts = Set.union u_set (TermSet.of_list tl) in
-          find_ctex num_checks elts))
+        then Some (Set.union lstate.t_set t_set, elts)
+        else find_ctex num_checks elts)
   in
-  (* Declare all variables *)
+  (* Execute the preamble. *)
   SyncSmt.exec_all solver preamble;
-  (* (match find_ctex 0 lstate.t_set with
-  | Some _ -> failwith "Synthesizer and solver disagree on solution. That's unexpected!"
-  | None -> ()); *)
-  let ctex_or_none = find_ctex 0 lstate.u_set in
-  SyncSmt.close_solver solver;
-  let elapsed = Unix.gettimeofday () -. start_time in
-  Stats.add_verif_time elapsed;
-  Log.info (fun f () -> Fmt.(pf f "... finished in %3.4fs" elapsed));
-  Config.verbose := verb;
-  ctex_or_none
+  (* Check that the solution is correct on current set T. If it is not, this is because of some wrong
+  assumption made for optimization. *)
+  match find_ctex 0 lstate.t_set with
+  | Some _ -> `Incorrect_assumptions
+  | None ->
+    let ctex_or_none = find_ctex 0 lstate.u_set in
+    SyncSmt.close_solver solver;
+    let elapsed = Unix.gettimeofday () -. start_time in
+    Stats.add_verif_time elapsed;
+    Log.info (fun f () -> Fmt.(pf f "... finished in %3.4fs" elapsed));
+    Config.verbose := verb;
+    (match ctex_or_none with
+    | Some ctex -> `Ctexs ctex
+    | None -> `Correct)
 ;;
 
 (* ============================================================================================= *)

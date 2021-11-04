@@ -196,16 +196,27 @@ let log_major_step_end
   | None -> Stack.push refinement_log [ "success", json ]
 ;;
 
+let last_lemma_synthesized : (string * string) option ref = ref None
+
+let set_lemma_synthesized (kind : string) (expression : string) =
+  last_lemma_synthesized := Some (kind, expression)
+;;
+
 let log_minor_step ~(synth_time : float) ~(auxtime : float) (lifted : bool) : unit =
   let elapsed = get_glob_elapsed () in
   let json : Yojson.t =
     `Assoc
-      [ "elapsed", `Float elapsed
-      ; "synth_time", `Float synth_time
-      ; "aux_time", `Float auxtime
-      ; "lifted", `Bool lifted
-      ]
+      ([ "elapsed", `Float elapsed
+       ; "synth_time", `Float synth_time
+       ; "aux_time", `Float auxtime
+       ; "lifted", `Bool lifted
+       ]
+      @
+      match !last_lemma_synthesized with
+      | Some (kind_id, lemma_term) -> [ kind_id, `String lemma_term ]
+      | None -> [])
   in
+  last_lemma_synthesized := None;
   match Stack.pop refinement_log with
   | Some x ->
     let entry_name = Fmt.(str "failure_%i" (List.length x - 2)) in
