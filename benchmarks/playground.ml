@@ -1,36 +1,40 @@
-(** @synduce --no-gropt *)
+(* Origin type. *)
+type list =
+  | Nil
+  | Cons of int * list
 
-type 'a list =
-  | Elt of 'a
-  | Cons of 'a * 'a list
-
-(* Representation function: sort a list in increasing order. *)
-let rec repr = function
-  | Elt x -> Elt x
-  | Cons (hd, tl) -> insert hd (repr tl)
-
-and insert y = function
-  | Elt x -> if y < x then Cons (y, Elt x) else Cons (x, Elt y)
-  | Cons (hd, tl) -> if y < hd then Cons (y, Cons (hd, tl)) else Cons (hd, insert y tl)
-;;
-
-(* Invariant: length >= 2 *)
-let rec is_length_lt2 l = len l >= 2
+(* Invariant: the list is sorted in decreasing order. *)
+let rec sorted_and_lt2 l = is_sorted l && len l >= 2
 
 and len = function
-  | Elt x -> 1
+  | Nil -> 0
   | Cons (hd, tl) -> 1 + len tl
+
+and is_sorted = function
+  | Nil -> true
+  | Cons (hd, tl) -> hd > 0 && next_is_lt hd tl && is_sorted tl
+
+and next_is_lt x = function
+  | Nil -> true
+  | Cons (hd, tl) -> x > hd
 ;;
 
-let rec spec l = f 0 l
-
-and f s = function
-  | Elt x -> x
-  | Cons (hd, tl) -> if s = 2 then hd else f (s + 1) tl
+(* Specification. *)
+let rec spec = function
+  | Nil -> 0, 0
+  | Cons (hd, tl) ->
+    let amax, sec_max = spec tl in
+    max hd amax, max sec_max (min hd amax)
+  [@@ensures fun (x, y) -> x >= y]
 ;;
 
+(* Target function. *)
 let rec target = function
-  | Elt x -> [%synt base_case] x
-  | Cons (hd, tl) -> [%synt join] hd (target tl)
-  [@@requires is_length_lt2]
+  | Nil -> [%synt init]
+  | Cons (hd, tl) -> [%synt ffst] hd (next tl)
+  [@@requires sorted_and_lt2]
+
+and next = function
+  | Nil -> [%synt x]
+  | Cons (hd, tl) -> [%synt fsnd] hd
 ;;

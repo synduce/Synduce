@@ -82,6 +82,7 @@ constraint_benchmarks = [
     ["constraints/ensures/mps_no_ensures.ml", "-B"],
     ["constraints/ensures/mts_no_ensures.ml", ""],
     ["constraints/ensures/mss_no_ensures.ml", "-B"],
+
     # sortedlist
     ["constraints/sortedlist/min.ml", ""],
     ["constraints/sortedlist/max.ml", ""],
@@ -92,6 +93,8 @@ constraint_benchmarks = [
     ["constraints/sortedlist/smallest_diff.ml", ""],
     ["constraints/sortedlist/sndmind.ml", ""],
     ["constraints/sortedlist/sndmax_empty_base_case.ml", "-NB"],
+    ["constraints/sortedlist/sndmax_empty_base_case_v2.ml", "-NB"],
+    ["constraints/sortedlist/sndmax_len2_base_case.ml", "-NB"],
     ["constraints/sortedlist/parallel_min.ml", "-NB"],
     ["constraints/sortedlist/parallel_max.ml", "-NB"],
     ["constraints/sortedlist/parallel_max2.ml", "-NB"],

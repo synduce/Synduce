@@ -996,6 +996,10 @@ let synthesize_new_lemma ~(p : psi_def) (det : term_state_detail)
     : (string * variable list * term) option
   =
   AlgoLog.announce_new_lemma_synthesis det;
+  (* Use the exisiting Tinv to help in synthesis! It doesn have to be a black box synthesis! *)
+  (* (match p.psi_tinv with
+  | Some tinv -> Fmt.(pf stdout "Tinv(t) = %a" pp_term (Reduce.reduce_pmrs tinv det.term))
+  | None -> ()); *)
   let lem_id = 0 in
   let synth_objs, params, logic = synthfun_of_ctex ~p det lem_id in
   let neg_constraints =
@@ -1069,17 +1073,7 @@ let rec lemma_refinement_loop (det : term_state_detail) ~(p : psi_def)
           { det with lemma_candidate = Some (name, vars, lemma_term) }
       with
       | Unsat ->
-        Log.verbose (fun f () -> Fmt.(pf f "This lemma has been proven correct."));
-        Log.info (fun frmt () ->
-            Fmt.pf
-              frmt
-              "Lemma for term %a: \"%s %s = @[%a@]\"."
-              pp_term
-              det.term
-              name
-              (String.concat ~sep:" " (List.map ~f:(fun v -> v.vname) vars))
-              pp_term
-              lemma_term);
+        AlgoLog.lemma_proved_correct det name vars lemma_term;
         let lemma =
           match det.current_preconds with
           | None -> lemma_term
@@ -1088,8 +1082,7 @@ let rec lemma_refinement_loop (det : term_state_detail) ~(p : psi_def)
         in
         Some { det with lemma_candidate = None; lemmas = lemma :: det.lemmas }
       | SmtLib.SExps x ->
-        Log.verbose (fun f () ->
-            Fmt.(pf f "This lemma has not been proven correct. Refining lemma..."));
+        AlgoLog.lemma_not_proved_correct ();
         let new_positive_ctexs =
           parse_positive_example_solver_model (SmtLib.SExps x) det
         in
@@ -1102,7 +1095,7 @@ let rec lemma_refinement_loop (det : term_state_detail) ~(p : psi_def)
           { det with positive_ctexs = det.positive_ctexs @ new_positive_ctexs }
           ~p
       | Sat ->
-        Log.error_msg "Lemma verification returned Sat, which is weird.";
+        Log.error_msg "Lemma verification returned Sat. This is unexpected.";
         None
       | Unknown ->
         Log.error_msg "Lemma verification returned Unknown.";
@@ -1158,14 +1151,15 @@ let refine_ensures_predicates
       let var : variable =
         Variable.mk ~t:(Some p.psi_reference.poutput_typ) (Alpha.fresh ())
       in
-      Specifications.set_ensures
-        p.psi_reference.pvar
-        (mk_fun
-           [ FPatVar var ]
-           (mk_bin
-              Binop.And
-              (mk_app old_ensures [ mk_var var ])
-              (mk_app ensures [ mk_var var ]))));
+      let new_pred =
+        mk_fun
+          [ FPatVar var ]
+          (mk_bin
+             Binop.And
+             (mk_app old_ensures [ mk_var var ])
+             (mk_app ensures [ mk_var var ]))
+      in
+      Specifications.set_ensures p.psi_reference.pvar new_pred);
     lstate.term_state, true
 ;;
 

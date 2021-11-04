@@ -69,7 +69,9 @@ let show_pmrs pmrs =
     Fmt.(fun fmt () -> pf fmt "%a" (box (PMRS.pp ~short:(not !Config.verbose))) pmrs)
 ;;
 
-(* Messages from the Lemmas  *)
+(* ============================================================================================= *)
+(*                           Messages from the Lemma Synthesis                                   *)
+(* ============================================================================================= *)
 
 let no_spurious_ctex () =
   Log.info
@@ -118,6 +120,47 @@ let announce_new_lemma_synthesis (det : term_state_detail) =
             pre))
 ;;
 
+let lemma_not_proved_correct () =
+  Log.verbose (fun f () ->
+      Fmt.(pf f "This lemma has not been proven correct. Refining lemma..."))
+;;
+
+let lemma_proved_correct
+    (det : term_state_detail)
+    (name : string)
+    (vars : variable list)
+    (lemma_term : term)
+  =
+  let lemma_term = Eval.simplify lemma_term in
+  Log.verbose (fun f () -> Fmt.(pf f "This lemma has been proven correct."));
+  let lemma_str =
+    Fmt.(
+      str
+        "(%a)[%a]->%s(%s)= %a"
+        pp_term
+        det.term
+        (list ~sep:comma (pair ~sep:rightarrow pp_term pp_term))
+        det.recurs_elim
+        name
+        (String.concat ~sep:", " (List.map ~f:(fun v -> v.vname) vars))
+        (box pp_term)
+        lemma_term)
+  in
+  Stats.set_lemma_synthesized
+    "requires_lemma"
+    (String.concat ~sep:" " (List.map ~f:String.strip (String.split_lines lemma_str)));
+  Log.info (fun frmt () ->
+      Fmt.pf
+        frmt
+        "Lemma for term %a: \"%s %s = @[%a@]\"."
+        pp_term
+        det.term
+        name
+        (String.concat ~sep:" " (List.map ~f:(fun v -> v.vname) vars))
+        pp_term
+        lemma_term)
+;;
+
 (* Messages from ImagePredicates *)
 
 let violates_ensures p ctexs =
@@ -145,4 +188,10 @@ let positives_ensures p positives =
           p.psi_reference.pvar.vname
           (list ~sep:comma pp_term)
           positives)
+;;
+
+let log_new_ensures (new_pred : term) : unit =
+  Stats.set_lemma_synthesized
+    "ensures_lemma"
+    (String.strip (Fmt.str "%a" pp_term new_pred))
 ;;

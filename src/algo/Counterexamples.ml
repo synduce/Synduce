@@ -95,6 +95,33 @@ let pp_unrealizability_ctex (frmt : Formatter.t) (uc : unrealizability_ctex) : u
       uc.cj.ctex_model)
 ;;
 
+let merge_all (cl : unrealizability_ctex list) : unrealizability_ctex list =
+  let same_origin orig other =
+    Terms.equal other.ci.ctex_eqn.eterm orig.ci.ctex_eqn.eterm
+    && Terms.equal other.cj.ctex_eqn.eterm orig.cj.ctex_eqn.eterm
+  in
+  let complete_model (cm : ctex) (other_m : ctex) =
+    Map.fold other_m.ctex_model ~init:cm ~f:(fun ~key:v_of_other ~data cm ->
+        if Set.mem cm.ctex_vars v_of_other && Map.mem cm.ctex_model v_of_other
+        then cm
+        else
+          { cm with
+            ctex_vars = Set.add cm.ctex_vars v_of_other
+          ; ctex_model = Map.set cm.ctex_model ~key:v_of_other ~data
+          })
+  in
+  let merge_in hd sames =
+    let f cex other =
+      { cex with
+        ci = complete_model cex.ci other.ci
+      ; cj = complete_model cex.cj other.cj
+      }
+    in
+    List.fold ~f ~init:hd sames
+  in
+  List.map cl ~f:(fun cex -> merge_in cex (List.filter ~f:(same_origin cex) cl))
+;;
+
 let reinterpret_model vseti (m0i, m0j') var_subst =
   let mi, mj =
     List.fold var_subst ~init:(VarMap.empty, VarMap.empty) ~f:(fun (mi, mj) (v, v') ->

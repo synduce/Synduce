@@ -39,6 +39,8 @@
  (24 / 149) ✅ smallest_diff                            ×10 runs, average:  0.024s ± 0ms         R: +✓
  (25 / 149) ✅ sndmind                                  ×10 runs, average:  79.845s ± 166ms      R: +...✓
  (26 / 149) ✅ sndmax_empty_base_case                   ×10 runs, average:  10.052s ± 98ms       R: +.+..✓
+    (1 / 1) ✅ sndmax_len2_base_case                    ×10 runs, average:  0.588s ± 28ms        R: +...✓
+    (1 / 1) ✅ sndmax_empty_base_case_v2                ×10 runs, average:  16.094s ± 365ms      R: +..+..✓
  (27 / 149) ✅ parallel_min                             ×10 runs, average:  59.872s ± 589ms      R: +.✓
  (28 / 149) ✅ parallel_max                             ×10 runs, average:  140.515s ± 1538ms    R: +.✓
  (29 / 149) ✅ parallel_max2                            ×10 runs, average:  60.043s ± 429ms      R: +.✓
@@ -218,6 +220,6 @@
 (148 / 149) ✅ list_sum                                 ×10 runs, average:  0.071s ± 1ms         R: +++✓
 (149 / 149) ✅ list_sum_basic                           ×10 runs, average:  0.019s ± 0ms         R: ++✓
 
-❌ 1 errors out of 149 benchmarks in  12006.6 s.
+❌ 1 errors out of 151 benchmarks in  12006.6 s.
 Problematic benchmarks with algorithm:
 unimodal_lists/sm.ml,partbnd+all
