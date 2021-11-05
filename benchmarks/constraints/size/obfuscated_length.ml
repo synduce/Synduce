@@ -28,7 +28,7 @@ let rec spec = function
 ;;
 
 let rec target = function
-  | Elt x -> 0
+  | Elt x -> 1
   | Cons (hd, tl) -> [%synt join] (target tl)
   [@@requires is_length_lt2]
 ;;

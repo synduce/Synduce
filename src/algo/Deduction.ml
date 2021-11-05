@@ -505,7 +505,7 @@ module Solver = struct
         (match functionalize ~lemma ~args expr_res ided_boxes with
         | Ok (l, _) -> resolve_box_bindings l, None
         | Error (l, e_leftover) ->
-          Log.error
+          Log.debug
             Fmt.(
               fun fmt () ->
                 pf

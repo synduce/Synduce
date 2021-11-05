@@ -280,17 +280,18 @@ let nth_output_type (p : psi_def) (i : int) : RType.t option =
 (*                     HELPERS                                                                   *)
 (* ============================================================================================= *)
 let analyze_leftover (expr : Rewriter.Expression.t) : unit =
-  Fmt.(pf stdout "Analyzing leftover expression...@.");
+  Log.verbose Fmt.(fun fmt () -> pf fmt "Analyzing leftover expression...@.");
   let expr' = Rewriter.factorize expr in
-  Fmt.(pf stdout "-> Expr %a@." Rewriter.Expression.pp expr');
+  Log.verbose Fmt.(fun fmt () -> pf fmt "-> Expr %a@." Rewriter.Expression.pp expr');
   let need_to_compute = Deduction.subexpressions_without_boxes expr' in
-  Fmt.(
-    pf
-      stdout
-      "-> Need to compute %a@."
-      (list ~sep:comma (parens Rewriter.Expression.pp))
-      (Set.to_list need_to_compute));
-  Caml.exit (-1)
+  Log.verbose
+    Fmt.(
+      fun fmt () ->
+        pf
+          fmt
+          "-> Lifting may also need to compute %a@."
+          (list ~sep:comma (parens Rewriter.Expression.pp))
+          (Set.to_list need_to_compute))
 ;;
 
 (* ============================================================================================= *)

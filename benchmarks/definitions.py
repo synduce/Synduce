@@ -119,8 +119,8 @@ constraint_benchmarks = [
     ["constraints/bst/count_between.ml", "-NB --no-gropt"],
     ["constraints/bst/most_frequent_v1.ml", ""],
     ["constraints/bst/from_list_contains.ml", ""],
-    ["constraints/bst/from_list_max.ml", "-NB -n 100"],
-    ["constraints/bst/sum_gt_by_key.ml", "-NB -n 100"],
+    ["constraints/bst/from_list_max.ml", "-NB -n 50"],
+    ["constraints/bst/sum_gt_by_key.ml", "-NB -n 50"],
     # balanced_tree
     ["constraints/balanced_tree/node_count.ml", "-N"],
     ["constraints/balanced_tree/height.ml", "-N"],
@@ -151,12 +151,12 @@ constraint_benchmarks = [
     # program
     #["constraints/program/typecheck.ml", ""],
     # unimodal
-    ["constraints/unimodal_list/max_logn.ml", "-B"],
+    #["constraints/unimodal_list/max_logn.ml", "-B"],
     ["constraints/unimodal_list/max_logn_v2.ml", "-kNB"],
     ["constraints/unimodal_list/max_in_um_pos.ml", ""],
     # Size constraint
     ["constraints/size/obfuscated_length.ml", ""],
-    # ["constraints/size/obfuscated_length_3.ml", ""] ??
+    ["constraints/size/obfuscated_length_3.ml", ""]
 ]
 
 base_benchmark_set = [
@@ -272,6 +272,9 @@ lifting_benchmarks = [
     ["tailopt/mps_no_sum.ml", ""],
     # Combining traversals
     ["combine/mts_and_mps_nosum.ml", ""],
+    # Sorting list makes things easier
+    ["sort_list/sndmax.ml", ""],
+    ["sort_list/sndmin.ml", ""],
     # Switching tree traversals
     ["tree/gradient.ml", ""],
     ["tree/mits_nosum.ml", ""],
