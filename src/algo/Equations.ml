@@ -887,6 +887,7 @@ module Solve = struct
         let partial_soln', new_unknowns, new_eqns =
           solve_syntactic_definitions no_c_unknowns no_c_eqns
         in
+        (* (if Set.is_empty new_unknowns then Fmt.(pf stdout "All solved with syntax.@.")); *)
         c_soln @ partial_soln', new_unknowns, new_eqns)
       else [], unknowns, eqns
     in
@@ -1039,7 +1040,7 @@ let solve ~(p : psi_def) (eqns : equation list)
       ; preprocess_factor_subexpressions
       ]
   in
-  let soln_final =
+  let resp, soln_final =
     (* Apply the preprocessing actions, and construct the postprocessing in reverse. *)
     let unknowns', eqns', postprocessing_actions =
       List.fold
@@ -1058,13 +1059,13 @@ let solve ~(p : psi_def) (eqns : equation list)
   in
   Either.(
     match soln_final with
-    | _, First soln ->
+    | First soln ->
       Utils.Log.debug
         Fmt.(
           fun fmt () ->
             pf fmt "@[<hov 2>Solution found: @;%a@]" (box Solve.pp_partial_soln) soln)
     | _ -> ());
-  soln_final
+  resp, Either.map ~first:identity ~second:Counterexamples.merge_all soln_final
 ;;
 
 (* ============================================================================================= *)

@@ -7,8 +7,8 @@ open AlgoLog
 open Syguslib.Sygus
 open Utils
 
-let rec refinement_loop ?(major = true) (p : psi_def) (lstate : refinement_loop_state) =
-  let tsize, usize = Set.length lstate.t_set, Set.length lstate.u_set in
+let rec refinement_loop ?(major = true) (p : psi_def) (lstate_in : refinement_loop_state) =
+  let tsize, usize = Set.length lstate_in.t_set, Set.length lstate_in.u_set in
   if major
   then (
     Int.incr refinement_steps;
@@ -19,8 +19,8 @@ let rec refinement_loop ?(major = true) (p : psi_def) (lstate : refinement_loop_
   (* Add lemmas interactively if the option is set. *)
   let lstate =
     if !Config.interactive_lemmas
-    then Lemmas.add_lemmas_interactively ~p lstate
-    else lstate
+    then Lemmas.add_lemmas_interactively ~p lstate_in
+    else lstate_in
   in
   (* First, generate the set of constraints corresponding to the set of terms t_set. *)
   let eqns, lifting =
@@ -39,7 +39,7 @@ let rec refinement_loop ?(major = true) (p : psi_def) (lstate : refinement_loop_
          Stats.timed (fun () -> Verify.check_solution ~p lstate sol)
        in
        match check_r with
-       | Some (t_set, u_set) ->
+       | `Ctexs (t_set, u_set) ->
          (* If check_r is some new set of MR-terms t_set, and terms u_set, this means
                verification failed. The generalized counterexamples have been added to new_t_set,
                which is also a superset of t_set.
@@ -54,7 +54,17 @@ let rec refinement_loop ?(major = true) (p : psi_def) (lstate : refinement_loop_
          in
          (* Continue looping with the new sets. *)
          refinement_loop ~major:true p { lstate with t_set; u_set; lifting }
-       | None ->
+       | `Incorrect_assumptions ->
+         if !Config.Optims.use_syntactic_definitions
+            || !Config.Optims.make_partial_correctness_assumption
+         then (
+           AlgoLog.msg_too_many_opts ();
+           Config.Optims.(
+             turn_off use_syntactic_definitions;
+             turn_off make_partial_correctness_assumption);
+           refinement_loop ~major p lstate_in)
+         else Error RFail
+       | `Correct ->
          (* This case happens when verification succeeded.
                Store the equation system, return the solution. *)
          Stats.log_major_step_end ~synth_time ~verif_time ~t:tsize ~u:usize true;
@@ -66,11 +76,7 @@ let rec refinement_loop ?(major = true) (p : psi_def) (lstate : refinement_loop_
       Log.error_msg Fmt.(str "Failure: %s" s);
       Log.error_msg "Solution cannot be proved correct, solver failed.";
       Error RFail
-    | e ->
-      (* A failure during the bounded check is an error. *)
-      Log.error_msg "Solution is incorrect, and synthesized and verifier disagree on why.";
-      Log.error_msg "Try without grammar optimizations (option --no-gropt).";
-      raise e)
+    | e -> raise e)
   | _ as synt_failure_info ->
     (* On synthesis failure, start by trying to synthesize lemmas. *)
     (match
