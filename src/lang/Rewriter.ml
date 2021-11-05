@@ -641,6 +641,8 @@ module Expression = struct
       (* min (abs x) 0 -> 0 *)
       | EOp (Binary Min, [ EOp (Unary Abs, [ _ ]); EInt 0 ])
       | EOp (Binary Min, [ EInt 0; EOp (Unary Abs, [ _ ]) ]) -> Some (EInt 0)
+      (* If-then-elses *)
+      | EIte (_, b, c) when equal b c -> Some b
       (* If to min / max *)
       (* a < b ? a : b -> min (a,b) *)
       | EIte (EOp (Binary (Lt | Le), [ a; b ]), a', b') when equal a a' && equal b b' ->
@@ -654,8 +656,52 @@ module Expression = struct
       (* a < b ? b : a -> max (a,b) *)
       | EIte (EOp (Binary (Lt | Le), [ a; b ]), a', b') when equal a b' && equal b a' ->
         Some (EOp (Binary Max, [ a; b ]))
-      (* If-then-elses *)
-      | EIte (_, b, c) when equal b c -> Some b
+      (* minmax *)
+      | EIte (EOp (Binary (Gt | Ge), [ a; b ]), b', EOp (Binary Max, [ a'; a'' ]))
+        when (equal a a' || equal a a'') && equal b b' ->
+        Some (mk_e_bin Min b (mk_e_bin Max a a''))
+      | EIte (EOp (Binary (Gt | Ge), [ a; b ]), a', EOp (Binary Min, [ b'; b'' ]))
+        when (equal b b'' || equal b b') && equal a a' ->
+        Some (mk_e_bin Max a (mk_e_bin Min b b''))
+      | EIte (EOp (Binary (Lt | Le), [ a; b ]), b', EOp (Binary Min, [ a'; a'' ]))
+        when (equal a a' || equal a a'') && equal b b' ->
+        Some (mk_e_bin Max b (mk_e_bin Min a a''))
+      | EIte (EOp (Binary (Lt | Le), [ a; b ]), a', EOp (Binary Max, [ b'; b'' ]))
+        when (equal a a' || equal b b') && equal b b' ->
+        Some (mk_e_bin Min a (mk_e_bin Max b b''))
+      | EIte
+          ( EOp (Binary (Gt | Ge), [ a; b ])
+          , EOp (Binary Min, [ a'; EOp (Binary Max, [ b'; b'' ]) ])
+          , EOp (Binary Min, [ b_'; EOp (Binary Max, [ a_'; a_'' ]) ]) )
+        when equal a a'
+             && equal b b_'
+             && (equal a a_'' || equal a a_')
+             && (equal b b' || equal b b'') ->
+        if not (equal b b'')
+        then Some (mk_e_bin Min (mk_e_bin Max a b) (mk_e_bin Max a b''))
+        else Some (mk_e_bin Min (mk_e_bin Max a b) (mk_e_bin Max a b'))
+      | EIte
+          ( EOp (Binary (Gt | Ge), [ a; b ])
+          , EOp (Binary Max, [ b_'; EOp (Binary Min, [ a_'; a_'' ]) ])
+          , EOp (Binary Max, [ a'; EOp (Binary Min, [ b'; b'' ]) ]) )
+        when equal a a'
+             && equal b b_'
+             && (equal a a_'' || equal a a_')
+             && (equal b b' || equal b b'') ->
+        if not (equal b b'')
+        then Some (mk_e_bin Max (mk_e_bin Min a b) (mk_e_bin Min a b''))
+        else Some (mk_e_bin Max (mk_e_bin Min a b) (mk_e_bin Min a b'))
+      | EIte
+          ( EOp (Binary (Lt | Le), [ a; b ])
+          , EOp (Binary Max, [ a'; EOp (Binary Min, [ b'; b'' ]) ])
+          , EOp (Binary Max, [ b_'; EOp (Binary Min, [ a_'; a_'' ]) ]) )
+        when equal a a'
+             && equal b b_'
+             && (equal a a_'' || equal a a_')
+             && (equal b b' || equal b b'') ->
+        if not (equal b b'')
+        then Some (mk_e_bin Max (mk_e_bin Min a b) (mk_e_bin Min a b''))
+        else Some (mk_e_bin Max (mk_e_bin Min a b) (mk_e_bin Min a b'))
       (* Comparisons *)
       | EOp (Binary Lt, [ EInt a; EInt b ]) -> Some (mk_e_bool (a < b))
       | EOp (Binary Gt, [ EInt a; EInt b ]) -> Some (mk_e_bool (a > b))

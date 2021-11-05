@@ -6,6 +6,7 @@ type list2 =
   | Nil2
   | Cons2 of int * int * list2
 
+(* Representation function: sort the list then build a list2 *)
 let rec repr l = dcomp (sort l)
 
 and dcomp = function
@@ -22,7 +23,7 @@ and sort = function
 
 and insert y = function
   | Nil -> Cons (y, Nil)
-  | Cons (hd, tl) -> if y > hd then Cons (y, Cons (hd, tl)) else Cons (hd, insert y tl)
+  | Cons (hd, tl) -> if y < hd then Cons (y, Cons (hd, tl)) else Cons (hd, insert y tl)
 ;;
 
 let rec spec = function
@@ -30,9 +31,9 @@ let rec spec = function
   | Cons2 (hd1, hd2, tl) -> hd2
 ;;
 
-let rec allpos = function
+let rec allneg = function
   | Nil -> true
-  | Cons (hd, tl) -> hd > 0 && allpos tl && alldif hd tl
+  | Cons (hd, tl) -> hd < 0 && allneg tl && alldif hd tl
 
 and alldif hd = function
   | Nil -> true
@@ -42,5 +43,5 @@ and alldif hd = function
 let rec target = function
   | Nil -> [%synt base_case]
   | Cons (hd, tl) -> [%synt oplus] hd (target tl)
-  [@@requires allpos]
+  [@@requires allneg]
 ;;
