@@ -128,7 +128,8 @@ let solved_eqn_system : equation_system option ref = ref None
 type term_state_detail =
   { term : term
   ; lemmas : term list
-  ; lemma_candidate : (string * variable list * term) option
+  ; lemma : variable
+  ; lemma_candidate : term option
   ; negative_ctexs : ctex list
   ; positive_ctexs : ctex list
   ; recurs_elim : (term * term) list

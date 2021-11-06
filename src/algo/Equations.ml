@@ -747,6 +747,34 @@ module Solve = struct
       else Lwt.task () |> fun (_, r) -> Lwt.return (RFail, Either.Second []), r
   ;;
 
+  let check_unrealizable
+      (task_counter : int ref)
+      (unknowns : VarSet.t)
+      (eqns : equation_system)
+    =
+    if !Config.check_unrealizable
+    then
+      Some
+        (let t, r = Counterexamples.check_unrealizable unknowns eqns in
+         let task =
+           let* ctexs = t in
+           match ctexs with
+           | [] ->
+             (* It not infeasible, sleep for timeout duration, unless counter is 0 *)
+             let* () = Lwt_unix.sleep !Config.Optims.wait_parallel_tlimit in
+             Int.decr task_counter;
+             Lwt.return (RFail, Either.Second [])
+           | _ ->
+             if !Config.generate_benchmarks
+             then ignore (core_solve ~gen_only:true unknowns eqns);
+             if !Config.check_unrealizable_smt_unsatisfiable
+             then Counterexamples.smt_unsatisfiability_check unknowns eqns;
+             Lwt.return (RInfeasible, Either.Second ctexs)
+         in
+         r, task)
+    else None
+  ;;
+
   let solve_eqns (unknowns : VarSet.t) (eqns : equation list)
       : solver_response
         * (partial_soln, Counterexamples.unrealizability_ctex list) Either.t
@@ -757,6 +785,7 @@ module Solve = struct
     let task_counter =
       if !Config.sysfe_opt then ref ((Bool.to_int opt_cst * 2) + 3) else ref 2
     in
+    (* A task that is some task if the option is true. *)
     let on_opt opt task =
       if !Config.sysfe_opt && opt
       then
@@ -769,27 +798,7 @@ module Solve = struct
       List.concat_map
         ~f:Option.to_list
         [ (* Task 1 : checking unrealizability, if the option is set. *)
-          (if !Config.check_unrealizable
-          then
-            Some
-              (let t, r = Counterexamples.check_unrealizable unknowns eqns in
-               let task =
-                 let* ctexs = t in
-                 match ctexs with
-                 | [] ->
-                   (* It not infeasible, sleep for timeout duration, unless counter is 0 *)
-                   let* () = Lwt_unix.sleep !Config.Optims.wait_parallel_tlimit in
-                   Int.decr task_counter;
-                   Lwt.return (RFail, Either.Second [])
-                 | _ ->
-                   if !Config.generate_benchmarks
-                   then ignore (core_solve ~gen_only:true unknowns eqns);
-                   if !Config.check_unrealizable_smt_unsatisfiable
-                   then Counterexamples.smt_unsatisfiability_check unknowns eqns;
-                   Lwt.return (RInfeasible, Either.Second ctexs)
-               in
-               r, task)
-          else None)
+          check_unrealizable task_counter unknowns eqns
         ; (* Task 2 : solving system of equations, default strategy. *)
           Some
             (let t, r = core_solve ~gen_only:false unknowns eqns in
@@ -1065,7 +1074,7 @@ let solve ~(p : psi_def) (eqns : equation list)
           fun fmt () ->
             pf fmt "@[<hov 2>Solution found: @;%a@]" (box Solve.pp_partial_soln) soln)
     | _ -> ());
-  resp, Either.map ~first:identity ~second:Counterexamples.merge_all soln_final
+  resp, soln_final
 ;;
 
 (* ============================================================================================= *)

@@ -42,7 +42,7 @@ let on_success
   =
   let elapsed = Stats.get_glob_elapsed () in
   let verif_ratio = 100.0 *. (!Stats.verif_time /. elapsed) in
-  Log.(verbose print_solvers_summary);
+  Log.(info print_solvers_summary);
   Log.info
     Fmt.(
       fun frmt () ->

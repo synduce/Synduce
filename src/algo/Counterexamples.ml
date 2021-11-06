@@ -319,10 +319,12 @@ let check_unrealizable (unknowns : VarSet.t) (eqns : equation_system)
         new_ctexs
     in
     let* ctexs =
-      List.fold
-        ~f:check_eqn_accum
-        ~init:(return [])
-        (List.mapi ~f:(fun i eqn -> i, eqn) eqns |> combinations)
+      Lwt.map
+        merge_all
+        (List.fold
+           ~f:check_eqn_accum
+           ~init:(return [])
+           (List.mapi ~f:(fun i eqn -> i, eqn) eqns |> combinations))
     in
     let+ _ = AsyncSmt.close_solver solver in
     let elapsed = Unix.gettimeofday () -. start_time in

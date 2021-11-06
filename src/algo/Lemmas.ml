@@ -12,9 +12,9 @@ module Smt = SmtInterface
 module S = Smtlib.SmtLib
 module T = Term
 
-let make_new_recurs_elim_from_term (term : term) ~(p : psi_def)
-    : (term * term) list * variable list
-  =
+let empty_term_state : term_state = Map.empty (module Terms)
+
+let recurs_elim_of_term (term : term) ~(p : psi_def) : (term * term) list * variable list =
   Set.fold
     ~init:([], p.psi_reference.pargs)
     ~f:(fun (rec_elim, vars) var ->
@@ -30,19 +30,6 @@ let make_new_recurs_elim_from_term (term : term) ~(p : psi_def)
             (mk_var var, a) :: rec_elim, vars @ Set.elements (Analysis.free_variables a))
         else rec_elim, var :: vars)
     (Analysis.free_variables term)
-;;
-
-let make_term_state_detail ~(p : psi_def) (term : term) : term_state_detail =
-  let recurs_elim, scalar_vars = make_new_recurs_elim_from_term ~p term in
-  { term
-  ; lemmas = []
-  ; lemma_candidate = None
-  ; negative_ctexs = []
-  ; positive_ctexs = []
-  ; recurs_elim
-  ; scalar_vars
-  ; current_preconds = None
-  }
 ;;
 
 let flatten_rec_elim_tuples elim =
@@ -72,63 +59,23 @@ let subs_from_elim_to_elim elim1 elim2 : (term * term) list =
     (flatten_rec_elim_tuples elim1)
 ;;
 
-let make_term_state_detail_from_ctex ~(p : psi_def) (is_pos_ctex : bool) (ctex : ctex)
-    : term_state_detail
-  =
-  let neg = if is_pos_ctex then [] else [ ctex ] in
-  let pos = if is_pos_ctex then [ ctex ] else [] in
-  let recurs_elim_, scalar_vars_ =
-    make_new_recurs_elim_from_term ~p ctex.ctex_eqn.eterm
-  in
-  let recurs_elim =
-    List.filter
-      ~f:(fun (l, _) ->
-        let rec f l lst =
-          match lst with
-          | [] -> false
-          | (hd, _) :: tl -> if Terms.(equal l hd) then true else f l tl
-        in
-        f l ctex.ctex_eqn.eelim)
-      recurs_elim_
-  in
-  let subs_ = subs_from_elim_to_elim recurs_elim ctex.ctex_eqn.eelim in
-  let scalar_vars =
-    (* Filter out the vars that are not relevant to this ctex's model *)
-    List.filter
-      ~f:(fun v ->
-        let rec g v' s =
-          match s with
-          | [] -> false
-          | (_, b) :: tl -> if Terms.(equal (mk_var v') b) then true else g v' tl
-        in
-        let rec f lst =
-          match lst with
-          | [] -> false
-          | hd :: tl ->
-            if Variable.(equal v hd) then true else if g v subs_ then true else f tl
-        in
-        f (Set.elements ctex.ctex_vars))
-      scalar_vars_
-  in
-  let subs =
-    (* Filter out the vars that are not relevant to this ctex's model *)
-    List.filter
-      ~f:(fun (_, b) ->
-        let is_in = List.mem (List.map ~f:mk_var scalar_vars) ~equal:Terms.equal b in
-        is_in)
-      subs_
+let term_state_of_context ~(is_pos_ctex : bool) (ctex : ctex) : term_state_detail =
+  let scalar_vars = Map.keys ctex.ctex_model in
+  let input_args_t = List.map ~f:Variable.vtype_or_new scalar_vars in
+  let lemma_f =
+    Variable.mk
+      ~t:(Some (RType.fun_typ_pack input_args_t TBool))
+      (Alpha.fresh ~s:"lemma" ())
   in
   { term = ctex.ctex_eqn.eterm
   ; lemmas = []
+  ; lemma = lemma_f
   ; lemma_candidate = None
-  ; negative_ctexs = neg
-  ; positive_ctexs = pos
-  ; recurs_elim
-  ; scalar_vars
-  ; current_preconds =
-      (match ctex.ctex_eqn.eprecond with
-      | None -> None
-      | Some pre -> Some (substitution subs pre))
+  ; negative_ctexs = (if is_pos_ctex then [ ctex ] else [])
+  ; positive_ctexs = (if is_pos_ctex then [] else [ ctex ])
+  ; recurs_elim = ctex.ctex_eqn.eelim
+  ; scalar_vars = Map.keys ctex.ctex_model
+  ; current_preconds = ctex.ctex_eqn.eprecond
   }
 ;;
 
@@ -158,123 +105,13 @@ let term_detail_to_lemma ~(p : psi_def) (det : term_state_detail) : term option 
   Option.map ~f:Rewriter.simplify_term (T.mk_assoc Binop.And (List.map ~f det.lemmas))
 ;;
 
-let empty_term_state : term_state = Map.empty (module Terms)
-
-let set_term_lemma ~(p : psi_def) (ts : term_state) ~(key : term) ~(lemma : term)
-    : term_state
-  =
-  match Map.find ts key with
-  | None ->
-    Map.add_exn ts ~key ~data:{ (make_term_state_detail ~p key) with lemmas = [ lemma ] }
-  | Some det -> Map.add_exn ts ~key ~data:{ det with lemmas = [ lemma ] }
-;;
-
-let create_or_update_term_state_for_ctex
-    ~(p : psi_def)
-    (is_pos_ctex : bool)
-    (ts : term_state)
-    (ctex : ctex)
-    : term_state
-  =
-  match Map.find ts ctex.ctex_eqn.eterm with
-  | None ->
-    Log.debug (fun fmt () ->
-        Fmt.pf fmt "Creating new term state for term@;%a" pp_term ctex.ctex_eqn.eterm);
-    Map.add_exn
-      ~key:ctex.ctex_eqn.eterm
-      ~data:(make_term_state_detail_from_ctex ~p is_pos_ctex ctex)
-      ts
-  | Some _ ->
-    Map.update ts ctex.ctex_eqn.eterm ~f:(fun maybe_det ->
-        match maybe_det with
-        | None -> failwith "Term detail does not exist."
-        | Some det ->
-          if is_pos_ctex
-          then { det with positive_ctexs = ctex :: det.positive_ctexs }
-          else
-            { det with
-              current_preconds =
-                (match ctex.ctex_eqn.eprecond with
-                | None -> None
-                | Some pre ->
-                  let pre' =
-                    substitution
-                      (subs_from_elim_to_elim det.recurs_elim ctex.ctex_eqn.eelim)
-                      pre
-                  in
-                  Some pre')
-            ; negative_ctexs = ctex :: det.negative_ctexs
-            ; positive_ctexs = []
-            })
-;;
-
-let pre_refinement_update_term_state
-    ~(p : psi_def)
-    (ts : term_state)
-    ~(pos_ctexs : ctex list)
-    ~(neg_ctexs : ctex list)
-    : term_state
-  =
-  List.fold
-    ~init:(List.fold ~init:ts ~f:(create_or_update_term_state_for_ctex ~p true) pos_ctexs)
-    ~f:(create_or_update_term_state_for_ctex ~p false)
-    neg_ctexs
-;;
-
 let get_lemma ~(p : psi_def) (ts : term_state) ~(key : term) : term option =
   match Map.find ts key with
   | None -> None
   | Some det -> term_detail_to_lemma ~p det
 ;;
 
-let add_lemmas_interactively ~(p : psi_def) (lstate : refinement_loop_state)
-    : refinement_loop_state
-  =
-  let env_in_p = VarSet.of_list p.psi_reference.pargs in
-  let f existing_lemmas t =
-    let vars = Set.union (Analysis.free_variables t) env_in_p in
-    let env = VarSet.to_env vars in
-    Log.info (fun frmt () ->
-        Fmt.pf frmt "Please provide a constraint for \"@[%a@]\"." pp_term t);
-    Log.verbose (fun frmt () ->
-        Fmt.pf
-          frmt
-          "Environment:@;@[functions %s, %s and %s@]@;and @[%a@]."
-          p.psi_reference.pvar.vname
-          p.psi_target.pvar.vname
-          p.psi_repr.pvar.vname
-          VarSet.pp
-          vars);
-    match Stdio.In_channel.input_line Stdio.stdin with
-    | None | Some "" ->
-      Log.info (fun frmt () -> Fmt.pf frmt "No additional constraint provided.");
-      existing_lemmas
-    | Some x ->
-      let smtterm =
-        try
-          let sexpr = Sexplib.Sexp.of_string x in
-          Smtlib.SmtLib.smtTerm_of_sexp sexpr
-        with
-        | Failure _ -> None
-      in
-      let pred_term = Smt.term_of_smt env in
-      let term x =
-        match get_lemma ~p existing_lemmas ~key:t with
-        | None -> pred_term x
-        | Some inv -> mk_bin Binop.And inv (pred_term x)
-      in
-      (match smtterm with
-      | None -> existing_lemmas
-      | Some x -> set_term_lemma ~p existing_lemmas ~key:t ~lemma:(term x))
-  in
-  { lstate with term_state = Set.fold ~f ~init:lstate.term_state lstate.t_set }
-;;
-
-let ith_synth_fun index = "lemma_" ^ Int.to_string index
-
-let synthfun_of_ctex ~(p : psi_def) (det : term_state_detail) (lem_id : int)
-    : command * (string * sygus_sort) list * string
-  =
+let synthfun_of_ctex ~(p : psi_def) (det : term_state_detail) : (command * string) list =
   let opset =
     List.fold
       ~init:OpSet.empty
@@ -291,8 +128,7 @@ let synthfun_of_ctex ~(p : psi_def) (det : term_state_detail) (lem_id : int)
     Grammars.generate_grammar ~guess:None ~bools:true opset det.scalar_vars RType.TBool
   in
   let logic = logic_of_operators opset in
-  let params = sorted_vars_of_vars det.scalar_vars in
-  mk_synthinv (ith_synth_fun lem_id) det.scalar_vars grammar, params, logic
+  [ mk_synthinv det.lemma.vname det.scalar_vars grammar, logic ]
 ;;
 
 let term_var_string term : string =
@@ -402,29 +238,14 @@ let ctex_model_to_args
       | Some t -> sygus_of_term t)
 ;;
 
-let constraint_of_neg_ctex
-    index
-    ~(p : psi_def)
-    (det : term_state_detail)
-    (params : (string * sygus_sort) list)
-    ctex
-  =
-  CConstraint
-    (SyApp
-       ( IdSimple "not"
-       , [ SyApp (IdSimple (ith_synth_fun index), ctex_model_to_args ~p det params ctex) ]
-       ))
+let constraint_of_neg_ctex (det : term_state_detail) ctex =
+  let neg_constraint = mk_un Not (mk_app (mk_var det.lemma) (Map.data ctex.ctex_model)) in
+  CConstraint (sygus_of_term neg_constraint)
 ;;
 
-let constraint_of_pos_ctex
-    index
-    ~(p : psi_def)
-    (det : term_state_detail)
-    (params : (string * sygus_sort) list)
-    ctex
-  =
-  CConstraint
-    (SyApp (IdSimple (ith_synth_fun index), ctex_model_to_args ~p det params ctex))
+let constraint_of_pos_ctex (det : term_state_detail) ctex =
+  let pos_constraint = mk_app (mk_var det.lemma) (Map.data ctex.ctex_model) in
+  CConstraint (sygus_of_term pos_constraint)
 ;;
 
 let log_soln s vs t =
@@ -441,12 +262,13 @@ let log_soln s vs t =
 let handle_lemma_synth_response
     (det : term_state_detail)
     ((task, resolver) : solver_response option Lwt.t * int Lwt.u)
+    : term list option
   =
-  let parse_synth_fun (fname, _fargs, _, fbody) =
+  let parse_synth_fun (_, _, _, fbody) =
     let body, _ =
       infer_type (term_of_sygus (VarSet.to_env (VarSet.of_list det.scalar_vars)) fbody)
     in
-    fname, det.scalar_vars, body
+    body
   in
   match
     Lwt_main.run
@@ -455,7 +277,7 @@ let handle_lemma_synth_response
   with
   | Some (RSuccess resps) ->
     let soln = List.map ~f:parse_synth_fun resps in
-    let _ = List.iter ~f:(fun (s, vs, t) -> log_soln s vs t) soln in
+    let _ = List.iter ~f:(fun t -> log_soln det.lemma.vname det.scalar_vars t) soln in
     Some soln
   | Some RInfeasible | Some RFail | Some RUnknown | None -> None
 ;;
@@ -522,11 +344,13 @@ let smt_of_tinv_app ~(p : psi_def) (det : term_state_detail) =
   | Some pmrs -> S.mk_simple_app pmrs.pvar.vname [ Smt.smt_of_term det.term ]
 ;;
 
-let smt_of_lemma_app (lemma_name, lemma_args, _lemma_body) =
-  S.mk_simple_app lemma_name (List.map ~f:(fun var -> S.mk_var var.vname) lemma_args)
+let smt_of_lemma_app (det : term_state_detail) =
+  S.mk_simple_app
+    det.lemma.vname
+    (List.map ~f:(fun var -> S.mk_var var.vname) det.scalar_vars)
 ;;
 
-let smt_of_lemma_validity ~(p : psi_def) lemma (det : term_state_detail) =
+let smt_of_lemma_validity ~(p : psi_def) (det : term_state_detail) =
   let mk_sort maybe_rtype =
     match maybe_rtype with
     | None -> S.mk_int_sort
@@ -550,12 +374,12 @@ let smt_of_lemma_validity ~(p : psi_def) lemma (det : term_state_detail) =
     S.mk_assoc_and
       ([ smt_of_tinv_app ~p det; smt_of_recurs_elim_eqns det.recurs_elim ~p ] @ preconds)
   in
-  let if_then = smt_of_lemma_app lemma in
+  let if_then = smt_of_lemma_app det in
   [ S.mk_assert (S.mk_not (S.mk_forall quants (S.mk_or (S.mk_not if_condition) if_then)))
   ]
 ;;
 
-let set_up_lemma_solver solver ~(p : psi_def) lemma_candidate =
+let set_up_lemma_solver solver ~(p : psi_def) (det : term_state_detail) =
   let preamble =
     Smt.Commands.mk_preamble
       ~logic:
@@ -570,33 +394,37 @@ let set_up_lemma_solver solver ~(p : psi_def) lemma_candidate =
       ~models:true
       ()
   in
-  let%lwt () = Smt.AsyncSmt.exec_all solver preamble in
-  let%lwt () =
-    Lwt_list.iter_p
-      (fun x ->
-        let%lwt _ = Smt.AsyncSmt.exec_command solver x in
-        return ())
-      ((* Start by defining tinv. *)
-       (match p.psi_tinv with
-       | None -> []
-       | Some tinv -> Smt.smt_of_pmrs tinv)
-      (* PMRS definitions.*)
-      @ (if p.psi_repr_is_identity
-        then Smt.smt_of_pmrs p.psi_reference
-        else Smt.smt_of_pmrs p.psi_reference @ Smt.smt_of_pmrs p.psi_repr)
-      (* Assert invariants on functions *)
-      @ List.map ~f:S.mk_assert (smt_of_aux_ensures ~p)
-      (* Declare lemmas. *)
-      @ [ (match lemma_candidate with
-          | name, vars, body ->
-            Smt.Commands.mk_def_fun
-              name
-              (List.map ~f:(fun v -> v.vname, Variable.vtype_or_new v) vars)
+  let lemma_body = det.lemma_candidate in
+  match lemma_body with
+  | Some lemma_body ->
+    let%lwt () = Smt.AsyncSmt.exec_all solver preamble in
+    let%lwt () =
+      Lwt_list.iter_p
+        (fun x ->
+          let%lwt _ = Smt.AsyncSmt.exec_command solver x in
+          return ())
+        ((* Start by defining tinv. *)
+         (match p.psi_tinv with
+         | None -> []
+         | Some tinv -> Smt.smt_of_pmrs tinv)
+        (* PMRS definitions.*)
+        @ (if p.psi_repr_is_identity
+          then Smt.smt_of_pmrs p.psi_reference
+          else Smt.smt_of_pmrs p.psi_reference @ Smt.smt_of_pmrs p.psi_repr)
+        (* Assert invariants on functions *)
+        @ List.map ~f:S.mk_assert (smt_of_aux_ensures ~p)
+        (* Declare lemmas. *)
+        @ [ Smt.Commands.mk_def_fun
+              det.lemma.vname
+              (List.map ~f:(fun v -> v.vname, Variable.vtype_or_new v) det.scalar_vars)
               RType.TBool
-              body)
-        ])
-  in
-  return ()
+              lemma_body
+          ])
+    in
+    return ()
+  | None ->
+    (* Nothing to do! *)
+    return ()
 ;;
 
 let classify_ctexs_opt ~(p : psi_def) ctexs : ctex list =
@@ -636,7 +464,7 @@ let smt_of_disallow_ctex_values (det : term_state_detail) : S.smtTerm =
        ctexs)
 ;;
 
-let set_up_to_get_model solver ~(p : psi_def) lemma (det : term_state_detail) =
+let set_up_to_get_model solver ~(p : psi_def) (det : term_state_detail) =
   (* Step 1. Declare vars for term, and assert that term satisfies tinv. *)
   let%lwt () =
     Smt.(
@@ -671,7 +499,7 @@ let set_up_to_get_model solver ~(p : psi_def) lemma (det : term_state_detail) =
     else return ()
   in
   (* Step 4. Assert that lemma candidate is false. *)
-  Smt.AsyncSmt.exec_command solver (S.mk_assert (S.mk_not (smt_of_lemma_app lemma)))
+  Smt.AsyncSmt.exec_command solver (S.mk_assert (S.mk_not (smt_of_lemma_app det)))
 ;;
 
 let mk_model_sat_asserts det f_o_r instantiate =
@@ -698,7 +526,7 @@ let mk_model_sat_asserts det f_o_r instantiate =
   List.map ~f det.scalar_vars
 ;;
 
-let verify_lemma_bounded ~(p : psi_def) (det : term_state_detail) lemma_candidate
+let verify_lemma_bounded ~(p : psi_def) (det : term_state_detail)
     : Smt.AsyncSmt.response * int Lwt.u
   =
   let logic = SmtLogic.infer_logic ~logic_infos:(AState.psi_def_logics p) [] in
@@ -777,11 +605,13 @@ let verify_lemma_bounded ~(p : psi_def) (det : term_state_detail) lemma_candidat
             return ()
         in
         (* Assert that lemma is false for this concrete term t  *)
-        let _, _, lemma = lemma_candidate in
         let%lwt _ =
-          Smt.AsyncSmt.exec_command
-            solver
-            (S.mk_assert (S.mk_not (Smt.smt_of_term (substitution subs lemma))))
+          match det.lemma_candidate with
+          | Some lemma ->
+            Smt.AsyncSmt.exec_command
+              solver
+              (S.mk_assert (S.mk_not (Smt.smt_of_term (substitution subs lemma))))
+          | _ -> return S.Unknown
         in
         let%lwt resp = Smt.AsyncSmt.check_sat solver in
         (* Note that I am getting a model after check-sat unknown response. This may not halt.  *)
@@ -832,23 +662,23 @@ let verify_lemma_bounded ~(p : psi_def) (det : term_state_detail) lemma_candidat
   Smt.AsyncSmt.(cancellable_task (make_solver "cvc") task)
 ;;
 
-let verify_lemma_unbounded ~(p : psi_def) (det : term_state_detail) lemma_candidate
+let verify_lemma_unbounded ~(p : psi_def) (det : term_state_detail)
     : Smt.AsyncSmt.response * int Lwt.u
   =
   let build_task (cvc4_instance, task_start) =
     let%lwt _ = task_start in
-    let%lwt () = set_up_lemma_solver cvc4_instance ~p lemma_candidate in
+    let%lwt () = set_up_lemma_solver cvc4_instance ~p det in
     let%lwt () =
       (Lwt_list.iter_p (fun x ->
            let%lwt _ = Smt.AsyncSmt.exec_command cvc4_instance x in
            return ()))
-        (smt_of_lemma_validity ~p lemma_candidate det)
+        (smt_of_lemma_validity ~p det)
     in
     let%lwt resp = Smt.AsyncSmt.check_sat cvc4_instance in
     let%lwt final_response =
       match resp with
       | Sat | Unknown ->
-        let%lwt _ = set_up_to_get_model cvc4_instance ~p lemma_candidate det in
+        let%lwt _ = set_up_to_get_model cvc4_instance ~p det in
         let%lwt resp' = Smt.AsyncSmt.check_sat cvc4_instance in
         (match resp' with
         | Sat | Unknown -> Smt.AsyncSmt.get_model cvc4_instance
@@ -867,13 +697,13 @@ let verify_lemma_candidate ~(p : psi_def) (det : term_state_detail)
   =
   match det.lemma_candidate with
   | None -> failwith "Cannot verify lemma candidate; there is none."
-  | Some lemma_candidate ->
+  | Some _ ->
     Log.verbose (fun f () -> Fmt.(pf f "Checking lemma candidate..."));
     let resp =
       try
         Lwt_main.run
-          (let pr1, resolver1 = verify_lemma_bounded ~p det lemma_candidate in
-           let pr2, resolver2 = verify_lemma_unbounded ~p det lemma_candidate in
+          (let pr1, resolver1 = verify_lemma_bounded ~p det in
+           let pr2, resolver2 = verify_lemma_unbounded ~p det in
            Lwt.wakeup resolver2 1;
            Lwt.wakeup resolver1 1;
            (* The first call to return is kept, the other one is ignored. *)
@@ -932,148 +762,274 @@ let parse_positive_example_solver_model response (det : term_state_detail) =
       "Parse model failure: Positive example cannot be found during lemma refinement."
 ;;
 
-let trim (s : string) = Str.global_replace (Str.regexp "[\r\n\t ]") "" s
-
-let parse_interactive_positive_example (det : term_state_detail) (input : string)
-    : ctex option
+(** Given a counterexample, create a new term state that contains that counterexample,
+  or if a term state exists for the term associated with that counterexample,
+  update the term state by adding the counterexample's models.
+*)
+let create_or_update_term_state_with_ctex
+    ~(is_pos_ctex : bool)
+    (ts : term_state)
+    (ctex : ctex)
+    : term_state
   =
-  Some
-    { (placeholder_ctex det) with
-      ctex_model =
-        List.fold
-          ~init:VarMap.empty
-          ~f:(fun acc s_ ->
-            let s = Str.split (Str.regexp " *= *") s_ in
-            if not (equal (List.length s) 2)
-            then acc
-            else (
-              let key = trim (List.nth_exn s 0) in
-              let data = mk_const (CInt (Int.of_string (trim (List.nth_exn s 1)))) in
-              match VarSet.find_by_name (VarSet.of_list det.scalar_vars) key with
-              | None -> acc
-              | Some var -> Map.set ~data acc ~key:var))
-          (Str.split (Str.regexp " *, *") input)
+  match Map.find ts ctex.ctex_eqn.eterm with
+  | None ->
+    Log.debug (fun fmt () ->
+        Fmt.pf fmt "Creating new term state for term@;%a" pp_term ctex.ctex_eqn.eterm);
+    Map.add_exn
+      ~key:ctex.ctex_eqn.eterm
+      ~data:(term_state_of_context ~is_pos_ctex ctex)
+      ts
+  | Some _ ->
+    Map.update ts ctex.ctex_eqn.eterm ~f:(fun maybe_det ->
+        match maybe_det with
+        | None -> failwith "Term detail does not exist."
+        | Some det ->
+          if is_pos_ctex
+          then { det with positive_ctexs = ctex :: det.positive_ctexs }
+          else
+            { det with
+              current_preconds =
+                (match ctex.ctex_eqn.eprecond with
+                | None -> None
+                | Some pre ->
+                  let pre' =
+                    substitution
+                      (subs_from_elim_to_elim det.recurs_elim ctex.ctex_eqn.eelim)
+                      pre
+                  in
+                  Some pre')
+            ; negative_ctexs = ctex :: det.negative_ctexs
+            ; positive_ctexs = []
+            })
+;;
+
+module Interactive = struct
+  let make_term_state_detail ~(p : psi_def) (term : term) : term_state_detail =
+    let recurs_elim, scalar_vars = recurs_elim_of_term ~p term in
+    let input_args_t = List.map ~f:Variable.vtype_or_new scalar_vars in
+    let lemma_f =
+      Variable.mk
+        ~t:(Some (RType.fun_typ_pack input_args_t TBool))
+        (Alpha.fresh ~s:"lemma" ())
+    in
+    { term
+    ; lemmas = []
+    ; lemma = lemma_f
+    ; lemma_candidate = None
+    ; negative_ctexs = []
+    ; positive_ctexs = []
+    ; recurs_elim
+    ; scalar_vars
+    ; current_preconds = None
     }
-;;
+  ;;
 
-let interactive_get_positive_examples (det : term_state_detail) =
-  let vars =
-    Set.filter
-      ~f:(fun var ->
-        match Variable.vtype var with
-        | None -> false
-        | Some t -> not (RType.is_recursive t))
-      (Analysis.free_variables det.term)
-  in
-  Log.info (fun f () ->
-      Fmt.(
-        pf
-          f
-          "Enter an example as \"%s\""
-          (String.concat
-             ~sep:", "
-             (List.map
-                ~f:(fun var ->
-                  var.vname
-                  ^ "=<"
-                  ^ (match Variable.vtype var with
-                    | None -> ""
-                    | Some t ->
-                      (match RType.base_name t with
+  let set_term_lemma ~(p : psi_def) (ts : term_state) ~(key : term) ~(lemma : term)
+      : term_state
+    =
+    match Map.find ts key with
+    | None ->
+      Map.add_exn
+        ts
+        ~key
+        ~data:{ (make_term_state_detail ~p key) with lemmas = [ lemma ] }
+    | Some det -> Map.add_exn ts ~key ~data:{ det with lemmas = [ lemma ] }
+  ;;
+
+  let add_lemmas ~(p : psi_def) (lstate : refinement_loop_state) : refinement_loop_state =
+    let env_in_p = VarSet.of_list p.psi_reference.pargs in
+    let f existing_lemmas t =
+      let vars = Set.union (Analysis.free_variables t) env_in_p in
+      let env = VarSet.to_env vars in
+      Log.info (fun frmt () ->
+          Fmt.pf frmt "Please provide a constraint for \"@[%a@]\"." pp_term t);
+      Log.verbose (fun frmt () ->
+          Fmt.pf
+            frmt
+            "Environment:@;@[functions %s, %s and %s@]@;and @[%a@]."
+            p.psi_reference.pvar.vname
+            p.psi_target.pvar.vname
+            p.psi_repr.pvar.vname
+            VarSet.pp
+            vars);
+      match Stdio.In_channel.input_line Stdio.stdin with
+      | None | Some "" ->
+        Log.info (fun frmt () -> Fmt.pf frmt "No additional constraint provided.");
+        existing_lemmas
+      | Some x ->
+        let smtterm =
+          try
+            let sexpr = Sexplib.Sexp.of_string x in
+            Smtlib.SmtLib.smtTerm_of_sexp sexpr
+          with
+          | Failure _ -> None
+        in
+        let pred_term = Smt.term_of_smt env in
+        let term x =
+          match get_lemma ~p existing_lemmas ~key:t with
+          | None -> pred_term x
+          | Some inv -> mk_bin Binop.And inv (pred_term x)
+        in
+        (match smtterm with
+        | None -> existing_lemmas
+        | Some x -> set_term_lemma ~p existing_lemmas ~key:t ~lemma:(term x))
+    in
+    { lstate with term_state = Set.fold ~f ~init:lstate.term_state lstate.t_set }
+  ;;
+
+  let parse_interactive_positive_example (det : term_state_detail) (input : string)
+      : ctex option
+    =
+    Some
+      { (placeholder_ctex det) with
+        ctex_model =
+          List.fold
+            ~init:VarMap.empty
+            ~f:(fun acc s_ ->
+              let s = Str.split (Str.regexp " *= *") s_ in
+              if not (equal (List.length s) 2)
+              then acc
+              else (
+                let key = trim (List.nth_exn s 0) in
+                let data = mk_const (CInt (Int.of_string (trim (List.nth_exn s 1)))) in
+                match VarSet.find_by_name (VarSet.of_list det.scalar_vars) key with
+                | None -> acc
+                | Some var -> Map.set ~data acc ~key:var))
+            (Str.split (Str.regexp " *, *") input)
+      }
+  ;;
+
+  let interactive_get_positive_examples (det : term_state_detail) =
+    let vars =
+      Set.filter
+        ~f:(fun var ->
+          match Variable.vtype var with
+          | None -> false
+          | Some t -> not (RType.is_recursive t))
+        (Analysis.free_variables det.term)
+    in
+    Log.info (fun f () ->
+        Fmt.(
+          pf
+            f
+            "Enter an example as \"%s\""
+            (String.concat
+               ~sep:", "
+               (List.map
+                  ~f:(fun var ->
+                    var.vname
+                    ^ "=<"
+                    ^ (match Variable.vtype var with
                       | None -> ""
-                      | Some tname -> tname))
-                  ^ ">")
-                (Set.elements vars)))));
-  match Stdio.In_channel.input_line Stdio.stdin with
-  | None -> []
-  | Some s ->
-    (match parse_interactive_positive_example det s with
+                      | Some t ->
+                        (match RType.base_name t with
+                        | None -> ""
+                        | Some tname -> tname))
+                    ^ ">")
+                  (Set.elements vars)))));
+    match Stdio.In_channel.input_line Stdio.stdin with
     | None -> []
-    | Some ctex -> [ ctex ])
+    | Some s ->
+      (match parse_interactive_positive_example det s with
+      | None -> []
+      | Some ctex -> [ ctex ])
+  ;;
+
+  let interactive_check_lemma lemma_refinement_loop name vars lemma_term det =
+    Log.info (fun f () ->
+        Fmt.(
+          pf
+            f
+            "Is the lemma \"%s %s = @[%a@]\" for term %a[%a] correct? [Y/N]"
+            name
+            (String.concat ~sep:" " (List.map ~f:(fun v -> v.vname) vars))
+            pp_term
+            lemma_term
+            pp_term
+            det.term
+            pp_subs
+            det.recurs_elim));
+    match Stdio.In_channel.input_line Stdio.stdin with
+    | Some "Y" ->
+      let lemma =
+        match det.current_preconds with
+        | None -> lemma_term
+        | Some pre -> mk_bin Binop.Or (mk_un Unop.Not pre) lemma_term
+      in
+      Some { det with lemma_candidate = None; lemmas = lemma :: det.lemmas }
+    | _ ->
+      Log.info (fun f () ->
+          Fmt.(
+            pf
+              f
+              "Would you like to provide a non-spurious example in which the lemma is \
+               false? [Y/N]"));
+      (match Stdio.In_channel.input_line Stdio.stdin with
+      | Some "Y" ->
+        lemma_refinement_loop
+          { det with
+            positive_ctexs = det.positive_ctexs @ interactive_get_positive_examples det
+          }
+      | _ -> None)
+  ;;
+end
+
+let synthesize_new_lemma ~(p : psi_def) (det : term_state_detail) : term option =
+  let with_synth_obj i synth_obj logic =
+    AlgoLog.announce_new_lemma_synthesis i det;
+    let neg_constraints = List.map ~f:(constraint_of_neg_ctex det) det.negative_ctexs in
+    let pos_constraints = List.map ~f:(constraint_of_pos_ctex det) det.positive_ctexs in
+    let extra_defs = [ max_definition; min_definition ] in
+    let commands =
+      CSetLogic logic
+      :: (extra_defs @ [ synth_obj ] @ neg_constraints @ pos_constraints @ [ CCheckSynth ])
+    in
+    match
+      handle_lemma_synth_response det (SygusInterface.SygusSolver.solve_commands commands)
+    with
+    | None -> None
+    | Some solns -> List.nth solns 0
+  in
+  match synthfun_of_ctex ~p det with
+  | [ (synth_obj, logic) ] -> with_synth_obj 0 synth_obj logic
+  | obj_choices ->
+    let lwt_tasks =
+      List.mapi obj_choices ~f:(fun i (synth_obj, logic) ->
+          Lwt.task ()
+          |> fun (t, r) -> Lwt.map (fun _ -> with_synth_obj i synth_obj logic) t, r)
+    in
+    Lwt_main.run
+      (Lwt.pick
+         (List.map
+            ~f:(fun (t, r) ->
+              Lwt.wakeup r 0;
+              t)
+            lwt_tasks))
 ;;
 
-let synthesize_new_lemma ~(p : psi_def) (det : term_state_detail)
-    : (string * variable list * term) option
-  =
-  AlgoLog.announce_new_lemma_synthesis det;
-  (* Use the exisiting Tinv to help in synthesis! It doesn have to be a black box synthesis! *)
-  (* (match p.psi_tinv with
-  | Some tinv -> Fmt.(pf stdout "Tinv(t) = %a" pp_term (Reduce.reduce_pmrs tinv det.term))
-  | None -> ()); *)
-  let lem_id = 0 in
-  let synth_objs, params, logic = synthfun_of_ctex ~p det lem_id in
-  let neg_constraints =
-    List.map ~f:(constraint_of_neg_ctex lem_id ~p det params) det.negative_ctexs
-  in
-  let pos_constraints =
-    List.map ~f:(constraint_of_pos_ctex lem_id ~p det params) det.positive_ctexs
-  in
-  let extra_defs = [ max_definition; min_definition ] in
-  let commands =
-    CSetLogic logic
-    :: (extra_defs @ [ synth_objs ] @ neg_constraints @ pos_constraints @ [ CCheckSynth ])
-  in
-  match
-    handle_lemma_synth_response det (SygusInterface.SygusSolver.solve_commands commands)
-  with
-  | None -> None
-  | Some solns -> List.nth solns 0
-;;
+(* Execute different possiblities in parallel. *)
 
-let rec lemma_refinement_loop (det : term_state_detail) ~(p : psi_def)
+let rec lemma_refinement_loop ~(p : psi_def) (det : term_state_detail)
     : term_state_detail option
   =
   match synthesize_new_lemma ~p det with
   | None ->
     Log.debug_msg "Lemma synthesis failure.";
     None
-  | Some (name, vars, lemma_term) ->
+  | Some lemma_term ->
     if !Config.interactive_check_lemma
-    then (
-      Log.info (fun f () ->
-          Fmt.(
-            pf
-              f
-              "Is the lemma \"%s %s = @[%a@]\" for term %a[%a] correct? [Y/N]"
-              name
-              (String.concat ~sep:" " (List.map ~f:(fun v -> v.vname) vars))
-              pp_term
-              lemma_term
-              pp_term
-              det.term
-              pp_subs
-              det.recurs_elim));
-      match Stdio.In_channel.input_line Stdio.stdin with
-      | Some "Y" ->
-        let lemma =
-          match det.current_preconds with
-          | None -> lemma_term
-          | Some pre -> mk_bin Binop.Or (mk_un Unop.Not pre) lemma_term
-        in
-        Some { det with lemma_candidate = None; lemmas = lemma :: det.lemmas }
-      | _ ->
-        Log.info (fun f () ->
-            Fmt.(
-              pf
-                f
-                "Would you like to provide a non-spurious example in which the lemma is \
-                 false? [Y/N]"));
-        (match Stdio.In_channel.input_line Stdio.stdin with
-        | Some "Y" ->
-          lemma_refinement_loop
-            { det with
-              positive_ctexs = det.positive_ctexs @ interactive_get_positive_examples det
-            }
-            ~p
-        | _ -> None))
+    then
+      Interactive.interactive_check_lemma
+        (lemma_refinement_loop ~p)
+        det.lemma.vname
+        det.scalar_vars
+        lemma_term
+        det
     else (
-      match
-        verify_lemma_candidate
-          ~p
-          { det with lemma_candidate = Some (name, vars, lemma_term) }
-      with
+      match verify_lemma_candidate ~p { det with lemma_candidate = Some lemma_term } with
       | Unsat ->
-        AlgoLog.lemma_proved_correct det name vars lemma_term;
+        AlgoLog.lemma_proved_correct det lemma_term;
         let lemma =
           match det.current_preconds with
           | None -> lemma_term
@@ -1204,12 +1160,17 @@ let synthesize_lemmas ~(p : psi_def) synt_failure_info (lstate : refinement_loop
           ~pos_ctexs:ensures_positives
           lstate
       else (
+        (* Update the term state by adding the positive and negative counterexamples to it. *)
         let ts : term_state =
-          pre_refinement_update_term_state
-            ~p
-            lstate.term_state
-            ~neg_ctexs:lemma_synt_negatives
-            ~pos_ctexs:lemma_synt_positives
+          let update is_positive ctexs ts =
+            List.fold
+              ctexs
+              ~init:ts
+              ~f:(create_or_update_term_state_with_ctex ~is_pos_ctex:is_positive)
+          in
+          lstate.term_state
+          |> update false lemma_synt_negatives
+          |> update true lemma_synt_positives
         in
         if List.is_empty lemma_synt_negatives
         then (
