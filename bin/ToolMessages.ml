@@ -15,13 +15,23 @@ let prep_final_json
     (pb : Algo.AState.psi_def)
     (soln : Algo.AState.soln)
     (elapsed : float)
+    (verif : float)
     : Yojson.t
   =
   let _ = is_ocaml_syntax, source_filename, pb, soln in
   let solvers = Utils.LogJson.solvers_summary () in
   let refinement_steps = Utils.LogJson.refinement_steps_summary () in
+  let algo =
+    if !Config.Optims.use_segis
+    then "SEGIS"
+    else if !Config.Optims.use_cegis
+    then "CEGIS"
+    else "SE2GIS"
+  in
   `Assoc
-    [ "total_elapsed", `Float elapsed
+    [ "algorithm", `String algo
+    ; "total_elapsed", `Float elapsed
+    ; "verif_elapsed", `Float verif
     ; "solver-usage", solvers
     ; "refinement-steps", refinement_steps
     ; ( "solution"
@@ -75,7 +85,9 @@ let on_success
     Fmt.(pf stdout "success@."));
   if !Config.json_out
   then (
-    let json = prep_final_json ~is_ocaml_syntax source_filename pb soln elapsed in
+    let json =
+      prep_final_json ~is_ocaml_syntax source_filename pb soln elapsed !Stats.verif_time
+    in
     if !Config.json_progressive
     then (
       Yojson.to_channel ~std:true Stdio.stdout json;
@@ -106,8 +118,8 @@ let print_usage () =
     \    -t --no-detupling              Turn off detupling.\n\
     \    -c --simple-init               Initialize T naively.\n\
     \    -l --lemma-sketch              Sketch lemmas in synthesis.\n\
-    \       --acegis                    Use the Abstract CEGIS algorithm. Turns bmc on.\n\
-    \       --ccegis                    Use the Concrete CEGIS algorithm. Turns bmc on.\n\
+    \       --segis                    Use the Abstract CEGIS algorithm. Turns bmc on.\n\
+    \       --cegis                    Use the Concrete CEGIS algorithm. Turns bmc on.\n\
     \       --no-assumptions            Don't  partial correctness assumptions.\n\
     \       --no-simplify               Don't simplify equations with partial evaluation.\n\
     \       --no-gropt                  Don't optimize grammars (level 0)\n\
@@ -119,7 +131,7 @@ let print_usage () =
     \       --sysfe-opt-off             Turn off optimizations to solve systems of \
      equations in parallel\n\
     \  Bounded checking:\n\
-    \       --use-bmc                   Use acegis bounded model checking (bmc mode).\n\
+    \       --use-bmc                   Use segis bounded model checking (bmc mode).\n\
     \    -b --bmc=MAX_DEPTH             Maximum depth of terms for bounded model \
      checking, in bmc mode.\n\
     \    -n --verification=NUM          Number of expand calls for bounded model \

@@ -213,7 +213,7 @@ let replace_rhs_of_mains (p : psi_def) (t0 : term) : term =
 ;;
 
 (* ============================================================================================= *)
-(*                                   acegis TERM EXPANSION                                       *)
+(*                                   segis TERM EXPANSION                                       *)
 (* ============================================================================================= *)
 
 let simple ?(verbose = false) ?(max_height = !Config.Optims.expand_cut) (t0 : term) =

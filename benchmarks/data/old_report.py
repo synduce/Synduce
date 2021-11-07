@@ -1,21 +1,110 @@
 #!/usr/bin/env python3
 import sys
 import datetime
-import argparse
-from definitions import *
 
 timeout_time = 600.0
 
 
+algorithms = ["se2gis", "segis", "cegis"]
+versions = ["all", "ini", "st", "d", "off"]
+fields = ["synt", "verif", "#i", "last"]
+
+show_benchmarks = [
+    ["tree", [
+        ["sumtree", ["", "sum", "no", "sum"]],
+        ["maxtree", ["", "max", "no", "max"]],
+        ["maxtree2", ["", "max 2", "no", "max(2)"]],
+        ["min", ["Changing", "min", "no", "min"]],
+        ["minmax", ["Tree", "min-max", "no", "minmax"]],
+        ["maxPathWeight", ["Traversals", "max weighted path", "no", "max w. path"]],
+        ["sorted", ["", "sorted in-order", "no", "sorted"]],
+        ["poly", ["", "pre-order poly.", "no", "poly"]],
+        ["mips", ["", "{\\tt mips}", "yes", "{\\tt mips}"]],
+        ["mits", ["", "in-order mts", "yes", "mits"]],
+        ["mpps", ["", "post-order mps", "yes", "mpps"]]
+    ]],
+    ["treepaths", [
+        ["sum", ["", "sum", "no", "sum"]],
+        ["height", ["From ", "height", "no", "height"]],
+        ["maxPathWeight", ["Tree to", "max weighted path", "no", "max w. path"]],
+        ["maxPathWeight2", [
+            "Path", "max w. path (hom)", "no", "max w. path"]],
+        ["leftmostodd", ["", "leftmost odd", "no", "leftmost o."]],
+        ["mips", ["", "{\\tt mips}", "yes", "{\\tt mips}"]]
+    ]],
+    ["tailopt",
+     [
+         ["sum", ["Enforcing", "sum", "no", "sum"]],
+         ["mts", ["Tail", "mts", "no", "mts"]],
+         ["mps", ["Recursion", "mps", "no", "mps"]]
+     ]],
+    ["combine",
+     [
+         ["mts", ["Combining", "mts + sum", "no", "mts"]],
+         ["mts_and_mps", ["Traversals", "sum + mts + mps", "yes", "max. sums"]]
+     ]],
+    ["ptree", [
+        ["sum", ["", "sum", "no", "sum"]],
+        ["mul", ["Tree", "product", "no", "mul"]],
+        ["maxheads", ["Flattening", "max of heads", "no", "max heads"]],
+        ["maxlast", ["", "max of lasts", "no", "max lasts"]],
+        ["maxsum", ["", "max sibling sum", "no", "max sib. sum"]]
+    ]],
+
+    ["list", [
+        ["sumhom", ["", "sum", "no", "sum"]],
+        ["sumevens", ["", "sum of even elts.", "no", "sum evens"]],
+        ["lenhom", ["", "length", "no", "len"]],
+        ["last", ["", "last", "no", "last"]],
+        ["prodhom", ["Parallelizing", "product", "no", "product"]],
+        ["polyhom", ["Functions", "polynomial", "no", "polynomial"]],
+        ["hamming", ["on", "hamming", "no", "hamming"]],
+        ["minhom", ["Lists", "min", "no", "minhom"]],
+        ["issorted", ["", "is sorted", "no", "sorted"]],
+        ["search", ["", "linear search", "no", "search"]],
+        ["line_of_sight", ["", "line of sight", "no", "l. of sight"]],
+        ["mtshom", ["", "mts", "yes", "mts"]],
+        ["mpshom", ["", "mps", "yes", "mps"]],
+        ["mts_and_mps_hom", ["", "mts and mps", "yes", "mts + mps"]],
+        ["msshom", ["", "mss", "yes", "mss"]],
+        ["maxcount", ["", "count max elements", "no", "max cnt."]],
+    ]]
+]
+
+extra_benchmarks = [
+    ["tree_to_list", [
+        ["search",    ["List", "search", "no", "search"]],
+        ["search_v2", ["to", "search (v2)", "no", "search"]],
+        ["search_v3", ["Tree", "search (v3)", "no", "search"]],
+        # ["mls", ["", "max left sum", "yes", "mls"]],
+        # ["mps",       ["", "mps", "no", "mps"]]
+    ]]
+]
+
+sp = " "
+dash = "-"
+kw_class = "... Class"
+kw_benchmark = "... Benchmark"
+kw_time = "time"
+kw_steps = "#st"
+kw_tlast = "Tlast"
+kw_ver = "ver.%"
+kw_toolname = "Synduce"
+kw_baseline = "Baseline"
+kw_segis = "Symbolic CEGIS"
+kw_cegis = "Concrete CEGIS"
+kw_path = "Path"
+
+
 def explain():
     print("Benchmarks are stored in the benchmarks/ folder.")
-    print(f"{kw_class: <20s} | {kw_benchmark : <25s} | L | {kw_path : <30s}")
+    print(f"{kw_class: <20s} | {kw_benchmark : <25s} | {kw_path : <30s}")
     for cat_folder, cat_benchmarks in show_benchmarks:
         print(f"{dash:-<80s}-")
         for bench_file, attributes in cat_benchmarks:
             bench_path = "benchmarks/" + cat_folder + "/" + bench_file + ".pmrs"
             print(
-                f" {attributes[0]: <19s} | {attributes[1]: <25s} | {attributes[5]} | {bench_path : <30s}")
+                f" {attributes[0]: <19s} | {attributes[1]: <25s} | {bench_path : <30s}")
 
 
 def all_timeout(l):
@@ -23,6 +112,34 @@ def all_timeout(l):
     for elt in l:
         is_t = is_t and (elt == ["TIMEOUT"])
     return is_t
+
+
+def floti(f):
+    ret = "-"
+    try:
+        ret = float(f)
+    except:
+        ret = timeout_time
+    return ret
+
+
+def speedup(a, b):
+    if b == "?" or a == "?":
+        return "?"
+    if b == "-":
+        if a != "-":
+            return "∞"
+        else:
+            return "!"
+    elif a == "-":
+        return "-∞"
+    else:
+        a = floti(a)
+        b = floti(b)
+        if b > 0:
+            return "%3.1f" % (b / a)
+        else:
+            return -1
 
 
 def median(sample):
@@ -65,7 +182,7 @@ def incr_avg(old_val, new_count, new_val):
 
 # TABLE 1
 
-caption1 = "Experimental Results. Benchmarks are grouped by categories introduced in Section 6.1.\n #st indicates the number of refinement rounds. \n  Tlast is the elapsed time before the last call to the SyGuS solver in the last refinement\n  step before timeout.\nAll times are in seconds. A '-' indicates timeout (4 min) or memory out (> 4Gb).\nThe N column indicates whether bounded checking was required to classify counterexamples, \n and the B column bounded checking for proving lemmas correct."
+caption1 = "Experimental Results. Benchmarks are grouped by categories introduced in Section 6.1.\n #st indicates the number of refinement rounds. \n  Tlast is the elapsed time before the last call to the SyGuS solver in the last refinement\n  step before timeout.\nAll times are in seconds. A '-' indicates timeout (10 min).\nThe Inv? column indicates if codomain constraints were required."
 
 
 def produce_txt_table(tex_output_file, data):
@@ -73,11 +190,11 @@ def produce_txt_table(tex_output_file, data):
 
         # open table
         outp.write(
-            f"{kw_class:.<15s}| {kw_benchmark:.<15s}| N  | B  |  {kw_toolname: <20s}|  {kw_baseline: <20s}\n")
+            f"{kw_class:.<15s}| {kw_benchmark:.<20s}|Inv?|  {kw_toolname: <20s}|  {kw_baseline: <20s}\n")
         outp.write(
             f"{sp:-<88s}\n")
         outp.write(
-            f"{sp: <15s}| {sp: <15s}| N  | B  | {kw_time: <7s}| {kw_steps: <4s}| {kw_tlast: <6s}| {kw_time: <7s}| {kw_steps: <4s}| {kw_tlast: <6s}\n")
+            f"{sp: <15s}| {sp: <20s}|    | {kw_time: <7s}| {kw_steps: <4s}| {kw_tlast: <6s}| {kw_time: <7s}| {kw_steps: <4s}| {kw_tlast: <6s}\n")
 
         speedups = []
         for benchmark_class, benchmarks in show_benchmarks:
@@ -92,11 +209,11 @@ def produce_txt_table(tex_output_file, data):
                 nai_iters = "?"
                 nai_last = "?"
 
-                bkey = benchmark_class + "/" + benchmark_file + ".ml"
+                bkey = benchmark_class + "/" + benchmark_file + ".pmrs"
                 segis_bf = False
 
                 if (bkey, "se2gis") not in data.keys():
-                    # print("No data for %s, se2gis" % bkey)
+                    #print("No data for %s, se2gis" % bkey)
                     pass
                 else:
                     b_data = data[bkey, "se2gis"]["all"]
@@ -112,7 +229,7 @@ def produce_txt_table(tex_output_file, data):
                 best_t = timeout_time
 
                 if (bkey, "segis") not in data.keys():
-                    # print("No data for %s, segis" % bkey)
+                    #print("No data for %s, segis" % bkey)
                     pass
                 else:
                     b_data = data[bkey, "segis"]["all"]
@@ -131,9 +248,9 @@ def produce_txt_table(tex_output_file, data):
                               speedup(req_t, nai_t)]]
 
                 outp.write(
-                    f"{benchmark_info[0]:.<15s}| {benchmark_info[1]:.<15s}| {benchmark_info[2]: <3s}| {benchmark_info[3]: <3s}| {str(req_t): <7s}| {str(req_iters): <4s}| {req_last: <6s}| {nai_t: <7s}| {str(nai_iters): <4s}|{nai_last: >7s}\n")
+                    f"{benchmark_info[0]:.<15s}| {benchmark_info[1]:.<20s}| {benchmark_info[2]: <3s}| {str(req_t): <7s}| {str(req_iters): <4s}| {req_last: <6s}| {nai_t: <7s}| {str(nai_iters): <4s}|{nai_last: >7s}\n")
         outp.write(f"{sp:-<88s}\n")
-        outp.write("TABLE X: \n")
+        outp.write("TABLE 1: \n")
         outp.write(caption1)
         outp.write("\n")
         outp.close()
@@ -152,7 +269,7 @@ def produce_txt_table(tex_output_file, data):
         count_data_points = 0
         for b, s in speedups:
             if s != "?":
-                print("%20s,%20s : %s" % (b[0], b[1], s))
+                print("%10s,%20s : %s" % (b[0], b[1], s))
                 count_data_points += 1
             try:
                 s = float(s)
@@ -191,7 +308,7 @@ def table2(tex_output_file, data):
         f"{sp : <18s}| {kw_time: <7s}| {kw_ver: <6s}| {kw_steps: <4s}|| {kw_time: <7s}| {kw_ver: <6s}| {kw_steps: <4s}|| {kw_time: <7s}| {kw_ver: <6s}| {kw_steps: <4s}\n")
 
     ver = "all"
-    for benchmark_class, benchmarks in show_benchmarks:
+    for benchmark_class, benchmarks in show_benchmarks + extra_benchmarks:
         if len(benchmarks) > 0:
             txt_out.write(f"{sp:-<88s}\n")
         for benchmark_file, benchmark_info in benchmarks:
@@ -251,7 +368,7 @@ def table3(tex_output_file, data):
     kw_stepi = "#i"
     txt_out.write(f"{sp: <18s}| {kw_step: <2s}| {kw_on: <6s}| {kw_stepi: <2s}| {kw_ini: <6s}| {kw_sys : <6s}| {kw_stx: <6s}| {kw_off: <6s}|| {kw_step: <2s}| {kw_on: <6s}| {kw_sys : <6s}| {kw_stx: <6s}| {kw_off: <7s}\n")
     ver = "all"
-    for benchmark_class, benchmarks in show_benchmarks:
+    for benchmark_class, benchmarks in show_benchmarks + extra_benchmarks:
         if len(benchmarks) > 0:
             txt_out.write(f"{sp:-<103s}\n")
 
@@ -302,7 +419,7 @@ def table3(tex_output_file, data):
             for i in range(1, len(cegis_csvline)):
                 if floti(cegis_csvline[i]) < amin:
                     indexmin = i
-            # cegis_csvline[indexmin] = bold(cegis_csvline[indexmin])
+            #cegis_csvline[indexmin] = bold(cegis_csvline[indexmin])
 
             # txt_out.write("%s & %s & %s \\\\ \n" % (
             #    benchmark_info[1], "& ".join(req_csvline), "& ".join(cegis_csvline)))
@@ -366,7 +483,7 @@ def times_of_bdata(b_data):
 
 
 def build_line(data, benchmark_class, benchmark_file):
-    bkey = (benchmark_class + "/" + benchmark_file + ".ml").strip()
+    bkey = benchmark_class + "/" + benchmark_file + ".pmrs"
     csvline = [benchmark_class, benchmark_file]
     for algo in algorithms:
         if (bkey, algo) in data.keys():
@@ -408,19 +525,17 @@ def raw_to_csv(input_file):
             infos = ""
             s = lines[i]
             if s.startswith("B:"):
-                inst = s.strip("B:").strip("/").split(",")
+                inst = s.strip().strip("B:").split(",")
                 benchfile, method = inst[0], inst[1].strip(" ").split("+")
                 method_base = method[0]
                 method_opt = "all"
                 if len(method) > 1 and method[1] != "":
-                    method_opt = method[1].strip()
+                    method_opt = method[1]
                 key = benchfile, method_base, method_opt
                 if key not in benchmark_data:
                     benchmark_data[key] = {}
                 if "max" not in benchmark_data[key]:
                     benchmark_data[key]["max"] = 0
-            elif s == "success":
-                continue
             else:
                 infos = lines[i].strip().split(",")
                 # A line with 5 numbers if for an intermediate synthesis step.
@@ -432,24 +547,20 @@ def raw_to_csv(input_file):
                         benchmark_data[key]["max"], int(step))
                 # A line with 3 numbers means synthesis finished.
                 if len(infos) == 3:
-                    try:
-                        steps = int(infos[0])
                     # Res = #of refinement steps, verif. time, total time.
-                        if "res" in benchmark_data[key]:
-                            old_res = benchmark_data[key]["res"]
-                            old_count = old_res[3]
-                            new_steps = max(old_res[0], steps)
-                            new_verif = incr_avg(
-                                old_res[1], old_count, float((infos[1])))
-                            new_time = incr_avg(
-                                old_res[2], old_count, float(infos[2]))
-                            new_count = old_count + 1
-                            benchmark_data[key]["res"] = new_steps, new_verif, new_time, new_count
-                        else:
-                            benchmark_data[key]["res"] = steps, float(
-                                infos[1]), float(infos[2]), 1
-                    except:
-                        continue
+                    if "res" in benchmark_data[key]:
+                        old_res = benchmark_data[key]["res"]
+                        old_count = old_res[3]
+                        new_steps = max(old_res[0], int(infos[0]))
+                        new_verif = incr_avg(
+                            old_res[1], old_count, float((infos[1])))
+                        new_time = incr_avg(
+                            old_res[2], old_count, float(infos[2]))
+                        new_count = old_count + 1
+                        benchmark_data[key]["res"] = new_steps, new_verif, new_time, new_count
+                    else:
+                        benchmark_data[key]["res"] = int(
+                            infos[0]), float(infos[1]), float(infos[2]), 1
 
     bd = {}
     for k, v in benchmark_data.items():
@@ -460,6 +571,7 @@ def raw_to_csv(input_file):
         else:
             bd[key] = {}
             bd[key][flags] = v
+
     return bd
 
 
@@ -468,28 +580,24 @@ def benchsort(x):
 
 
 if __name__ == "__main__":
-    aparser = argparse.ArgumentParser()
-    aparser.add_argument(
-        "-i", "--input", help="The input file produced by running test.py", type=str, default="benchmarks/constraints_bench.txt")
-    aparser.add_argument(
-        "-o", "--output", help="The output text file for the table.", type=str, default="benchmarks/table.txt")
-    aparser.add_argument(
-        "-t", "--table", help="Table number that the script must generate.", type=int, choices=[1, 2, 3], default=1)
-    aparser.add_argument(
-        "-c", "--csv", help="The output csv file for results.", type=str, default="benchmarks/constraints_results.csv")
-    aparser.add_argument(
-        "-e", "--explain", help="Explain where the benchmarks are stored.", action="store_true")
+    # input_file = "benchmarks/bench.txt"
+    # output_file = "benchmarks/results.csv"
 
-    args = aparser.parse_args()
-
-    if args.explain:
+    if len(sys.argv) < 4:
+        print(
+            "Usage: python3 report.py LOG_FILE OUTPUT_CSV TABLE# [TXT_OUTPUT]\n\
+Use this script to generate the tables from the experiment log in LOG_FILE.\n\
+            LOG_FILE     the input file produce by running test.py\n\
+            OUTPUT_CSV   a csv to store temporary results\n\
+            TABLE#       1-3 to produce Table 1, 2 or 3.\n\
+            TXT_OUTPUT   If 0 < TABLE# <= 3, provide .txt output file for the table.\n\
+This is where the benchmark input files are stored:")
         explain()
         exit()
 
-    input_file = args.input
-    output_file = args.csv
-    table_no = args.table
-    tex_out = args.output
+    input_file = sys.argv[1]
+    output_file = sys.argv[2]
+    table_no = int(sys.argv[3])
 
     if table_no > 0 and table_no < 4:
         if len(sys.argv) < 5:

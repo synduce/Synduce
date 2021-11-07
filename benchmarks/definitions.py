@@ -1,7 +1,20 @@
 import sys
 
 # Timeout for all experiments.
-timeout_value = 400
+timeout_value = 200
+sp = " "
+dash = "-"
+kw_class = "... Class"
+kw_benchmark = "... Benchmark"
+kw_time = "time"
+kw_steps = "#st"
+kw_tlast = "Tlast"
+kw_ver = "ver.%"
+kw_toolname = "Synduce"
+kw_baseline = "Baseline"
+kw_segis = "Symbolic CEGIS"
+kw_cegis = "Concrete CEGIS"
+kw_path = "Path"
 
 if sys.platform.startswith('linux'):
     timeout = ("timeout %i" %
@@ -306,3 +319,216 @@ def summarize():
     print("\t- %i benchmarks with requires constraints (run with --constraint-benchmarks)." % num_constraint)
     print("\t- %i benchmarks with lifting (run with --lifting-benchmarks)." % num_lifting)
     print("\t- %i extras benchmarks." % num_extrs)
+
+
+algorithms = ["se2gis", "segis", "cegis"]
+versions = ["all", "ini", "st", "d", "off"]
+fields = ["synt", "verif", "#i", "last"]
+
+show_benchmarks = [
+    # All positive
+    ["constraint/all_positive", [
+        ["list_mps",     [" Elements > 0    ",
+                          " mps   ", "no", "no",  "mps", 0]]
+    ]],
+    # Alist
+    ["constraint/alist", [
+        ["count_eq2",     ["              ",
+                           " # elt. = (v2) ", "yes", "yes",  "# =", 0]],
+        ["count_eq",      ["  Association ",
+                           " # elt. =      ", "no", "no", " # = (v2)", 0]],
+        ["sums",          ["   List       ",  "sums", "no", "no", "sums ", 0]],
+        ["most_frequent", ["              ",
+                           "most frequent", "no", "no",  "most freq.", 0]],
+    ]],
+    # Balanced tree
+    ["constraint/balanced_tree", [
+        ["node_count",  [" Balanced ", "node count", "yes", "no",  "node cnt.", 0]],
+        ["height",      ["  Tree    ", "height", "yes", "no", "height", 0]],
+        ["height_v2",   ["          ",
+                         "height (v2)  ", "yes", "yes", "height v2.", 0]],
+    ]],
+    # BST
+    ["constraint/bst", [
+        ["contains",           ["          ",
+                                "contains elt. ", "no", "no", "contains", 0]],
+        ["count_lt",           ["  Binary  ",
+                                "# elts. < ", "yes", "yes", "count <", 0]],
+        ["most_frequent_v1",   ["Search",
+                                " most frequent ", "no", "no", "most freq. ", 0]],
+        ["from_list_contains", ["  Tree    ",
+                                "of list ∋", "no", "no", "contains (list)", 0]],
+        ["from_list_max",      ["          ",
+                                "of list max ", "yes", "yes", "max (list)", 0]],
+        ["sum_gt_by_key",      ["          ",
+                                "sum if key >   ", "yes", "yes", "sumkey", 0]],
+    ]],
+    # Combining traversals
+    ["combine", [
+        ["mts_and_mps_nosum", ["Combine", "mts+mps", "no", "no", "m(t+p)s", 1]]]],
+    # Constant list
+    ["constraint/constantlist", [
+        ["index_of",  [" Constant ", "index of elt. ", "no", "no", "idx", 0]],
+        ["contains",  ["  List    ", "contains elt  ", "no", "no", "contains", 0]],
+    ]],
+    # Empty right subtree
+    ["constraint/empty_right_subtree", [
+        ["contains",  [" Empty Subtree", " contains elt", "yes", "no", "contains", 0]],
+    ]],
+    # Even list
+    ["constraint/evenlist",
+     [
+         ["parity_of_first", ["           ",
+                              "parity of 1st", "no", "no", "parity 1st", 0]],
+         ["parity_of_last",  ["  List of  ",
+                              "parity of last", "no", "no", "parity last", 0]],
+         ["first_odd",       ["   even    ",
+                              "first odd elt.", "no", "no", "first odd", 0]],
+         ["parity_of_sum",   ["  numbers  ",
+                              "parity of sum ", "no", "no", "parity sum", 0]]
+     ]],
+    # Even tree
+    ["constraint/even_tree",
+     [
+         ["parity_of_max", ["  Tree of Even ",
+                            "parity of max ", "no", "no", "parity max", 0]],
+         ["sum_of_parities", ["  Numbers  ",
+                              "parity of sum", "yes", "yes", "parity sum", 0]]
+     ]],
+    # Indexed list
+    ["indexed_list", [
+        ["position_polynomial_no_index",    [" Indexed  ",
+                                             "value-pos mult.",   "no", "no", "val*pos", 1]],
+        ["search_no_index",                 ["    List  ",
+                                             "search index",      "no", "no", "search i", 1]],
+        ["sum_elts_lt_pos_no_len",          ["          ",
+                                             "sum elts w. pos <", "no", "no", "sum pos", 1]]
+    ]],
+    ["list", [
+        ["atoi_no_fac",                     [
+            "    ", "atoi", "no", "no", "atoi", 1]],
+        ["is_sorted_no_last",               [
+            " List ", "is sorted", "no", "no", "sorted", 1]],
+        ["largest_diff_sorted_list_nohead", [
+            " Parallelization ", "largest diff", "no", "no", "l. diff", 1]],
+        ["mps_no_sum",                      [
+            "      ", "mps", "no", "no", "mps", 1]],
+        ["poly_no_fac",                     [
+            "      ", "poly", "no", "no", "poly", 1]],
+        ["zero_after_one_no",               ["      ", "0 after 1", "no", "no", "0-1", 1]]]],
+    # Memo
+    ["constraint/memo", [
+        ["tree_size",     ["             ", "tree size", "yes", "yes",  "size", 0]],
+        ["constant",      ["  Tree       ", "constant", "no", "no", " constant", 0]],
+        ["max_contains",  [" Memoizing   ",
+                           " contains elt. ", "yes", "yes", "contains", 0]],
+        ["count_lt",      [" Information ", "count <", "yes", "yes",  "cnt <", 0]],
+        ["max_sum_gt",    ["             ", "sum of elts >", "yes", "yes",  "sum >", 0]],
+        ["proper_indexation_sum_lt_pos_v2",
+         ["             ", "sum elts > pos", "no", "no", "sum > pos", 0]],
+        ["proper_indexation_sum_lt_pos",
+         ["             ", "sum elts > pos .v2", "no", "no", "sum > pos v2", 0]]
+
+    ]],
+    # Program
+    ["constraint/program", [
+        ["typecheck",  [" Program AST ", " type check  ", "yes", "no", "type chk", 0]],
+    ]],
+    # Symmetric tree
+    ["constraint/symmetric_tree", [
+        ["sum",         [" Symmetric  ", "sum", "yes", "no", "sum", 0]],
+        ["height",      ["    Tree    ", "height", "yes", "no", "height", 0]],
+        ["min",         ["            ", "min", "yes", "no", "min", 0]]
+    ]],
+    # Sorted
+    ["constraint/sortedlist", [
+        ["min",                    ["        ", "min ", "no", "no", "min", 0]],
+        ["max",                    [" Sorted ", "max ", "no", "no", "max", 0]],
+        ["count_lt",               [" List   ",
+                                    "count elt. < ", "no", "no", "cnt <", 0]],
+        ["index_of",               ["        ",
+                                    "index of elt ", "no", "no", "idx", 0]],
+        ["is_intersection_empty",  ["        ", "∩-empty ", "no", "no", "∩-∅", 0]],
+        ["largest_diff",           ["        ",
+                                    "largest diff ", "no", "no", "ldiff", 0]],
+        ["smallest_diff",          ["        ",
+                                    "smallest diff ", "no", "no", "sdiff", 0]],
+        ["parallel_min",          ["        ",
+                                   "parallel min", "yes", "yes", "||min", 0]],
+        ["parallel_max",          ["        ",
+                                   "parallel max", "yes", "yes", "||max", 0]],
+    ]],
+    # Sorted and indexed
+    ["constraint/sorted_and_indexed", [
+        ["count_lt0",                    ["        ",
+                                          "count < 0", "yes", "yes", "# < 0", 0]],
+        ["count_lt",                    ["        ",
+                                         "count < x", "yes", "yes", "# < 0", 0]],
+    ]],
+    # Tail optimizations
+    ["tailopt", [
+        ["mps_no_sum",  [" Tail opt. ", " mps  ", "no", "no", "mps", 1]],
+    ]],
+    # Switching tree traversals
+    ["tree", [
+        ["gradient",   [" Tree      ", "gradient", "no", "no", "grad", 1]],
+        ["mits_nosum", [" Traversal ", "mits", "no", "no", "mits", 1]]]]
+]
+
+lift_info = {
+    "indexed_list/position_polynomial_no_index.ml": "1",
+    "indexed_list/search_no_index.ml": "1",
+    "indexed_list/sum_elts_lt_pos_no_len.ml": "1",
+    "list/atoi_no_fac.ml": "1",
+    "list/is_sorted_no_last.ml": "1",
+    "list/largest_diff_sorted_list_nohead.ml": "1",
+    "list/mps_no_sum.ml": "1",
+    "list/poly_no_fac.ml": "1",
+    "list/zero_after_one_no.ml": "1",
+    "tailopt/mps_no_sum.ml": "1",
+    "combine/mts_and_mps_nosum.ml": "1",
+    "tree/gradient.ml": "1",
+    "tree/mits_nosum.ml": "1",
+}
+
+
+def explain():
+    print("Benchmarks are stored in the benchmarks/ folder.")
+    print(f"{kw_class: <20s} | {kw_benchmark : <25s} | L | {kw_path : <30s}")
+    for cat_folder, cat_benchmarks in show_benchmarks:
+        print(f"{dash:-<80s}-")
+        for bench_file, attributes in cat_benchmarks:
+            bench_path = "benchmarks/" + cat_folder + "/" + bench_file + ".pmrs"
+            print(
+                f" {attributes[0]: <19s} | {attributes[1]: <25s} | {attributes[5]} | {bench_path : <30s}")
+
+
+def floti(f):
+    ret = "-"
+    try:
+        ret = float(f)
+    except:
+        ret = float(timeout_value)
+    return ret
+
+
+timeout_names = ["N/A", "-", "timeout", "TIMEOUT"]
+
+
+def speedup(a, b):
+    if b in timeout_names and a in timeout_names:
+        return "?"
+    if b in timeout_names:
+        if a not in timeout_names:
+            return "∞"
+        else:
+            return "!"
+    elif a in timeout_names:
+        return "-∞"
+    else:
+        a = floti(a)
+        b = floti(b)
+        if b > 0:
+            return "%3.1f" % (b / a)
+        else:
+            return -1

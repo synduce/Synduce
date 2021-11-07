@@ -18,9 +18,25 @@ def run_one(progress, bench_id, command, algo, optim, filename, extra_opt):
     process = subprocess.Popen(
         command, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
     info = None
+    last_refinement_string = ""
+    last_verif_time = 0.0
+    last_elapsed = 0.0
     # Poll process for new output until finished
     while True:
-        info = DataObj(json.loads(process.stdout.readline()))
+        try:
+            line = process.stdout.readline()
+            data = json.loads(line)
+            info = DataObj(data)
+            last_refinement_string = info.get_refinement_summary()
+            last_verif_time = info.verif_elapsed
+            last_elapsed = info.elapsed
+        except Exception as e:
+            info = DataObj({})
+            info.is_successful = False
+            info.verif_elapsed = last_verif_time
+            info.elapsed = last_elapsed
+            break
+
         if process.poll() is not None or info.is_successful:
             break
         print(
@@ -32,17 +48,21 @@ def run_one(progress, bench_id, command, algo, optim, filename, extra_opt):
 def run_n(progress, bench_id, command, algo,
           optim, filename, extra_opt, errors, num_runs, csv_output):
 
-    total_elapsed = 0
+    total_elapsed = 0.0
+    verif_elapsed = 0.0
     max_e = 0
     min_e = timeout_value
     estim = 0
     delta = 0
     sp = " "
     bench_parts = bench_id.split(".")[0].split("/")
-    bench_category = "->".join(bench_parts[:-1])
     bench_name = bench_parts[-1]
+    info = DataObj({})
+    info.is_successful = False
     print(
         f"{progress : >11s} {bench_name: <25s}", end="\r")
+
+    # Run the tests num_run times
     for i in range(num_runs):
         try:
             info = run_one(progress, bench_id, command,
@@ -53,6 +73,7 @@ def run_n(progress, bench_id, command, algo,
 
         if info.is_successful:
             total_elapsed += info.elapsed
+            verif_elapsed += info.verif_elapsed
             max_e = max(info.elapsed, max_e)
             min_e = min(info.elapsed, min_e)
             estim = float(estim * i + info.elapsed) / float(i + 1)
@@ -61,30 +82,50 @@ def run_n(progress, bench_id, command, algo,
             print(msg, end="\r")
             sys.stdout.flush()
         else:
-            print(f"{progress : >11s} ❌ {bench_id : <70s}{sp : <10s}", end="\r")
-            sys.stdout.flush()
-            return (errors + [bench_id]),  info.elapsed, 0
+            break
 
     elapsed = total_elapsed / num_runs
+    verif_elapsed = verif_elapsed / num_runs
     delta = 1000 * max(abs(max_e - elapsed), abs(min_e-elapsed))
     sp = " "
-    if elapsed > 0:
+    csvline = "?,?,?,?,?,?"
+
+    if info.is_successful:
         delta_str = f"{delta : .0f}ms"
         if (float(delta) / (1000.0 * elapsed)) > 0.05:
             delta_str = f"{delta_str} !"
         else:
             delta_str = f"{delta_str}  "
         timing = f"average: {elapsed: 4.3f}s ±{delta_str}"
-        msg = f"{progress : >11s} ✅ {bench_name : <40s} ×{num_runs} runs, {str(timing): <30s} R: {info.get_refinement_summary()} {sp : <40s} "
+
+        if info.proved_by_induction:
+            p_by_induction = "✓"
+        else:
+            p_by_induction = "~"
+
+        if info.classified_by_induction:
+            c_by_induction = "✓"
+        else:
+            c_by_induction = "~"
+        refinement_rounds = info.get_refinement_summary()
+        if "." in refinement_rounds:
+            induction_info = f"B:{c_by_induction},B':{p_by_induction}"
+        else:
+            induction_info = "        "
+
+        msg = f"{progress : >11s} ✅ {info.algo: <6s} : {bench_name : <33s} ×{num_runs} runs, {str(timing): <30s} {induction_info} | R: {refinement_rounds} {sp : <30s} "
         print(msg)
+        csvline = f"{elapsed: 4.3f},{delta : .0f},{refinement_rounds},{c_by_induction},{p_by_induction},{verif_elapsed}"
     else:
         print(f"{progress: >11s} ❌ {bench_id : <120s}")
+        csvline = f"N/A,N/A,{info.get_refinement_summary()},N/A,N/A,N/A"
+
     sys.stdout.flush()
 
-    return errors,  elapsed, delta
+    return errors,  elapsed, csvline
 
 
-def run_benchmarks(input_files, algos, optims, num_runs=1, raw_output=None, exit_err=False):
+def run_benchmarks(input_files, algos, optims, num_runs=1, csv_output=None, exit_err=False):
     benchmark_cnt = 0
     benchmark_total = len(input_files) * len(algos) * len(optims)
     errors = []
@@ -94,6 +135,7 @@ def run_benchmarks(input_files, algos, optims, num_runs=1, raw_output=None, exit
         filename = filename_with_opt[0]
         category = os.path.dirname(filename)
         extra_opt = filename_with_opt[1]
+        csvline_all_algos = []
         for algo in algos:
             for optim in optims:
                 benchmark_cnt += 1
@@ -125,8 +167,13 @@ def run_benchmarks(input_files, algos, optims, num_runs=1, raw_output=None, exit
                     print(f"\n⏺ Category: {bench_cat}")
                     prev_bench_cat = bench_cat
                 # Run the benchmark n times.
-                errors, elapsed, delta = run_n(progress, bench_id, command, algo,
-                                               optim, filename, extra_opt, errors, num_runs, raw_output)
+                errors, elapsed, csvline = run_n(progress, bench_id, command, algo,
+                                                 optim, filename, extra_opt, errors, num_runs, csv_output)
+                csvline_all_algos += [f"{algo[0]}:{optim[0]}", csvline]
+
+        if csv_output:
+            line = ",".join([filename] + csvline_all_algos) + "\n"
+            csv_output.write(line)
 
     elapsed = time.time() - start
     if len(errors) <= 0:
@@ -149,7 +196,7 @@ if __name__ == "__main__":
     table_info = "Tables: #1 is for CAV21 paper Table 1,\
     # 2 is for CAV21 paper Table 2,\
     # 3 is for CAV21 paper Table 3,\
-    # 4 is for testing benchmarks with constraints, with partial bounding only,\
+    # 4 is for testing benchmarks with constraints, with p-boudning and symbolic CEGIS,\
     # 5 is for testing benchmarks with constraints, with p-bounding and Symbolic-CEGIS."
 
     sys.stdout.flush()
@@ -166,7 +213,7 @@ if __name__ == "__main__":
         "-o", "--output", help="Dump Synduce output in -i mode to file (appending to file).", type=str, default=-1)
     aparser.add_argument(
         "-b", "--benchmarks", help="Run the lifting benchmarks.", type=str,
-        choices=["all", "constraint", "lifting", "base", "small"], default="small")
+        choices=["all", "constraint", "lifting", "base", "small"], default=None)
     aparser.add_argument(
         "--single", help="Run the lifting benchmark in benchmarks/[FILE]", type=str, default=None)
     aparser.add_argument(
@@ -185,18 +232,14 @@ if __name__ == "__main__":
         definitions.summarize()
         exit()
 
-    # Algorithm set selection by table number.
-    table_no = args.table
     # Optional output settings.
     generate_solutions = args.generate_solutions
     generate_benchmarks = args.generate_benchmarks
 
-    run_test_only = table_no == -1 or args.run
-
-    raw_output = None
+    csv_output = None
     if args.output is not None:
         try:
-            raw_output = open(args.output, 'a+', encoding='utf-8')
+            csv_output = open(args.output, 'a+', encoding='utf-8')
         except:
             pass
 
@@ -231,56 +274,57 @@ if __name__ == "__main__":
     # Run a single file if --single has an argument
     if args.single and args.single != "":
         print("Running single file")
-        algos = [["partbnd", cvc]]
+        algos = [["se2gis", cvc]]
         optims = [["all", ""]]
         binfo = str(args.single).split("+")
         if len(binfo) == 1:
             binfo = [str(binfo[0]), ""]
         run_benchmarks([binfo], algos, optims,
-                       raw_output=raw_output, num_runs=runs)
+                       csv_output=csv_output, num_runs=runs)
         exit()
 
     bench_set = []
     # Running specific sets if we're supposed to.
     if run_kick_the_tires_only:
-        algos = [["partbnd", cvc]]
+        algos = [["se2gis", cvc]]
         optims = [["all", ""]]
         run_benchmarks(definitions.kick_the_tires_set, algos,
-                       optims, raw_output=raw_output, num_runs=runs)
+                       optims, csv_output=csv_output, num_runs=runs)
         exit(0)
-
-    if run_lifting_benchmarks:
-        algos = [["partbnd", cvc]]
-        optims = [["all", ""]]
-        bench_set += definitions.lifting_benchmarks
-
-    if run_constraint_benchmarks:
-        algos = [["partbnd", cvc]]
-        optims = [["all", ""]]
-        bench_set += definitions.constraint_benchmarks
-
-    if run_base_benchmarks:
-        algos = [["partbnd", cvc]]
-        optims = [["all", ""]]
-        bench_set += definitions.base_benchmark_set
 
     # If we were supposed to run a specific set of benchmarks, we're done
     if run_base_benchmarks or run_constraint_benchmarks or run_lifting_benchmarks:
+        if run_lifting_benchmarks:
+            algos = [["se2gis", cvc]]
+            optims = [["all", ""]]
+            bench_set += definitions.lifting_benchmarks
+
+        if run_constraint_benchmarks:
+            algos = [["se2gis", cvc]]
+            optims = [["all", ""]]
+            bench_set += definitions.constraint_benchmarks
+
+        if run_base_benchmarks:
+            algos = [["se2gis", cvc]]
+            optims = [["all", ""]]
+            bench_set += definitions.base_benchmark_set
+
         run_benchmarks(bench_set, algos,
-                       optims, raw_output=raw_output, num_runs=runs)
+                       optims, csv_output=csv_output, num_runs=runs)
         exit()
 
     # === === TABLES and CAV runs === ===
-    if run_test_only:
-        algos = [["partbnd", ""]]
-        optims = [["all", cvc]]
+
+    # Algorithm set selection by table number.
+    table_no = args.table
+    print(f"Running Table {table_no} Benchmarks.")
 
     # Table 1 / CAV 21 paper : compare Synduce and Baseline
-    elif table_no == 1:
+    if table_no == 1:
 
         algos = [
-            ["partbnd", "--no-gropt"],
-            ["acegis", "--acegis --no-gropt"]
+            ["se2gis", "--no-gropt"],
+            ["segis", "--segis --no-gropt"]
         ]
         optims = [["all", ""]]
 
@@ -288,9 +332,9 @@ if __name__ == "__main__":
     elif table_no == 2:
 
         algos = [
-            ["partbnd", "--no-gropt"],
-            ["acegis", "--acegis --no-gropt"],
-            ["ccegis", "--ccegis --no-gropt"]
+            ["se2gis", "--no-gropt"],
+            ["segis", "--segis --no-gropt"],
+            ["cegis", "--cegis --no-gropt"]
         ]
         optims = [["all", ""]]
 
@@ -298,8 +342,8 @@ if __name__ == "__main__":
     elif table_no == 3:
 
         algos = [
-            ["partbnd", "--no-gropt"],
-            ["acegis", "--acegis --no-gropt"],
+            ["se2gis", "--no-gropt"],
+            ["segis", "--segis --no-gropt"],
         ]
 
         optims = [
@@ -312,21 +356,21 @@ if __name__ == "__main__":
 
     # Table 4 / Test
     elif table_no == 4:
-        algos = [["partbnd"]]
+        algos = [["se2gis", "--cvc4"], ["segis", "--segis --cvc4"]]
         optims = [["all", ""]]
 
     # Table 5 / Test with cvc4 against baseline comparison
     elif table_no == 5:
-        algos = [["partbnd", "--cvc4"], ["acegis", "--acegis --cvc4"]]
+        algos = [["se2gis", "--cvc4"], ["segis", "--segis --cvc4"]]
         optims = [["all", ""]]
 
     # No table - just run the base algorithm.
     else:
-        algos = [["partbnd", ""]]
+        algos = [["se2gis", "--cvc4"], ["segis", "--segis --cvc4"]]
         optims = [["all", ""]]
 
     # Benchmark set selection.
-
+    input_files = []
     if args.kick_the_tires:
         input_files = definitions.kick_the_tires_set
 
@@ -339,10 +383,10 @@ if __name__ == "__main__":
             input_files = definitions.constraint_benchmarks
         elif table_no == 5:
             input_files = definitions.constraint_benchmarks + definitions.lifting_benchmarks
-        elif run_test_only:
-            input_files = definitions.benchmark_set
         else:
             input_files = definitions.kick_the_tires_set
 
-    run_benchmarks(input_files, algos, optims, raw_output=raw_output,
+    run_benchmarks(input_files, algos, optims, csv_output=csv_output,
                    exit_err=True, num_runs=runs)
+    if csv_output:
+        csv_output.close()

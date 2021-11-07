@@ -36,13 +36,39 @@ def is_successful(data: dict):
     return ret
 
 
+def all_proved_by_induction(data: dict):
+    cex_classif_flag = True
+    lemma_proof_flag = True
+    refinement_steps = data.get("refinement-steps")
+    if refinement_steps:
+        for step in refinement_steps.values():
+            for failure in step["failures"].values():
+
+                classif_with = failure.get('cex_classification_with')
+                if classif_with:
+                    if classif_with.startswith("bounded"):
+                        cex_classif_flag = False
+
+                proved_by = failure.get('proved_by')
+                if proved_by:
+                    if proved_by.startswith("bounded"):
+                        lemma_proof_flag = False
+
+    return cex_classif_flag, lemma_proof_flag
+
+
 class DataObj:
     def __init__(self, data):
         self.data = data
+        self.algo = data.get("algorithm")
         self.minor_step_count = get_minor_step_count(data)
         self.major_step_count = get_major_step_count(data)
         self.elapsed = data.get("total_elapsed")
+        self.verif_elapsed = data.get("verif_elapsed")
         self.is_successful = is_successful(data)
+        cex_classif_flag, lemma_proof_flag = all_proved_by_induction(data)
+        self.proved_by_induction = lemma_proof_flag
+        self.classified_by_induction = cex_classif_flag
 
     def get_refinement_summary(self, set_sizes=False) -> str:
         rsteps = self.data.get("refinement-steps")

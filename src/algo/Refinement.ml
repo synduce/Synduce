@@ -320,9 +320,9 @@ let solve_problem
   let problem = find_problem_components (target_fname, spec_fname, repr_fname) pmrs in
   (* Solve the problem. *)
   ( problem
-  , if !Config.Optims.use_acegis
-    then Baselines.algo_acegis problem
-    else if !Config.Optims.use_ccegis
-    then Baselines.algo_ccegis problem
+  , if !Config.Optims.use_segis
+    then Baselines.algo_segis problem
+    else if !Config.Optims.use_cegis
+    then Baselines.algo_cegis problem
     else psi problem )
 ;;

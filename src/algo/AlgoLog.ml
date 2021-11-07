@@ -23,7 +23,12 @@ let show_stat elapsed tsize usize =
       usize
   else if !Config.json_progressive && !Config.json_out
   then (
-    let json = `Assoc [ "progress", LogJson.refinement_steps_summary () ] in
+    let json =
+      `Assoc
+        [ "progress", LogJson.refinement_steps_summary ()
+        ; "verif_elapsed", `Float !Stats.verif_time
+        ]
+    in
     pf stdout "%s@." (Yojson.to_string ~std:false json))
   else ()
 ;;
@@ -126,14 +131,25 @@ let announce_new_lemma_synthesis (thread_no : int) (det : term_state_detail) =
           pre)
 ;;
 
-let lemma_not_proved_correct () =
+let lemma_not_proved_correct (m : Stats.verif_method) =
   Log.verbose (fun f () ->
-      pf f "This lemma has not been proven correct. Refining lemma...")
+      pf
+        f
+        "This lemma has been proved incorrect by %s. Refining lemma..."
+        (Stats.verif_method_to_str m))
 ;;
 
-let lemma_proved_correct (det : term_state_detail) (lemma_term : term) =
+let lemma_proved_correct
+    (proof_method : Stats.verif_method)
+    (det : term_state_detail)
+    (lemma_term : term)
+  =
   let lemma_term = Eval.simplify lemma_term in
-  Log.verbose (fun f () -> pf f "This lemma has been proven correct.");
+  Log.verbose (fun f () ->
+      pf
+        f
+        "This lemma has been proven correct by %s."
+        (Stats.verif_method_to_str proof_method));
   let lemma_str =
     str
       "(%a)[%a]->%s(%s)= %a"
@@ -149,6 +165,7 @@ let lemma_proved_correct (det : term_state_detail) (lemma_term : term) =
   Stats.set_lemma_synthesized
     "requires_lemma"
     (String.concat ~sep:" " (List.map ~f:String.strip (String.split_lines lemma_str)));
+  Stats.set_last_lemma_proof_method proof_method;
   Log.info (fun frmt () ->
       pf
         frmt
@@ -188,4 +205,98 @@ let positives_ensures p positives =
 
 let log_new_ensures (new_pred : term) : unit =
   Stats.set_lemma_synthesized "ensures_lemma" (String.strip (str "%a" pp_term new_pred))
+;;
+
+(* ============================================================================================= *)
+(*                           Messages from the Lemma Synthesis                                   *)
+(* ============================================================================================= *)
+
+let image_ctex_class
+    (p : psi_def)
+    (ctex : ctex)
+    (resp : Smtlib.SmtLib.solver_response)
+    (vmethod : Stats.verif_method)
+  =
+  Stats.update_counterexample_classification_method vmethod;
+  Log.verbose (fun frmt () ->
+      if SmtInterface.SyncSmt.is_unsat resp
+      then
+        Fmt.(
+          pf
+            frmt
+            "%s: %a: ctex not in the image of reference function \"%s\":@;<1 4>%a."
+            (Stats.verif_method_to_str vmethod)
+            (styled (`Fg `Red) string)
+            "SPURIOUS"
+            p.psi_reference.pvar.vname
+            (box pp_ctex)
+            ctex)
+      else if SmtInterface.SyncSmt.is_sat resp
+      then
+        Fmt.(
+          pf
+            frmt
+            "%s: %a: ctex in the image of %s:@;%a"
+            (Stats.verif_method_to_str vmethod)
+            (styled (`Fg `Green) string)
+            "VALID"
+            p.psi_reference.pvar.vname
+            (box pp_ctex)
+            ctex)
+      else
+        Fmt.(
+          pf
+            frmt
+            "%s: %a: Is the following in the image of %s?@;%a"
+            (Stats.verif_method_to_str vmethod)
+            (styled (`Fg `White) (styled (`Bg `Red) string))
+            "UNKNOWN"
+            p.psi_reference.pvar.vname
+            (box pp_ctex)
+            ctex))
+;;
+
+let requires_ctex_class
+    (tinv : PMRS.t)
+    (ctex : ctex)
+    (resp : Smtlib.SmtLib.solver_response)
+    (vmethod : Stats.verif_method)
+  =
+  Stats.update_counterexample_classification_method vmethod;
+  Log.verbose (fun frmt () ->
+      if SmtInterface.SyncSmt.is_unsat resp
+      then
+        Fmt.(
+          pf
+            frmt
+            "%s: %a ctex does not satisfy \"%s\":@;<1 4>%a"
+            (Stats.verif_method_to_str vmethod)
+            (styled (`Fg `Red) string)
+            "SPURIOUS"
+            tinv.PMRS.pvar.vname
+            (box pp_ctex)
+            ctex)
+      else if SmtInterface.SyncSmt.is_sat resp
+      then
+        Fmt.(
+          pf
+            frmt
+            "%s: %a ctex satisfies %s:@;<1 4>%a"
+            (Stats.verif_method_to_str vmethod)
+            (styled (`Fg `Green) string)
+            "VALID"
+            tinv.PMRS.pvar.vname
+            (box pp_ctex)
+            ctex)
+      else
+        Fmt.(
+          pf
+            frmt
+            "%s: %a The ctex satisfies %s?@;<1 4>%a"
+            (Stats.verif_method_to_str vmethod)
+            (styled (`Fg `White) (styled (`Bg `Red) string))
+            "UNKNOWN"
+            tinv.PMRS.pvar.vname
+            (box pp_ctex)
+            ctex))
 ;;

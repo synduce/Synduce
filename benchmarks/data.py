@@ -22,7 +22,7 @@ caption_optimizations = "Optimization Evaluation Results: We evaluate {\\tool} a
              Experiments are run on a laptop with 16G memory and an i7-8750H 6-core CPU at 2.20GHz running Ubuntu 19.10."
 
 
-algorithms = ["partbnd", "acegis", "ccegis"]
+algorithms = ["se2gis", "segis", "cegis"]
 versions = ["all", "ini", "st", "d", "off"]
 fields = ["synt", "verif", "#i", "last"]
 
@@ -196,17 +196,17 @@ def produce_tex_table(tex_output_file, data):
                 nai_last = "?"
 
                 bkey = benchmark_class + "/" + benchmark_file + ".pmrs"
-                acegis_bf = False
+                segis_bf = False
 
-                # Pick best optimized version for partbnd
-                a_data = data[bkey, "partbnd"]
+                # Pick best optimized version for se2gis
+                a_data = data[bkey, "se2gis"]
                 versions = ["all", "st", "d", "off"]
                 best_v = "all"
 
-                if (bkey, "partbnd") not in data.keys():
-                    print("No data for %s, partbnd" % bkey)
+                if (bkey, "se2gis") not in data.keys():
+                    print("No data for %s, se2gis" % bkey)
                 else:
-                    b_data = data[bkey, "partbnd"][best_v]
+                    b_data = data[bkey, "se2gis"][best_v]
                     if "res" in b_data:
                         req_iters, _, req_time, _ = b_data["res"]
                         req_t = "%3.2f" % float(req_time)
@@ -216,8 +216,8 @@ def produce_tex_table(tex_output_file, data):
                     if str(b_data["max"]) in b_data:
                         req_last = "%3.2f" % b_data[str(b_data["max"])][1]
 
-                # Pick best optimized version for acegis
-                a_data = data[bkey, "acegis"]
+                # Pick best optimized version for segis
+                a_data = data[bkey, "segis"]
                 versions = ["all", "st", "d", "off"]
                 best_v = "all"
                 best_t = timeout_time
@@ -231,16 +231,16 @@ def produce_tex_table(tex_output_file, data):
                                 best_t = this_t
                                 best_v = version
 
-                if (bkey, "acegis") not in data.keys():
-                    print("No data for %s, acegis" % bkey)
+                if (bkey, "segis") not in data.keys():
+                    print("No data for %s, segis" % bkey)
 
                 else:
-                    b_data = data[bkey, "acegis"][best_v]
+                    b_data = data[bkey, "segis"][best_v]
                     if "res" in b_data:
                         nai_iters, _, nai_time, _ = b_data["res"]
                         nai_t = "%3.2f" % float(nai_time)
                         if req_t == "-" or float(nai_time) < float(req_t):
-                            acegis_bf = True
+                            segis_bf = True
                     else:
                         nai_t = "-"
                         nai_iters = b_data["max"]
@@ -250,7 +250,7 @@ def produce_tex_table(tex_output_file, data):
                 speedups += [[(benchmark_class, benchmark_info[1]),
                               speedup(req_t, nai_t)]]
 
-                if acegis_bf:
+                if segis_bf:
                     nai_t = "{\\bfseries %s}" % nai_t
                 else:
                     req_t = "{\\bfseries %s}" % req_t
@@ -333,13 +333,13 @@ def produce_full_tex_table(tex_output_file, data):
                     csvline += times
             # Make fastest bold
             t_Synduce = floti(csvline[0])
-            t_acegis = floti(csvline[4])
-            t_ccegis = floti(csvline[8])
-            if t_Synduce <= t_acegis and t_Synduce <= t_ccegis:
+            t_segis = floti(csvline[4])
+            t_cegis = floti(csvline[8])
+            if t_Synduce <= t_segis and t_Synduce <= t_cegis:
                 csvline[0] = "{\\bf %s}" % csvline[0]
-            if t_acegis < t_Synduce and t_acegis < t_ccegis:
+            if t_segis < t_Synduce and t_segis < t_cegis:
                 csvline[4] = "{\\bf %s}" % csvline[4]
-            if t_ccegis < t_Synduce and t_ccegis < t_acegis:
+            if t_cegis < t_Synduce and t_cegis < t_segis:
                 csvline[8] = "{\\bf %s}" % csvline[8]
             # Put percentage in italic
             csvline[1] = format_verif(csvline[1])
@@ -392,8 +392,8 @@ def produce_versions_tex_table(tex_output_file, data):
             tex.write("\t\t\t\\hline\n")
         for benchmark_file, benchmark_info in benchmarks:
             bkey = benchmark_class + "/" + benchmark_file + ".pmrs"
-            # Collect Data for partbnd
-            algo = "partbnd"
+            # Collect Data for se2gis
+            algo = "se2gis"
             csvline = []
             if (bkey, algo) in data.keys():
                 bdata = data[bkey, algo]
@@ -416,7 +416,7 @@ def produce_versions_tex_table(tex_output_file, data):
                     indexmin = i
             req_csvline[indexmin] = bold(req_csvline[indexmin])
             # Collect data for ACEGIS
-            algo = "acegis"
+            algo = "segis"
             csvline = []
             if (bkey, algo) in data.keys():
                 bdata = data[bkey, algo]

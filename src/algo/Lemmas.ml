@@ -655,7 +655,7 @@ let mk_model_sat_asserts det f_o_r instantiate =
 ;;
 
 let verify_lemma_bounded ~(p : psi_def) (det : term_state_detail)
-    : AsyncSmt.response * int Lwt.u
+    : (Utils.Stats.verif_method * S.solver_response) Lwt.t * int Lwt.u
   =
   let logic = SmtLogic.infer_logic ~logic_infos:(AState.psi_def_logics p) [] in
   let task (solver, starter) =
@@ -784,13 +784,13 @@ let verify_lemma_bounded ~(p : psi_def) (det : term_state_detail)
     in
     let* res = expand_loop (TermSet.singleton det.term) in
     let* () = AsyncSmt.close_solver solver in
-    return res
+    return (Utils.Stats.BoundedChecking, res)
   in
   AsyncSmt.(cancellable_task (make_solver "cvc") task)
 ;;
 
 let verify_lemma_unbounded ~(p : psi_def) (det : term_state_detail)
-    : AsyncSmt.response * int Lwt.u
+    : (Utils.Stats.verif_method * S.solver_response) Lwt.t * int Lwt.u
   =
   let build_task (cvc4_instance, task_start) =
     let%lwt _ = task_start in
@@ -814,7 +814,7 @@ let verify_lemma_unbounded ~(p : psi_def) (det : term_state_detail)
     in
     let%lwt () = AsyncSmt.close_solver cvc4_instance in
     Log.debug_msg "Unbounded lemma verification is complete.";
-    return final_response
+    return (Utils.Stats.Induction, final_response)
   in
   AsyncSmt.(cancellable_task (AsyncSmt.make_solver "cvc") build_task)
 ;;
@@ -824,7 +824,7 @@ let verify_lemma_unbounded ~(p : psi_def) (det : term_state_detail)
   is correct while the smt solver attempt to find a counterexample.
 *)
 let verify_lemma_candidate ~(p : psi_def) (det : term_state_detail)
-    : SyncSmt.solver_response
+    : Utils.Stats.verif_method * SyncSmt.solver_response
   =
   match det.lemma_candidate with
   | None -> failwith "Cannot verify lemma candidate; there is none."
@@ -843,7 +843,7 @@ let verify_lemma_candidate ~(p : psi_def) (det : term_state_detail)
       | End_of_file ->
         Log.error_msg "Solvers terminated unexpectedly  ⚠️ .";
         Log.error_msg "Please inspect logs.";
-        SmtLib.Unknown
+        BoundedChecking, SmtLib.Unknown
     in
     resp
 ;;
@@ -1118,8 +1118,8 @@ let rec lemma_refinement_loop ~(p : psi_def) (det : term_state_detail)
         det
     else (
       match verify_lemma_candidate ~p { det with lemma_candidate = Some lemma_term } with
-      | Unsat ->
-        AlgoLog.lemma_proved_correct det lemma_term;
+      | vmethod, Unsat ->
+        AlgoLog.lemma_proved_correct vmethod det lemma_term;
         let lemma =
           match det.current_preconds with
           | None -> lemma_term
@@ -1127,8 +1127,8 @@ let rec lemma_refinement_loop ~(p : psi_def) (det : term_state_detail)
           (* mk_bin Binop.And (mk_un Unop.Not pre) lemma_term *)
         in
         Some { det with lemma_candidate = None; lemmas = lemma :: det.lemmas }
-      | SmtLib.SExps x ->
-        AlgoLog.lemma_not_proved_correct ();
+      | vmethod, SmtLib.SExps x ->
+        AlgoLog.lemma_not_proved_correct vmethod;
         let new_positive_ctexs =
           parse_positive_example_solver_model (SmtLib.SExps x) det
         in
@@ -1138,12 +1138,12 @@ let rec lemma_refinement_loop ~(p : psi_def) (det : term_state_detail)
                 Fmt.(pf f "Found a positive example: %a" (box pp_ctex) ctex)))
           new_positive_ctexs;
         lemma_refinement_loop
-          { det with positive_ctexs = det.positive_ctexs @ new_positive_ctexs }
           ~p
-      | Sat ->
+          { det with positive_ctexs = det.positive_ctexs @ new_positive_ctexs }
+      | _, Sat ->
         Log.error_msg "Lemma verification returned Sat. This is unexpected.";
         None
-      | Unknown ->
+      | _, Unknown ->
         Log.error_msg "Lemma verification returned Unknown.";
         None
       | _ ->
