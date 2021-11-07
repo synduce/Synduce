@@ -24,6 +24,11 @@ let use_syntactic_definitions = ref true
  *)
 let make_partial_correctness_assumption = ref true
 
+(**
+  Turn on with --lemma-sketches.
+ *)
+let make_partial_lemma_sketches = ref false
+
 (** Separate systems of equations into subsystems, and solve independently each subsystem.
   Use option -s or --split-solving-off to turn off.
 *)

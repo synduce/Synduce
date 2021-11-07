@@ -72,6 +72,29 @@ end
 (* ============================================================================================= *)
 (*                                  TERM REDUCTION                                               *)
 (* ============================================================================================= *)
+let project_irreducible_terms (t : term) =
+  let case frec t =
+    match t.tkind with
+    | TVar v ->
+      (match Variable.vtype_or_new v with
+      | RType.TTup tl ->
+        Some (mk_tup (List.mapi tl ~f:(fun i typ -> mk_sel ~typ:(Some typ) (mk_var v) i)))
+      | _ -> None)
+    | TApp (f, args) ->
+      let f' = frec f
+      and args' = List.map ~f:frec args in
+      let _, tout = RType.fun_typ_unpack (type_of f') in
+      (match tout with
+      | RType.TTup tl ->
+        Some
+          (mk_tup
+             (List.mapi tl ~f:(fun i typ -> mk_sel ~typ:(Some typ) (mk_app f' args') i)))
+      | _ -> None)
+    | _ -> None
+  in
+  transform ~case t
+;;
+
 type func_resolution =
   | FRFun of fpattern list * term
   | FRPmrs of PMRS.t
@@ -136,7 +159,7 @@ let rule_lookup prules (f : variable) (fargs : term list) : term list =
 (**
   reduce_term reduces a term using only the lambda-calculus
 *)
-let rec reduce_term ?(unboxing = false) (t : term) : term =
+let rec reduce_term ?(projecting = false) ?(unboxing = false) (t : term) : term =
   let one_step t =
     let rstep = ref false in
     let case f t =
@@ -199,7 +222,7 @@ let rec reduce_term ?(unboxing = false) (t : term) : term =
         Some x
       | None -> None
     in
-    transform ~case t, !rstep
+    transform ~case (if projecting then project_irreducible_terms t else t), !rstep
   in
   until_irreducible one_step t
 

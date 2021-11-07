@@ -1,7 +1,7 @@
 import sys
 
 # Timeout for all experiments.
-timeout_value = 700
+timeout_value = 400
 
 if sys.platform.startswith('linux'):
     timeout = ("timeout %i" %
@@ -107,7 +107,7 @@ constraint_benchmarks = [
     # all positive
     ["constraints/all_positive/list_mps.ml", ""],
     ["constraints/all_positive/sndmin.ml", "-NB"],
-    # ["constraints/all_positive/sndmax.ml", "-NB"], Unsafe for now, sometimes takes 10min
+    ["constraints/all_positive/sndmax.ml", "-NB"],
     # evenlist
     ["constraints/evenlist/parity_of_first.ml", ""],
     ["constraints/evenlist/parity_of_last.ml", ""],
@@ -149,11 +149,11 @@ constraint_benchmarks = [
     ["constraints/even_tree/sum_of_parities.ml", "-NB"],
     ["constraints/even_tree/parity_of_max.ml", ""],
     # program
-    #["constraints/program/typecheck.ml", ""],
+    # ["constraints/program/typecheck.ml", ""],
     # unimodal
     #["constraints/unimodal_list/max_logn.ml", "-B"],
-    ["constraints/unimodal_list/max_logn_v2.ml", "-kNB"],
-    ["constraints/unimodal_list/max_in_um_pos.ml", ""],
+    ["constraints/unimodal_list/max_logn_v2.ml", ""],
+    #["constraints/unimodal_list/max_in_um_pos.ml", ""],
     # Size constraint
     ["constraints/size/obfuscated_length.ml", ""],
     ["constraints/size/obfuscated_length_3.ml", ""]
@@ -182,7 +182,7 @@ base_benchmark_set = [
     ["list/hamming.pmrs", ""],
     ["list/last.pmrs", ""],
     ["list/lenhom.pmrs", ""],
-    ["list/line_of_sight.pmrs", ""],
+    ["list/line_of_sight.ml", ""],
     ["list/maxcount.pmrs", ""],
     ["list/maxhom.pmrs", ""],
     ["list/mincount.pmrs", ""],
@@ -249,7 +249,7 @@ base_benchmark_set = [
     ["treepaths/mips.pmrs", ""],
     ["treepaths/sum.pmrs", ""],
     # Split lists
-    ["unimodal_lists/sm.ml", ""],
+    ["unimodal_lists/sum.ml", ""],
     ["unimodal_lists/search_no_optim.ml", ""],
     # Zippers
     ["zippers/list_sum.ml", ""],

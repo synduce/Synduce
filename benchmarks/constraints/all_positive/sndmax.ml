@@ -1,3 +1,5 @@
+(** @synduce -NB -n 50 -l *)
+
 type clist =
   | Empty
   | Elt of int

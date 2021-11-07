@@ -275,6 +275,7 @@ let set_logic_info_of_pmrs (p : t) : t =
     SmtLogic.
       { theory = Smtlib.Logics.join_theories theory logic_info.theory
       ; linearity = logic_info.linearity && Set.for_all ~f:Operator.is_lia operators
+      ; datatypes = SmtLogic.term_requires_datatype rhs
       }
   in
   let li = Map.fold ~f ~init:SmtLogic.base_logic_info p.prules in

@@ -173,7 +173,7 @@ let eusolver_binary_path =
   | _ -> ""
 ;;
 
-let verification_solver = ref "cvc"
+let verification_solver = ref "z3"
 
 let set_verification_solver (s : string) =
   match s with
@@ -237,7 +237,8 @@ let options print_usage parse_only =
   ; 'I', "interactive", set interactive_lemmas true, None
   ; 'j', "json", Some set_json_out, None
   ; 'J', "interactive-lifting", set interactive_lifting true, None
-  ; 'k', "skip-lemmas", set bound_after_verif true, None
+  ; 'k', "post-bounding", set bound_after_verif true, None
+  ; 'l', "lemma-sketch", set make_partial_lemma_sketches true, None
   ; 'L', "interactive-loop", set interactive_lemmas_loop true, None
   ; 'm', "style-math", set math_display true, None
   ; 'n', "verification", None, Some set_num_expansions_check

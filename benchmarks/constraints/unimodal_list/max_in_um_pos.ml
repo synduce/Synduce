@@ -33,11 +33,11 @@ and is_unimodal_list = function
 
 and aux_up pr = function
   | Nil -> pr >= 0
-  | Cons (x, l) -> pr >= 0 && if pr <= x then aux_up x l else aux_down x l
+  | Cons (x, l) -> pr >= 0 && if pr < x then aux_up x l else aux_down x l
 
 and aux_down pr = function
-  | Nil -> pr >= 0
-  | Cons (x, l) -> pr >= 0 && pr >= x && aux_down x l
+  | Nil -> pr > 0
+  | Cons (x, l) -> pr >= 0 && pr > x && aux_down x l
 ;;
 
 (* This is just a sum to test the tool on accepting the unimodal list specification. *)
