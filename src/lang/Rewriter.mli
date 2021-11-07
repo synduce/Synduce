@@ -131,10 +131,12 @@ module Skeleton : sig
     | SUn of Term.Unop.t * t
     | SIte of t * t * t
     | SType of RType.t
+    | STypedWith of RType.t * t list
     | SArg of int
     | STuple of t list
     | SNonGuessable
 
+  val pp : t Fmt.t
   val of_expression : Expression.t -> t option
 end
 

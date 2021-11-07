@@ -1,3 +1,5 @@
+(** @synduce -NBk -n 30 *)
+
 (* A data type representing lists in a tree format, where the list elements
    are kept where the list is "split" as opposed to concat-lists where
    all the elements are in the leaves.

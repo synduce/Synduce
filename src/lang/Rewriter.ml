@@ -808,9 +808,24 @@ module Skeleton = struct
     | SIte of t * t * t (** An if-then-else.  *)
     | SType of RType.t
         (** A guess of some type (to be filled with the appropriate non-terminal).  *)
+    | STypedWith of RType.t * t list
     | SArg of int (** A direct reference to a function argument.  *)
     | STuple of t list
     | SNonGuessable
+
+  let rec pp (frmt : Formatter.t) (sk : t) : unit =
+    match sk with
+    | SChoice l -> Fmt.(pf frmt "(%a)" (list ~sep:vbar pp) l)
+    | SBin (op, a, b) -> Fmt.(pf frmt "(%a %a %a)" Binop.pp op (box pp) a (box pp) b)
+    | SUn (op, a) -> Fmt.(pf frmt "(%a %a)" Unop.pp op (box pp) a)
+    | SIte (a, b, c) -> Fmt.(pf frmt "(ite@;%a@;%a@;%a)" (box pp) a (box pp) b (box pp) c)
+    | SType t -> Fmt.(pf frmt "<%a?>" RType.pp t)
+    | STypedWith (t, choices) ->
+      Fmt.(pf frmt "<%a?>(%a)" RType.pp t (box (list ~sep:sp pp)) choices)
+    | SArg i -> Fmt.(pf frmt "@%i" i)
+    | STuple tl -> Fmt.(pf frmt "(tuple %a)" (box (list ~sep:sp pp)) tl)
+    | SNonGuessable -> Fmt.(pf frmt "!?")
+  ;;
 
   let rec of_expression : Expression.t -> t option = function
     | EInt _ -> Some (SType RType.TInt)

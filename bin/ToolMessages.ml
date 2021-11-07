@@ -105,6 +105,7 @@ let print_usage () =
     \       --no-syndef                 Do not use syntactic definitions.\n\
     \    -t --no-detupling              Turn off detupling.\n\
     \    -c --simple-init               Initialize T naively.\n\
+    \    -l --lemma-sketch              Sketch lemmas in synthesis.\n\
     \       --acegis                    Use the Abstract CEGIS algorithm. Turns bmc on.\n\
     \       --ccegis                    Use the Concrete CEGIS algorithm. Turns bmc on.\n\
     \       --no-assumptions            Don't  partial correctness assumptions.\n\

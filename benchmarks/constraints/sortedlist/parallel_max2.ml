@@ -1,4 +1,4 @@
-(** @synduce --no-lifting *)
+(** @synduce --no-lifting -NB -n 30 *)
 
 type 'a list =
   | Elt of 'a

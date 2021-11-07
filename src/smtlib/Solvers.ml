@@ -105,7 +105,9 @@ module Synchronous (Log : Logger) (Stats : Statistics) = struct
     in
     match Result.map ~f:(fun l -> parse_response [ l ]) l with
     | Ok r -> r
-    | Error sexps -> SExps [ Atom "error"; sexps ]
+    | Error sexps ->
+      Log.error (fun fmt () -> Sexp.pp fmt (List [ Atom "error"; sexps ]));
+      SExps [ Atom "error"; sexps ]
   ;;
 
   let already_declared (solver : online_solver) (s : smtSymbol) : bool =
