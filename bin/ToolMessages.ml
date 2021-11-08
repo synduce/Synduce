@@ -13,60 +13,85 @@ let prep_final_json
     ~(is_ocaml_syntax : bool)
     (source_filename : string ref)
     (pb : Algo.AState.psi_def)
-    (soln : Algo.AState.soln)
+    (soln : (Algo.AState.soln, bool) Either.t)
     (elapsed : float)
+    (verif : float)
     : Yojson.t
   =
   let _ = is_ocaml_syntax, source_filename, pb, soln in
   let solvers = Utils.LogJson.solvers_summary () in
   let refinement_steps = Utils.LogJson.refinement_steps_summary () in
+  let algo =
+    if !Config.Optims.use_segis
+    then "SEGIS"
+    else if !Config.Optims.use_cegis
+    then "CEGIS"
+    else "SE2GIS"
+  in
+  let soln_or_refutation =
+    match soln with
+    | Either.First soln ->
+      [ ( "solution"
+        , `String
+            (Fmt.str
+               "%a"
+               (box (Algo.AState.pp_soln ~use_ocaml_syntax:is_ocaml_syntax))
+               soln) )
+      ; "unrealizable", `Bool false
+      ]
+    | Either.Second _ -> [ "unrealizable", `Bool true ]
+  in
   `Assoc
-    [ "total_elapsed", `Float elapsed
-    ; "solver-usage", solvers
-    ; "refinement-steps", refinement_steps
-    ; ( "solution"
-      , `String
-          (Fmt.str
-             "%a"
-             (box (Algo.AState.pp_soln ~use_ocaml_syntax:is_ocaml_syntax))
-             soln) )
-    ]
+    ([ "algorithm", `String algo
+     ; "total_elapsed", `Float elapsed
+     ; "verif_elapsed", `Float verif
+     ; "solver-usage", solvers
+     ; "refinement-steps", refinement_steps
+     ]
+    @ soln_or_refutation)
 ;;
 
 let on_success
     ~(is_ocaml_syntax : bool)
     (source_filename : string ref)
     (pb : Algo.AState.psi_def)
-    (soln : Algo.AState.soln)
+    (result : (Algo.AState.soln, bool) Either.t)
     : unit
   =
   let elapsed = Stats.get_glob_elapsed () in
   let verif_ratio = 100.0 *. (!Stats.verif_time /. elapsed) in
   Log.(info print_solvers_summary);
-  Log.info
-    Fmt.(
-      fun frmt () ->
-        pf
-          frmt
-          "Solution found in %4.4fs (%3.1f%% verifying):@.%a@]"
-          elapsed
-          verif_ratio
-          (box (Algo.AState.pp_soln ~use_ocaml_syntax:is_ocaml_syntax))
-          soln);
+  (* Print the solution. *)
+  (match result with
+  | Either.First soln ->
+    Log.info
+      Fmt.(
+        fun frmt () ->
+          pf
+            frmt
+            "Solution found in %4.4fs (%3.1f%% verifying):@.%a@]"
+            elapsed
+            verif_ratio
+            (box (Algo.AState.pp_soln ~use_ocaml_syntax:is_ocaml_syntax))
+            soln)
+  | Either.Second _ -> Log.(info (wrap "No solution: problem is unrealizable.")));
   (* If output specified, write the solution in file. *)
-  (match Config.get_output_file !source_filename with
-  | Some out_file ->
-    Utils.Log.to_file out_file (fun frmt () ->
-        (box (Algo.AState.pp_soln ~use_ocaml_syntax:is_ocaml_syntax)) frmt soln)
-  | None -> ());
-  (* If specified, output a Dafny proof skeleton. *)
-  if !Config.generate_proof
-  then
-    Codegen.(
-      Generation.gen_proof
-        (Commons.problem_descr_of_psi_def pb, Some soln)
-        !Config.proof_generation_file)
-  else ();
+  (match result with
+  | Either.First soln ->
+    (match Config.get_output_file !source_filename with
+    | Some out_file ->
+      Utils.Log.to_file out_file (fun frmt () ->
+          (box (Algo.AState.pp_soln ~use_ocaml_syntax:is_ocaml_syntax)) frmt soln)
+    | None -> ());
+    (* If specified, output a Dafny proof skeleton. *)
+    if !Config.generate_proof
+    then
+      Codegen.(
+        Generation.gen_proof
+          (Commons.problem_descr_of_psi_def pb, Some soln)
+          !Config.proof_generation_file)
+    else ()
+  | _ -> ());
   (* If no info required, output timing information. *)
   if (not !Config.info) && !Config.timings
   then (
@@ -75,7 +100,9 @@ let on_success
     Fmt.(pf stdout "success@."));
   if !Config.json_out
   then (
-    let json = prep_final_json ~is_ocaml_syntax source_filename pb soln elapsed in
+    let json =
+      prep_final_json ~is_ocaml_syntax source_filename pb result elapsed !Stats.verif_time
+    in
     if !Config.json_progressive
     then (
       Yojson.to_channel ~std:true Stdio.stdout json;
@@ -106,9 +133,15 @@ let print_usage () =
     \    -t --no-detupling              Turn off detupling.\n\
     \    -c --simple-init               Initialize T naively.\n\
     \    -l --lemma-sketch              Sketch lemmas in synthesis.\n\
-    \       --acegis                    Use the Abstract CEGIS algorithm. Turns bmc on.\n\
+     <<<<<<< HEAD\n\
+    \           --acegis                    Use the Abstract CEGIS algorithm. Turns bmc \
+     on.\n\
     \       --ccegis                    Use the Concrete CEGIS algorithm. Turns bmc on.\n\
-    \       --no-assumptions            Don't  partial correctness assumptions.\n\
+     =======\n\
+    \           --segis                    Use the Abstract CEGIS algorithm. Turns bmc on.\n\
+    \       --cegis                    Use the Concrete CEGIS algorithm. Turns bmc on.\n\
+     >>>>>>> 54628d9a06d33c9eb1d7db2a5596c3beda02d2a4\n\
+    \           --no-assumptions            Don't  partial correctness assumptions.\n\
     \       --no-simplify               Don't simplify equations with partial evaluation.\n\
     \       --no-gropt                  Don't optimize grammars (level 0)\n\
     \       --set-gropt=NUM             Set grammar optimization level (NUM=0,1 or 2)\n\
@@ -119,7 +152,7 @@ let print_usage () =
     \       --sysfe-opt-off             Turn off optimizations to solve systems of \
      equations in parallel\n\
     \  Bounded checking:\n\
-    \       --use-bmc                   Use acegis bounded model checking (bmc mode).\n\
+    \       --use-bmc                   Use segis bounded model checking (bmc mode).\n\
     \    -b --bmc=MAX_DEPTH             Maximum depth of terms for bounded model \
      checking, in bmc mode.\n\
     \    -n --verification=NUM          Number of expand calls for bounded model \

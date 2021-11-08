@@ -47,15 +47,15 @@ let bound_after_verif = ref false
 
 (**
   Not an optimization. Set to true to use the base abstract cegis algorithm.
-  Option --use-acegis sets this flag to true.
+  Option --use-segis sets this flag to true.
   *)
-let use_acegis = ref false
+let use_segis = ref false
 
 (**
   Not an optimization. Set to true to use the base concrete cegis algorithm.
-  Option --use-ccegis sets this flag to true.
+  Option --use-cegis sets this flag to true.
   *)
-let use_ccegis = ref false
+let use_cegis = ref false
 
 (**
   Simplify equations before feeding them to equations solver.

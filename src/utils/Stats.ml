@@ -166,6 +166,7 @@ let log_new_major_step ~tsize ~usize () =
 ;;
 
 let log_major_step_end
+    ?(failure_step = false)
     ~(synth_time : float)
     ~(verif_time : float)
     ~(t : int)
@@ -184,6 +185,7 @@ let log_major_step_end
       ; "verified", `Bool verified
       ]
   in
+  let kw = if failure_step then "failed" else "success" in
   match Stack.pop refinement_log with
   | Some x ->
     (match x with
@@ -191,16 +193,43 @@ let log_major_step_end
     | step_no :: start_info :: failures ->
       Stack.push
         refinement_log
-        ([ step_no; start_info; "failures", `Assoc failures ] @ [ "success", json ])
-    | _ -> Stack.push refinement_log (x @ [ "success", json ]))
-  | None -> Stack.push refinement_log [ "success", json ]
+        ([ step_no; start_info; "failures", `Assoc failures ] @ [ kw, json ])
+    | _ -> Stack.push refinement_log (x @ [ kw, json ]))
+  | None -> Stack.push refinement_log [ kw, json ]
+;;
+
+type verif_method =
+  | BoundedChecking
+  | Induction
+
+let verif_method_to_str = function
+  | BoundedChecking -> "bounded checking"
+  | Induction -> "induction"
+;;
+
+let counterexample_classification_method : verif_method option ref = ref None
+
+let update_counterexample_classification_method (v : verif_method) =
+  match !counterexample_classification_method with
+  | None -> counterexample_classification_method := Some v
+  (* If the method was induction, it either stays induction or switched to bmc. *)
+  | Some Induction -> counterexample_classification_method := Some v
+  (* Method cannot change back to induction if we used boundedchecking at some point. *)
+  | Some BoundedChecking -> ()
 ;;
 
 let last_lemma_synthesized : (string * string) option ref = ref None
 
+(**  If a lemma has been proved, the [Some true] means it has been proved by induction
+  and [Some false] means it has been proved by bounded checking.
+*)
+let last_lemma_proved : verif_method option ref = ref None
+
 let set_lemma_synthesized (kind : string) (expression : string) =
   last_lemma_synthesized := Some (kind, expression)
 ;;
+
+let set_last_lemma_proof_method (v : verif_method) = last_lemma_proved := Some v
 
 let log_minor_step ~(synth_time : float) ~(auxtime : float) (lifted : bool) : unit =
   let elapsed = get_glob_elapsed () in
@@ -211,12 +240,24 @@ let log_minor_step ~(synth_time : float) ~(auxtime : float) (lifted : bool) : un
        ; "aux_time", `Float auxtime
        ; "lifted", `Bool lifted
        ]
+      @ (match !counterexample_classification_method with
+        | Some vmethod ->
+          [ "cex_classification_with", `String (verif_method_to_str vmethod) ]
+        | None -> [])
       @
       match !last_lemma_synthesized with
-      | Some (kind_id, lemma_term) -> [ kind_id, `String lemma_term ]
+      | Some (kind_id, lemma_term) ->
+        [ kind_id, `String lemma_term ]
+        @
+        (match !last_lemma_proved with
+        | Some proof_method -> [ "proved_by", `String (verif_method_to_str proof_method) ]
+        | None -> [])
       | None -> [])
   in
+  (* Resset all the fields. *)
   last_lemma_synthesized := None;
+  last_lemma_proved := None;
+  counterexample_classification_method := None;
   match Stack.pop refinement_log with
   | Some x ->
     let entry_name = Fmt.(str "failure_%i" (List.length x - 2)) in

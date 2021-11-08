@@ -1,228 +1,195 @@
-⏺ Category: indexed_list
-  (1 / 153) ✅ position_polynomial_no_index             ×1 runs, average:  0.615s ± 0ms         R: ++^+✓
-  (2 / 153) ✅ search_no_index                          ×1 runs, average:  1.314s ± 0ms         R: ++^+✓
-  (3 / 153) ✅ sum_elts_lt_pos_no_len                   ×1 runs, average:  77.623s ± 0ms        R: ++^+✓
-
-⏺ Category: list
-  (4 / 153) ✅ atoi_no_fac                              ×1 runs, average:  1.810s ± 0ms         R: +^++✓
-  (5 / 153) ✅ is_sorted_no_last                        ×1 runs, average:  16.324s ± 0ms        R: ++^+✓
-  (6 / 153) ✅ largest_diff_sorted_list_nohead          ×1 runs, average:  0.052s ± 0ms         R: +^+✓
-  (7 / 153) ✅ mps_no_sum                               ×1 runs, average:  1.924s ± 0ms         R: +^++✓
-  (8 / 153) ✅ poly_no_fac                              ×1 runs, average:  0.354s ± 0ms         R: +^+✓
-  (9 / 153) ✅ zero_after_one_no                        ×1 runs, average:  1.426s ± 0ms         R: +^++✓
-
-⏺ Category: tailopt
- (10 / 153) ✅ mps_no_sum                               ×1 runs, average:  10.734s ± 0ms        R: ++^+✓
-
-⏺ Category: combine
- (11 / 153) ✅ mts_and_mps_nosum                        ×1 runs, average:  26.704s ± 0ms        R: ++^+✓
-
-⏺ Category: sort_list
- (12 / 153) ✅ sndmax                                   ×1 runs, average:  0.958s ± 0ms         R: ++^+✓
- (13 / 153) ✅ sndmin                                   ×1 runs, average:  0.641s ± 0ms         R: ++^+✓
-
-⏺ Category: tree
- (14 / 153) ✅ gradient                                 ×1 runs, average:  0.987s ± 0ms         R: +^✓
- (15 / 153) ✅ mits_nosum                               ×1 runs, average:  4.087s ± 0ms         R: ++^++✓
-
-⏺ Category: unimodal_lists
- (16 / 153) ✅ prod_needs_aux                           ×1 runs, average:  1.973s ± 0ms         R: +^✓
+Running Table 5 Benchmarks.
 
 ⏺ Category: constraints->ensures
- (17 / 153) ✅ mps_no_ensures                           ×1 runs, average:  0.739s ± 0ms         R: +..✓
- (18 / 153) ✅ mts_no_ensures                           ×1 runs, average:  0.577s ± 0ms         R: +.+✓
- (19 / 153) ✅ mss_no_ensures                           ×1 runs, average:  18.507s ± 0ms        R: +......++✓
+  (1 / 148) ✅ SE2GIS : mps_no_ensures                    ×1 runs, average:  0.753s ± 0ms         B:✓,B':✓ | R: +..✓
+  (2 / 148) ✅ SEGIS  : mps_no_ensures                    ×1 runs, average:  4.461s ± 0ms                  | R: +++++✓
+  (3 / 148) ✅ SE2GIS : mts_no_ensures                    ×1 runs, average:  0.544s ± 0ms         B:✓,B':✓ | R: +.+✓
+  (4 / 148) ✅ SEGIS  : mts_no_ensures                    ×1 runs, average:  5.879s ± 0ms                  | R: +++++✓
+  (5 / 148) ✅ SE2GIS : mss_no_ensures                    ×1 runs, average:  18.479s ± 0ms        B:✓,B':✓ | R: +......++✓
+  (6 / 148) ❌ constraints/ensures/mss_no_ensures.ml,segis+all
 
 ⏺ Category: constraints->sortedlist
- (20 / 153) ✅ min                                      ×1 runs, average:  0.091s ± 0ms         R: +..✓
- (21 / 153) ✅ max                                      ×1 runs, average:  0.102s ± 0ms         R: +..✓
- (22 / 153) ✅ count_lt                                 ×1 runs, average:  0.050s ± 0ms         R: +.✓
- (23 / 153) ✅ index_of                                 ×1 runs, average:  0.893s ± 0ms         R: +..✓
- (24 / 153) ✅ is_intersection_empty                    ×1 runs, average:  0.054s ± 0ms         R: +✓
- (25 / 153) ✅ largest_diff                             ×1 runs, average:  0.035s ± 0ms         R: ++✓
- (26 / 153) ✅ smallest_diff                            ×1 runs, average:  0.017s ± 0ms         R: +✓
- (27 / 153) ✅ sndmind                                  ×1 runs, average:  3.257s ± 0ms         R: +...✓
- (28 / 153) ✅ sndmax_empty_base_case                   ×1 runs, average:  5.078s ± 0ms         R: +.+..✓
- (29 / 153) ✅ sndmax_empty_base_case_v2                ×1 runs, average:  8.279s ± 0ms         R: +...+...✓
- (30 / 153) ✅ sndmax_len2_base_case                    ×1 runs, average:  0.774s ± 0ms         R: +....✓
- (31 / 153) ✅ parallel_min                             ×1 runs, average:  0.894s ± 0ms         R: +..✓
- (32 / 153) ✅ parallel_max                             ×1 runs, average:  0.857s ± 0ms         R: +.✓
- (33 / 153) ✅ parallel_max2                            ×1 runs, average:  0.898s ± 0ms         R: +..✓
+  (7 / 148) ✅ SE2GIS : min                               ×1 runs, average:  0.092s ± 0ms         B:~,B':✓ | R: +..✓
+  (8 / 148) ✅ SEGIS  : min                               ×1 runs, average:  0.010s ± 0ms                  | R: +✓
+  (9 / 148) ✅ SE2GIS : max                               ×1 runs, average:  0.102s ± 0ms         B:~,B':✓ | R: +..✓
+ (10 / 148) ✅ SEGIS  : max                               ×1 runs, average:  0.010s ± 0ms                  | R: +✓
+ (11 / 148) ✅ SE2GIS : count_lt                          ×1 runs, average:  0.050s ± 0ms         B:✓,B':✓ | R: +.✓
+ (12 / 148) ✅ SEGIS  : count_lt                          ×1 runs, average:  0.026s ± 0ms                  | R: ++✓
+ (13 / 148) ✅ SE2GIS : index_of                          ×1 runs, average:  0.876s ± 0ms         B:~,B':✓ | R: +..✓
+ (14 / 148) ✅ SEGIS  : index_of                          ×1 runs, average:  0.712s ± 0ms                  | R: ++✓
+ (15 / 148) ✅ SE2GIS : is_intersection_empty             ×1 runs, average:  0.053s ± 0ms                  | R: +✓
+ (16 / 148) ✅ SEGIS  : is_intersection_empty             ×1 runs, average:  0.138s ± 0ms                  | R: ++++✓
+ (17 / 148) ✅ SE2GIS : largest_diff                      ×1 runs, average:  0.034s ± 0ms                  | R: ++✓
+ (18 / 148) ✅ SEGIS  : largest_diff                      ×1 runs, average:  0.952s ± 0ms                  | R: +++✓
+ (19 / 148) ✅ SE2GIS : smallest_diff                     ×1 runs, average:  0.016s ± 0ms                  | R: +✓
+ (20 / 148) ✅ SEGIS  : smallest_diff                     ×1 runs, average:  0.025s ± 0ms                  | R: ++✓
+ (21 / 148) ✅ SE2GIS : sndmind                           ×1 runs, average:  3.251s ± 0ms         B:✓,B':✓ | R: +...✓
+ (22 / 148) ✅ SEGIS  : sndmind                           ×1 runs, average:  0.125s ± 0ms                  | R: ++✓
+ (23 / 148) ✅ SE2GIS : sndmax_empty_base_case            ×1 runs, average:  4.969s ± 0ms         B:~,B':~ | R: +.+..✓
+ (24 / 148) ❌ constraints/sortedlist/sndmax_empty_base_case.ml,segis+all
+ (25 / 148) ✅ SE2GIS : sndmax_empty_base_case_v2         ×1 runs, average:  8.367s ± 0ms         B:~,B':~ | R: +...+...✓
+ (26 / 148) ❌ constraints/sortedlist/sndmax_empty_base_case_v2.ml,segis+all
+ (27 / 148) ✅ SE2GIS : sndmax_len2_base_case             ×1 runs, average:  0.769s ± 0ms         B:✓,B':✓ | R: +....✓
+ (28 / 148) ✅ SEGIS  : sndmax_len2_base_case             ×1 runs, average:  0.024s ± 0ms                  | R: ++✓
+ (29 / 148) ✅ SE2GIS : parallel_min                      ×1 runs, average:  0.875s ± 0ms         B:~,B':~ | R: +..✓
+ (30 / 148) ✅ SEGIS  : parallel_min                      ×1 runs, average:  0.026s ± 0ms                  | R: +✓
+ (31 / 148) ✅ SE2GIS : parallel_max                      ×1 runs, average:  0.832s ± 0ms         B:~,B':~ | R: +.✓
+ (32 / 148) ✅ SEGIS  : parallel_max                      ×1 runs, average:  0.024s ± 0ms                  | R: +✓
+ (33 / 148) ✅ SE2GIS : parallel_max2                     ×1 runs, average:  0.870s ± 0ms         B:~,B':~ | R: +..✓
+ (34 / 148) ✅ SEGIS  : parallel_max2                     ×1 runs, average:  0.025s ± 0ms                  | R: +✓
 
 ⏺ Category: constraints->sorted_and_indexed
- (34 / 153) ✅ count_lt0                                ×1 runs, average:  1.488s ± 0ms         R: +..✓
- (35 / 153) ✅ count_lt                                 ×1 runs, average:  1.684s ± 0ms         R: +..✓
+ (35 / 148) ✅ SE2GIS : count_lt0                         ×1 runs, average:  1.440s ± 0ms         B:~,B':~ | R: +..✓
+ (36 / 148) ✅ SEGIS  : count_lt0                         ×1 runs, average:  0.038s ± 0ms                  | R: ++✓
+ (37 / 148) ✅ SE2GIS : count_lt                          ×1 runs, average:  1.644s ± 0ms         B:~,B':~ | R: +..✓
+ (38 / 148) ✅ SEGIS  : count_lt                          ×1 runs, average:  0.047s ± 0ms                  | R: ++✓
 
 ⏺ Category: constraints->constantlist
- (36 / 153) ✅ index_of                                 ×1 runs, average:  1.008s ± 0ms         R: +.✓
- (37 / 153) ✅ contains                                 ×1 runs, average:  1.249s ± 0ms         R: +..✓
+ (39 / 148) ✅ SE2GIS : index_of                          ×1 runs, average:  0.999s ± 0ms         B:✓,B':✓ | R: +.✓
+ (40 / 148) ✅ SEGIS  : index_of                          ×1 runs, average:  1.441s ± 0ms                  | R: ++✓
+ (41 / 148) ✅ SE2GIS : contains                          ×1 runs, average:  1.234s ± 0ms         B:~,B':✓ | R: +..✓
+ (42 / 148) ✅ SEGIS  : contains                          ×1 runs, average:  1.660s ± 0ms                  | R: ++✓
 
 ⏺ Category: constraints->all_positive
- (38 / 153) ✅ list_mps                                 ×1 runs, average:  0.544s ± 0ms         R: +..✓
- (39 / 153) ✅ sndmin                                   ×1 runs, average:  1.403s ± 0ms         R: +.✓
- (40 / 153) ✅ sndmax                                   ×1 runs, average:  18.360s ± 0ms        R: +.+...✓
+ (43 / 148) ✅ SE2GIS : list_mps                          ×1 runs, average:  0.541s ± 0ms         B:✓,B':✓ | R: +..✓
+ (44 / 148) ✅ SEGIS  : list_mps                          ×1 runs, average:  1.308s ± 0ms                  | R: ++++✓
+ (45 / 148) ✅ SE2GIS : sndmin                            ×1 runs, average:  1.323s ± 0ms         B:~,B':~ | R: +.✓
+ (46 / 148) ✅ SEGIS  : sndmin                            ×1 runs, average:  0.577s ± 0ms                  | R: +✓
+ (47 / 148) ✅ SE2GIS : sndmax                            ×1 runs, average:  11.976s ± 0ms        B:~,B':~ | R: +.+..✓
+ (48 / 148) ✅ SEGIS  : sndmax                            ×1 runs, average:  68.822s ± 0ms                 | R: ++++++✓
 
 ⏺ Category: constraints->evenlist
- (41 / 153) ✅ parity_of_first                          ×1 runs, average:  0.125s ± 0ms         R: +..✓
- (42 / 153) ✅ parity_of_last                           ×1 runs, average:  0.058s ± 0ms         R: +.✓
- (43 / 153) ✅ first_odd                                ×1 runs, average:  0.203s ± 0ms         R: +..✓
- (44 / 153) ✅ parity_of_sum                            ×1 runs, average:  0.017s ± 0ms         R: +✓
+ (49 / 148) ✅ SE2GIS : parity_of_first                   ×1 runs, average:  0.105s ± 0ms         B:~,B':✓ | R: +..✓
+ (50 / 148) ❌ constraints/evenlist/parity_of_first.ml,segis+all
+ (51 / 148) ✅ SE2GIS : parity_of_last                    ×1 runs, average:  0.056s ± 0ms         B:✓,B':✓ | R: +.✓
+ (52 / 148) ❌ constraints/evenlist/parity_of_last.ml,segis+all
+ (53 / 148) ✅ SE2GIS : first_odd                         ×1 runs, average:  0.190s ± 0ms         B:✓,B':✓ | R: +..✓
+ (54 / 148) ✅ SEGIS  : first_odd                         ×1 runs, average:  0.033s ± 0ms                  | R: ++✓
+ (55 / 148) ✅ SE2GIS : parity_of_sum                     ×1 runs, average:  0.017s ± 0ms                  | R: +✓
+ (56 / 148) ✅ SEGIS  : parity_of_sum                     ×1 runs, average:  0.029s ± 0ms                  | R: ++✓
 
 ⏺ Category: constraints->bst
- (45 / 153) ✅ contains                                 ×1 runs, average:  0.212s ± 0ms         R: +..✓
- (46 / 153) ✅ count_lt                                 ×1 runs, average:  3.415s ± 0ms         R: +..✓
- (47 / 153) ✅ count_between                            ×1 runs, average:  7.777s ± 0ms         R: +..✓
- (48 / 153) ✅ most_frequent_v1                         ×1 runs, average:  6.858s ± 0ms         R: ++++++✓
- (49 / 153) ✅ from_list_contains                       ×1 runs, average:  0.156s ± 0ms         R: +..✓
- (50 / 153) ✅ from_list_max                            ×1 runs, average:  2.204s ± 0ms         R: +..✓
- (51 / 153) ✅ sum_gt_by_key                            ×1 runs, average:  1.913s ± 0ms         R: +..✓
+ (57 / 148) ✅ SE2GIS : contains                          ×1 runs, average:  0.209s ± 0ms         B:~,B':✓ | R: +..✓
+ (58 / 148) ✅ SEGIS  : contains                          ×1 runs, average:  0.168s ± 0ms                  | R: ++✓
+ (59 / 148) ✅ SE2GIS : count_lt                          ×1 runs, average:  3.392s ± 0ms         B:~,B':✓ | R: +..✓
+ (60 / 148) ✅ SEGIS  : count_lt                          ×1 runs, average:  0.192s ± 0ms                  | R: ++✓
+ (61 / 148) ✅ SE2GIS : count_between                     ×1 runs, average:  7.744s ± 0ms         B:~,B':✓ | R: +..✓
+ (62 / 148) ❌ constraints/bst/count_between.ml,segis+all
+ (63 / 148) ✅ SE2GIS : most_frequent_v1                  ×1 runs, average:  6.750s ± 0ms                  | R: ++++++✓
+ (64 / 148) ❌ constraints/bst/most_frequent_v1.ml,segis+all
+ (65 / 148) ✅ SE2GIS : from_list_contains                ×1 runs, average:  0.151s ± 0ms         B:~,B':✓ | R: +..✓
+ (66 / 148) ✅ SEGIS  : from_list_contains                ×1 runs, average:  0.096s ± 0ms                  | R: ++✓
+ (67 / 148) ✅ SE2GIS : from_list_max                     ×1 runs, average:  2.181s ± 0ms         B:~,B':~ | R: +..✓
+ (68 / 148) ✅ SEGIS  : from_list_max                     ×1 runs, average:  0.133s ± 0ms                  | R: ++✓
+ (69 / 148) ✅ SE2GIS : sum_gt_by_key                     ×1 runs, average:  1.860s ± 0ms         B:~,B':~ | R: +..✓
+ (70 / 148) ✅ SEGIS  : sum_gt_by_key                     ×1 runs, average:  0.153s ± 0ms                  | R: ++✓
 
 ⏺ Category: constraints->balanced_tree
- (52 / 153) ✅ node_count                               ×1 runs, average:  0.279s ± 0ms         R: +.✓
- (53 / 153) ✅ height                                   ×1 runs, average:  0.303s ± 0ms         R: +..✓
+ (71 / 148) ✅ SE2GIS : node_count                        ×1 runs, average:  0.279s ± 0ms         B:~,B':✓ | R: +.✓
+ (72 / 148) ✅ SEGIS  : node_count                        ×1 runs, average:  0.040s ± 0ms                  | R: +++✓
+ (73 / 148) ✅ SE2GIS : height                            ×1 runs, average:  0.297s ± 0ms         B:~,B':✓ | R: +..✓
+ (74 / 148) ✅ SEGIS  : height                            ×1 runs, average:  0.038s ± 0ms                  | R: +++✓
 
 ⏺ Category: constraints->symmetric_tree
- (54 / 153) ✅ sum                                      ×1 runs, average:  0.211s ± 0ms         R: +.✓
- (55 / 153) ✅ height                                   ×1 runs, average:  0.222s ± 0ms         R: +.✓
- (56 / 153) ✅ min                                      ×1 runs, average:  1.211s ± 0ms         R: +..✓
+ (75 / 148) ✅ SE2GIS : sum                               ×1 runs, average:  0.210s ± 0ms         B:~,B':✓ | R: +.✓
+ (76 / 148) ❌ constraints/symmetric_tree/sum.ml,segis+all
+ (77 / 148) ✅ SE2GIS : height                            ×1 runs, average:  0.228s ± 0ms         B:~,B':✓ | R: +.✓
+ (78 / 148) ❌ constraints/symmetric_tree/height.ml,segis+all
+ (79 / 148) ✅ SE2GIS : min                               ×1 runs, average:  1.225s ± 0ms         B:~,B':✓ | R: +..✓
+ (80 / 148) ❌ constraints/symmetric_tree/min.ml,segis+all
 
 ⏺ Category: constraints->memo
- (57 / 153) ✅ tree_size                                ×1 runs, average:  10.818s ± 0ms        R: +..✓
- (58 / 153) ✅ constant                                 ×1 runs, average:  0.004s ± 0ms         R: +✓
- (59 / 153) ✅ mts_memo_sum                             ×1 runs, average:  0.032s ± 0ms         R: +✓
- (60 / 153) ✅ max_contains                             ×1 runs, average:  2.124s ± 0ms         R: +...✓
- (61 / 153) ✅ count_lt                                 ×1 runs, average:  3.746s ± 0ms         R: +.✓
- (62 / 153) ✅ max_sum_gt                               ×1 runs, average:  0.334s ± 0ms         R: +...✓
- (63 / 153) ✅ proper_indexation_sum_lt_pos_v2          ×1 runs, average:  0.004s ± 0ms         R: +✓
- (64 / 153) ✅ proper_indexation_sum_lt_pos             ×1 runs, average:  0.146s ± 0ms         R: ++✓
+ (81 / 148) ✅ SE2GIS : tree_size                         ×1 runs, average:  11.124s ± 0ms        B:~,B':~ | R: +..✓
+ (82 / 148) ❌ constraints/memo/tree_size.ml,segis+all
+ (83 / 148) ✅ SE2GIS : constant                          ×1 runs, average:  0.006s ± 0ms                  | R: +✓
+ (84 / 148) ❌ constraints/memo/constant.ml,segis+all
+ (85 / 148) ✅ SE2GIS : mts_memo_sum                      ×1 runs, average:  0.043s ± 0ms                  | R: +✓
+ (86 / 148) ✅ SEGIS  : mts_memo_sum                      ×1 runs, average:  0.039s ± 0ms                  | R: ++✓
+ (87 / 148) ✅ SE2GIS : max_contains                      ×1 runs, average:  2.106s ± 0ms         B:~,B':~ | R: +...✓
+ (88 / 148) ✅ SEGIS  : max_contains                      ×1 runs, average:  0.172s ± 0ms                  | R: ++✓
+ (89 / 148) ✅ SE2GIS : count_lt                          ×1 runs, average:  3.703s ± 0ms         B:~,B':~ | R: +.✓
+ (90 / 148) ❌ constraints/memo/count_lt.ml,segis+all
+ (91 / 148) ✅ SE2GIS : max_sum_gt                        ×1 runs, average:  0.322s ± 0ms         B:~,B':✓ | R: +...✓
+ (92 / 148) ✅ SEGIS  : max_sum_gt                        ×1 runs, average:  0.188s ± 0ms                  | R: ++✓
+ (93 / 148) ✅ SE2GIS : proper_indexation_sum_lt_pos_v2   ×1 runs, average:  0.004s ± 0ms                  | R: +✓
+ (94 / 148) ❌ constraints/memo/proper_indexation_sum_lt_pos_v2.ml,segis+all
+ (95 / 148) ✅ SE2GIS : proper_indexation_sum_lt_pos      ×1 runs, average:  0.153s ± 0ms                  | R: ++✓
+ (96 / 148) ❌ constraints/memo/proper_indexation_sum_lt_pos.ml,segis+all
 
 ⏺ Category: constraints->empty_right_subtree
- (65 / 153) ✅ contains                                 ×1 runs, average:  2.150s ± 0ms         R: +..✓
+ (97 / 148) ✅ SE2GIS : contains                          ×1 runs, average:  2.104s ± 0ms         B:~,B':✓ | R: +..✓
+ (98 / 148) ❌ constraints/empty_right_subtree/contains.ml,segis+all
 
 ⏺ Category: constraints->alist
- (66 / 153) ✅ count_eq2                                ×1 runs, average:  0.480s ± 0ms         R: +.✓
- (67 / 153) ✅ count_eq                                 ×1 runs, average:  0.091s ± 0ms         R: +..✓
- (68 / 153) ✅ sums                                     ×1 runs, average:  0.089s ± 0ms         R: +..✓
- (69 / 153) ✅ most_frequent                            ×1 runs, average:  7.917s ± 0ms         R: ++++✓
+ (99 / 148) ✅ SE2GIS : count_eq2                         ×1 runs, average:  0.462s ± 0ms         B:~,B':~ | R: +.✓
+(100 / 148) ✅ SEGIS  : count_eq2                         ×1 runs, average:  0.057s ± 0ms                  | R: ++++✓
+(101 / 148) ✅ SE2GIS : count_eq                          ×1 runs, average:  0.095s ± 0ms         B:~,B':✓ | R: +..✓
+(102 / 148) ❌ constraints/alist/count_eq.ml,segis+all
+(103 / 148) ✅ SE2GIS : sums                              ×1 runs, average:  0.084s ± 0ms         B:~,B':✓ | R: +..✓
+(104 / 148) ❌ constraints/alist/sums.ml,segis+all
+(105 / 148) ✅ SE2GIS : most_frequent                     ×1 runs, average:  7.893s ± 0ms                  | R: ++++✓
+(106 / 148) ✅ SEGIS  : most_frequent                     ×1 runs, average:  1.415s ± 0ms                  | R: +++++✓
 
 ⏺ Category: constraints->even_tree
- (70 / 153) ✅ sum_of_parities                          ×1 runs, average:  2.977s ± 0ms         R: +...✓
- (71 / 153) ✅ parity_of_max                            ×1 runs, average:  5.672s ± 0ms         R: +✓
+(107 / 148) ✅ SE2GIS : sum_of_parities                   ×1 runs, average:  2.962s ± 0ms         B:~,B':✓ | R: +...✓
+(108 / 148) ✅ SEGIS  : sum_of_parities                   ×1 runs, average:  0.038s ± 0ms                  | R: ++✓
+(109 / 148) ✅ SE2GIS : parity_of_max                     ×1 runs, average:  5.800s ± 0ms                  | R: +✓
+(110 / 148) ✅ SEGIS  : parity_of_max                     ×1 runs, average:  0.065s ± 0ms                  | R: ++✓
 
 ⏺ Category: constraints->unimodal_list
- (72 / 153) ✅ max_logn_v2                              ×1 runs, average:  4.057s ± 0ms         R: +...+✓
+(111 / 148) ✅ SE2GIS : max_logn_v2                       ×1 runs, average:  3.997s ± 0ms         B:~,B':~ | R: +...+✓
+(112 / 148) ✅ SEGIS  : max_logn_v2                       ×1 runs, average:  0.260s ± 0ms                  | R: ++✓
 
 ⏺ Category: constraints->size
- (73 / 153) ✅ obfuscated_length                        ×1 runs, average:  0.091s ± 0ms         R: ++++✓
- (74 / 153) ✅ obfuscated_length_3                      ×1 runs, average:  0.178s ± 0ms         R: +✓
-
-⏺ Category: combine
- (75 / 153) ✅ mts                                      ×1 runs, average:  0.041s ± 0ms         R: ++✓
- (76 / 153) ✅ mts_and_mps                              ×1 runs, average:  0.397s ± 0ms         R: +++✓
- (77 / 153) ✅ mss_with_sum                             ×1 runs, average:  0.681s ± 0ms         R: ++✓
-
-⏺ Category: compressed_list
- (78 / 153) ✅ sum                                      ×1 runs, average:  0.139s ± 0ms         R: +++✓
+(113 / 148) ✅ SE2GIS : obfuscated_length                 ×1 runs, average:  0.088s ± 0ms                  | R: ++++✓
+(114 / 148) ✅ SEGIS  : obfuscated_length                 ×1 runs, average:  31.340s ± 0ms                 | R: ++++✓
+(115 / 148) ✅ SE2GIS : obfuscated_length_3               ×1 runs, average:  0.175s ± 0ms                  | R: +✓
+(116 / 148) ✅ SEGIS  : obfuscated_length_3               ×1 runs, average:  0.182s ± 0ms                  | R: ++✓
 
 ⏺ Category: indexed_list
- (79 / 153) ✅ search                                   ×1 runs, average:  0.021s ± 0ms         R: ++✓
- (80 / 153) ✅ position_polynomial                      ×1 runs, average:  0.036s ± 0ms         R: +++✓
- (81 / 153) ✅ sum_elts_lt_pos                          ×1 runs, average:  0.717s ± 0ms         R: ++✓
-
-⏺ Category: misc
- (82 / 153) ✅ count_between                            ×1 runs, average:  0.742s ± 0ms         R: +✓
- (83 / 153) ✅ composed_unkwns                          ×1 runs, average:  0.067s ± 0ms         R: +✓
- (84 / 153) ✅ simple_nnf                               ×1 runs, average:  0.007s ± 0ms         R: +✓
- (85 / 153) ✅ unknowns_are_ids                         ×1 runs, average:  0.065s ± 0ms         R: +✓
+(117 / 148) ✅ SE2GIS : position_polynomial_no_index      ×1 runs, average:  0.617s ± 0ms                  | R: ++^+✓
+(118 / 148) ❌ indexed_list/position_polynomial_no_index.ml,segis+all
+(119 / 148) ✅ SE2GIS : search_no_index                   ×1 runs, average:  1.325s ± 0ms                  | R: ++^+✓
+(120 / 148) ❌ indexed_list/search_no_index.ml,segis+all
+(121 / 148) ✅ SE2GIS : sum_elts_lt_pos_no_len            ×1 runs, average:  73.736s ± 0ms                 | R: ++^+✓
+(122 / 148) ❌ indexed_list/sum_elts_lt_pos_no_len.ml,segis+all
 
 ⏺ Category: list
- (86 / 153) ✅ alist_sum                                ×1 runs, average:  0.060s ± 0ms         R: +✓
- (87 / 153) ✅ atoi                                     ×1 runs, average:  0.148s ± 0ms         R: +✓
- (88 / 153) ✅ bal                                      ×1 runs, average:  5.072s ± 0ms         R: ++✓
- (89 / 153) ✅ hamming                                  ×1 runs, average:  0.104s ± 0ms         R: +✓
- (90 / 153) ✅ last                                     ×1 runs, average:  0.011s ± 0ms         R: +✓
- (91 / 153) ✅ lenhom                                   ×1 runs, average:  0.074s ± 0ms         R: +✓
- (92 / 153) ✅ line_of_sight                            ×1 runs, average:  0.323s ± 0ms         R: ++✓
- (93 / 153) ✅ maxcount                                 ×1 runs, average:  0.102s ± 0ms         R: +✓
- (94 / 153) ✅ maxhom                                   ×1 runs, average:  0.106s ± 0ms         R: +✓
- (95 / 153) ✅ mincount                                 ×1 runs, average:  0.104s ± 0ms         R: +✓
- (96 / 153) ✅ minhom                                   ×1 runs, average:  0.027s ± 0ms         R: +✓
- (97 / 153) ✅ mpshom                                   ×1 runs, average:  0.276s ± 0ms         R: +✓
- (98 / 153) ✅ mtshom                                   ×1 runs, average:  0.377s ± 0ms         R: ++✓
- (99 / 153) ✅ mts_and_mps_hom                          ×1 runs, average:  0.880s ± 0ms         R: ++✓
-(100 / 153) ✅ msshom                                   ×1 runs, average:  10.722s ± 0ms        R: +++✓
-(101 / 153) ✅ prodhom                                  ×1 runs, average:  0.081s ± 0ms         R: +✓
-(102 / 153) ✅ polyhom                                  ×1 runs, average:  0.141s ± 0ms         R: +✓
-(103 / 153) ✅ search                                   ×1 runs, average:  0.086s ± 0ms         R: +✓
-(104 / 153) ✅ sndmax                                   ×1 runs, average:  0.814s ± 0ms         R: +✓
-(105 / 153) ✅ sndmin                                   ×1 runs, average:  0.835s ± 0ms         R: +✓
-(106 / 153) ✅ sumgt                                    ×1 runs, average:  0.078s ± 0ms         R: +✓
-(107 / 153) ✅ sumhom                                   ×1 runs, average:  0.079s ± 0ms         R: +✓
-(108 / 153) ✅ sumodds                                  ×1 runs, average:  0.088s ± 0ms         R: +✓
-(109 / 153) ✅ sumevens                                 ×1 runs, average:  0.088s ± 0ms         R: +✓
-(110 / 153) ✅ zero_after_one                           ×1 runs, average:  0.520s ± 0ms         R: ++✓
-(111 / 153) ✅ zeros_ones                               ×1 runs, average:  0.483s ± 0ms         R: ++✓
-(112 / 153) ✅ issorted                                 ×1 runs, average:  3.263s ± 0ms         R: ++✓
-
-⏺ Category: list_to_tree
-(113 / 153) ✅ search                                   ×1 runs, average:  2.820s ± 0ms         R: ++✓
-(114 / 153) ✅ search_v2                                ×1 runs, average:  2.672s ± 0ms         R: ++✓
-(115 / 153) ✅ search_v3                                ×1 runs, average:  4.287s ± 0ms         R: ++✓
-(116 / 153) ✅ mls                                      ×1 runs, average:  15.740s ± 0ms        R: +++✓
-
-⏺ Category: numbers
-(117 / 153) ✅ int_nat_toint                            ×1 runs, average:  0.051s ± 0ms         R: +++✓
-(118 / 153) ✅ int_nat_twosum                           ×1 runs, average:  0.977s ± 0ms         R: ++++++✓
-
-⏺ Category: ptree
-(119 / 153) ✅ maxheads                                 ×1 runs, average:  0.863s ± 0ms         R: ++✓
-(120 / 153) ✅ maxlast                                  ×1 runs, average:  0.853s ± 0ms         R: ++✓
-(121 / 153) ✅ maxsum                                   ×1 runs, average:  0.037s ± 0ms         R: ++✓
-(122 / 153) ✅ mul                                      ×1 runs, average:  0.082s ± 0ms         R: +++✓
-(123 / 153) ✅ sum                                      ×1 runs, average:  0.060s ± 0ms         R: +++✓
-
-⏺ Category: sort_list
-(124 / 153) ✅ min                                      ×1 runs, average:  0.013s ± 0ms         R: +✓
-(125 / 153) ✅ max                                      ×1 runs, average:  0.022s ± 0ms         R: +✓
-(126 / 153) ✅ sumgtz                                   ×1 runs, average:  2.720s ± 0ms         R: +✓
+(123 / 148) ✅ SE2GIS : atoi_no_fac                       ×1 runs, average:  1.799s ± 0ms                  | R: +^++✓
+(124 / 148) ❌ list/atoi_no_fac.ml,segis+all
+(125 / 148) ✅ SE2GIS : is_sorted_no_last                 ×1 runs, average:  16.331s ± 0ms                 | R: ++^+✓
+(126 / 148) ❌ list/is_sorted_no_last.ml,segis+all
+(127 / 148) ✅ SE2GIS : largest_diff_sorted_list_nohead   ×1 runs, average:  0.050s ± 0ms                  | R: +^+✓
+(128 / 148) ❌ list/largest_diff_sorted_list_nohead.ml,segis+all
+(129 / 148) ✅ SE2GIS : mps_no_sum                        ×1 runs, average:  1.923s ± 0ms                  | R: +^++✓
+(130 / 148) ❌ list/mps_no_sum.ml,segis+all
+(131 / 148) ✅ SE2GIS : poly_no_fac                       ×1 runs, average:  0.334s ± 0ms                  | R: +^+✓
+(132 / 148) ❌ list/poly_no_fac.ml,segis+all
+(133 / 148) ✅ SE2GIS : zero_after_one_no                 ×1 runs, average:  1.366s ± 0ms                  | R: +^++✓
+(134 / 148) ❌ list/zero_after_one_no.ml,segis+all
 
 ⏺ Category: tailopt
-(127 / 153) ✅ mts                                      ×1 runs, average:  0.042s ± 0ms         R: ++✓
-(128 / 153) ✅ mps                                      ×1 runs, average:  0.041s ± 0ms         R: ++✓
-(129 / 153) ✅ sum                                      ×1 runs, average:  0.009s ± 0ms         R: ++✓
+(135 / 148) ✅ SE2GIS : mps_no_sum                        ×1 runs, average:  9.991s ± 0ms                  | R: ++^+✓
+(136 / 148) ❌ tailopt/mps_no_sum.ml,segis+all
 
-⏺ Category: terms
-(130 / 153) ✅ height                                   ×1 runs, average:  0.011s ± 0ms         R: +✓
+⏺ Category: combine
+(137 / 148) ✅ SE2GIS : mts_and_mps_nosum                 ×1 runs, average:  25.092s ± 0ms                 | R: ++^+✓
+(138 / 148) ❌ combine/mts_and_mps_nosum.ml,segis+all
+
+⏺ Category: sort_list
+(139 / 148) ✅ SE2GIS : sndmax                            ×1 runs, average:  0.921s ± 0ms                  | R: ++^+✓
+(140 / 148) ❌ sort_list/sndmax.ml,segis+all
+(141 / 148) ✅ SE2GIS : sndmin                            ×1 runs, average:  0.654s ± 0ms                  | R: ++^+✓
+(142 / 148) ❌ sort_list/sndmin.ml,segis+all
 
 ⏺ Category: tree
-(131 / 153) ✅ maxPathWeight                            ×1 runs, average:  0.989s ± 0ms         R: ++✓
-(132 / 153) ✅ maxtree                                  ×1 runs, average:  0.360s ± 0ms         R: +✓
-(133 / 153) ✅ maxtree2                                 ×1 runs, average:  0.266s ± 0ms         R: ++✓
-(134 / 153) ✅ min                                      ×1 runs, average:  0.264s ± 0ms         R: ++✓
-(135 / 153) ✅ minmax                                   ×1 runs, average:  0.744s ± 0ms         R: ++✓
-(136 / 153) ✅ mips                                     ×1 runs, average:  1.270s ± 0ms         R: ++✓
-(137 / 153) ✅ mits                                     ×1 runs, average:  1.251s ± 0ms         R: ++✓
-(138 / 153) ✅ mpps                                     ×1 runs, average:  131.731s ± 0ms       R: ++++✓
-(139 / 153) ✅ poly                                     ×1 runs, average:  8.411s ± 0ms         R: ++✓
-(140 / 153) ✅ poly2                                    ×1 runs, average:  10.729s ± 0ms        R: ++✓
-(141 / 153) ✅ sorted                                   ×1 runs, average:  0.004s ± 0ms         R: +✓
-(142 / 153) ✅ sorted_2                                 ×1 runs, average:  0.904s ± 0ms         R: +✓
-(143 / 153) ✅ sumtree                                  ×1 runs, average:  0.036s ± 0ms         R: ++✓
-
-⏺ Category: treepaths
-(144 / 153) ✅ height                                   ×1 runs, average:  0.010s ± 0ms         R: +✓
-(145 / 153) ✅ leftmostodd                              ×1 runs, average:  0.006s ± 0ms         R: +✓
-(146 / 153) ✅ maxPathWeight                            ×1 runs, average:  0.006s ± 0ms         R: +✓
-(147 / 153) ✅ maxPathWeight2                           ×1 runs, average:  0.006s ± 0ms         R: +✓
-(148 / 153) ✅ mips                                     ×1 runs, average:  19.243s ± 0ms        R: ++✓
-(149 / 153) ✅ sum                                      ×1 runs, average:  0.005s ± 0ms         R: +✓
+(143 / 148) ✅ SE2GIS : gradient                          ×1 runs, average:  1.008s ± 0ms                  | R: +^✓
+(144 / 148) ❌ tree/gradient.ml,segis+all
+(145 / 148) ✅ SE2GIS : mits_nosum                        ×1 runs, average:  3.824s ± 0ms                  | R: ++^++✓
+(146 / 148) ❌ tree/mits_nosum.ml,segis+all
 
 ⏺ Category: unimodal_lists
-(150 / 153) ✅ sum                                      ×1 runs, average:  0.468s ± 0ms         R: +✓
-(151 / 153) ✅ search_no_optim                          ×1 runs, average:  0.482s ± 0ms         R: +✓
+(147 / 148) ✅ SE2GIS : prod_needs_aux                    ×1 runs, average:  1.937s ± 0ms                  | R: +^✓
+(148 / 148) ❌ unimodal_lists/prod_needs_aux.ml,segis+all
 
-⏺ Category: zippers
-(152 / 153) ✅ list_sum                                 ×1 runs, average:  0.078s ± 0ms         R: +++✓
-(153 / 153) ✅ list_sum_basic                           ×1 runs, average:  0.020s ± 0ms         R: ++✓
-
-✅ All 153 benchmarks passed in  519.3 s.
+✅ All 148 benchmarks passed in  3260.2 s.

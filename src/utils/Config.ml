@@ -250,8 +250,8 @@ let options print_usage parse_only =
   ; 'v', "verbose", set verbose true, None
   ; 'X', "classify-ctex", set classify_ctex true, None
   ; 'C', "interactive-check-lemma", set interactive_check_lemma true, None
-  ; '\000', "acegis", set use_acegis true, None
-  ; '\000', "ccegis", set use_ccegis true, None
+  ; '\000', "segis", set use_segis true, None
+  ; '\000', "cegis", set use_cegis true, None
   ; '\000', "cvc4", set use_cvc4 true, None
   ; '\000', "cvc5", set use_cvc4 false, None
   ; '\000', "check-smt-unrealizable", set check_unrealizable_smt_unsatisfiable true, None

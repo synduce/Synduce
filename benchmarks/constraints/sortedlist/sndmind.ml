@@ -1,4 +1,4 @@
-(** @synduce --no-lifting -lNB *)
+(** @synduce --no-lifting -lB *)
 
 type 'a clist =
   | CTwo of 'a * 'a

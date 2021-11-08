@@ -39,12 +39,10 @@ let rec spec = function
     let cnt, v = spec tl in
     let cnt2 = count hd tl in
     if cnt2 + 1 > cnt then cnt2 + 1, hd else cnt, v
-  [@@ensures fun (x, y) -> x > 0]
 
 and count x = function
   | Elt v -> if v = x then 1 else 0
   | Cons (hd, tl) -> count x tl + if hd = x then 1 else 0
-  [@@ensures fun x -> x > 0]
 ;;
 
 let rec target = function

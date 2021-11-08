@@ -60,7 +60,15 @@ let rec refinement_loop ?(major = true) (p : psi_def) (lstate_in : refinement_lo
          if !Config.Optims.use_syntactic_definitions
             || !Config.Optims.make_partial_correctness_assumption
          then (
+           (* The tool might have made some incorrect assumptions. *)
            AlgoLog.msg_too_many_opts ();
+           Stats.log_major_step_end
+             ~failure_step:true
+             ~synth_time
+             ~verif_time
+             ~t:tsize
+             ~u:usize
+             false;
            Config.Optims.(
              turn_off use_syntactic_definitions;
              turn_off make_partial_correctness_assumption);
@@ -96,7 +104,17 @@ let rec refinement_loop ?(major = true) (p : psi_def) (lstate_in : refinement_lo
         Lifting.msg_lifting ();
         Stats.log_minor_step ~synth_time ~auxtime:lsynt_time true;
         refinement_loop ~major:false p' lstate'
-      | Error r' -> Error r')
+      | Error r' ->
+        (* Infeasible is not a failure! *)
+        (match r' with
+        | RInfeasible ->
+          Stats.log_major_step_end ~synth_time ~verif_time:0. ~t:tsize ~u:usize false;
+          Error RInfeasible
+        | _ -> Error r'))
+    | _, Error RInfeasible ->
+      (* Infeasible is not a failure! *)
+      Stats.log_major_step_end ~synth_time ~verif_time:0. ~t:tsize ~u:usize false;
+      Error RInfeasible
     | _ -> Error RFail)
 ;;
 
@@ -320,9 +338,9 @@ let solve_problem
   let problem = find_problem_components (target_fname, spec_fname, repr_fname) pmrs in
   (* Solve the problem. *)
   ( problem
-  , if !Config.Optims.use_acegis
-    then Baselines.algo_acegis problem
-    else if !Config.Optims.use_ccegis
-    then Baselines.algo_ccegis problem
+  , if !Config.Optims.use_segis
+    then Baselines.algo_segis problem
+    else if !Config.Optims.use_cegis
+    then Baselines.algo_cegis problem
     else psi problem )
 ;;

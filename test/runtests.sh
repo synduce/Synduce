@@ -1,3 +1,2 @@
 #!/bin/sh
-python3 benchmarks/test.py --run --generate-solutions
-
+python3 benchmarks/test.py -b all --generate-solutions

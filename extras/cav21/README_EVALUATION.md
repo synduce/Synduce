@@ -128,12 +128,12 @@ Options:
        --no-syndef                 Do not use syntactic definitions.
     -t --no-detupling              Turn off detupling.
     -c --simple-init               Initialize T naively.
-       --acegis                    Use the Abstract CEGIS algorithm. Turns bmc on.
-       --ccegis                    Use the Concrete CEGIS algorithm. Turns bmc on.
+       --segis                    Use the Abstract CEGIS algorithm. Turns bmc on.
+       --cegis                    Use the Concrete CEGIS algorithm. Turns bmc on.
        --no-simplify               Don't simplify equations with partial evaluation.
        --no-gropt                  Don't optimize grammars.
   Bounded checking:
-       --use-bmc                   Use acegis bounded model checking (bmc mode).
+       --use-bmc                   Use segis bounded model checking (bmc mode).
     -b --bmc                       Maximum depth of terms for bounded model checking, in bmc mode.
     -v --verification              Number of expand calls for bounded model checking, in opt mode.
   Debugging:
@@ -142,8 +142,8 @@ Options:
 -> Try:
 ./Synduce benchmarks/list/mps.ml
 ```
-The reviewers may be interested in running the tool with the `--acegis` option to run the baseline
-algorithm (symbolic CEGIS). The `--ccegis` flag runs the concrete CEGIS algorithm that is
+The reviewers may be interested in running the tool with the `--segis` option to run the baseline
+algorithm (symbolic CEGIS). The `--cegis` flag runs the concrete CEGIS algorithm that is
 discussed in Table 2.
 
 The flags that need to be used to turn the optimizations discussed for Table 3 are also explained in

@@ -655,7 +655,7 @@ let mk_model_sat_asserts det f_o_r instantiate =
 ;;
 
 let verify_lemma_bounded ~(p : psi_def) (det : term_state_detail)
-    : AsyncSmt.response * int Lwt.u
+    : (Utils.Stats.verif_method * S.solver_response) Lwt.t * int Lwt.u
   =
   let logic = SmtLogic.infer_logic ~logic_infos:(AState.psi_def_logics p) [] in
   let task (solver, starter) =
@@ -784,13 +784,13 @@ let verify_lemma_bounded ~(p : psi_def) (det : term_state_detail)
     in
     let* res = expand_loop (TermSet.singleton det.term) in
     let* () = AsyncSmt.close_solver solver in
-    return res
+    return (Utils.Stats.BoundedChecking, res)
   in
   AsyncSmt.(cancellable_task (make_solver "cvc") task)
 ;;
 
 let verify_lemma_unbounded ~(p : psi_def) (det : term_state_detail)
-    : AsyncSmt.response * int Lwt.u
+    : (Utils.Stats.verif_method * S.solver_response) Lwt.t * int Lwt.u
   =
   let build_task (cvc4_instance, task_start) =
     let%lwt _ = task_start in
@@ -814,7 +814,7 @@ let verify_lemma_unbounded ~(p : psi_def) (det : term_state_detail)
     in
     let%lwt () = AsyncSmt.close_solver cvc4_instance in
     Log.debug_msg "Unbounded lemma verification is complete.";
-    return final_response
+    return (Utils.Stats.Induction, final_response)
   in
   AsyncSmt.(cancellable_task (AsyncSmt.make_solver "cvc") build_task)
 ;;
@@ -824,7 +824,7 @@ let verify_lemma_unbounded ~(p : psi_def) (det : term_state_detail)
   is correct while the smt solver attempt to find a counterexample.
 *)
 let verify_lemma_candidate ~(p : psi_def) (det : term_state_detail)
-    : SyncSmt.solver_response
+    : Utils.Stats.verif_method * SyncSmt.solver_response
   =
   match det.lemma_candidate with
   | None -> failwith "Cannot verify lemma candidate; there is none."
@@ -843,7 +843,7 @@ let verify_lemma_candidate ~(p : psi_def) (det : term_state_detail)
       | End_of_file ->
         Log.error_msg "Solvers terminated unexpectedly  ⚠️ .";
         Log.error_msg "Please inspect logs.";
-        SmtLib.Unknown
+        BoundedChecking, SmtLib.Unknown
     in
     resp
 ;;
@@ -1118,8 +1118,8 @@ let rec lemma_refinement_loop ~(p : psi_def) (det : term_state_detail)
         det
     else (
       match verify_lemma_candidate ~p { det with lemma_candidate = Some lemma_term } with
-      | Unsat ->
-        AlgoLog.lemma_proved_correct det lemma_term;
+      | vmethod, Unsat ->
+        AlgoLog.lemma_proved_correct vmethod det lemma_term;
         let lemma =
           match det.current_preconds with
           | None -> lemma_term
@@ -1127,8 +1127,8 @@ let rec lemma_refinement_loop ~(p : psi_def) (det : term_state_detail)
           (* mk_bin Binop.And (mk_un Unop.Not pre) lemma_term *)
         in
         Some { det with lemma_candidate = None; lemmas = lemma :: det.lemmas }
-      | SmtLib.SExps x ->
-        AlgoLog.lemma_not_proved_correct ();
+      | vmethod, SmtLib.SExps x ->
+        AlgoLog.lemma_not_proved_correct vmethod;
         let new_positive_ctexs =
           parse_positive_example_solver_model (SmtLib.SExps x) det
         in
@@ -1138,12 +1138,12 @@ let rec lemma_refinement_loop ~(p : psi_def) (det : term_state_detail)
                 Fmt.(pf f "Found a positive example: %a" (box pp_ctex) ctex)))
           new_positive_ctexs;
         lemma_refinement_loop
-          { det with positive_ctexs = det.positive_ctexs @ new_positive_ctexs }
           ~p
-      | Sat ->
+          { det with positive_ctexs = det.positive_ctexs @ new_positive_ctexs }
+      | _, Sat ->
         Log.error_msg "Lemma verification returned Sat. This is unexpected.";
         None
-      | Unknown ->
+      | _, Unknown ->
         Log.error_msg "Lemma verification returned Unknown.";
         None
       | _ ->
@@ -1182,6 +1182,7 @@ let refine_ensures_predicates
     ~(neg_ctexs : ctex list)
     ~(pos_ctexs : ctex list)
     (lstate : refinement_loop_state)
+    : term_state * [ `CoarseningOk | `CoarseningFailure | `Unrealizable ]
   =
   Log.info
     Fmt.(
@@ -1189,7 +1190,7 @@ let refine_ensures_predicates
         pf fmt "%i counterexamples violate image assumption." (List.length neg_ctexs));
   let maybe_pred = ImagePredicates.synthesize ~p pos_ctexs neg_ctexs [] in
   match maybe_pred with
-  | None -> lstate.term_state, false
+  | None -> lstate.term_state, `CoarseningFailure
   | Some ensures ->
     (match Specifications.get_ensures p.psi_reference.pvar with
     | None -> Specifications.set_ensures p.psi_reference.pvar ensures
@@ -1206,13 +1207,13 @@ let refine_ensures_predicates
              (mk_app ensures [ mk_var var ]))
       in
       Specifications.set_ensures p.psi_reference.pvar new_pred);
-    lstate.term_state, true
+    lstate.term_state, `CoarseningOk
 ;;
 
 let synthesize_lemmas ~(p : psi_def) synt_failure_info (lstate : refinement_loop_state)
     : (refinement_loop_state, solver_response) Result.t
   =
-  let interactive_synthesis () =
+  let _interactive_synthesis () =
     !Config.interactive_lemmas_loop
     &&
     (Log.info (fun frmt () -> Fmt.pf frmt "No luck. Try again? (Y/N)");
@@ -1230,6 +1231,7 @@ let synthesize_lemmas ~(p : psi_def) synt_failure_info (lstate : refinement_loop
    *)
   let new_state, lemma_synthesis_success =
     match synt_failure_info with
+    | _, Either.First _ -> failwith "There is no synt_failure_info in synthesize_lemmas."
     | _, Either.Second unrealizability_ctexs ->
       (* Forget about the specific association in pairs. *)
       let ctexs = List.concat_map unrealizability_ctexs ~f:(fun uc -> [ uc.ci; uc.cj ]) in
@@ -1270,27 +1272,30 @@ let synthesize_lemmas ~(p : psi_def) synt_failure_info (lstate : refinement_loop
         then (
           (* lemma_synt_negatives and ensures_negatives are empty; all ctexs spurious! *)
           AlgoLog.no_spurious_ctex ();
-          ts, false)
+          ts, `Unrealizable)
         else (
           AlgoLog.spurious_violates_requires (List.length lemma_synt_negatives);
-          Map.fold
-            ts
-            ~init:(Map.empty (module Terms), true)
-            ~f:(fun ~key ~data:det (acc, status) ->
-              if Analysis.is_bounded det.term
-              then acc, status (* Skip lemma synth for bounded terms. *)
-              else if not status
-              then acc, status
-              else (
-                match lemma_refinement_loop det ~p with
-                | None -> acc, false
-                | Some det -> Map.add_exn ~key ~data:det acc, status))))
-    | _ -> failwith "There is no synt_failure_info in synthesize_lemmas."
+          let new_ts, success =
+            Map.fold
+              ts
+              ~init:(Map.empty (module Terms), true)
+              ~f:(fun ~key ~data:det (acc, status) ->
+                if Analysis.is_bounded det.term
+                then acc, status (* Skip lemma synth for bounded terms. *)
+                else if not status
+                then acc, status
+                else (
+                  match lemma_refinement_loop det ~p with
+                  | None -> acc, false
+                  | Some det -> Map.add_exn ~key ~data:det acc, status))
+          in
+          new_ts, if success then `CoarseningOk else `CoarseningFailure))
   in
-  if lemma_synthesis_success || interactive_synthesis ()
-  then Ok { lstate with term_state = new_state }
-  else (
-    match synt_failure_info with
+  match lemma_synthesis_success with
+  | `CoarseningOk -> Ok { lstate with term_state = new_state }
+  | `Unrealizable -> Error RInfeasible
+  | `CoarseningFailure ->
+    (match synt_failure_info with
     | RFail, _ ->
       Log.error_msg "SyGuS solver failed to find a solution.";
       Error RFail
