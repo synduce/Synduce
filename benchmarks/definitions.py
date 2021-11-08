@@ -2,6 +2,8 @@ import sys
 
 # Timeout for all experiments.
 timeout_value = 200
+timestamp_definition = "%d-%m-%y-%H:%M:%S"
+experimental_setup = "a machine with and AMD® Ryzen 7 3700x 8-core processor and 32GB Ram running Ubuntu 20.04"
 sp = " "
 dash = "-"
 kw_class = "... Class"
@@ -90,87 +92,6 @@ reduced_benchmark_set_table3 = [
     ["tree/mips.pmrs", ""],
 ]
 
-constraint_benchmarks = [
-    # Ensures
-    ["constraints/ensures/mps_no_ensures.ml", "-B"],
-    ["constraints/ensures/mts_no_ensures.ml", ""],
-    ["constraints/ensures/mss_no_ensures.ml", "-B"],
-
-    # sortedlist
-    ["constraints/sortedlist/min.ml", ""],
-    ["constraints/sortedlist/max.ml", ""],
-    ["constraints/sortedlist/count_lt.ml", ""],
-    ["constraints/sortedlist/index_of.ml", ""],
-    ["constraints/sortedlist/is_intersection_empty.ml", ""],
-    ["constraints/sortedlist/largest_diff.ml", ""],
-    ["constraints/sortedlist/smallest_diff.ml", ""],
-    ["constraints/sortedlist/sndmind.ml", ""],
-    ["constraints/sortedlist/sndmax_empty_base_case.ml", "-NB"],
-    ["constraints/sortedlist/sndmax_empty_base_case_v2.ml", "-NB"],
-    ["constraints/sortedlist/sndmax_len2_base_case.ml", "-NB"],
-    ["constraints/sortedlist/parallel_min.ml", "-NB"],
-    ["constraints/sortedlist/parallel_max.ml", "-NB"],
-    ["constraints/sortedlist/parallel_max2.ml", "-NB"],
-    # Sorted and indexed
-    ["constraints/sorted_and_indexed/count_lt0.ml", "-NB -n 30"],
-    ["constraints/sorted_and_indexed/count_lt.ml", "-NB -n 30"],
-    # constantlist
-    ["constraints/constantlist/index_of.ml", ""],
-    ["constraints/constantlist/contains.ml", ""],
-    # all positive
-    ["constraints/all_positive/list_mps.ml", ""],
-    ["constraints/all_positive/sndmin.ml", "-NB"],
-    ["constraints/all_positive/sndmax.ml", "-NB"],
-    # evenlist
-    ["constraints/evenlist/parity_of_first.ml", ""],
-    ["constraints/evenlist/parity_of_last.ml", ""],
-    ["constraints/evenlist/first_odd.ml", ""],
-    ["constraints/evenlist/parity_of_sum.ml", ""],
-    # bst
-    ["constraints/bst/contains.ml", ""],
-    ["constraints/bst/count_lt.ml", "-NB"],
-    ["constraints/bst/count_between.ml", "-NB --no-gropt"],
-    ["constraints/bst/most_frequent_v1.ml", ""],
-    ["constraints/bst/from_list_contains.ml", ""],
-    ["constraints/bst/from_list_max.ml", "-NB -n 50"],
-    ["constraints/bst/sum_gt_by_key.ml", "-NB -n 50"],
-    # balanced_tree
-    ["constraints/balanced_tree/node_count.ml", "-N"],
-    ["constraints/balanced_tree/height.ml", "-N"],
-    # ["constraints/balanced_tree/height_v2.ml", "-NB"],
-    # symmetric tree
-    ["constraints/symmetric_tree/sum.ml", "-N"],
-    ["constraints/symmetric_tree/height.ml", "-N"],
-    ["constraints/symmetric_tree/min.ml", "-N"],
-    # memo
-    ["constraints/memo/tree_size.ml", "-NB"],
-    ["constraints/memo/constant.ml", ""],
-    ["constraints/memo/mts_memo_sum.ml", ""],
-    ["constraints/memo/max_contains.ml", "-NB"],
-    ["constraints/memo/count_lt.ml", "-NB -n 50"],
-    ["constraints/memo/max_sum_gt.ml", "-NB"],
-    ["constraints/memo/proper_indexation_sum_lt_pos_v2.ml", ""],
-    ["constraints/memo/proper_indexation_sum_lt_pos.ml", ""],
-    # empty_right
-    ["constraints/empty_right_subtree/contains.ml", "-N"],
-    # alist
-    ["constraints/alist/count_eq2.ml", "-NB"],
-    ["constraints/alist/count_eq.ml", ""],
-    ["constraints/alist/sums.ml", ""],
-    ["constraints/alist/most_frequent.ml", ""],
-    # even_tree
-    ["constraints/even_tree/sum_of_parities.ml", "-NB"],
-    ["constraints/even_tree/parity_of_max.ml", ""],
-    # program
-    # ["constraints/program/typecheck.ml", ""],
-    # unimodal
-    #["constraints/unimodal_list/max_logn.ml", "-B"],
-    ["constraints/unimodal_list/max_logn_v2.ml", ""],
-    #["constraints/unimodal_list/max_in_um_pos.ml", ""],
-    # Size constraint
-    ["constraints/size/obfuscated_length.ml", ""],
-    ["constraints/size/obfuscated_length_3.ml", ""]
-]
 
 base_benchmark_set = [
     # Combine
@@ -269,6 +190,87 @@ base_benchmark_set = [
     ["zippers/list_sum_basic.ml", ""],
 ]
 
+constraint_benchmarks = [
+    # Ensures
+    ["constraints/ensures/mps_no_ensures.ml", "-B"],
+    ["constraints/ensures/mts_no_ensures.ml", ""],
+    ["constraints/ensures/mss_no_ensures.ml", "-B"],
+    # alist
+    ["constraints/alist/count_eq2.ml", "-NB"],
+    ["constraints/alist/count_eq.ml", ""],
+    ["constraints/alist/sums.ml", ""],
+    ["constraints/alist/most_frequent.ml", ""],
+    # all positive
+    ["constraints/all_positive/list_mps.ml", ""],
+    ["constraints/all_positive/sndmin.ml", "-NB"],
+    ["constraints/all_positive/sndmax.ml", "-NB"],
+    # balanced_tree
+    ["constraints/balanced_tree/node_count.ml", "-N"],
+    ["constraints/balanced_tree/height.ml", "-N"],
+    # ["constraints/balanced_tree/height_v2.ml", "-NB"],
+    # bst
+    ["constraints/bst/contains.ml", ""],
+    ["constraints/bst/count_lt.ml", "-NB"],
+    ["constraints/bst/count_between.ml", "-NB --no-gropt"],
+    ["constraints/bst/most_frequent_v1.ml", ""],
+    ["constraints/bst/from_list_contains.ml", ""],
+    ["constraints/bst/from_list_max.ml", "-NB -n 50"],
+    ["constraints/bst/sum_gt_by_key.ml", "-NB -n 50"],
+    # constantlist
+    ["constraints/constantlist/index_of.ml", ""],
+    ["constraints/constantlist/contains.ml", ""],
+    # empty_right
+    ["constraints/empty_right_subtree/contains.ml", "-N"],
+    # evenlist
+    ["constraints/evenlist/parity_of_first.ml", ""],
+    ["constraints/evenlist/parity_of_last.ml", ""],
+    ["constraints/evenlist/first_odd.ml", ""],
+    ["constraints/evenlist/parity_of_sum.ml", ""],
+    # even_tree
+    ["constraints/even_tree/sum_of_parities.ml", "-NB"],
+    ["constraints/even_tree/parity_of_max.ml", ""],
+    # memo
+    ["constraints/memo/tree_size.ml", "-NB"],
+    ["constraints/memo/constant.ml", ""],
+    ["constraints/memo/mts_memo_sum.ml", ""],
+    ["constraints/memo/max_contains.ml", "-NB"],
+    ["constraints/memo/count_lt.ml", "-NB -n 50"],
+    ["constraints/memo/max_sum_gt.ml", "-NB"],
+    ["constraints/memo/proper_indexation_sum_lt_pos_v2.ml", ""],
+    ["constraints/memo/proper_indexation_sum_lt_pos.ml", ""],
+    # Size constraint
+    ["constraints/size/obfuscated_length.ml", ""],
+    ["constraints/size/obfuscated_length_3.ml", ""],
+    # program
+    # ["constraints/program/typecheck.ml", ""],
+    # sortedlist
+    ["constraints/sortedlist/min.ml", ""],
+    ["constraints/sortedlist/max.ml", ""],
+    ["constraints/sortedlist/count_lt.ml", ""],
+    ["constraints/sortedlist/index_of.ml", ""],
+    ["constraints/sortedlist/is_intersection_empty.ml", ""],
+    ["constraints/sortedlist/largest_diff.ml", ""],
+    ["constraints/sortedlist/smallest_diff.ml", ""],
+    ["constraints/sortedlist/sndmind.ml", ""],
+    ["constraints/sortedlist/sndmax_empty_base_case.ml", "-NB"],
+    ["constraints/sortedlist/sndmax_empty_base_case_v2.ml", "-NB"],
+    ["constraints/sortedlist/sndmax_len2_base_case.ml", "-NB"],
+    ["constraints/sortedlist/parallel_min.ml", "-NB"],
+    ["constraints/sortedlist/parallel_max.ml", "-NB"],
+    ["constraints/sortedlist/parallel_max2.ml", "-NB"],
+    # Sorted and indexed
+    ["constraints/sorted_and_indexed/count_lt0.ml", "-NB -n 30"],
+    ["constraints/sorted_and_indexed/count_lt.ml", "-NB -n 30"],
+    # symmetric tree
+    ["constraints/symmetric_tree/sum.ml", "-N"],
+    ["constraints/symmetric_tree/height.ml", "-N"],
+    ["constraints/symmetric_tree/min.ml", "-N"],
+    # unimodal
+    #["constraints/unimodal_list/max_logn.ml", "-B"],
+    ["constraints/unimodal_list/max_logn_v2.ml", ""],
+    #["constraints/unimodal_list/max_in_um_pos.ml", ""],
+]
+
 lifting_benchmarks = [
     # Indexed list
     ["indexed_list/position_polynomial_no_index.ml", ""],
@@ -327,56 +329,56 @@ fields = ["synt", "verif", "#i", "last"]
 
 show_benchmarks = [
     # All positive
-    ["constraint/all_positive", [
+    ["constraints/all_positive", [
         ["list_mps",     [" Elements > 0    ",
                           " mps   ", "no", "no",  "mps", 0]]
     ]],
     # Alist
-    ["constraint/alist", [
+    ["constraints/alist", [
         ["count_eq2",     ["              ",
-                           " # elt. = (v2) ", "yes", "yes",  "# =", 0]],
+                           "num elt. = (v2) ", "yes", "yes",  "num=", 0]],
         ["count_eq",      ["  Association ",
-                           " # elt. =      ", "no", "no", " # = (v2)", 0]],
+                           "num elt. =      ", "no", "no", "num=(v2)", 0]],
         ["sums",          ["   List       ",  "sums", "no", "no", "sums ", 0]],
         ["most_frequent", ["              ",
                            "most frequent", "no", "no",  "most freq.", 0]],
     ]],
     # Balanced tree
-    ["constraint/balanced_tree", [
+    ["constraints/balanced_tree", [
         ["node_count",  [" Balanced ", "node count", "yes", "no",  "node cnt.", 0]],
         ["height",      ["  Tree    ", "height", "yes", "no", "height", 0]],
-        ["height_v2",   ["          ",
-                         "height (v2)  ", "yes", "yes", "height v2.", 0]],
+        # ["height_v2",   ["          ",
+        #                  "height (v2)  ", "yes", "yes", "height v2.", 0]],
     ]],
     # BST
-    ["constraint/bst", [
+    ["constraints/bst", [
         ["contains",           ["          ",
-                                "contains elt. ", "no", "no", "contains", 0]],
+                                "contains elt", "no", "no", "contains", 0]],
         ["count_lt",           ["  Binary  ",
-                                "# elts. < ", "yes", "yes", "count <", 0]],
+                                "count smaller elts ", "yes", "yes", "count <", 0]],
         ["most_frequent_v1",   ["Search",
                                 " most frequent ", "no", "no", "most freq. ", 0]],
         ["from_list_contains", ["  Tree    ",
-                                "of list ∋", "no", "no", "contains (list)", 0]],
+                                "list-contains", "no", "no", "contains (list)", 0]],
         ["from_list_max",      ["          ",
                                 "of list max ", "yes", "yes", "max (list)", 0]],
         ["sum_gt_by_key",      ["          ",
-                                "sum if key >   ", "yes", "yes", "sumkey", 0]],
+                                "sum if key larger", "yes", "yes", "sumkey", 0]],
     ]],
     # Combining traversals
     ["combine", [
         ["mts_and_mps_nosum", ["Combine", "mts+mps", "no", "no", "m(t+p)s", 1]]]],
     # Constant list
-    ["constraint/constantlist", [
+    ["constraints/constantlist", [
         ["index_of",  [" Constant ", "index of elt. ", "no", "no", "idx", 0]],
         ["contains",  ["  List    ", "contains elt  ", "no", "no", "contains", 0]],
     ]],
     # Empty right subtree
-    ["constraint/empty_right_subtree", [
+    ["constraints/empty_right_subtree", [
         ["contains",  [" Empty Subtree", " contains elt", "yes", "no", "contains", 0]],
     ]],
     # Even list
-    ["constraint/evenlist",
+    ["constraints/evenlist",
      [
          ["parity_of_first", ["           ",
                               "parity of 1st", "no", "no", "parity 1st", 0]],
@@ -388,7 +390,7 @@ show_benchmarks = [
                               "parity of sum ", "no", "no", "parity sum", 0]]
      ]],
     # Even tree
-    ["constraint/even_tree",
+    ["constraints/even_tree",
      [
          ["parity_of_max", ["  Tree of Even ",
                             "parity of max ", "no", "no", "parity max", 0]],
@@ -402,7 +404,7 @@ show_benchmarks = [
         ["search_no_index",                 ["    List  ",
                                              "search index",      "no", "no", "search i", 1]],
         ["sum_elts_lt_pos_no_len",          ["          ",
-                                             "sum elts w. pos <", "no", "no", "sum pos", 1]]
+                                             "sum smaller pos.", "no", "no", "sum pos", 1]]
     ]],
     ["list", [
         ["atoi_no_fac",                     [
@@ -417,38 +419,39 @@ show_benchmarks = [
             "      ", "poly", "no", "no", "poly", 1]],
         ["zero_after_one_no",               ["      ", "0 after 1", "no", "no", "0-1", 1]]]],
     # Memo
-    ["constraint/memo", [
+    ["constraints/memo", [
         ["tree_size",     ["             ", "tree size", "yes", "yes",  "size", 0]],
         ["constant",      ["  Tree       ", "constant", "no", "no", " constant", 0]],
         ["max_contains",  [" Memoizing   ",
                            " contains elt. ", "yes", "yes", "contains", 0]],
-        ["count_lt",      [" Information ", "count <", "yes", "yes",  "cnt <", 0]],
-        ["max_sum_gt",    ["             ", "sum of elts >", "yes", "yes",  "sum >", 0]],
+        ["count_lt",      [" Information ", "count smaller", "yes", "yes",  "cnt <", 0]],
+        ["max_sum_gt",    ["             ",
+                           "sum of elts larger", "yes", "yes",  "sum >", 0]],
         ["proper_indexation_sum_lt_pos_v2",
-         ["             ", "sum elts > pos", "no", "no", "sum > pos", 0]],
+         ["             ", "sum elts larger pos", "no", "no", "sum > pos", 0]],
         ["proper_indexation_sum_lt_pos",
-         ["             ", "sum elts > pos .v2", "no", "no", "sum > pos v2", 0]]
+         ["             ", "sum elts larger pos .v2", "no", "no", "sum > pos v2", 0]]
 
     ]],
     # Program
-    ["constraint/program", [
-        ["typecheck",  [" Program AST ", " type check  ", "yes", "no", "type chk", 0]],
-    ]],
+    # ["constraints/program", [
+    #     ["typecheck",  [" Program AST ", " type check  ", "yes", "no", "type chk", 0]],
+    # ]],
     # Symmetric tree
-    ["constraint/symmetric_tree", [
+    ["constraints/symmetric_tree", [
         ["sum",         [" Symmetric  ", "sum", "yes", "no", "sum", 0]],
         ["height",      ["    Tree    ", "height", "yes", "no", "height", 0]],
         ["min",         ["            ", "min", "yes", "no", "min", 0]]
     ]],
     # Sorted
-    ["constraint/sortedlist", [
+    ["constraints/sortedlist", [
         ["min",                    ["        ", "min ", "no", "no", "min", 0]],
         ["max",                    [" Sorted ", "max ", "no", "no", "max", 0]],
         ["count_lt",               [" List   ",
-                                    "count elt. < ", "no", "no", "cnt <", 0]],
+                                    "count elt. smaller ", "no", "no", "cnt <", 0]],
         ["index_of",               ["        ",
                                     "index of elt ", "no", "no", "idx", 0]],
-        ["is_intersection_empty",  ["        ", "∩-empty ", "no", "no", "∩-∅", 0]],
+        ["is_intersection_empty",  ["        ", "inter-empty ", "no", "no", "∩-∅", 0]],
         ["largest_diff",           ["        ",
                                     "largest diff ", "no", "no", "ldiff", 0]],
         ["smallest_diff",          ["        ",
@@ -459,11 +462,11 @@ show_benchmarks = [
                                    "parallel max", "yes", "yes", "||max", 0]],
     ]],
     # Sorted and indexed
-    ["constraint/sorted_and_indexed", [
+    ["constraints/sorted_and_indexed", [
         ["count_lt0",                    ["        ",
-                                          "count < 0", "yes", "yes", "# < 0", 0]],
+                                          "count smaller 0", "yes", "yes", "# < 0", 0]],
         ["count_lt",                    ["        ",
-                                         "count < x", "yes", "yes", "# < 0", 0]],
+                                         "count smaller", "yes", "yes", "# < 0", 0]],
     ]],
     # Tail optimizations
     ["tailopt", [

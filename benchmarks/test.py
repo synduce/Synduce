@@ -7,7 +7,7 @@ import argparse
 import subprocess
 import json
 # Local helper modules
-import definitions
+from definitions import *
 from parsing import DataObj
 
 
@@ -158,7 +158,7 @@ def run_benchmarks(input_files, algos, optims, num_runs=1, csv_output=None, exit
                 bench_id = "%s,%s+%s" % (filename, algo[0], optim[0])
                 progress = f"({benchmark_cnt} / {benchmark_total})"
                 command = ("%s %s %s -j --json-progress %s %s %s %s %s" %
-                           (definitions.timeout, exec_path, algo[1], optim[1], extra_opt,
+                           (timeout, exec_path, algo[1], optim[1], extra_opt,
                             os.path.realpath(os.path.join(
                                 "benchmarks", filename)),
                             soln_file_opt, gen_opt))
@@ -229,7 +229,7 @@ if __name__ == "__main__":
     args = aparser.parse_args()
 
     if args.summary:
-        definitions.summarize()
+        summarize()
         exit()
 
     # Optional output settings.
@@ -288,7 +288,7 @@ if __name__ == "__main__":
     if run_kick_the_tires_only:
         algos = [["se2gis", cvc]]
         optims = [["all", ""]]
-        run_benchmarks(definitions.kick_the_tires_set, algos,
+        run_benchmarks(kick_the_tires_set, algos,
                        optims, csv_output=csv_output, num_runs=runs)
         exit(0)
 
@@ -297,17 +297,17 @@ if __name__ == "__main__":
         if run_lifting_benchmarks:
             algos = [["se2gis", cvc]]
             optims = [["all", ""]]
-            bench_set += definitions.lifting_benchmarks
+            bench_set += lifting_benchmarks
 
         if run_constraint_benchmarks:
             algos = [["se2gis", cvc]]
             optims = [["all", ""]]
-            bench_set += definitions.constraint_benchmarks
+            bench_set += constraint_benchmarks
 
         if run_base_benchmarks:
             algos = [["se2gis", cvc]]
             optims = [["all", ""]]
-            bench_set += definitions.base_benchmark_set
+            bench_set += base_benchmark_set
 
         run_benchmarks(bench_set, algos,
                        optims, csv_output=csv_output, num_runs=runs)
@@ -369,22 +369,29 @@ if __name__ == "__main__":
         algos = [["se2gis", "--cvc4"], ["segis", "--segis --cvc4"]]
         optims = [["all", ""]]
 
+    # If no csv output has been provided, generate a timestamped output file
+    if not csv_output:
+        timestr = time.strftime(timestamp_definition)
+        filename = f"benchmarks/data/exp/bench_{timestr}_table{table_no}.csv"
+        print(f"No output file given, I will be writing in {filename}")
+        csv_output = open(filename, 'a+', encoding='utf-8')
+
     # Benchmark set selection.
     input_files = []
     if args.kick_the_tires:
-        input_files = definitions.kick_the_tires_set
+        input_files = kick_the_tires_set
 
     else:
         if table_no == 2:
-            input_files = definitions.reduced_benchmark_set_table2
+            input_files = reduced_benchmark_set_table2
         elif table_no == 3:
-            input_files = definitions.reduced_benchmark_set_table3
+            input_files = reduced_benchmark_set_table3
         elif table_no == 4:
-            input_files = definitions.constraint_benchmarks
+            input_files = constraint_benchmarks
         elif table_no == 5:
-            input_files = definitions.constraint_benchmarks + definitions.lifting_benchmarks
+            input_files = constraint_benchmarks + lifting_benchmarks
         else:
-            input_files = definitions.kick_the_tires_set
+            input_files = kick_the_tires_set
 
     run_benchmarks(input_files, algos, optims, csv_output=csv_output,
                    exit_err=True, num_runs=runs)
