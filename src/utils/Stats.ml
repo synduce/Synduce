@@ -166,6 +166,7 @@ let log_new_major_step ~tsize ~usize () =
 ;;
 
 let log_major_step_end
+    ?(failure_step = false)
     ~(synth_time : float)
     ~(verif_time : float)
     ~(t : int)
@@ -184,6 +185,7 @@ let log_major_step_end
       ; "verified", `Bool verified
       ]
   in
+  let kw = if failure_step then "failed" else "success" in
   match Stack.pop refinement_log with
   | Some x ->
     (match x with
@@ -191,9 +193,9 @@ let log_major_step_end
     | step_no :: start_info :: failures ->
       Stack.push
         refinement_log
-        ([ step_no; start_info; "failures", `Assoc failures ] @ [ "success", json ])
-    | _ -> Stack.push refinement_log (x @ [ "success", json ]))
-  | None -> Stack.push refinement_log [ "success", json ]
+        ([ step_no; start_info; "failures", `Assoc failures ] @ [ kw, json ])
+    | _ -> Stack.push refinement_log (x @ [ kw, json ]))
+  | None -> Stack.push refinement_log [ kw, json ]
 ;;
 
 type verif_method =

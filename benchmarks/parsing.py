@@ -33,7 +33,15 @@ def is_successful(data: dict):
         success_info = final_step.get("success")
         if success_info:
             ret = bool(success_info.get("verified"))
+    unrealizable = data.get("unrealizable")
+    if unrealizable is not None:
+        ret = ret or unrealizable
     return ret
+
+
+def is_unrealizable(data: dict):
+    unrealizable = data.get("unrealizable")
+    return bool(unrealizable)
 
 
 def all_proved_by_induction(data: dict):
@@ -66,6 +74,7 @@ class DataObj:
         self.elapsed = data.get("total_elapsed")
         self.verif_elapsed = data.get("verif_elapsed")
         self.is_successful = is_successful(data)
+     #   self.is_unrealizable = is_unrealizable(data)
         cex_classif_flag, lemma_proof_flag = all_proved_by_induction(data)
         self.proved_by_induction = lemma_proof_flag
         self.classified_by_induction = cex_classif_flag
@@ -91,5 +100,8 @@ class DataObj:
                     str_summary += "."
             if verified:
                 str_summary += "✓"
+
+        if is_unrealizable(self.data):
+            str_summary += "∅"
 
         return str_summary

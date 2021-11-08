@@ -51,6 +51,7 @@ kick_the_tires_set = [
     ["constraints/ensures/mps_no_ensures.ml", "-B"],
     ["list/largest_diff_sorted_list_nohead.ml", ""],
     ["list/poly_no_fac.ml", ""],
+    ["unrealizable/po_sorted.ml", ""]
 ]
 
 reduced_benchmark_set_table2 = [
@@ -207,7 +208,7 @@ constraint_benchmarks = [
     # balanced_tree
     ["constraints/balanced_tree/node_count.ml", "-N"],
     ["constraints/balanced_tree/height.ml", "-N"],
-    # ["constraints/balanced_tree/height_v2.ml", "-NB"],
+    ["constraints/balanced_tree/height_v2.ml", "-NB"],
     # bst
     ["constraints/bst/contains.ml", ""],
     ["constraints/bst/count_lt.ml", "-NB"],
@@ -266,9 +267,9 @@ constraint_benchmarks = [
     ["constraints/symmetric_tree/height.ml", "-N"],
     ["constraints/symmetric_tree/min.ml", "-N"],
     # unimodal
-    #["constraints/unimodal_list/max_logn.ml", "-B"],
+    # ["constraints/unimodal_list/max_logn.ml", "-B"],
     ["constraints/unimodal_list/max_logn_v2.ml", ""],
-    #["constraints/unimodal_list/max_in_um_pos.ml", ""],
+    # ["constraints/unimodal_list/max_in_um_pos.ml", ""],
 ]
 
 lifting_benchmarks = [
@@ -297,6 +298,13 @@ lifting_benchmarks = [
     ["unimodal_lists/prod_needs_aux.ml", ""]
 ]
 
+unrealizable_benchmarks = [
+    ["unrealizable/po_sorted.ml", ""],
+    ["unrealizable/balanced_tree_logn_sum.ml", ""],
+    ["unrealizable/twosum.ml", ""],
+    ["unrealizable/minmax.ml", ""],
+    ["unrealizable/count_between.ml", ""]
+]
 
 benchmark_set = constraint_benchmarks + base_benchmark_set + lifting_benchmarks
 
@@ -347,8 +355,8 @@ show_benchmarks = [
     ["constraints/balanced_tree", [
         ["node_count",  [" Balanced ", "node count", "yes", "no",  "node cnt.", 0]],
         ["height",      ["  Tree    ", "height", "yes", "no", "height", 0]],
-        # ["height_v2",   ["          ",
-        #                  "height (v2)  ", "yes", "yes", "height v2.", 0]],
+        ["height_v2",   ["          ",
+                         "height (v2)  ", "yes", "yes", "height v2.", 0]],
     ]],
     # BST
     ["constraints/bst", [

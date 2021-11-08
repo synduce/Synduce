@@ -1,12 +1,12 @@
-(* Run with --no-lifting -dvN *)
+(** @synduce -NB --no-lifting *)
 
 type 'a tree =
   | Nil
   | Node of 'a * 'a tree * 'a tree
 
-let rec balanced = function
+let rec is_balanced = function
   | Nil -> true
-  | Node (a, b, c) -> aux b = aux c && balanced b && balanced c
+  | Node (a, b, c) -> aux b = aux c && is_balanced b && is_balanced c
 
 and aux = function
   | Nil -> 0
@@ -21,8 +21,8 @@ let rec height = function
 (* A small variation of height. *)
 let rec target = function
   | Nil -> [%synt s0]
-  | Node (a, l, r) -> a + [%synt f0] a (target l)
-  [@@requires balanced]
+  | Node (a, l, r) -> [%synt f0] a (target l)
+  [@@requires is_balanced]
 ;;
 
 assert (target = height)

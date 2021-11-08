@@ -1182,6 +1182,7 @@ let refine_ensures_predicates
     ~(neg_ctexs : ctex list)
     ~(pos_ctexs : ctex list)
     (lstate : refinement_loop_state)
+    : term_state * [ `CoarseningOk | `CoarseningFailure | `Unrealizable ]
   =
   Log.info
     Fmt.(
@@ -1189,7 +1190,7 @@ let refine_ensures_predicates
         pf fmt "%i counterexamples violate image assumption." (List.length neg_ctexs));
   let maybe_pred = ImagePredicates.synthesize ~p pos_ctexs neg_ctexs [] in
   match maybe_pred with
-  | None -> lstate.term_state, false
+  | None -> lstate.term_state, `CoarseningFailure
   | Some ensures ->
     (match Specifications.get_ensures p.psi_reference.pvar with
     | None -> Specifications.set_ensures p.psi_reference.pvar ensures
@@ -1206,13 +1207,13 @@ let refine_ensures_predicates
              (mk_app ensures [ mk_var var ]))
       in
       Specifications.set_ensures p.psi_reference.pvar new_pred);
-    lstate.term_state, true
+    lstate.term_state, `CoarseningOk
 ;;
 
 let synthesize_lemmas ~(p : psi_def) synt_failure_info (lstate : refinement_loop_state)
     : (refinement_loop_state, solver_response) Result.t
   =
-  let interactive_synthesis () =
+  let _interactive_synthesis () =
     !Config.interactive_lemmas_loop
     &&
     (Log.info (fun frmt () -> Fmt.pf frmt "No luck. Try again? (Y/N)");
@@ -1230,6 +1231,7 @@ let synthesize_lemmas ~(p : psi_def) synt_failure_info (lstate : refinement_loop
    *)
   let new_state, lemma_synthesis_success =
     match synt_failure_info with
+    | _, Either.First _ -> failwith "There is no synt_failure_info in synthesize_lemmas."
     | _, Either.Second unrealizability_ctexs ->
       (* Forget about the specific association in pairs. *)
       let ctexs = List.concat_map unrealizability_ctexs ~f:(fun uc -> [ uc.ci; uc.cj ]) in
@@ -1270,27 +1272,30 @@ let synthesize_lemmas ~(p : psi_def) synt_failure_info (lstate : refinement_loop
         then (
           (* lemma_synt_negatives and ensures_negatives are empty; all ctexs spurious! *)
           AlgoLog.no_spurious_ctex ();
-          ts, false)
+          ts, `Unrealizable)
         else (
           AlgoLog.spurious_violates_requires (List.length lemma_synt_negatives);
-          Map.fold
-            ts
-            ~init:(Map.empty (module Terms), true)
-            ~f:(fun ~key ~data:det (acc, status) ->
-              if Analysis.is_bounded det.term
-              then acc, status (* Skip lemma synth for bounded terms. *)
-              else if not status
-              then acc, status
-              else (
-                match lemma_refinement_loop det ~p with
-                | None -> acc, false
-                | Some det -> Map.add_exn ~key ~data:det acc, status))))
-    | _ -> failwith "There is no synt_failure_info in synthesize_lemmas."
+          let new_ts, success =
+            Map.fold
+              ts
+              ~init:(Map.empty (module Terms), true)
+              ~f:(fun ~key ~data:det (acc, status) ->
+                if Analysis.is_bounded det.term
+                then acc, status (* Skip lemma synth for bounded terms. *)
+                else if not status
+                then acc, status
+                else (
+                  match lemma_refinement_loop det ~p with
+                  | None -> acc, false
+                  | Some det -> Map.add_exn ~key ~data:det acc, status))
+          in
+          new_ts, if success then `CoarseningOk else `CoarseningFailure))
   in
-  if lemma_synthesis_success || interactive_synthesis ()
-  then Ok { lstate with term_state = new_state }
-  else (
-    match synt_failure_info with
+  match lemma_synthesis_success with
+  | `CoarseningOk -> Ok { lstate with term_state = new_state }
+  | `Unrealizable -> Error RInfeasible
+  | `CoarseningFailure ->
+    (match synt_failure_info with
     | RFail, _ ->
       Log.error_msg "SyGuS solver failed to find a solution.";
       Error RFail

@@ -12,7 +12,7 @@ open AState
 open Syguslib.Sygus
 
 (* ============================================================================================= *)
-(*                             ACEGIS REFINEMENT LOOP                                            *)
+(*                             SEGIS REFINEMENT LOOP                                            *)
 (* ============================================================================================= *)
 
 (** [segis_loop p t_set] solves the synthesis problem defined by [p] starting with the set of
@@ -31,7 +31,7 @@ let rec segis_loop (p : psi_def) (t_set : TermSet.t) =
   then AlgoLog.show_steps tsize usize
   else AlgoLog.show_stat elapsed tsize usize;
   Log.debug_msg
-    Fmt.(str "<ACEGIS> Start refinement loop with %i terms in T." (Set.length t_set));
+    Fmt.(str "<SEGIS> Start refinement loop with %i terms in T." (Set.length t_set));
   (* Start of the algorithm. *)
   let eqns, _ =
     Equations.make
@@ -52,7 +52,7 @@ let rec segis_loop (p : psi_def) (t_set : TermSet.t) =
           Fmt.(
             pf
               frmt
-              "@[<hov 2><ACEGIS> Counterexample term:@;@[<hov 2>%a@]"
+              "@[<hov 2><SEGIS> Counterexample term:@;@[<hov 2>%a@]"
               pp_term
               eqn.eterm));
       segis_loop p (Set.add t_set eqn.eterm)
@@ -61,38 +61,42 @@ let rec segis_loop (p : psi_def) (t_set : TermSet.t) =
       Log.print_ok ();
       Ok { soln_rec_scheme = p.psi_target; soln_implems = sol })
   | RFail, _ ->
-    Log.error_msg "<ACEGIS> SyGuS solver failed to find a solution.";
+    Log.error_msg "<SEGIS> SyGuS solver failed to find a solution.";
     Error RFail
   | RInfeasible, _ ->
+    Stats.log_major_step_end ~synth_time ~verif_time:0. ~t:tsize ~u:0 false;
     Log.info
       Fmt.(
         fun frmt () ->
           pf
             frmt
-            "@[<hov 2><ACEGIS> This problem has no solution. Counterexample set:@;%a@]"
+            "@[<hov 2><SEGIS> This problem has no solution. Counterexample set:@;%a@]"
             (list ~sep:sp pp_term)
             (Set.elements t_set));
     Error RInfeasible
   | RUnknown, _ ->
-    Log.error_msg "<ACEGIS> SyGuS solver returned unknown.";
+    Log.error_msg "<SEGIS> SyGuS solver returned unknown.";
     Error RUnknown
   | _ -> Error s_resp
 ;;
 
 let algo_segis (p : psi_def) =
+  (* In segis, checking for unrealizability may return errors. *)
+  (* Config.check_unrealizable := false; *)
+  Config.check_unrealizable_smt_unsatisfiable := false;
   let t_set = TermSet.of_list (Analysis.terms_of_max_depth 1 !AState._theta) in
   refinement_steps := 0;
   segis_loop p t_set
 ;;
 
 (* ============================================================================================= *)
-(*                             CCEGIS REFINEMENT LOOP                                            *)
+(*                             CEGIS REFINEMENT LOOP                                            *)
 (* ============================================================================================= *)
 
 (** [cegis_loop p t_set] solves the synthesis problem defined by [p] starting with the set of
     equations [Equations.make t]. The terms in [t] must be *concrete* terms, and only concrete terms
     will be taken as counterexamples during the refinement loop: this is a concrete CEGIS algorithm.
-    Use the option [--segis] in the executable to use this synthesis algorithm.
+    Use the option [--cegis] in the executable to use this synthesis algorithm.
 *)
 let rec cegis_loop (p : psi_def) (t_set : TermSet.t) =
   Int.incr refinement_steps;
@@ -109,7 +113,7 @@ let rec cegis_loop (p : psi_def) (t_set : TermSet.t) =
         elapsed
         (Set.length t_set)));
   Log.debug_msg
-    Fmt.(str "<CCEGIS> Start refinement loop with %i terms in T." (Set.length t_set));
+    Fmt.(str "<CEGIS> Start refinement loop with %i terms in T." (Set.length t_set));
   (* Start of the algorithm. *)
   let eqns, _ =
     Equations.make
@@ -129,7 +133,7 @@ let rec cegis_loop (p : psi_def) (t_set : TermSet.t) =
           Fmt.(
             pf
               frmt
-              "@[<hov 2><CCEGIS> Counterexample term:@;@[<hov 2>%a@]"
+              "@[<hov 2><CEGIS> Counterexample term:@;@[<hov 2>%a@]"
               pp_term
               eqn.eterm));
       cegis_loop p (Set.add t_set eqn.eterm)
@@ -137,7 +141,7 @@ let rec cegis_loop (p : psi_def) (t_set : TermSet.t) =
       Log.print_ok ();
       Ok { soln_rec_scheme = p.psi_target; soln_implems = sol })
   | RFail, _ ->
-    Log.error_msg "<CCEGIS> SyGuS solver failed to find a solution.";
+    Log.error_msg "<CEGIS> SyGuS solver failed to find a solution.";
     Error RFail
   | RInfeasible, _ ->
     Log.info
@@ -145,12 +149,12 @@ let rec cegis_loop (p : psi_def) (t_set : TermSet.t) =
         fun frmt () ->
           pf
             frmt
-            "@[<hov 2><CCEGIS> This problem has no solution. Counterexample set:@;%a@]"
+            "@[<hov 2><CEGIS> This problem has no solution. Counterexample set:@;%a@]"
             (list ~sep:sp pp_term)
             (Set.elements t_set));
     Error RInfeasible
   | RUnknown, _ ->
-    Log.error_msg "<CCEGIS> SyGuS solver returned unknown.";
+    Log.error_msg "<CEGIS> SyGuS solver returned unknown.";
     Error RUnknown
   | _ -> Error s_resp
 ;;

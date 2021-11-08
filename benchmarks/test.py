@@ -212,8 +212,11 @@ if __name__ == "__main__":
     aparser.add_argument(
         "-o", "--output", help="Dump Synduce output in -i mode to file (appending to file).", type=str, default=-1)
     aparser.add_argument(
-        "-b", "--benchmarks", help="Run the lifting benchmarks.", type=str,
-        choices=["all", "constraint", "lifting", "base", "small"], default=None)
+        "-b", "--benchmarks", help="Run a set of benchmarks.", type=str,
+        choices=["all", "constraint", "lifting", "base", "unr", "small"], default=None)
+    aparser.add_argument(
+        "-c", "--compare", help="Compare with segis or cegis", type=str,
+        choices=["segis", "cegis"], default=None)
     aparser.add_argument(
         "--single", help="Run the lifting benchmark in benchmarks/[FILE]", type=str, default=None)
     aparser.add_argument(
@@ -251,6 +254,7 @@ if __name__ == "__main__":
     run_lifting_benchmarks = False
     run_constraint_benchmarks = False
     run_base_benchmarks = False
+    run_unrealizable = False
     run_kick_the_tires_only = False
 
     if args.benchmarks == "constraint":
@@ -261,6 +265,8 @@ if __name__ == "__main__":
         run_base_benchmarks = True
     elif args.benchmarks == "small":
         run_kick_the_tires_only = True
+    elif args.benchmarks == "unr":
+        run_unrealizable = True
     elif args.benchmarks is not None:  # e.g. benchmarks = "all"
         run_lifting_benchmarks = True
         run_constraint_benchmarks = True
@@ -270,6 +276,13 @@ if __name__ == "__main__":
     cvc = "--cvc4"
     if args.cvc5:
         cvc = "--cvc5"
+
+    if args.compare == "segis":
+        other_alg = [["segis", "--segis " + cvc]]
+    elif args.compare == "cegis":
+        other_alg = [["cegis", "--cegis " + cvc]]
+    else:
+        other_alg = []
 
     # Run a single file if --single has an argument
     if args.single and args.single != "":
@@ -286,28 +299,31 @@ if __name__ == "__main__":
     bench_set = []
     # Running specific sets if we're supposed to.
     if run_kick_the_tires_only:
-        algos = [["se2gis", cvc]]
+        algos = [["se2gis", cvc]] + other_alg
         optims = [["all", ""]]
         run_benchmarks(kick_the_tires_set, algos,
                        optims, csv_output=csv_output, num_runs=runs)
         exit(0)
 
     # If we were supposed to run a specific set of benchmarks, we're done
-    if run_base_benchmarks or run_constraint_benchmarks or run_lifting_benchmarks:
+    if run_base_benchmarks or run_constraint_benchmarks or run_lifting_benchmarks or run_unrealizable:
+        algos = [["se2gis", cvc]] + other_alg
+
         if run_lifting_benchmarks:
-            algos = [["se2gis", cvc]]
             optims = [["all", ""]]
             bench_set += lifting_benchmarks
 
         if run_constraint_benchmarks:
-            algos = [["se2gis", cvc]]
             optims = [["all", ""]]
             bench_set += constraint_benchmarks
 
         if run_base_benchmarks:
-            algos = [["se2gis", cvc]]
             optims = [["all", ""]]
             bench_set += base_benchmark_set
+
+        if run_unrealizable:
+            optims = [["all", ""]]
+            bench_set += unrealizable_benchmarks
 
         run_benchmarks(bench_set, algos,
                        optims, csv_output=csv_output, num_runs=runs)

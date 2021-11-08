@@ -13,7 +13,7 @@ let prep_final_json
     ~(is_ocaml_syntax : bool)
     (source_filename : string ref)
     (pb : Algo.AState.psi_def)
-    (soln : Algo.AState.soln)
+    (soln : (Algo.AState.soln, bool) Either.t)
     (elapsed : float)
     (verif : float)
     : Yojson.t
@@ -28,55 +28,70 @@ let prep_final_json
     then "CEGIS"
     else "SE2GIS"
   in
+  let soln_or_refutation =
+    match soln with
+    | Either.First soln ->
+      [ ( "solution"
+        , `String
+            (Fmt.str
+               "%a"
+               (box (Algo.AState.pp_soln ~use_ocaml_syntax:is_ocaml_syntax))
+               soln) )
+      ; "unrealizable", `Bool false
+      ]
+    | Either.Second _ -> [ "unrealizable", `Bool true ]
+  in
   `Assoc
-    [ "algorithm", `String algo
-    ; "total_elapsed", `Float elapsed
-    ; "verif_elapsed", `Float verif
-    ; "solver-usage", solvers
-    ; "refinement-steps", refinement_steps
-    ; ( "solution"
-      , `String
-          (Fmt.str
-             "%a"
-             (box (Algo.AState.pp_soln ~use_ocaml_syntax:is_ocaml_syntax))
-             soln) )
-    ]
+    ([ "algorithm", `String algo
+     ; "total_elapsed", `Float elapsed
+     ; "verif_elapsed", `Float verif
+     ; "solver-usage", solvers
+     ; "refinement-steps", refinement_steps
+     ]
+    @ soln_or_refutation)
 ;;
 
 let on_success
     ~(is_ocaml_syntax : bool)
     (source_filename : string ref)
     (pb : Algo.AState.psi_def)
-    (soln : Algo.AState.soln)
+    (result : (Algo.AState.soln, bool) Either.t)
     : unit
   =
   let elapsed = Stats.get_glob_elapsed () in
   let verif_ratio = 100.0 *. (!Stats.verif_time /. elapsed) in
   Log.(info print_solvers_summary);
-  Log.info
-    Fmt.(
-      fun frmt () ->
-        pf
-          frmt
-          "Solution found in %4.4fs (%3.1f%% verifying):@.%a@]"
-          elapsed
-          verif_ratio
-          (box (Algo.AState.pp_soln ~use_ocaml_syntax:is_ocaml_syntax))
-          soln);
+  (* Print the solution. *)
+  (match result with
+  | Either.First soln ->
+    Log.info
+      Fmt.(
+        fun frmt () ->
+          pf
+            frmt
+            "Solution found in %4.4fs (%3.1f%% verifying):@.%a@]"
+            elapsed
+            verif_ratio
+            (box (Algo.AState.pp_soln ~use_ocaml_syntax:is_ocaml_syntax))
+            soln)
+  | Either.Second _ -> Log.(info (wrap "No solution: problem is unrealizable.")));
   (* If output specified, write the solution in file. *)
-  (match Config.get_output_file !source_filename with
-  | Some out_file ->
-    Utils.Log.to_file out_file (fun frmt () ->
-        (box (Algo.AState.pp_soln ~use_ocaml_syntax:is_ocaml_syntax)) frmt soln)
-  | None -> ());
-  (* If specified, output a Dafny proof skeleton. *)
-  if !Config.generate_proof
-  then
-    Codegen.(
-      Generation.gen_proof
-        (Commons.problem_descr_of_psi_def pb, Some soln)
-        !Config.proof_generation_file)
-  else ();
+  (match result with
+  | Either.First soln ->
+    (match Config.get_output_file !source_filename with
+    | Some out_file ->
+      Utils.Log.to_file out_file (fun frmt () ->
+          (box (Algo.AState.pp_soln ~use_ocaml_syntax:is_ocaml_syntax)) frmt soln)
+    | None -> ());
+    (* If specified, output a Dafny proof skeleton. *)
+    if !Config.generate_proof
+    then
+      Codegen.(
+        Generation.gen_proof
+          (Commons.problem_descr_of_psi_def pb, Some soln)
+          !Config.proof_generation_file)
+    else ()
+  | _ -> ());
   (* If no info required, output timing information. *)
   if (not !Config.info) && !Config.timings
   then (
@@ -86,7 +101,7 @@ let on_success
   if !Config.json_out
   then (
     let json =
-      prep_final_json ~is_ocaml_syntax source_filename pb soln elapsed !Stats.verif_time
+      prep_final_json ~is_ocaml_syntax source_filename pb result elapsed !Stats.verif_time
     in
     if !Config.json_progressive
     then (
