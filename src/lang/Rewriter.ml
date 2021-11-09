@@ -50,7 +50,7 @@ let get_ty_const (typ : RType.t) : term =
   RType.(
     match typ with
     | TInt -> mk_const (Constant.of_int 0)
-    | TBool -> mk_const (Constant.of_int 1)
+    | TBool -> mk_const (Constant.of_bool true)
     | _ -> mk_const (Constant.of_int 0))
 ;;
 

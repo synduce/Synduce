@@ -201,9 +201,19 @@ let bool_parametric
           then [ GTerm (SyApp (IdSimple "div", [ int_nonterm; int_const_nonterm ])) ]
           else [])
         @ [ GTerm (SyApp (IdSimple "ite", [ bool_nonterm; int_nonterm; int_nonterm ])) ]
+        @ (if Set.mem params.g_opset (Binary Mod)
+          then [ GTerm (SyApp (IdSimple "mod", [ int_nonterm; int_const_nonterm ])) ]
+          else [])
         @
-        if Set.mem params.g_opset (Binary Mod)
-        then [ GTerm (SyApp (IdSimple "mod", [ int_nonterm; int_const_nonterm ])) ]
+        if Set.mem params.g_opset (Binary Times)
+           || Set.mem params.g_opset (Binary Div)
+           || Set.mem params.g_opset (Binary Mod)
+           || params.g_nonlinear
+        then
+          [ GTerm (SyApp (IdSimple "*", [ int_nonterm; int_nonterm ]))
+          ; GTerm (SyApp (IdSimple "div", [ int_nonterm; int_nonterm ]))
+          ; GTerm (SyApp (IdSimple "mod", [ int_nonterm; int_nonterm ]))
+          ]
         else [] )
     ]
     @ [ ( ("Ic", int_sort)

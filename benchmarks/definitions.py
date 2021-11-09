@@ -211,17 +211,22 @@ constraint_benchmarks = [
     ["constraints/balanced_tree/height_v2.ml", "-NB"],
     # bst
     ["constraints/bst/contains.ml", ""],
+    ["constraints/bst/contains_boolean.ml", ""],
+    ["constraints/bst/contains_bool_2.ml", ""],
+    ["constraints/bst/contains_no_ensures.ml", ""],
     ["constraints/bst/count_lt.ml", "-NB"],
     ["constraints/bst/count_between.ml", "-NB --no-gropt"],
     ["constraints/bst/most_frequent_v1.ml", ""],
     ["constraints/bst/from_list_contains.ml", ""],
     ["constraints/bst/from_list_max.ml", "-NB -n 50"],
     ["constraints/bst/sum_gt_by_key.ml", "-NB -n 50"],
+    ["constraints/bst/minmax_separate.ml", ""],
     # constantlist
     ["constraints/constantlist/index_of.ml", ""],
     ["constraints/constantlist/contains.ml", ""],
     # empty_right
     ["constraints/empty_right_subtree/contains.ml", "-N"],
+    ["constraints/empty_right_subtree/sum.ml", ""],
     # evenlist
     ["constraints/evenlist/parity_of_first.ml", ""],
     ["constraints/evenlist/parity_of_last.ml", ""],
@@ -239,6 +244,7 @@ constraint_benchmarks = [
     ["constraints/memo/max_sum_gt.ml", "-NB"],
     ["constraints/memo/proper_indexation_sum_lt_pos_v2.ml", ""],
     ["constraints/memo/proper_indexation_sum_lt_pos.ml", ""],
+    ["constraints/memo/minmax.ml", ""],
     # Size constraint
     ["constraints/size/obfuscated_length.ml", ""],
     ["constraints/size/obfuscated_length_3.ml", ""],
@@ -303,7 +309,11 @@ unrealizable_benchmarks = [
     ["unrealizable/balanced_tree_logn_sum.ml", ""],
     ["unrealizable/twosum.ml", ""],
     ["unrealizable/minmax.ml", ""],
-    ["unrealizable/count_between.ml", ""]
+    ["unrealizable/count_between.ml", ""],
+    ["unrealizable/contains.ml", ""],
+    ["unrealizable/contains2.ml", ""],
+    ["unrealizable/simple_parity.ml", ""],
+    ["unrealizable/minmax_mistake.ml", ""]
 ]
 
 benchmark_set = constraint_benchmarks + base_benchmark_set + lifting_benchmarks
@@ -438,7 +448,9 @@ show_benchmarks = [
         ["proper_indexation_sum_lt_pos_v2",
          ["             ", "sum elts larger pos", "no", "no", "sum > pos", 0]],
         ["proper_indexation_sum_lt_pos",
-         ["             ", "sum elts larger pos .v2", "no", "no", "sum > pos v2", 0]]
+         ["             ", "sum elts larger pos .v2", "no", "no", "sum > pos v2", 0]],
+        ["minmax",
+         ["             ", "memoize minmax", "no", "no", "m. minmax", 0]]
 
     ]],
     # Program

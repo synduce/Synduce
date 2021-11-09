@@ -185,19 +185,35 @@ let skeleton_match ~unknowns (e1 : term) (e2 : term) : (term * term) list option
 let components_of_unrealizability ~unknowns (eqn1 : equation) (eqn2 : equation)
     : ((term * term) list * (term * term)) option
   =
+  let validate terms =
+    List.for_all terms ~f:(fun (t, t') ->
+        Set.is_empty (Set.inter (Analysis.free_variables t) unknowns)
+        && Set.is_empty (Set.inter (Analysis.free_variables t') unknowns))
+  in
   match skeleton_match ~unknowns eqn1.erhs eqn2.erhs with
-  | Some args_1_2 -> Some (args_1_2, (eqn1.elhs, eqn2.elhs))
+  | Some args_1_2 ->
+    if validate ((eqn1.elhs, eqn2.elhs) :: args_1_2)
+    then Some (args_1_2, (eqn1.elhs, eqn2.elhs))
+    else None
   | None ->
-    if Terms.equal eqn1.erhs eqn2.erhs then Some ([], (eqn1.elhs, eqn2.erhs)) else None
+    if Terms.equal eqn1.erhs eqn2.erhs
+       && validate [ eqn1.erhs, eqn2.erhs; eqn1.elhs, eqn2.elhs ]
+    then Some ([], (eqn1.elhs, eqn2.erhs))
+    else None
 ;;
 
 let gen_info (eqn_i, eqn_j) unknowns =
   let fv e =
     VarSet.union_list
-      [ Analysis.free_variables e.elhs
-      ; Analysis.free_variables e.erhs
-      ; Option.value_map ~default:VarSet.empty ~f:Analysis.free_variables e.eprecond
-      ]
+      (List.map e.eelim ~f:(fun (_, elim) -> Analysis.free_variables elim)
+      @ [ Set.filter
+            ~f:(fun v -> RType.is_base (Variable.vtype_or_new v))
+            (Analysis.free_variables e.eterm)
+        ]
+      @ [ Analysis.free_variables e.elhs
+        ; Analysis.free_variables e.erhs
+        ; Option.value_map ~default:VarSet.empty ~f:Analysis.free_variables e.eprecond
+        ])
   in
   let vseti = Set.diff (fv eqn_i) unknowns
   and vsetj = Set.diff (fv eqn_j) unknowns in
@@ -252,6 +268,7 @@ let check_unrealizable (unknowns : VarSet.t) (eqns : equation_system)
             AsyncSmt.smt_assert solver (smt_of_term pre_i)
           | None -> return ()
         in
+        (* Assert the precondition for j *)
         let* () =
           match eqn_j.eprecond with
           | Some pre_j ->
@@ -697,7 +714,10 @@ let check_tinv_sat ~(p : psi_def) (tinv : PMRS.t) (ctex : ctex)
       let vars =
         VarSet.union_list
           (Option.(to_list (map ~f:Analysis.free_variables ctex.ctex_eqn.eprecond))
-          @ [ Analysis.free_variables t; Analysis.free_variables (f_compose_r t) ])
+          @ [ ctex.ctex_vars
+            ; Analysis.free_variables t
+            ; Analysis.free_variables (f_compose_r t)
+            ])
       in
       (* Start sequence of solver commands, bind on accum. *)
       let* _ = binder in

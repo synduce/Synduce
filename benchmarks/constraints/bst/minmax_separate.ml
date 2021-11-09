@@ -16,7 +16,7 @@ let rec tree_max = function
 
 let rec is_bst = function
   | Leaf x -> true
-  | Node (a, l, r) -> a >= tree_max l && a <= tree_min r && is_bst l && is_bst r
+  | Node (a, l, r) -> a >= tree_max r && a <= tree_min l && is_bst l && is_bst r
 ;;
 
 let repr x = x
@@ -31,7 +31,7 @@ let rec spec = function
 
 let rec target = function
   | Leaf a -> [%synt xi_0] a
-  | Node (a, l, r) -> [%synt xi_2] a (amin l) (amax r)
+  | Node (a, l, r) -> [%synt xi_2] a (amin l) (amax r) (amax l) (amin r)
 
 and amin = function
   | Leaf a -> a

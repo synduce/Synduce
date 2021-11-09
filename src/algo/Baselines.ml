@@ -81,9 +81,6 @@ let rec segis_loop (p : psi_def) (t_set : TermSet.t) =
 ;;
 
 let algo_segis (p : psi_def) =
-  (* In segis, checking for unrealizability may return errors. *)
-  (* Config.check_unrealizable := false; *)
-  Config.check_unrealizable_smt_unsatisfiable := false;
   let t_set = TermSet.of_list (Analysis.terms_of_max_depth 1 !AState._theta) in
   refinement_steps := 0;
   segis_loop p t_set

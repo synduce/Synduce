@@ -287,7 +287,7 @@ if __name__ == "__main__":
     # Run a single file if --single has an argument
     if args.single and args.single != "":
         print("Running single file")
-        algos = [["se2gis", cvc]]
+        algos = [["se2gis", cvc]] + other_alg
         optims = [["all", ""]]
         binfo = str(args.single).split("+")
         if len(binfo) == 1:
@@ -405,7 +405,8 @@ if __name__ == "__main__":
         elif table_no == 4:
             input_files = constraint_benchmarks
         elif table_no == 5:
-            input_files = constraint_benchmarks + lifting_benchmarks
+            input_files = constraint_benchmarks + \
+                lifting_benchmarks + unrealizable_benchmarks
         else:
             input_files = kick_the_tires_set
 
