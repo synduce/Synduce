@@ -271,6 +271,7 @@ constraint_benchmarks = [
     ["constraints/sortedlist/parallel_min.ml", "-NB"],
     ["constraints/sortedlist/parallel_max.ml", "-NB"],
     ["constraints/sortedlist/parallel_max2.ml", "-NB"],
+    ["constraints/sortedlist/interval_intersection.ml", ""],
     # Sorted and indexed
     ["constraints/sorted_and_indexed/count_lt0.ml", "-NB -n 30"],
     ["constraints/sorted_and_indexed/count_lt.ml", "-NB -n 30"],
