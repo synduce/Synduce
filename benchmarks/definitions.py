@@ -101,6 +101,9 @@ base_benchmark_set = [
     ["combine/mss_with_sum.ml", ""],
     # Compressed list
     ["compressed_list/sum.ml", ""],
+    # Expressions
+    ["expressions/norm_arith.ml", ""],
+    ["expressions/max_subexpr_sum.ml", ""],
     # Indexed list
     ["indexed_list/search.ml", ""],
     ["indexed_list/position_polynomial.ml", ""],
@@ -251,6 +254,7 @@ constraint_benchmarks = [
     ["constraints/size/obfuscated_length_3.ml", ""],
     # program
     # ["constraints/program/typecheck.ml", ""],
+    ["constraints/program/memo_psum.ml", ""],
     # sortedlist
     ["constraints/sortedlist/min.ml", ""],
     ["constraints/sortedlist/max.ml", ""],
@@ -258,6 +262,7 @@ constraint_benchmarks = [
     ["constraints/sortedlist/index_of.ml", ""],
     ["constraints/sortedlist/is_intersection_empty.ml", ""],
     ["constraints/sortedlist/largest_diff.ml", ""],
+    ["constraints/sortedlist/largest_diff_poslist.ml", ""],
     ["constraints/sortedlist/smallest_diff.ml", ""],
     ["constraints/sortedlist/sndmind.ml", ""],
     ["constraints/sortedlist/sndmax_empty_base_case.ml", "-NB"],
@@ -314,7 +319,9 @@ unrealizable_benchmarks = [
     ["unrealizable/contains.ml", ""],
     ["unrealizable/contains2.ml", ""],
     ["unrealizable/simple_parity.ml", ""],
-    ["unrealizable/minmax_mistake.ml", ""]
+    ["unrealizable/minmax_mistake.ml", ""],
+    ["unrealizable/approximately_pareto.ml", ""],
+    ["unrealizable/eval_psum.ml", ""]
 ]
 
 benchmark_set = constraint_benchmarks + base_benchmark_set + lifting_benchmarks

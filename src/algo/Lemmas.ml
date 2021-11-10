@@ -97,8 +97,8 @@ let term_state_of_context ~(is_pos_ctex : bool) (ctex : ctex) : term_state_detai
   ; lemmas = []
   ; lemma = lemma_f
   ; lemma_candidate = None
-  ; negative_ctexs = (if is_pos_ctex then [ ctex ] else [])
-  ; positive_ctexs = (if is_pos_ctex then [] else [ ctex ])
+  ; negative_ctexs = (if is_pos_ctex then [] else [ ctex ])
+  ; positive_ctexs = (if is_pos_ctex then [ ctex ] else [])
   ; recurs_elim = ctex.ctex_eqn.eelim
   ; scalar_vars = Map.keys ctex.ctex_model
   ; current_preconds = ctex.ctex_eqn.eprecond

@@ -12,14 +12,14 @@ type psum_expr =
 
 let rec repr = function
   | NInt i -> Int i
-  | NPlus (s1, s2, a, b) -> Plus (repr a, repr b)
-  | NMinus (s1, s2, a, b) -> Minus (repr a, repr b)
+  | NPlus (s, a, b) -> Plus (repr a, repr b)
+  | NMinus (s, a, b) -> Minus (repr a, repr b)
 ;;
 
 let rec is_memo_psum = function
   | NInt i -> true
-  | NPlus (s1, s2, a, b) -> s1 = maxs a && s2 = maxs b && is_memo_psum a && is_memo_psum b
-  | NMinus (s1, s2, a, b) -> s = sum a - sum b && is_memo_psum a && is_memo_psum b
+  | NPlus (s, a, b) -> s >= sum a + sum b && is_memo_psum a && is_memo_psum b
+  | NMinus (s, a, b) -> s >= sum a - sum b && is_memo_psum a && is_memo_psum b
 
 and sum = function
   | NInt i -> i
