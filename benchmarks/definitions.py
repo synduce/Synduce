@@ -221,6 +221,7 @@ constraint_benchmarks = [
     ["constraints/bst/from_list_max.ml", "-NB -n 50"],
     ["constraints/bst/sum_gt_by_key.ml", "-NB -n 50"],
     ["constraints/bst/minmax_separate.ml", ""],
+    ["constraints/bst/minmax_sim.ml", ""],
     # constantlist
     ["constraints/constantlist/index_of.ml", ""],
     ["constraints/constantlist/contains.ml", ""],
@@ -382,6 +383,10 @@ show_benchmarks = [
                                 "of list max ", "yes", "yes", "max (list)", 0]],
         ["sum_gt_by_key",      ["          ",
                                 "sum if key larger", "yes", "yes", "sumkey", 0]],
+        ["minmax_separate",      ["          ",
+                                  "min and max", "yes", "yes", "minmax-sep", 0]],
+        ["minmax_sim",      ["          ",
+                             "minmax simultaneous", "yes", "yes", "minmax-sim", 0]],
     ]],
     # Combining traversals
     ["combine", [
