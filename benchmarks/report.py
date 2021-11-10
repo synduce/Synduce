@@ -69,10 +69,8 @@ def make_tex_table(data, output_file_name):
         ('%', str(datetime.now())))
     tex.write("%s ====================================\n" % '%')
     # open table
-    tex.write("\\begin{table*}\n")
-    tex.write("\t\caption{%s}\label{table:experiments}\n" % caption)
     tex.write("\t{\n")
-    tex.write("\t\t\\begin{tabular}[h]{|c|c|c|c|c||c|c|}\n")
+    tex.write("\t\t\\begin{longtable}[h]{|c|c|c|c|c||c|c|}\n")
     tex.write("\t\t\t\\hline\n")
     tex.write(
         "\t\t\t \multirow{2}{*}{Class} &\
@@ -96,9 +94,9 @@ def make_tex_table(data, output_file_name):
                           experimental_data[0], experimental_data[1]))
 
     tex.write("\t\t\t\\hline\n")
-    tex.write("\t\t\end{tabular}\n")
+    tex.write("\t\caption{%s}\label{table:experiments}\n" % caption)
+    tex.write("\t\t\end{longtable}\n")
     tex.write("\t}\n")
-    tex.write("\end{table*}\n")
     tex.close()
 
 
@@ -126,6 +124,7 @@ def make_table_5(input_file, output_file):
     input_name = input_file.split(".")[0]
     quantile_file = input_name + "_quantile.pdf"
     scatter_file = input_name + "_scatter.pdf"
+    scatter_no_timeouts_file = input_name + "_no_timeouts_scatter.pdf"
     tex_table = input_name + "_table.tex"
 
     table = {}
@@ -173,17 +172,42 @@ def make_table_5(input_file, output_file):
                       (benchmark, a, b, speedup(a, b)))
 
     # Plot a scatter plot with a diagonal line
-    fig, ax = plt.subplots(figsize=(9, 6))
+    fig, ax = plt.subplots(figsize=(6, 6))
     ax.plot(segis_series, se2gis_series, "x", color="firebrick")
     ax.set_xscale("log")
     ax.set_yscale("log")
-    ax.set(xlim=(0.0001, timeout_value + 200),
-           ylim=(0.0001, timeout_value + 200))
+    ax_min = 0.5*min(segis_series + se2gis_series)
+    ax_max = 5*max(segis_series + se2gis_series)
+    ax.set(xlim=(ax_min, ax_max),
+           ylim=(ax_min, ax_max))
     ax.set(xlabel="Synthesis time using SEGIS (log)",
            ylabel="Synthesis time using SE²GIS (log)")
     ax.plot([0, 1], [0, 1], color="black",
             linestyle="dotted", transform=ax.transAxes)
+    ax.set_aspect('equal')
     fig.savefig(scatter_file)
+
+    # Plot a scatter plot with a diagonal line, omitting timeouts
+    no_timeouts = list(filter(lambda d : d[0] != timeout_value and d[1] != timeout_value, zip(segis_series, se2gis_series)))
+    segis_series_no_timeout = [d[0] for d in no_timeouts]
+    se2gis_series_no_timeout = [d[1] for d in no_timeouts]
+    fig, ax = plt.subplots(figsize=(6, 6))
+    ax.plot(segis_series_no_timeout, se2gis_series_no_timeout, "x", color="firebrick")
+    ax_min = 0.5*min(segis_series_no_timeout + se2gis_series_no_timeout)
+    ax_max = 5*max(segis_series_no_timeout + se2gis_series_no_timeout)
+    ax.set(xlim=(ax_min,ax_max),
+           ylim=(ax_min, ax_max))
+    ax.set_xscale("log")
+    ax.set_yscale("log")
+    ax.set(xlabel="Synthesis time using SEGIS (log)",
+           ylabel="Synthesis time using SE²GIS (log)")
+    diag_max = int(min(max(segis_series_no_timeout), max(se2gis_series_no_timeout)))
+    ax.plot([0, 1], [0, 1], color="black",
+            linestyle="dotted", transform=ax.transAxes)
+    ax.plot(list(range(diag_max)), list(range(diag_max)), color="black",
+            linestyle="dotted")
+    ax.set_aspect('equal')
+    fig.savefig(scatter_no_timeouts_file)
 
     # Plot a quantile plot
     fig, ax = plt.subplots(figsize=(9, 6))
@@ -198,11 +222,13 @@ def make_table_5(input_file, output_file):
     # Output a tex table
     make_tex_table(table, tex_table)
 
-    print(f"{segis_timeouts} timeouts for SEGIS, {se2gis_timeouts} timeouts for SEGIS.")
+    print(f"Number of benchmarks: {len(segis_series)}")
+    print(f"{segis_timeouts} timeouts for SEGIS, {se2gis_timeouts} timeouts for SE2GIS.")
     print(f"SE2GIS is faster on {speedups} benchmarks.")
     print(f"Tex table    : { tex_table}  ")
     print(f"Quantile plot: {quantile_file}")
     print(f"Scatter plot : {scatter_file}")
+    print(f"Scatter plot (omitting timeouts) : {scatter_no_timeouts_file}")
 
 
 def select_last_known_experimental_data(table_no):
