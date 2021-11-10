@@ -185,19 +185,35 @@ let skeleton_match ~unknowns (e1 : term) (e2 : term) : (term * term) list option
 let components_of_unrealizability ~unknowns (eqn1 : equation) (eqn2 : equation)
     : ((term * term) list * (term * term)) option
   =
+  let validate terms =
+    List.for_all terms ~f:(fun (t, t') ->
+        Set.is_empty (Set.inter (Analysis.free_variables t) unknowns)
+        && Set.is_empty (Set.inter (Analysis.free_variables t') unknowns))
+  in
   match skeleton_match ~unknowns eqn1.erhs eqn2.erhs with
-  | Some args_1_2 -> Some (args_1_2, (eqn1.elhs, eqn2.elhs))
+  | Some args_1_2 ->
+    if validate ((eqn1.elhs, eqn2.elhs) :: args_1_2)
+    then Some (args_1_2, (eqn1.elhs, eqn2.elhs))
+    else None
   | None ->
-    if Terms.equal eqn1.erhs eqn2.erhs then Some ([], (eqn1.elhs, eqn2.erhs)) else None
+    if Terms.equal eqn1.erhs eqn2.erhs
+       && validate [ eqn1.erhs, eqn2.erhs; eqn1.elhs, eqn2.elhs ]
+    then Some ([], (eqn1.elhs, eqn2.erhs))
+    else None
 ;;
 
 let gen_info (eqn_i, eqn_j) unknowns =
   let fv e =
     VarSet.union_list
-      [ Analysis.free_variables e.elhs
-      ; Analysis.free_variables e.erhs
-      ; Option.value_map ~default:VarSet.empty ~f:Analysis.free_variables e.eprecond
-      ]
+      (List.map e.eelim ~f:(fun (_, elim) -> Analysis.free_variables elim)
+      @ [ Set.filter
+            ~f:(fun v -> RType.is_base (Variable.vtype_or_new v))
+            (Analysis.free_variables e.eterm)
+        ]
+      @ [ Analysis.free_variables e.elhs
+        ; Analysis.free_variables e.erhs
+        ; Option.value_map ~default:VarSet.empty ~f:Analysis.free_variables e.eprecond
+        ])
   in
   let vseti = Set.diff (fv eqn_i) unknowns
   and vsetj = Set.diff (fv eqn_j) unknowns in
@@ -252,6 +268,7 @@ let check_unrealizable (unknowns : VarSet.t) (eqns : equation_system)
             AsyncSmt.smt_assert solver (smt_of_term pre_i)
           | None -> return ()
         in
+        (* Assert the precondition for j *)
         let* () =
           match eqn_j.eprecond with
           | Some pre_j ->
@@ -319,10 +336,12 @@ let check_unrealizable (unknowns : VarSet.t) (eqns : equation_system)
         new_ctexs
     in
     let* ctexs =
-      List.fold
-        ~f:check_eqn_accum
-        ~init:(return [])
-        (List.mapi ~f:(fun i eqn -> i, eqn) eqns |> combinations)
+      Lwt.map
+        merge_all
+        (List.fold
+           ~f:check_eqn_accum
+           ~init:(return [])
+           (List.mapi ~f:(fun i eqn -> i, eqn) eqns |> combinations))
     in
     let+ _ = AsyncSmt.close_solver solver in
     let elapsed = Unix.gettimeofday () -. start_time in
@@ -370,7 +389,7 @@ let add_cause (ctx : ctex_stat) (cause : spurious_cause) =
 
 (*               CLASSIFYING SPURIOUS COUNTEREXAMPLES - NOT IN REFERENCE IMAGE                   *)
 
-let check_image_sat ~p ctex : AsyncSmt.response * int u =
+let check_image_sat ~p ctex : (Stats.verif_method * SmtLib.solver_response) Lwt.t * int u =
   let f_compose_r t =
     let repr_of_v =
       if p.psi_repr_is_identity then t else Reduce.reduce_pmrs p.psi_repr t
@@ -432,12 +451,12 @@ let check_image_sat ~p ctex : AsyncSmt.response * int u =
         (return (TermSet.singleton ctex.ctex_eqn.eterm))
     in
     let* () = AsyncSmt.close_solver solver_instance in
-    return res
+    return (Stats.BoundedChecking, res)
   in
   AsyncSmt.(cancellable_task (make_solver "z3") build_task)
 ;;
 
-let check_image_unsat ~p ctex : AsyncSmt.response * int u =
+let check_image_unsat ~p ctex : (Stats.verif_method * SmtLib.solver_response) t * int u =
   let f_compose_r t =
     let repr_of_v =
       if p.psi_repr_is_identity then t else mk_app_v p.psi_repr.pvar [ t ]
@@ -497,7 +516,7 @@ let check_image_unsat ~p ctex : AsyncSmt.response * int u =
     in
     let* resp = AsyncSmt.check_sat solver in
     let* () = AsyncSmt.close_solver solver in
-    return resp
+    return (Stats.Induction, resp)
   in
   AsyncSmt.(cancellable_task (AsyncSmt.make_solver "cvc") build_task)
 ;;
@@ -509,9 +528,9 @@ let check_image_unsat ~p ctex : AsyncSmt.response * int u =
 let check_ctex_in_image ?(ignore_unknown = false) ~(p : psi_def) (ctex : ctex) : ctex =
   Log.verbose_msg
     Fmt.(str "Checking whether ctex is in the image of %s..." p.psi_reference.pvar.vname);
-  let resp =
+  let vmethod, resp =
     if Analysis.is_bounded ctex.ctex_eqn.eterm
-    then SmtLib.Sat
+    then Stats.Induction, SmtLib.Sat
     else (
       try
         Lwt_main.run
@@ -527,35 +546,9 @@ let check_ctex_in_image ?(ignore_unknown = false) ~(p : psi_def) (ctex : ctex) :
       | End_of_file ->
         Log.error_msg "Solvers terminated unexpectedly  ⚠️ .";
         Log.error_msg "Please inspect logs.";
-        SmtLib.Unknown)
+        Stats.Induction, SmtLib.Unknown)
   in
-  Log.verbose (fun frmt () ->
-      if SyncSmt.is_unsat resp
-      then
-        Fmt.(
-          pf
-            frmt
-            "(%a)@;<1 4>is not in the image of reference function \"%s\"."
-            (box pp_ctex)
-            ctex
-            p.psi_reference.pvar.vname)
-      else if SyncSmt.is_sat resp
-      then
-        Fmt.(
-          pf
-            frmt
-            "(%a) is in the image of %s."
-            (box pp_ctex)
-            ctex
-            p.psi_reference.pvar.vname)
-      else
-        Fmt.(
-          pf
-            frmt
-            "I do not know whether (%a) is in the image of %s."
-            (box pp_ctex)
-            ctex
-            p.psi_reference.pvar.vname));
+  AlgoLog.image_ctex_class p ctex resp vmethod;
   match resp with
   | Sat -> ctex
   | Unsat -> { ctex with ctex_stat = add_cause ctex.ctex_stat NotInReferenceImage }
@@ -609,7 +602,7 @@ let mk_model_sat_asserts ctex f_o_r instantiate =
   stalls or returns unknown.
 *)
 let check_tinv_unsat ~(p : psi_def) (tinv : PMRS.t) (ctex : ctex)
-    : AsyncSmt.response * int Lwt.u
+    : (Stats.verif_method * SmtLib.solver_response) t * int Lwt.u
   =
   let build_task (cvc4_instance, task_start) =
     let* _ = task_start in
@@ -675,7 +668,7 @@ let check_tinv_unsat ~(p : psi_def) (tinv : PMRS.t) (ctex : ctex)
     in
     let* resp = AsyncSmt.check_sat cvc4_instance in
     let* () = AsyncSmt.close_solver cvc4_instance in
-    return resp
+    return (Stats.Induction, resp)
   in
   AsyncSmt.(cancellable_task (AsyncSmt.make_solver "cvc") build_task)
 ;;
@@ -685,7 +678,7 @@ let check_tinv_unsat ~(p : psi_def) (tinv : PMRS.t) (ctex : ctex)
     response and a resolver for that promise. The promise is cancellable.
  *)
 let check_tinv_sat ~(p : psi_def) (tinv : PMRS.t) (ctex : ctex)
-    : AsyncSmt.response * int Lwt.u
+    : (Stats.verif_method * SmtLib.solver_response) t * int Lwt.u
   =
   let f_compose_r t =
     let repr_of_v =
@@ -721,7 +714,10 @@ let check_tinv_sat ~(p : psi_def) (tinv : PMRS.t) (ctex : ctex)
       let vars =
         VarSet.union_list
           (Option.(to_list (map ~f:Analysis.free_variables ctex.ctex_eqn.eprecond))
-          @ [ Analysis.free_variables t; Analysis.free_variables (f_compose_r t) ])
+          @ [ ctex.ctex_vars
+            ; Analysis.free_variables t
+            ; Analysis.free_variables (f_compose_r t)
+            ])
       in
       (* Start sequence of solver commands, bind on accum. *)
       let* _ = binder in
@@ -752,13 +748,13 @@ let check_tinv_sat ~(p : psi_def) (tinv : PMRS.t) (ctex : ctex)
         (return (TermSet.singleton ctex.ctex_eqn.eterm))
     in
     let* () = AsyncSmt.close_solver solver in
-    return res
+    return (Stats.BoundedChecking, res)
   in
   AsyncSmt.(cancellable_task (make_solver "z3") task)
 ;;
 
 let satisfies_tinv ~(p : psi_def) (tinv : PMRS.t) (ctex : ctex) : ctex =
-  let resp =
+  let vmethod, resp =
     try
       Lwt_main.run
         ((* This call is expected to respond "unsat" when terminating. *)
@@ -773,23 +769,9 @@ let satisfies_tinv ~(p : psi_def) (tinv : PMRS.t) (ctex : ctex) : ctex =
     | End_of_file ->
       Log.error_msg "Solvers terminated unexpectedly  ⚠️ .";
       Log.error_msg "Please inspect logs.";
-      SmtLib.Unknown
+      Stats.Induction, SmtLib.Unknown
   in
-  Log.verbose (fun frmt () ->
-      if SyncSmt.is_unsat resp
-      then
-        Fmt.(
-          pf frmt "(%a)@;<1 4>does not satisfy \"%s\"." (box pp_ctex) ctex tinv.pvar.vname)
-      else if SyncSmt.is_sat resp
-      then Fmt.(pf frmt "(%a) satisfies %s." (box pp_ctex) ctex tinv.pvar.vname)
-      else
-        Fmt.(
-          pf
-            frmt
-            "I dot not know whether (%a) satisfies %s."
-            (box pp_ctex)
-            ctex
-            tinv.pvar.vname));
+  AlgoLog.requires_ctex_class tinv ctex resp vmethod;
   match resp with
   | Sat -> { ctex with ctex_stat = Valid }
   | Unsat -> { ctex with ctex_stat = add_cause ctex.ctex_stat ViolatesTargetRequires }

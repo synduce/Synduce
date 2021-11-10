@@ -25,13 +25,37 @@ Note that *Synduce* does not rely on any specific API and instead communicates w
 The script `setup.sh` installs all the dependencies and packages from a fresh Ubuntu installation.
 
 
-# Folder structure
-
+# Documentation
+The documentation for the library in the `dev` branch is [here](https://victornicolet.github.io/Synduce/Synduce/index.html).
 - `./bin/` contains all the sources for the executable,
 - `./src/` contains all the sources for the libraries. The `lang` folder is where you will find most of the language definitions and `algo` the algorithmic components.
 - `./benchmarks/` contains benchmarks and sample inputs. `parse_examples/parsing.pmrs` is an example of the input syntax for the PMRS with recursive type definitions. The syntax is similar to Caml, except for the recursion scheme declarations. Call `./benchmarks/report.py` to see a list of benchmarks. The `./benchmarks/unrealizable` folder contains examples on which the tool either fails or runs forever because no solution exists. You will find benchmarks with predicates on input type in the `benchmarks/constraints` folder.
 
-### Basic Usage
+# Evaluation
+## Benchmarks
+You can run the set of benchmarks of Synduce by executing the following command:
+```
+./benchmarks/test.py -b all
+```
+This can take up to an hour depending on your computer. If you just want to perform a quick check that everything is running properly, you can use a smaller set of benchmarks:
+```
+./benchmarks/test.py -b simple
+```
+You can also benchmark a single file. For example, if you want to run `benchmarks/list/mss.ml` 10 times, using cvc5 as backend solver instead of cvc4, run:
+```
+./benchmarks/test.py --single list/mss.ml+"--cvc5" -n 10
+```
+The argument to `--single` should be the path to the file in the benchmarks folders, and if necessary, add options to pass to the tool by adding +"options".
+For a single benchmark, the script prints a line of the form:
+```
+    (1 / 1) ✅ mss                                      ×10 runs, average:  9.158s ± 208ms       R: ++✓
+```
+Indicating the average runtime of running the tool on the benchmark with a delta. The string after the R: represents the refinement rounds necessary to produce the solution. A "+" indicates that the approximation needed to be strenghtened, a "." indicates weakening and "^" indicates lifting. For a successful benchmark, the string should end by a check mark, indicating the solution was successfully checked in the last round.
+## CAV21
+The folder `extras/cav21` contains scripts and a readme to reproduce the results presented in the CAV21 paper (use the `cav21` release).
+Please move the scripts to the root folder before executing them.
+
+# Basic Usage
 `./Synduce -h` should get you started.
 
 The subfolders of the `benchmarks` folder contains input examples. An input problem is defined by three components: a reference function, a representation function and a recursion skeleton. By default, the tool looks for a reference function called `spec`, a representation function `repr` and a recursion skeleton `target`.
@@ -173,10 +197,3 @@ pmrs (unknowns*) pmrs_name pmrs_args {invariant} =
 - `g x_1 ... x_n p -> t` is a pattern matching rule with arguments `x_1 ... x_n` and pattern `p` and contractum `t`.
 - The first rule defines the main function of the PMRS. The type of the non-terminal symbol of
 the first rule should be the type of a function from input type of the PMRS to output type.
-
-# Evaluation
-The folder `extras/cav21` contains scripts and a readme to reproduce the results presented in the CAV21 paper.
-Please move the scripts to the root folder before executing them.
-
-# Documentation
-The documentation for the library in the `dev` branch is [here](https://victornicolet.github.io/Synduce/Synduce/index.html).

@@ -1,46 +1,44 @@
-type list =
-  | Nil
-  | Cons of int * list
+(** @synduce -NB --no-lifting *)
 
-type list2 =
-  | Nil2
-  | Cons2 of int * int * list2
+type 'a tree =
+  | Leaf of 'a
+  | Node of 'a * 'a tree * 'a tree
 
-let rec repr l = dcomp (sort l)
-
-and dcomp = function
-  | Nil -> Nil2
-  | Cons (hd, tl) -> dcomp2 hd tl
-
-and dcomp2 x = function
-  | Nil -> Cons2 (x, 0, Nil2)
-  | Cons (hd, tl) -> Cons2 (x, hd, dcomp tl)
-
-and sort = function
-  | Nil -> Nil
-  | Cons (hd, tl) -> insert hd (sort tl)
-
-and insert y = function
-  | Nil -> Cons (y, Nil)
-  | Cons (hd, tl) -> if y > hd then Cons (y, Cons (hd, tl)) else Cons (hd, insert y tl)
+let rec tree_min = function
+  | Leaf x -> x
+  | Node (a, l, r) -> min a (min (tree_min l) (tree_min r))
 ;;
+
+let rec tree_max = function
+  | Leaf x -> x
+  | Node (a, l, r) -> max a (max (tree_max l) (tree_max r))
+;;
+
+let rec is_bst = function
+  | Leaf x -> true
+  | Node (a, l, r) -> a >= tree_max l && a <= tree_min r && is_bst l && is_bst r
+;;
+
+let repr x = x
 
 let rec spec = function
-  | Nil2 -> 0
-  | Cons2 (hd1, hd2, tl) -> hd2
-;;
-
-let rec allpos = function
-  | Nil -> true
-  | Cons (hd, tl) -> hd > 0 && allpos tl && alldif hd tl
-
-and alldif hd = function
-  | Nil -> true
-  | Cons (x, tl) -> (not (hd = x)) && alldif hd tl
+  | Leaf a -> a, a
+  | Node (a, l, r) ->
+    let x1, y1 = spec l in
+    let x2, y2 = spec r in
+    max x1 (max x2 a), min y1 (min y2 a)
 ;;
 
 let rec target = function
-  | Nil -> [%synt base_case]
-  | Cons (hd, tl) -> [%synt oplus] hd (target tl)
-  [@@requires allpos]
+  | Leaf a -> [%synt xi_0] a
+  | Node (a, l, r) -> [%synt xi_2] a (amin l) (amax r)
+
+and amin = function
+  | Leaf a -> a
+  | Node (a, l, r) -> min a (min (amin l) (amin r))
+
+and amax = function
+  | Leaf a -> a
+  | Node (a, l, r) -> max a (max (amax l) (amax r))
+  [@@requires is_bst]
 ;;

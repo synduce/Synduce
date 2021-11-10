@@ -346,6 +346,10 @@ let free_vars_of_equations (sys_eq : equation list) : VarSet.t =
 module Solve = struct
   type partial_soln = (string * variable list * term) list
 
+  let pick_only_one_soln =
+    List.dedup_and_sort ~compare:(fun (n1, _, _) (n2, _, _) -> String.compare n1 n2)
+  ;;
+
   let pp_partial_soln (f : Formatter.t) soln =
     Fmt.(
       list ~sep:comma (fun fmrt (s, args, bod) ->
@@ -385,11 +389,16 @@ module Solve = struct
      sygus solver.
   *)
   let solve_constant_eqns (unknowns : VarSet.t) (eqns : equation list) =
+    let ok_precond precond =
+      match precond with
+      | Some { tkind = TConst Constant.CFalse; _ } -> false
+      | _ -> true
+    in
     let constant_soln, other_eqns =
       let f eqn =
         match eqn.erhs.tkind with
         | TVar x when Set.mem unknowns x ->
-          if Analysis.is_constant eqn.elhs
+          if Analysis.is_constant eqn.elhs && ok_precond eqn.eprecond
           then Either.first (x, eqn.elhs)
           else Either.Second eqn
         | _ -> Either.Second eqn
@@ -405,7 +414,9 @@ module Solve = struct
           ; erhs = substitution substs eqn.erhs
           })
     in
-    let partial_soln = List.map ~f:(fun (x, lhs) -> x.vname, [], lhs) constant_soln in
+    let partial_soln =
+      pick_only_one_soln (List.map ~f:(fun (x, lhs) -> x.vname, [], lhs) constant_soln)
+    in
     if List.length partial_soln > 0
     then
       Log.debug
@@ -432,6 +443,11 @@ module Solve = struct
         if List.length (List.concat args) = Set.length argset then Some args else None)
       else None
     in
+    let ok_precond precond =
+      match precond with
+      | Some { tkind = TConst Constant.CFalse; _ } -> false
+      | _ -> true
+    in
     (* Make a function out of lhs of equation constraint using args. *)
     let mk_lam lhs args =
       let pre_subst =
@@ -452,9 +468,9 @@ module Solve = struct
     (* Find syntactic definiitons, and check there is no conflict between definitions. *)
     let full_defs, other_eqns =
       let f (defs, other_eqns) eqn =
-        match eqn.eprecond, eqn.erhs.tkind with
-        | _, TApp ({ tkind = TVar unknown; _ }, args)
-          when Set.mem unknowns unknown && ok_rhs_args args ->
+        match eqn.erhs.tkind with
+        | TApp ({ tkind = TVar unknown; _ }, args)
+          when Set.mem unknowns unknown && ok_rhs_args args && ok_precond eqn.eprecond ->
           (match ok_lhs_args eqn.elhs args with
           | Some argv ->
             let lam_args, lam_body = mk_lam eqn.elhs argv in
@@ -747,6 +763,34 @@ module Solve = struct
       else Lwt.task () |> fun (_, r) -> Lwt.return (RFail, Either.Second []), r
   ;;
 
+  let check_unrealizable
+      (task_counter : int ref)
+      (unknowns : VarSet.t)
+      (eqns : equation_system)
+    =
+    if !Config.check_unrealizable
+    then
+      Some
+        (let t, r = Counterexamples.check_unrealizable unknowns eqns in
+         let task =
+           let* ctexs = t in
+           match ctexs with
+           | [] ->
+             (* It not infeasible, sleep for timeout duration, unless counter is 0 *)
+             let* () = Lwt_unix.sleep !Config.Optims.wait_parallel_tlimit in
+             Int.decr task_counter;
+             Lwt.return (RFail, Either.Second [])
+           | _ ->
+             if !Config.generate_benchmarks
+             then ignore (core_solve ~gen_only:true unknowns eqns);
+             if !Config.check_unrealizable_smt_unsatisfiable
+             then Counterexamples.smt_unsatisfiability_check unknowns eqns;
+             Lwt.return (RInfeasible, Either.Second ctexs)
+         in
+         r, task)
+    else None
+  ;;
+
   let solve_eqns (unknowns : VarSet.t) (eqns : equation list)
       : solver_response
         * (partial_soln, Counterexamples.unrealizability_ctex list) Either.t
@@ -757,6 +801,7 @@ module Solve = struct
     let task_counter =
       if !Config.sysfe_opt then ref ((Bool.to_int opt_cst * 2) + 3) else ref 2
     in
+    (* A task that is some task if the option is true. *)
     let on_opt opt task =
       if !Config.sysfe_opt && opt
       then
@@ -769,27 +814,7 @@ module Solve = struct
       List.concat_map
         ~f:Option.to_list
         [ (* Task 1 : checking unrealizability, if the option is set. *)
-          (if !Config.check_unrealizable
-          then
-            Some
-              (let t, r = Counterexamples.check_unrealizable unknowns eqns in
-               let task =
-                 let* ctexs = t in
-                 match ctexs with
-                 | [] ->
-                   (* It not infeasible, sleep for timeout duration, unless counter is 0 *)
-                   let* () = Lwt_unix.sleep !Config.Optims.wait_parallel_tlimit in
-                   Int.decr task_counter;
-                   Lwt.return (RFail, Either.Second [])
-                 | _ ->
-                   if !Config.generate_benchmarks
-                   then ignore (core_solve ~gen_only:true unknowns eqns);
-                   if !Config.check_unrealizable_smt_unsatisfiable
-                   then Counterexamples.smt_unsatisfiability_check unknowns eqns;
-                   Lwt.return (RInfeasible, Either.Second ctexs)
-               in
-               r, task)
-          else None)
+          check_unrealizable task_counter unknowns eqns
         ; (* Task 2 : solving system of equations, default strategy. *)
           Some
             (let t, r = core_solve ~gen_only:false unknowns eqns in
@@ -1065,7 +1090,7 @@ let solve ~(p : psi_def) (eqns : equation list)
           fun fmt () ->
             pf fmt "@[<hov 2>Solution found: @;%a@]" (box Solve.pp_partial_soln) soln)
     | _ -> ());
-  resp, Either.map ~first:identity ~second:Counterexamples.merge_all soln_final
+  resp, Either.map ~first:Solve.pick_only_one_soln ~second:identity soln_final
 ;;
 
 (* ============================================================================================= *)

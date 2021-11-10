@@ -20,15 +20,26 @@ let rec theory_of (t : RType.t) =
 type logic_info =
   { theory : Logics.theory
   ; linearity : bool
+  ; datatypes : bool
   }
 
 let logic_info_join (linfo1 : logic_info) (linfo2 : logic_info) : logic_info =
   { theory = Logics.join_theories linfo1.theory linfo2.theory
   ; linearity = linfo1.linearity && linfo2.linearity
+  ; datatypes = linfo1.datatypes || linfo2.datatypes
   }
 ;;
 
-let base_logic_info = { theory = Logics.Core; linearity = true }
+let base_logic_info = { theory = Logics.Core; linearity = true; datatypes = false }
+
+let term_requires_datatype (t : term) =
+  List.exists
+    ~f:(fun x ->
+      match Variable.vtype_or_new x with
+      | RType.TTup _ -> true
+      | _ -> false)
+    (Set.elements (Analysis.free_variables ~include_functions:false t))
+;;
 
 (** Infer the logic to use in calls using terms.
     @param quantifier_free is true by default, set to false if quantifiers will be used
@@ -53,7 +64,8 @@ let infer_logic
     let f linfo_accum t =
       let linearity = Set.for_all ~f:Operator.is_lia (Analysis.operators_of t) in
       let theory = theory_of (type_of t) in
-      logic_info_join linfo_accum { theory; linearity }
+      let datatypes = term_requires_datatype t in
+      logic_info_join linfo_accum { theory; linearity; datatypes }
     in
     List.fold ~f ~init:linfo terms
   in
@@ -62,7 +74,7 @@ let infer_logic
   | None ->
     Logics.combine
       ~arith:true
-      ~datatypes:for_induction
+      ~datatypes:(for_induction || linfo.datatypes)
       ~uf:with_uninterpreted_functions
       ~linear:linfo.linearity
       ~qf:quantifier_free

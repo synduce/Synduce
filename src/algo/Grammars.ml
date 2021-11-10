@@ -131,6 +131,7 @@ let int_parametric ?(guess = None) (params : grammar_parameters) =
 let bool_parametric
     ?(guess = None)
     ?(special_const_prod = true)
+    ?(short_predicate = false)
     (params : grammar_parameters)
   =
   let has_ints =
@@ -160,6 +161,7 @@ let bool_parametric
           else [])
           @ [ GTerm (SyApp (IdSimple "=", [ int_nonterm; int_nonterm ]))
             ; GTerm (SyApp (IdSimple ">", [ int_nonterm; int_nonterm ]))
+            ; GTerm (SyApp (IdSimple ">=", [ int_nonterm; int_nonterm ]))
             ]
         else [] )
     ]
@@ -171,16 +173,20 @@ let bool_parametric
               match s with
               | SId (IdSimple "Int") -> Some (GTerm t)
               | _ -> None)
-        @ [ GTerm (SyApp (IdSimple "-", [ int_nonterm ])) ]
-        @ [ GTerm (SyApp (IdSimple "+", [ int_nonterm; int_nonterm ])) ]
         @ (if special_const_prod
           then [ GTerm (SyApp (IdSimple "+", [ int_nonterm; int_const_nonterm ])) ]
           else [])
-        @ (if Set.mem params.g_opset (Binary Min)
-          then [ GTerm (SyApp (IdSimple "min", [ int_nonterm; int_nonterm ])) ]
-          else [])
-        @ (if Set.mem params.g_opset (Binary Max)
-          then [ GTerm (SyApp (IdSimple "max", [ int_nonterm; int_nonterm ])) ]
+        @ (if not short_predicate
+          then
+            [ GTerm (SyApp (IdSimple "-", [ int_nonterm ])) ]
+            @ [ GTerm (SyApp (IdSimple "+", [ int_nonterm; int_nonterm ])) ]
+            @ (if Set.mem params.g_opset (Binary Min)
+              then [ GTerm (SyApp (IdSimple "min", [ int_nonterm; int_nonterm ])) ]
+              else [])
+            @
+            if Set.mem params.g_opset (Binary Max)
+            then [ GTerm (SyApp (IdSimple "max", [ int_nonterm; int_nonterm ])) ]
+            else []
           else [])
         @ (if Set.mem params.g_opset (Binary Times)
           then [ GTerm (SyApp (IdSimple "*", [ int_const_nonterm; int_nonterm ])) ]
@@ -195,9 +201,19 @@ let bool_parametric
           then [ GTerm (SyApp (IdSimple "div", [ int_nonterm; int_const_nonterm ])) ]
           else [])
         @ [ GTerm (SyApp (IdSimple "ite", [ bool_nonterm; int_nonterm; int_nonterm ])) ]
+        @ (if Set.mem params.g_opset (Binary Mod)
+          then [ GTerm (SyApp (IdSimple "mod", [ int_nonterm; int_const_nonterm ])) ]
+          else [])
         @
-        if Set.mem params.g_opset (Binary Mod)
-        then [ GTerm (SyApp (IdSimple "mod", [ int_nonterm; int_const_nonterm ])) ]
+        if Set.mem params.g_opset (Binary Times)
+           || Set.mem params.g_opset (Binary Div)
+           || Set.mem params.g_opset (Binary Mod)
+           || params.g_nonlinear
+        then
+          [ GTerm (SyApp (IdSimple "*", [ int_nonterm; int_nonterm ]))
+          ; GTerm (SyApp (IdSimple "div", [ int_nonterm; int_nonterm ]))
+          ; GTerm (SyApp (IdSimple "mod", [ int_nonterm; int_nonterm ]))
+          ]
         else [] )
     ]
     @ [ ( ("Ic", int_sort)
@@ -272,6 +288,7 @@ let generate_grammar
     ?(guess = None)
     ?(bools = false)
     ?(special_const_prod = true)
+    ?(short_predicate = false)
     (opset : OpSet.t)
     (args : variable list)
     (ret_sort : RType.t)
@@ -292,7 +309,7 @@ let generate_grammar
   else (
     match ret_sort with
     | TInt -> Some (int_parametric ~guess params)
-    | TBool -> Some (bool_parametric ~guess ~special_const_prod params)
+    | TBool -> Some (bool_parametric ~short_predicate ~guess ~special_const_prod params)
     (* Ignore guess if it's a tuple that needs to be generated. *)
     | TTup types -> Some (tuple_grammar_constr params types)
     | _ -> None)

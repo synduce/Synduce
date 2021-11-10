@@ -140,13 +140,19 @@ let rec sygus_of_term (t : term) : sygus_term =
     else (
       let constructor = Tuples.constr_name_of_types (List.map ~f:Term.type_of tl) in
       SyApp (IdSimple constructor, List.map ~f:sygus_of_term tl))
-  | TSel (t, i) -> SyApp (IdIndexed ("tupSel", [ INum i ]), [ sygus_of_term t ])
+  | TSel (t, i) ->
+    if !Config.using_cvc4_tuples
+    then SyApp (IdIndexed ("tupSel", [ INum i ]), [ sygus_of_term t ])
+    else (
+      match Term.type_of t with
+      | TTup tl ->
+        let proj_name = Tuples.proj_name_of_types tl i in
+        SyApp (IdSimple proj_name, [ sygus_of_term t ])
+      | _ -> failwith "Sygus: converting a tuple projection on a non-tuple term.")
   | TData (cstr, args) ->
     (match args with
     | [] -> SyId (IdSimple cstr)
     | _ -> SyApp (IdSimple cstr, List.map ~f:sygus_of_term args))
-  | TApp ({ tkind = TVar v; _ }, args) ->
-    SyApp (IdSimple v.vname, List.map ~f:sygus_of_term args)
   | TApp ({ tkind = TFun (formal_args, fun_body); _ }, args) ->
     (match List.zip formal_args args with
     | Ok pre_bindings ->
@@ -155,7 +161,11 @@ let rec sygus_of_term (t : term) : sygus_term =
       SyLet (bindings, fbody')
     | Unequal_lengths ->
       failwith "Sygus: cannot translate application with wrong number of arguments.")
-  | TApp (_, _) -> failwith "Sygus: application function cannot be translated."
+  | TApp (t, []) -> sygus_of_term t
+  | TApp ({ tkind = TVar v; _ }, args) ->
+    SyApp (IdSimple v.vname, List.map ~f:sygus_of_term args)
+  | TApp (_, _) ->
+    failwith Fmt.(str "Sygus: function application cannot be translated (%a)." pp_term t)
   | TMatch (_, _) -> failwith "Sygus: match cases not supported."
   | TFun (_, _) -> failwith "Sygus: functions in terms not supported."
 
@@ -357,6 +367,7 @@ let grammar_production_of_skeleton
       | STuple elts ->
         let prods = Utils.cartesian_nary_product (List.map ~f:build_prods elts) in
         List.map ~f:(fun tuple_args -> SyApp (IdSimple "mkTuple", tuple_args)) prods
+      | STypedWith _ -> []
       | SNonGuessable -> [])
   in
   build_prods skel
@@ -507,7 +518,9 @@ let collect_tuple_decls (commands : command list) =
     | CSynthInv (_, args, _) -> List.filter_map args ~f:(fun (_, sort) -> of_sort sort)
     | _ -> []
   in
-  Set.of_list (module String) (List.concat_map ~f:of_command commands)
+  Set.diff
+    (Set.of_list (module String) (List.concat_map ~f:of_command commands))
+    (Set.of_list (module String) (List.concat_map ~f:declares commands))
 ;;
 
 module HLSolver = struct
@@ -591,6 +604,7 @@ module HLSolver = struct
   let set_logic (name : string) (solver : t) : t = { solver with logic = name }
 
   let all_commands (solver : t) =
+    let pre c = List.dedup_and_sort ~compare:compare_declares c in
     let core =
       solver.sorts
       @ solver.extra_defs
@@ -607,7 +621,7 @@ module HLSolver = struct
             (Tuples.types_of_tuple_name tuplename))
         (Set.to_list tds)
     in
-    [ CSetLogic solver.logic ] @ tuple_decls @ core @ [ CCheckSynth ]
+    [ CSetLogic solver.logic ] @ pre tuple_decls @ core @ [ CCheckSynth ]
   ;;
 
   let solve (solver : t) =

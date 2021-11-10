@@ -25,7 +25,7 @@ val rule_lookup
     Function symbolds in applications are resolved by looking up functions in the
     current environment.
 *)
-val reduce_term : ?unboxing:bool -> term -> term
+val reduce_term : ?projecting:bool -> ?unboxing:bool -> term -> term
 
 (**
     `reduce_pmrs p t` is a shortcut for `reduce_term (mk_app (mk_var p.pmain_symb) [t])`

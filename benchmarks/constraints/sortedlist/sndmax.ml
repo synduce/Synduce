@@ -1,3 +1,5 @@
+(** @synduce --no-lifting -NB -n 30 -l *)
+
 (* Target type. *)
 type clist =
   | Empty

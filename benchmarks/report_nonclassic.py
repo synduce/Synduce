@@ -2,193 +2,9 @@
 import sys
 import datetime
 import argparse
+from definitions import *
 
 timeout_time = 600.0
-
-
-algorithms = ["partbnd", "acegis", "ccegis"]
-versions = ["all", "ini", "st", "d", "off"]
-fields = ["synt", "verif", "#i", "last"]
-
-show_benchmarks = [
-    # All positive
-    ["constraint/all_positive", [
-        ["list_mps",     [" Elements > 0    ",
-                          " mps   ", "no", "no",  "mps", 0]]
-    ]],
-    # Alist
-    ["constraint/alist", [
-        ["count_eq2",     ["              ",
-                           " # elt. = (v2) ", "yes", "yes",  "# =", 0]],
-        ["count_eq",      ["  Association ",
-                           " # elt. =      ", "no", "no", " # = (v2)", 0]],
-        ["sums",          ["   List       ",  "sums", "no", "no", "sums ", 0]],
-        ["most_frequent", ["              ",
-                           "most frequent", "no", "no",  "most freq.", 0]],
-    ]],
-    # Balanced tree
-    ["constraint/balanced_tree", [
-        ["node_count",  [" Balanced ", "node count", "yes", "no",  "node cnt.", 0]],
-        ["height",      ["  Tree    ", "height", "yes", "no", "height", 0]],
-        ["height_v2",   ["          ",
-                         "height (v2)  ", "yes", "yes", "height v2.", 0]],
-    ]],
-    # BST
-    ["constraint/bst", [
-        ["contains",           ["          ",
-                                "contains elt. ", "no", "no", "contains", 0]],
-        ["count_lt",           ["  Binary  ",
-                                "# elts. < ", "yes", "yes", "count <", 0]],
-        ["most_frequent_v1",   ["Search",
-                                " most frequent ", "no", "no", "most freq. ", 0]],
-        ["from_list_contains", ["  Tree    ",
-                                "of list ∋", "no", "no", "contains (list)", 0]],
-        ["from_list_max",      ["          ",
-                                "of list max ", "yes", "yes", "max (list)", 0]],
-        ["sum_gt_by_key",      ["          ",
-                                "sum if key >   ", "yes", "yes", "sumkey", 0]],
-    ]],
-    # Combining traversals
-    ["combine", [
-        ["mts_and_mps_nosum", ["Combine", "mts+mps", "no", "no", "m(t+p)s", 1]]]],
-    # Constant list
-    ["constraint/constantlist", [
-        ["index_of",  [" Constant ", "index of elt. ", "no", "no", "idx", 0]],
-        ["contains",  ["  List    ", "contains elt  ", "no", "no", "contains", 0]],
-    ]],
-    # Empty right subtree
-    ["constraint/empty_right_subtree", [
-        ["contains",  [" Empty Subtree", " contains elt", "yes", "no", "contains", 0]],
-    ]],
-    # Even list
-    ["constraint/evenlist",
-     [
-         ["parity_of_first", ["           ",
-                              "parity of 1st", "no", "no", "parity 1st", 0]],
-         ["parity_of_last",  ["  List of  ",
-                              "parity of last", "no", "no", "parity last", 0]],
-         ["first_odd",       ["   even    ",
-                              "first odd elt.", "no", "no", "first odd", 0]],
-         ["parity_of_sum",   ["  numbers  ",
-                              "parity of sum ", "no", "no", "parity sum", 0]]
-     ]],
-    # Even tree
-    ["constraint/even_tree",
-     [
-         ["parity_of_max", ["  Tree of Even ",
-                            "parity of max ", "no", "no", "parity max", 0]],
-         ["sum_of_parities", ["  Numbers  ",
-                              "parity of sum", "yes", "yes", "parity sum", 0]]
-     ]],
-    # Indexed list
-    ["indexed_list", [
-        ["position_polynomial_no_index",    [" Indexed  ",
-                                             "value-pos mult.",   "no", "no", "val*pos", 1]],
-        ["search_no_index",                 ["    List  ",
-                                             "search index",      "no", "no", "search i", 1]],
-        ["sum_elts_lt_pos_no_len",          ["          ",
-                                             "sum elts w. pos <", "no", "no", "sum pos", 1]]
-    ]],
-    ["list", [
-        ["atoi_no_fac",                     [
-            "    ", "atoi", "no", "no", "atoi", 1]],
-        ["is_sorted_no_last",               [
-            " List ", "is sorted", "no", "no", "sorted", 1]],
-        ["largest_diff_sorted_list_nohead", [
-            " Parallelization ", "largest diff", "no", "no", "l. diff", 1]],
-        ["mps_no_sum",                      [
-            "      ", "mps", "no", "no", "mps", 1]],
-        ["poly_no_fac",                     [
-            "      ", "poly", "no", "no", "poly", 1]],
-        ["zero_after_one_no",               ["      ", "0 after 1", "no", "no", "0-1", 1]]]],
-    # Memo
-    ["constraint/memo", [
-        ["tree_size",     ["             ", "tree size", "yes", "yes",  "size", 0]],
-        ["constant",      ["  Tree       ", "constant", "no", "no", " constant", 0]],
-        ["max_contains",  [" Memoizing   ",
-                           " contains elt. ", "yes", "yes", "contains", 0]],
-        ["count_lt",      [" Information ", "count <", "yes", "yes",  "cnt <", 0]],
-        ["max_sum_gt",    ["             ", "sum of elts >", "yes", "yes",  "sum >", 0]],
-        ["proper_indexation_sum_lt_pos_v2",
-         ["             ", "sum elts > pos", "no", "no", "sum > pos", 0]],
-        ["proper_indexation_sum_lt_pos",
-         ["             ", "sum elts > pos .v2", "no", "no", "sum > pos v2", 0]]
-
-    ]],
-    # Program
-    ["constraint/program", [
-        ["typecheck",  [" Program AST ", " type check  ", "yes", "no", "type chk", 0]],
-    ]],
-    # Symmetric tree
-    ["constraint/symmetric_tree", [
-        ["sum",         [" Symmetric  ", "sum", "yes", "no", "sum", 0]],
-        ["height",      ["    Tree    ", "height", "yes", "no", "height", 0]],
-        ["min",         ["            ", "min", "yes", "no", "min", 0]]
-    ]],
-    # Sorted
-    ["constraint/sortedlist", [
-        ["min",                    ["        ", "min ", "no", "no", "min", 0]],
-        ["max",                    [" Sorted ", "max ", "no", "no", "max", 0]],
-        ["count_lt",               [" List   ",
-                                    "count elt. < ", "no", "no", "cnt <", 0]],
-        ["index_of",               ["        ",
-                                    "index of elt ", "no", "no", "idx", 0]],
-        ["is_intersection_empty",  ["        ", "∩-empty ", "no", "no", "∩-∅", 0]],
-        ["largest_diff",           ["        ",
-                                    "largest diff ", "no", "no", "ldiff", 0]],
-        ["smallest_diff",          ["        ",
-                                    "smallest diff ", "no", "no", "sdiff", 0]],
-        ["parallel_min",          ["        ",
-                                   "parallel min", "yes", "yes", "||min", 0]],
-        ["parallel_max",          ["        ",
-                                   "parallel max", "yes", "yes", "||max", 0]],
-    ]],
-    # Sorted and indexed
-    ["constraint/sorted_and_indexed", [
-        ["count_lt0",                    ["        ",
-                                          "count < 0", "yes", "yes", "# < 0", 0]],
-        ["count_lt",                    ["        ",
-                                         "count < x", "yes", "yes", "# < 0", 0]],
-    ]],
-    # Tail optimizations
-    ["tailopt", [
-        ["mps_no_sum",  [" Tail opt. ", " mps  ", "no", "no", "mps", 1]],
-    ]],
-    # Switching tree traversals
-    ["tree", [
-        ["gradient",   [" Tree      ", "gradient", "no", "no", "grad", 1]],
-        ["mits_nosum", [" Traversal ", "mits", "no", "no", "mits", 1]]]]
-]
-
-lift_info = {
-    "indexed_list/position_polynomial_no_index.ml": "1",
-    "indexed_list/search_no_index.ml": "1",
-    "indexed_list/sum_elts_lt_pos_no_len.ml": "1",
-    "list/atoi_no_fac.ml": "1",
-    "list/is_sorted_no_last.ml": "1",
-    "list/largest_diff_sorted_list_nohead.ml": "1",
-    "list/mps_no_sum.ml": "1",
-    "list/poly_no_fac.ml": "1",
-    "list/zero_after_one_no.ml": "1",
-    "tailopt/mps_no_sum.ml": "1",
-    "combine/mts_and_mps_nosum.ml": "1",
-    "tree/gradient.ml": "1",
-    "tree/mits_nosum.ml": "1",
-}
-
-sp = " "
-dash = "-"
-kw_class = "... Class"
-kw_benchmark = "... Benchmark"
-kw_time = "time"
-kw_steps = "#st"
-kw_tlast = "Tlast"
-kw_ver = "ver.%"
-kw_toolname = "Synduce"
-kw_baseline = "Baseline"
-kw_acegis = "Symbolic CEGIS"
-kw_ccegis = "Concrete CEGIS"
-kw_path = "Path"
 
 
 def explain():
@@ -207,34 +23,6 @@ def all_timeout(l):
     for elt in l:
         is_t = is_t and (elt == ["TIMEOUT"])
     return is_t
-
-
-def floti(f):
-    ret = "-"
-    try:
-        ret = float(f)
-    except:
-        ret = timeout_time
-    return ret
-
-
-def speedup(a, b):
-    if b == "?" or a == "?":
-        return "?"
-    if b == "-":
-        if a != "-":
-            return "∞"
-        else:
-            return "!"
-    elif a == "-":
-        return "-∞"
-    else:
-        a = floti(a)
-        b = floti(b)
-        if b > 0:
-            return "%3.1f" % (b / a)
-        else:
-            return -1
 
 
 def median(sample):
@@ -305,13 +93,13 @@ def produce_txt_table(tex_output_file, data):
                 nai_last = "?"
 
                 bkey = benchmark_class + "/" + benchmark_file + ".ml"
-                acegis_bf = False
+                segis_bf = False
 
-                if (bkey, "partbnd") not in data.keys():
-                    # print("No data for %s, partbnd" % bkey)
+                if (bkey, "se2gis") not in data.keys():
+                    # print("No data for %s, se2gis" % bkey)
                     pass
                 else:
-                    b_data = data[bkey, "partbnd"]["all"]
+                    b_data = data[bkey, "se2gis"]["all"]
                     if "res" in b_data:
                         req_iters, _, req_time, _ = b_data["res"]
                         req_t = "%3.2f" % float(req_time)
@@ -323,16 +111,16 @@ def produce_txt_table(tex_output_file, data):
 
                 best_t = timeout_time
 
-                if (bkey, "acegis") not in data.keys():
-                    # print("No data for %s, acegis" % bkey)
+                if (bkey, "segis") not in data.keys():
+                    # print("No data for %s, segis" % bkey)
                     pass
                 else:
-                    b_data = data[bkey, "acegis"]["all"]
+                    b_data = data[bkey, "segis"]["all"]
                     if "res" in b_data:
                         nai_iters, _, nai_time, _ = b_data["res"]
                         nai_t = "%3.2f" % float(nai_time)
                         if req_t == "-" or float(nai_time) < float(req_t):
-                            acegis_bf = True
+                            segis_bf = True
                     else:
                         nai_t = "-"
                         nai_iters = b_data["max"]
@@ -398,7 +186,7 @@ caption2 = "Extended Experimental Results. Three algorithms are compared: the se
 def table2(tex_output_file, data):
     txt_out = open(tex_output_file, 'w')
     txt_out.write(
-        f"{kw_benchmark: <18s}| {kw_toolname: <21s}|| {kw_acegis: <21s}|| {kw_ccegis: <21s}\n")
+        f"{kw_benchmark: <18s}| {kw_toolname: <21s}|| {kw_segis: <21s}|| {kw_cegis: <21s}\n")
     txt_out.write(
         f"{sp : <18s}| {kw_time: <7s}| {kw_ver: <6s}| {kw_steps: <4s}|| {kw_time: <7s}| {kw_ver: <6s}| {kw_steps: <4s}|| {kw_time: <7s}| {kw_ver: <6s}| {kw_steps: <4s}\n")
 
@@ -421,13 +209,13 @@ def table2(tex_output_file, data):
                     csvline += times
             # Make fastest bold
             t_Synduce = floti(csvline[0])
-            t_acegis = floti(csvline[4])
-            t_ccegis = floti(csvline[8])
-            if t_Synduce <= t_acegis and t_Synduce <= t_ccegis:
+            t_segis = floti(csvline[4])
+            t_cegis = floti(csvline[8])
+            if t_Synduce <= t_segis and t_Synduce <= t_cegis:
                 csvline[0] = "%s" % csvline[0]
-            if t_acegis < t_Synduce and t_acegis < t_ccegis:
+            if t_segis < t_Synduce and t_segis < t_cegis:
                 csvline[4] = "%s" % csvline[4]
-            if t_ccegis < t_Synduce and t_ccegis < t_acegis:
+            if t_cegis < t_Synduce and t_cegis < t_segis:
                 csvline[8] = "%s" % csvline[8]
             # Put percentage in italic
             csvline[1] = format_verif(csvline[1])
@@ -453,7 +241,7 @@ caption3 = "Optimization Evaluation Results:\nWe evaluate Synduce and symbolic C
 def table3(tex_output_file, data):
     txt_out = open(tex_output_file, 'w')
     txt_out.write(
-        f"{kw_benchmark: <18s}|  {kw_toolname: <44s} ||  {kw_acegis: <21s}\n")
+        f"{kw_benchmark: <18s}|  {kw_toolname: <44s} ||  {kw_segis: <21s}\n")
     kw_on = "on"
     kw_ini = "-ini"
     kw_sys = "-sys"
@@ -469,8 +257,8 @@ def table3(tex_output_file, data):
 
         for benchmark_file, benchmark_info in benchmarks:
             bkey = benchmark_class + "/" + benchmark_file + ".pmrs"
-            # Collect Data for partbnd
-            algo = "partbnd"
+            # Collect Data for se2gis
+            algo = "se2gis"
             csvline = []
             if (bkey, algo) in data.keys():
                 bdata = data[bkey, algo]
@@ -493,7 +281,7 @@ def table3(tex_output_file, data):
                     indexmin = i
             req_csvline[indexmin] = bold(req_csvline[indexmin])
             # Collect data for ACEGIS
-            algo = "acegis"
+            algo = "segis"
             csvline = []
             if (bkey, algo) in data.keys():
                 bdata = data[bkey, algo]

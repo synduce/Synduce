@@ -697,6 +697,30 @@ let is_well_formed (p : program) : bool =
     | _ -> setter_then_other p)
 ;;
 
+let declares (c : command) : symbol list =
+  match c with
+  | CCheckSynth
+  | CInvConstraint _
+  | CSetFeature _
+  | CSetInfo _
+  | CSetOption _
+  | CSetLogic _
+  | CConstraint _ -> []
+  | CDeclareVar (s, _)
+  | CSynthFun (s, _, _, _)
+  | CSynthInv (s, _, _)
+  | CDeclareSort (s, _)
+  | CDefineFun (s, _, _, _)
+  | CDefineSort (s, _) -> [ s ]
+  | CDeclareDataType (s, constrs) -> s :: List.map ~f:fst constrs
+  | CDeclareDataTypes (sl, cd) ->
+    List.map ~f:fst sl @ List.concat_map ~f:(List.map ~f:fst) cd
+;;
+
+let compare_declares (c1 : command) (c2 : command) =
+  List.compare String.compare (declares c1) (declares c2)
+;;
+
 (* ============================================================================================= *)
 (*                       STATIC DEFINITIONS                                                      *)
 (* ============================================================================================= *)

@@ -3,7 +3,6 @@ open Base
 open Lang
 open Lang.Term
 open Option.Let_syntax
-open AlgoLog
 open Syguslib.Sygus
 open Utils
 
@@ -12,14 +11,18 @@ let rec refinement_loop ?(major = true) (p : psi_def) (lstate_in : refinement_lo
   if major
   then (
     Int.incr refinement_steps;
-    Stats.log_new_major_step ~tsize ~usize ());
+    secondary_refinement_steps := 0;
+    Stats.log_new_major_step ~tsize ~usize ())
+  else Int.incr secondary_refinement_steps;
   (* Output status information before entering process. *)
   let elapsed = Stats.get_glob_elapsed () in
-  if !Config.info then show_steps tsize usize else show_stat elapsed tsize usize;
+  if !Config.info
+  then AlgoLog.show_steps tsize usize
+  else AlgoLog.show_stat elapsed tsize usize;
   (* Add lemmas interactively if the option is set. *)
   let lstate =
     if !Config.interactive_lemmas
-    then Lemmas.add_lemmas_interactively ~p lstate_in
+    then Lemmas.Interactive.add_lemmas ~p lstate_in
     else lstate_in
   in
   (* First, generate the set of constraints corresponding to the set of terms t_set. *)
@@ -44,9 +47,8 @@ let rec refinement_loop ?(major = true) (p : psi_def) (lstate_in : refinement_lo
                verification failed. The generalized counterexamples have been added to new_t_set,
                which is also a superset of t_set.
             *)
-         show_counterexamples lstate t_set;
+         AlgoLog.show_counterexamples lstate t_set;
          Stats.log_major_step_end ~synth_time ~verif_time ~t:tsize ~u:usize false;
-         secondary_refinement_steps := 0;
          let lstate =
            if !Config.Optims.make_partial_correctness_assumption
            then Equations.update_assumptions ~p lstate sol t_set
@@ -58,7 +60,15 @@ let rec refinement_loop ?(major = true) (p : psi_def) (lstate_in : refinement_lo
          if !Config.Optims.use_syntactic_definitions
             || !Config.Optims.make_partial_correctness_assumption
          then (
+           (* The tool might have made some incorrect assumptions. *)
            AlgoLog.msg_too_many_opts ();
+           Stats.log_major_step_end
+             ~failure_step:true
+             ~synth_time
+             ~verif_time
+             ~t:tsize
+             ~u:usize
+             false;
            Config.Optims.(
              turn_off use_syntactic_definitions;
              turn_off make_partial_correctness_assumption);
@@ -83,8 +93,6 @@ let rec refinement_loop ?(major = true) (p : psi_def) (lstate_in : refinement_lo
        Stats.timed (fun () -> Lemmas.synthesize_lemmas ~p synt_failure_info lstate)
      with
     | lsynt_time, Ok new_lstate ->
-      Int.decr refinement_steps;
-      Int.incr secondary_refinement_steps;
       Stats.log_minor_step ~synth_time ~auxtime:lsynt_time false;
       refinement_loop ~major:false p new_lstate
     | lsynt_time, Error _synt_failure
@@ -93,12 +101,20 @@ let rec refinement_loop ?(major = true) (p : psi_def) (lstate_in : refinement_lo
       (* If all no counterexample is spurious, lemma synthesis fails, we need lifting. *)
       (match Lifting.scalar ~p lstate synt_failure_info with
       | Ok (p', lstate') ->
-        Int.decr refinement_steps;
-        Int.incr secondary_refinement_steps;
         Lifting.msg_lifting ();
         Stats.log_minor_step ~synth_time ~auxtime:lsynt_time true;
         refinement_loop ~major:false p' lstate'
-      | Error r' -> Error r')
+      | Error r' ->
+        (* Infeasible is not a failure! *)
+        (match r' with
+        | RInfeasible ->
+          Stats.log_major_step_end ~synth_time ~verif_time:0. ~t:tsize ~u:usize false;
+          Error RInfeasible
+        | _ -> Error r'))
+    | _, Error RInfeasible ->
+      (* Infeasible is not a failure! *)
+      Stats.log_major_step_end ~synth_time ~verif_time:0. ~t:tsize ~u:usize false;
+      Error RInfeasible
     | _ -> Error RFail)
 ;;
 
@@ -264,17 +280,17 @@ let find_problem_components
       }
   in
   (* Print summary information about the problem, before solving.*)
-  show_summary (spec_fname, repr_fname, target_fname) target_f;
+  AlgoLog.show_summary (spec_fname, repr_fname, target_fname) target_f;
   (* Print reference function. *)
-  show_pmrs problem.psi_reference;
+  AlgoLog.show_pmrs problem.psi_reference;
   (* Print target recursion skeleton. *)
-  show_pmrs problem.psi_target;
+  AlgoLog.show_pmrs problem.psi_target;
   (* Print representation function. *)
   Log.info
     Fmt.(
       fun fmt () ->
         match repr with
-        | Either.First pmrs -> show_pmrs pmrs
+        | Either.First pmrs -> AlgoLog.show_pmrs pmrs
         | Either.Second (fv, args, body) ->
           pf
             fmt
@@ -287,7 +303,7 @@ let find_problem_components
   Log.verbose Specifications.dump_all;
   (* Print the condition on the reference function's input, if there is one. *)
   (match problem.psi_tinv with
-  | Some tinv -> show_pmrs tinv
+  | Some tinv -> AlgoLog.show_pmrs tinv
   | None -> ());
   (* Set global information. *)
   AState._tau := tau;
@@ -322,9 +338,9 @@ let solve_problem
   let problem = find_problem_components (target_fname, spec_fname, repr_fname) pmrs in
   (* Solve the problem. *)
   ( problem
-  , if !Config.Optims.use_acegis
-    then Baselines.algo_acegis problem
-    else if !Config.Optims.use_ccegis
-    then Baselines.algo_ccegis problem
+  , if !Config.Optims.use_segis
+    then Baselines.algo_segis problem
+    else if !Config.Optims.use_cegis
+    then Baselines.algo_cegis problem
     else psi problem )
 ;;
