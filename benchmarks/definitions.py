@@ -214,7 +214,7 @@ constraint_benchmarks = [
     ["constraints/balanced_tree/height_v2.ml", "-NB"],
     # bst
     ["constraints/bst/contains.ml", ""],
-    ["constraints/bst/contains_boolean.ml", ""],
+    #["constraints/bst/contains_boolean.ml", ""],
     ["constraints/bst/contains_bool_2.ml", ""],
     ["constraints/bst/contains_no_ensures.ml", ""],
     ["constraints/bst/count_lt.ml", "-NB"],
@@ -321,7 +321,9 @@ unrealizable_benchmarks = [
     ["unrealizable/simple_parity.ml", ""],
     ["unrealizable/minmax_mistake.ml", ""],
     ["unrealizable/approximately_pareto.ml", ""],
-    ["unrealizable/eval_psum.ml", ""]
+    ["unrealizable/eval_psum.ml", ""],
+    ["unrealizable/common_elt.ml", ""],
+    ["unrealizable/interval_intersection.ml"]
 ]
 
 benchmark_set = constraint_benchmarks + base_benchmark_set + lifting_benchmarks
