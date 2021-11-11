@@ -229,6 +229,7 @@ constraint_benchmarks = [
     ["constraints/bst/minmax_sim.ml", ""],
     ["constraints/bst/check_mem_included.ml", ""],
     ["constraints/bst/check_included_comb.ml", ""],
+    ["bst/check_no_subtree_sum_gt2.ml", ""],
     # constantlist
     ["constraints/constantlist/index_of.ml", ""],
     ["constraints/constantlist/contains.ml", ""],
@@ -317,19 +318,19 @@ lifting_benchmarks = [
 ]
 
 unrealizable_benchmarks = [
-    ["unrealizable/po_sorted.ml", ""],
-    ["unrealizable/balanced_tree_logn_sum.ml", ""],
-    ["unrealizable/twosum.ml", ""],
-    ["unrealizable/minmax.ml", ""],
-    ["unrealizable/count_between.ml", ""],
-    ["unrealizable/contains.ml", ""],
-    ["unrealizable/contains2.ml", ""],
-    ["unrealizable/simple_parity.ml", ""],
-    ["unrealizable/minmax_mistake.ml", ""],
-    ["unrealizable/approximately_pareto.ml", ""],
-    ["unrealizable/eval_psum.ml", ""],
-    ["unrealizable/common_elt.ml", ""],
-    ["unrealizable/interval_intersection.ml", ""]
+    ["unrealizable/po_sorted.ml", "", False],
+    ["unrealizable/balanced_tree_logn_sum.ml", "", False],
+    ["unrealizable/twosum.ml", "", False],
+    ["unrealizable/minmax.ml", "", False],
+    ["unrealizable/count_between.ml", "", False],
+    ["unrealizable/contains.ml", "", False],
+    ["unrealizable/contains2.ml", "", False],
+    ["unrealizable/simple_parity.ml", "", False],
+    ["unrealizable/minmax_mistake.ml", "", False],
+    ["unrealizable/approximately_pareto.ml", "", False],
+    ["unrealizable/eval_psum.ml", "", False],
+    ["unrealizable/common_elt.ml", "", False],
+    ["unrealizable/interval_intersection.ml", "", False]
 ]
 
 benchmark_set = constraint_benchmarks + base_benchmark_set + lifting_benchmarks

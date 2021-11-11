@@ -1,4 +1,4 @@
-(** @synduce -NB -n 50 -l --no-lifting *)
+(** @synduce -NB -n 10 -l --no-lifting *)
 
 type clist =
   | Empty

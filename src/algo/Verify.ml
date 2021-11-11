@@ -174,7 +174,9 @@ let check_solution
   (* Check that the solution is correct on current set T. If it is not, this is because of some wrong
   assumption made for optimization. *)
   match find_ctex 0 lstate.t_set with
-  | Some _ -> `Incorrect_assumptions
+  | Some _ ->
+    SyncSmt.close_solver solver;
+    `Incorrect_assumptions
   | None ->
     let ctex_or_none = find_ctex 0 lstate.u_set in
     SyncSmt.close_solver solver;

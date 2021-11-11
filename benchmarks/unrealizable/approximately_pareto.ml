@@ -1,4 +1,4 @@
-(** @synduce -NB -n 20 *)
+(** @synduce -NB -n 20 --no-lifting *)
 
 type 'a tree =
   | Leaf of 'a * 'a
