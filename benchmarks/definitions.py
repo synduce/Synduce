@@ -229,7 +229,7 @@ constraint_benchmarks = [
     ["constraints/bst/minmax_sim.ml", ""],
     ["constraints/bst/check_mem_included.ml", ""],
     ["constraints/bst/check_included_comb.ml", ""],
-    ["bst/check_no_subtree_sum_gt2.ml", ""],
+    ["constraints/bst/check_no_subtree_sum_gt2.ml", ""],
     # constantlist
     ["constraints/constantlist/index_of.ml", ""],
     ["constraints/constantlist/contains.ml", ""],
@@ -278,6 +278,7 @@ constraint_benchmarks = [
     ["constraints/sortedlist/parallel_max2.ml", "-NB"],
     ["constraints/sortedlist/interval_intersection.ml", ""],
     ["constraints/sortedlist/exists_equal_elems.ml", ""],
+    ["constraints/sortedlist/mss.ml", ""],
     # Sorted and indexed
     ["constraints/sorted_and_indexed/count_lt0.ml", "-NB -n 30"],
     ["constraints/sorted_and_indexed/count_lt.ml", "-NB -n 30"],

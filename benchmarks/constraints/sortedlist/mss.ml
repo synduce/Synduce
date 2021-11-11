@@ -1,4 +1,4 @@
-(** @synduce --no-lifting -NB *)
+(** @synduce --no-lifting -NB -n 30 *)
 
 type list =
   | Elt of int
@@ -50,7 +50,8 @@ let rec f = function
 
 let rec h = function
   | Single a -> [%synt f0] a
-  | Concat (a, y, z) -> if a < 0 then [%synt f1] (asum y) (h z) else [%synt odot] (h z)
+  | Concat (a, y, z) ->
+    if a < 0 then [%synt f1] (asum y) (h z) else [%synt odot] (h y) (h z)
   [@@requires is_partitioned]
 
 and asum = function
