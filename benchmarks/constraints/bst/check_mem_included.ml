@@ -1,4 +1,4 @@
-(** @synduce -NB -n 10 *)
+(** @synduce -NB -n 10 --no-gropt *)
 
 type tree =
   | Leaf of int * int
@@ -33,9 +33,9 @@ let target hi lo t =
   let rec g = function
     | Leaf (a, b) -> [%synt xi_0] hi lo a b
     | Node (a, b, l, r) ->
-      if b > hi && a < lo
-      then [%synt xi_1] (g r)
-      else [%synt xi_2] ([%synt comb] hi lo b a) (g l) (g r)
+      if b > hi
+      then if a > lo then [%synt xi_11] (g r) (g l) else [%synt xi_12] (g r)
+      else [%synt xi_2] hi lo b a (g l) (g r)
   in
   g t
   [@@requires is_bst]

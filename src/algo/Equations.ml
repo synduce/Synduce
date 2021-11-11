@@ -895,13 +895,22 @@ module Solve = struct
     let solve_eqn_aux (unknowns, equations) =
       if Set.length unknowns > 0 then [ solve_eqns_proxy unknowns equations ] else []
     in
-    (* First solve by mapping to subsystems. Will be done in parallel. *)
-    let solved = List.concat_map split_eqn_systems ~f:solve_eqn_aux in
-    (* Then combine the solutions. *)
-    List.fold
-      solved
-      ~init:(RSuccess [], Either.First partial_soln)
-      ~f:(fun (_, prev_sol) r -> combine prev_sol r)
+    let comb_l l =
+      List.fold
+        l
+        ~init:(RSuccess [], Either.First partial_soln)
+        ~f:(fun (_, prev_sol) r -> combine prev_sol r)
+    in
+    List.fold_until
+      split_eqn_systems
+      ~init:(RSuccess [], Either.first partial_soln)
+      ~finish:identity
+      ~f:(fun (_, prev_soln) subsystem ->
+        match comb_l (solve_eqn_aux subsystem) with
+        | resp, Either.First solution ->
+          Continue (combine prev_soln (resp, Either.First solution))
+        | resp, Either.Second counterexamples ->
+          Stop (combine prev_soln (resp, Either.Second counterexamples)))
   ;;
 
   let solve_stratified (unknowns : VarSet.t) (eqns : equation list) =

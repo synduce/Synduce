@@ -1077,7 +1077,7 @@ let transform ~(case : (term -> term) -> term -> term option) (t : term) : term 
           | TUn (uo, t1) -> TUn (uo, aux t1)
           | TConst _ -> t.tkind
           | TVar _ -> t.tkind
-          | TBox t -> t.tkind
+          | TBox _ -> t.tkind
           | TIte (c, a, b) -> TIte (aux c, aux a, aux b)
           | TTup tl -> TTup (aux_l tl)
           | TSel (t, i) -> TSel (aux t, i)

@@ -1,7 +1,7 @@
 import sys
 
 # Timeout for all experiments.
-timeout_value = 200
+timeout_value = 400
 timestamp_definition = "%d-%m-%y-%H:%M:%S"
 experimental_setup = "a machine with and AMD® Ryzen 7 3700x 8-core processor and 32GB Ram running Ubuntu 20.04"
 sp = " "
@@ -215,6 +215,8 @@ constraint_benchmarks = [
     # bst
     ["constraints/bst/contains.ml", ""],
     #["constraints/bst/contains_boolean.ml", ""],
+    ["constraints/bst/contains_v2.ml", ""],
+    ["constraints/bst/contains_v3.ml", ""],
     ["constraints/bst/contains_bool_2.ml", ""],
     ["constraints/bst/contains_no_ensures.ml", ""],
     ["constraints/bst/count_lt.ml", "-NB"],
@@ -225,6 +227,8 @@ constraint_benchmarks = [
     ["constraints/bst/sum_gt_by_key.ml", "-NB -n 50"],
     ["constraints/bst/minmax_separate.ml", ""],
     ["constraints/bst/minmax_sim.ml", ""],
+    ["constraints/bst/check_mem_included.ml", ""],
+    ["constraints/bst/check_included_comb.ml", ""],
     # constantlist
     ["constraints/constantlist/index_of.ml", ""],
     ["constraints/constantlist/contains.ml", ""],
@@ -272,6 +276,7 @@ constraint_benchmarks = [
     ["constraints/sortedlist/parallel_max.ml", "-NB"],
     ["constraints/sortedlist/parallel_max2.ml", "-NB"],
     ["constraints/sortedlist/interval_intersection.ml", ""],
+    ["constraints/sortedlist/exists_equal_elems.ml", ""],
     # Sorted and indexed
     ["constraints/sorted_and_indexed/count_lt0.ml", "-NB -n 30"],
     ["constraints/sorted_and_indexed/count_lt.ml", "-NB -n 30"],
@@ -280,9 +285,9 @@ constraint_benchmarks = [
     ["constraints/symmetric_tree/height.ml", "-N"],
     ["constraints/symmetric_tree/min.ml", "-N"],
     # unimodal
-    # ["constraints/unimodal_list/max_logn.ml", "-B"],
     ["constraints/unimodal_list/max_logn_v2.ml", ""],
-    # ["constraints/unimodal_list/max_in_um_pos.ml", ""],
+    ["constraints/unimodal_list/max_in_um_pos.ml", ""],
+    ["constraints/unimodal_list/max_logn.ml", "-B"],
 ]
 
 lifting_benchmarks = [
@@ -324,7 +329,7 @@ unrealizable_benchmarks = [
     ["unrealizable/approximately_pareto.ml", ""],
     ["unrealizable/eval_psum.ml", ""],
     ["unrealizable/common_elt.ml", ""],
-    ["unrealizable/interval_intersection.ml"]
+    ["unrealizable/interval_intersection.ml", ""]
 ]
 
 benchmark_set = constraint_benchmarks + base_benchmark_set + lifting_benchmarks
@@ -342,13 +347,16 @@ def summarize():
     num_base = len(base_benchmark_set)
     num_lifting = len(lifting_benchmarks)
     num_extrs = len(extra_benchmarks)
+    num_unr = len(unrealizable_benchmarks)
     total = num_constraint + num_base + num_lifting + num_extrs
     print("%i benchmarks in total:" % total)
     print("\t- %i basic benchmarks (run with --base)." % num_base)
-    print("\t\tincluding %i in kick-the-tires set (run with --kick-the-tires)." %
+    print("\t\tincluding %i in kick-the-tires set (run with --kick-the-tires or -b small)." %
           len(kick_the_tires_set))
-    print("\t- %i benchmarks with requires constraints (run with --constraint-benchmarks)." % num_constraint)
-    print("\t- %i benchmarks with lifting (run with --lifting-benchmarks)." % num_lifting)
+    print("\t- %i benchmarks with requires constraints (run with -b constraint)." %
+          num_constraint)
+    print("\t- %i unrealizable benchmarks (run with -b unr)." % num_unr)
+    print("\t- %i benchmarks with lifting (run with -b lifting)." % num_lifting)
     print("\t- %i extras benchmarks." % num_extrs)
 
 
