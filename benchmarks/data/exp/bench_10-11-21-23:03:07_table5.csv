@@ -1,0 +1,106 @@
+constraints/ensures/mps_no_ensures.ml,se2gis:all, 0.781, 40,+..✓,✓,✓,0.32366266250610354,segis:all, 4.637, 82,+++++✓,✓,✓,4.326836824417114
+constraints/ensures/mts_no_ensures.ml,se2gis:all, 0.609, 11,+.+✓,✓,✓,0.3155531883239746,segis:all, 5.984, 196,+++++✓,✓,✓,4.779467058181763
+constraints/ensures/mss_no_ensures.ml,se2gis:all, 20.004, 552,+........++✓,✓,✓,3.493330192565918,segis:all,N/A,N/A,None,N/A,N/A,N/A
+constraints/alist/count_eq2.ml,se2gis:all, 0.463, 3,+.✓,~,~,0.005705499649047851,segis:all, 0.057, 1,++++✓,✓,✓,0.025274372100830077
+constraints/alist/count_eq.ml,se2gis:all, 0.052, 1,+.✓,~,✓,0.002803802490234375,segis:all, 0.047, 0,+++✓,✓,✓,0.017445993423461915
+constraints/alist/sums.ml,se2gis:all, 0.050, 2,+.✓,~,✓,0.0026993751525878906,segis:all, 0.047, 1,+++✓,✓,✓,0.017535972595214843
+constraints/alist/most_frequent.ml,se2gis:all, 7.874, 25,++++✓,✓,✓,7.530527973175049,segis:all, 1.397, 11,+++++✓,✓,✓,0.05126113891601562
+constraints/all_positive/list_mps.ml,se2gis:all, 0.398, 6,+.✓,✓,✓,0.20385241508483887,segis:all, 1.312, 6,++++✓,✓,✓,1.2664226055145265
+constraints/all_positive/sndmin.ml,se2gis:all, 0.949, 9,+.✓,~,~,0.34830660820007325,segis:all, 0.577, 2,+✓,✓,✓,0.5672110080718994
+constraints/all_positive/sndmax.ml,se2gis:all, 5.202, 14,+.+..✓,~,~,0.06866116523742676,segis:all, 68.636, 122,++++++✓,✓,✓,23.219047021865844
+constraints/balanced_tree/node_count.ml,se2gis:all, 0.274, 5,+.✓,~,✓,0.003517436981201172,segis:all, 0.040, 0,+++✓,✓,✓,0.022298479080200197
+constraints/balanced_tree/height.ml,se2gis:all, 0.152, 2,+.✓,~,✓,0.0027527809143066406,segis:all, 0.039, 0,+++✓,✓,✓,0.0229583740234375
+constraints/balanced_tree/height_v2.ml,se2gis:all, 0.230, 4,+.✓,~,~,0.0048577308654785155,segis:all, 0.038, 0,+++✓,✓,✓,0.022625207901000977
+constraints/bst/contains.ml,se2gis:all, 0.139, 1,+.✓,~,✓,0.003442811965942383,segis:all, 0.168, 1,++✓,✓,✓,0.14275541305541992
+constraints/bst/contains_v2.ml,se2gis:all, 0.376, 2,+..✓,~,✓,0.004076433181762695,segis:all, 0.113, 0,+✓,✓,✓,0.10374460220336915
+constraints/bst/contains_v3.ml,se2gis:all, 0.695, 8,+..✓,~,✓,0.02741999626159668,segis:all, 43.173, 109,++✓,✓,✓,0.15456080436706543
+constraints/bst/contains_bool_2.ml,se2gis:all, 1.383, 14,+.✓,~,~,0.005956172943115234,segis:all, 0.094, 0,++✓,✓,✓,0.07451806068420411
+constraints/bst/contains_no_ensures.ml,se2gis:all, 1.079, 1,+.✓,✓,✓,0.003699588775634766,segis:all, 0.168, 1,++✓,✓,✓,0.1429394245147705
+constraints/bst/count_lt.ml,se2gis:all, 0.965, 10,+.✓,~,✓,0.003431558609008789,segis:all, 0.190, 3,++✓,✓,✓,0.16688756942749022
+constraints/bst/count_between.ml,se2gis:all, 1.696, 46,+..✓,~,✓,0.004907655715942383,segis:all,N/A,N/A,None,N/A,N/A,N/A
+constraints/bst/most_frequent_v1.ml,se2gis:all, 6.733, 27,++++++✓,✓,✓,5.843270683288575,segis:all,N/A,N/A,None,N/A,N/A,N/A
+constraints/bst/from_list_contains.ml,se2gis:all, 0.096, 2,+.✓,~,✓,0.040729618072509764,segis:all, 0.098, 1,++✓,✓,✓,0.07893600463867187
+constraints/bst/from_list_max.ml,se2gis:all, 2.192, 11,+..✓,~,~,0.15935196876525878,segis:all, 0.135, 1,++✓,✓,✓,0.1168635368347168
+constraints/bst/sum_gt_by_key.ml,se2gis:all, 1.031, 8,+.✓,~,~,0.14496307373046874,segis:all, 0.154, 0,++✓,✓,✓,0.12140321731567383
+constraints/bst/minmax_separate.ml,se2gis:all, 4.834, 22,+++✓,✓,✓,4.611797285079956,segis:all, 0.763, 3,++++✓,✓,✓,0.568803071975708
+constraints/bst/minmax_sim.ml,se2gis:all, 0.019, 0,+✓,✓,✓,0.017386245727539062,segis:all, 0.021, 0,++✓,✓,✓,0.010554647445678711
+constraints/bst/check_mem_included.ml,se2gis:all, 0.201, 16,+..✓,~,~,0.03311343193054199,segis:all,N/A,N/A,None,N/A,N/A,N/A
+constraints/bst/check_included_comb.ml,se2gis:all, 131.903, 268,+..✓,~,~,0.019988155364990233,segis:all,N/A,N/A,None,N/A,N/A,N/A
+constraints/bst/check_no_subtree_sum_gt2.ml,se2gis:all, 0.942, 7,+....✓,✓,~,0.005755996704101563,segis:all, 0.139, 1,++✓,✓,✓,0.07866392135620118
+constraints/constantlist/index_of.ml,se2gis:all, 0.983, 20,+.✓,✓,✓,0.009337377548217774,segis:all, 1.417, 5,++✓,✓,✓,0.013057422637939454
+constraints/constantlist/contains.ml,se2gis:all, 1.198, 1,+.✓,~,✓,0.003535604476928711,segis:all, 1.660, 3,++✓,✓,✓,0.013042831420898437
+constraints/empty_right_subtree/contains.ml,se2gis:all, 1.975, 3,+.✓,~,✓,0.004164361953735351,segis:all, 0.046, 1,+++∅,✓,✓,0.029211950302124024
+constraints/empty_right_subtree/sum.ml,se2gis:all, 0.073, 1,+.✓,~,✓,0.0028698921203613283,segis:all,N/A,N/A,None,N/A,N/A,N/A
+constraints/evenlist/parity_of_first.ml,se2gis:all, 0.136, 12,+..✓,~,✓,0.002650165557861328,segis:all,N/A,N/A,None,N/A,N/A,N/A
+constraints/evenlist/parity_of_last.ml,se2gis:all, 0.056, 1,+.✓,✓,✓,0.0025606632232666017,segis:all,N/A,N/A,None,N/A,N/A,N/A
+constraints/evenlist/first_odd.ml,se2gis:all, 0.222, 8,+..✓,✓,✓,0.002792215347290039,segis:all, 0.032, 0,++✓,✓,✓,0.012525415420532227
+constraints/evenlist/parity_of_sum.ml,se2gis:all, 0.017, 0,+✓,✓,✓,0.005668163299560547,segis:all, 0.015, 0,+✓,✓,✓,0.007706117630004883
+constraints/even_tree/sum_of_parities.ml,se2gis:all, 3.411, 50,+....✓,~,✓,0.005677604675292968,segis:all, 0.032, 9,++✓,✓,✓,0.018572521209716798
+constraints/even_tree/parity_of_max.ml,se2gis:all, 5.696, 55,+✓,✓,✓,5.682331609725952,segis:all, 0.046, 1,+✓,✓,✓,0.03914556503295898
+constraints/memo/tree_size.ml,se2gis:all, 10.459, 28,+..✓,~,~,0.007785606384277344,segis:all,N/A,N/A,None,N/A,N/A,N/A
+constraints/memo/constant.ml,se2gis:all, 0.004, 1,+✓,✓,✓,0.002910280227661133,segis:all,N/A,N/A,None,N/A,N/A,N/A
+constraints/memo/mts_memo_sum.ml,se2gis:all, 0.033, 8,+✓,✓,✓,0.010507965087890625,segis:all, 0.038, 0,++✓,✓,✓,0.012311124801635742
+constraints/memo/max_contains.ml,se2gis:all, 2.094, 15,+...✓,~,~,0.03551983833312988,segis:all, 0.175, 1,++✓,✓,✓,0.12459425926208496
+constraints/memo/count_lt.ml,se2gis:all, 1.965, 12,+.✓,~,~,0.004925775527954102,segis:all,N/A,N/A,None,N/A,N/A,N/A
+constraints/memo/max_sum_gt.ml,se2gis:all, 4.812, 35,+...✓,~,~,0.007260608673095703,segis:all, 0.191, 2,++✓,✓,✓,0.17332167625427247
+constraints/memo/proper_indexation_sum_lt_pos_v2.ml,se2gis:all, 0.004, 0,+✓,✓,✓,0.002987575531005859,segis:all,N/A,N/A,None,N/A,N/A,N/A
+constraints/memo/proper_indexation_sum_lt_pos.ml,se2gis:all, 0.146, 5,++✓,✓,✓,0.009778451919555665,segis:all,N/A,N/A,None,N/A,N/A,N/A
+constraints/memo/minmax.ml,se2gis:all, 20.324, 58,+......✓,✓,~,0.024005842208862305,segis:all,N/A,N/A,None,N/A,N/A,N/A
+constraints/size/obfuscated_length.ml,se2gis:all, 0.089, 3,++++✓,✓,✓,0.024646568298339843,segis:all, 31.219, 49,++++✓,✓,✓,0.02427358627319336
+constraints/size/obfuscated_length_3.ml,se2gis:all, 0.174, 0,+✓,✓,✓,0.00928955078125,segis:all, 0.181, 1,++✓,✓,✓,0.011897659301757813
+constraints/program/memo_psum.ml,se2gis:all, 0.688, 4,+..✓,~,~,0.004043865203857422,segis:all, 0.132, 1,+✓,✓,✓,0.1232271671295166
+constraints/sortedlist/min.ml,se2gis:all, 0.058, 1,+.✓,~,✓,0.002588176727294922,segis:all, 0.010, 0,+✓,✓,✓,0.006021022796630859
+constraints/sortedlist/max.ml,se2gis:all, 0.069, 1,+.✓,~,✓,0.0026063919067382812,segis:all, 0.011, 0,+✓,✓,✓,0.00596923828125
+constraints/sortedlist/count_lt.ml,se2gis:all, 0.048, 1,+.✓,✓,✓,0.002861166000366211,segis:all, 0.027, 0,++✓,✓,✓,0.014239358901977538
+constraints/sortedlist/index_of.ml,se2gis:all, 0.796, 1,+.✓,~,✓,0.003509330749511719,segis:all, 0.711, 1,++✓,✓,✓,0.016317367553710938
+constraints/sortedlist/is_intersection_empty.ml,se2gis:all, 0.053, 0,+✓,✓,✓,0.017232990264892577,segis:all, 0.149, 6,++++✓,✓,✓,0.056473922729492185
+constraints/sortedlist/largest_diff.ml,se2gis:all, 0.034, 0,++✓,✓,✓,0.019434547424316405,segis:all, 0.945, 4,+++✓,✓,✓,0.01952652931213379
+constraints/sortedlist/largest_diff_poslist.ml,se2gis:all, 0.012, 0,+✓,✓,✓,0.010501384735107422,segis:all, 0.027, 0,++✓,✓,✓,0.014156484603881836
+constraints/sortedlist/smallest_diff.ml,se2gis:all, 0.016, 0,+✓,✓,✓,0.013679027557373047,segis:all, 0.025, 0,++✓,✓,✓,0.013444042205810547
+constraints/sortedlist/sndmind.ml,se2gis:all, 40.245, 620,+....✓,~,~,0.548735237121582,segis:all, 0.125, 0,++✓,✓,✓,0.09054913520812988
+constraints/sortedlist/sndmax_empty_base_case.ml,se2gis:all, 7.322, 10,+.+...✓,~,~,0.23145880699157714,segis:all,N/A,N/A,None,N/A,N/A,N/A
+constraints/sortedlist/sndmax_empty_base_case_v2.ml,se2gis:all, 3.033, 16,+...+...✓,~,~,0.2796426773071289,segis:all,N/A,N/A,None,N/A,N/A,N/A
+constraints/sortedlist/sndmax_len2_base_case.ml,se2gis:all, 0.890, 7,+..✓,~,✓,0.0038648128509521486,segis:all, 0.024, 0,++✓,✓,✓,0.01547861099243164
+constraints/sortedlist/parallel_min.ml,se2gis:all, 0.468, 8,+.✓,~,~,0.05143904685974121,segis:all, 0.024, 0,+✓,✓,✓,0.01871480941772461
+constraints/sortedlist/parallel_max.ml,se2gis:all, 0.849, 7,+.✓,~,~,0.07463316917419434,segis:all, 0.024, 0,+✓,✓,✓,0.018791341781616212
+constraints/sortedlist/parallel_max2.ml,se2gis:all, 0.463, 3,+.✓,~,~,0.051079940795898435,segis:all, 0.024, 0,+✓,✓,✓,0.01848115921020508
+constraints/sortedlist/interval_intersection.ml,se2gis:all, 121.558, 227,++✓,✓,✓,0.014227151870727539,segis:all,N/A,N/A,None,N/A,N/A,N/A
+constraints/sortedlist/exists_equal_elems.ml,se2gis:all, 0.043, 1,+✓,✓,✓,0.007245397567749024,segis:all,N/A,N/A,None,N/A,N/A,N/A
+constraints/sortedlist/mss.ml,se2gis:all, 6.947, 13,++✓,✓,✓,4.627912712097168,segis:all,N/A,N/A,None,N/A,N/A,N/A
+constraints/sorted_and_indexed/count_lt0.ml,se2gis:all, 1.377, 8,+..✓,~,~,0.0035624027252197264,segis:all, 0.038, 0,++✓,✓,✓,0.014670324325561524
+constraints/sorted_and_indexed/count_lt.ml,se2gis:all, 1.512, 15,+..✓,~,~,0.0033673763275146483,segis:all, 0.047, 1,++✓,✓,✓,0.014842605590820313
+constraints/symmetric_tree/sum.ml,se2gis:all, 0.224, 3,+.✓,~,✓,0.003045988082885742,segis:all, 0.032, 0,++✓,✓,✓,0.016152191162109374
+constraints/symmetric_tree/height.ml,se2gis:all, 0.220, 2,+.✓,~,✓,0.0036457538604736327,segis:all,N/A,N/A,None,N/A,N/A,N/A
+constraints/symmetric_tree/min.ml,se2gis:all, 0.379, 3,+.✓,~,✓,0.0034930229187011717,segis:all, 0.031, 0,++✓,✓,✓,0.015300655364990234
+constraints/unimodal_list/max_logn_v2.ml,se2gis:all, 2.318, 13,+...+✓,~,~,0.12623872756958007,segis:all, 0.261, 2,++✓,✓,✓,0.22750091552734375
+constraints/unimodal_list/max_in_um_pos.ml,se2gis:all, 56.580, 95,+...✓,✓,~,3.1388332843780518,segis:all, 31.240, 121,+++++✓,✓,✓,31.019265031814577
+constraints/unimodal_list/max_logn.ml,se2gis:all, 327.134, 283,+...✓,~,~,0.44228692054748536,segis:all, 22.251, 70,++✓,✓,✓,22.239590787887572
+indexed_list/position_polynomial_no_index.ml,se2gis:all, 0.616, 1,++^+✓,✓,✓,0.01094813346862793,segis:all,N/A,N/A,None,N/A,N/A,N/A
+indexed_list/search_no_index.ml,se2gis:all, 1.313, 2,++^+✓,✓,✓,0.012996196746826172,segis:all,N/A,N/A,None,N/A,N/A,N/A
+indexed_list/sum_elts_lt_pos_no_len.ml,se2gis:all, 73.563, 204,++^+✓,✓,✓,0.015325117111206054,segis:all,N/A,N/A,None,N/A,N/A,N/A
+list/atoi_no_fac.ml,se2gis:all, 1.797, 3,+^++✓,~,✓,0.13026080131530762,segis:all,N/A,N/A,None,N/A,N/A,N/A
+list/is_sorted_no_last.ml,se2gis:all, 16.298, 21,++^+✓,~,✓,0.03547964096069336,segis:all,N/A,N/A,None,N/A,N/A,N/A
+list/largest_diff_sorted_list_nohead.ml,se2gis:all, 0.053, 1,+^+✓,~,✓,0.015244817733764649,segis:all,N/A,N/A,++∅,N/A,N/A,N/A
+list/mps_no_sum.ml,se2gis:all, 1.927, 6,+^++✓,~,✓,0.3134606838226318,segis:all,N/A,N/A,++++∅,N/A,N/A,N/A
+list/poly_no_fac.ml,se2gis:all, 0.336, 4,+^+✓,~,✓,0.11868724822998047,segis:all,N/A,N/A,++++∅,N/A,N/A,N/A
+list/zero_after_one_no.ml,se2gis:all, 1.336, 4,+^++✓,~,✓,0.2971139907836914,segis:all,N/A,N/A,++++∅,N/A,N/A,N/A
+tailopt/mps_no_sum.ml,se2gis:all, 9.951, 30,++^+✓,✓,✓,0.02140498161315918,segis:all,N/A,N/A,None,N/A,N/A,N/A
+combine/mts_and_mps_nosum.ml,se2gis:all, 25.096, 73,++^+✓,✓,✓,0.04820847511291504,segis:all,N/A,N/A,None,N/A,N/A,N/A
+sort_list/sndmax.ml,se2gis:all, 0.899, 14,++^+✓,~,✓,0.05137548446655273,segis:all,N/A,N/A,None,N/A,N/A,N/A
+sort_list/sndmin.ml,se2gis:all, 0.632, 9,++^+✓,~,✓,0.04961843490600586,segis:all,N/A,N/A,None,N/A,N/A,N/A
+tree/gradient.ml,se2gis:all, 0.994, 47,+^✓,✓,✓,0.9789111137390136,segis:all,N/A,N/A,++∅,N/A,N/A,N/A
+tree/mits_nosum.ml,se2gis:all, 3.819, 28,++^++✓,~,✓,0.19907898902893068,segis:all,N/A,N/A,None,N/A,N/A,N/A
+unimodal_lists/prod_needs_aux.ml,se2gis:all, 1.943, 6,+^✓,~,✓,0.7529202461242676,segis:all,N/A,N/A,None,N/A,N/A,N/A
+unrealizable/po_sorted.ml,se2gis:all, 0.060, 3,++∅,✓,✓,0.010167264938354492,segis:all, 0.035, 1,+++∅,✓,✓,0.01123218536376953
+unrealizable/balanced_tree_logn_sum.ml,se2gis:all, 0.022, 0,+∅,✓,✓,0.0,segis:all, 0.019, 0,++∅,✓,✓,0.006765604019165039
+unrealizable/twosum.ml,se2gis:all, 0.052, 0,++∅,✓,✓,0.004682350158691406,segis:all,N/A,N/A,None,N/A,N/A,N/A
+unrealizable/minmax.ml,se2gis:all, 0.043, 0,++++∅,✓,✓,0.00894770622253418,segis:all,N/A,N/A,None,N/A,N/A,N/A
+unrealizable/count_between.ml,se2gis:all, 7.402, 61,+..∅,~,~,0.0,segis:all, 0.031, 1,++∅,✓,✓,0.006303596496582031
+unrealizable/contains.ml,se2gis:all, 0.025, 0,+∅,✓,✓,0.0,segis:all, 0.044, 0,+++∅,✓,✓,0.011935091018676758
+unrealizable/contains2.ml,se2gis:all, 0.022, 0,+∅,✓,✓,0.0,segis:all, 0.024, 0,++∅,✓,✓,0.005518388748168945
+unrealizable/simple_parity.ml,se2gis:all, 0.052, 0,+∅,✓,✓,0.0,segis:all, 0.024, 0,++∅,✓,✓,0.005610895156860351
+unrealizable/minmax_mistake.ml,se2gis:all, 0.039, 0,+++∅,✓,✓,0.005689668655395508,segis:all,N/A,N/A,None,N/A,N/A,N/A
+unrealizable/approximately_pareto.ml,se2gis:all, 0.021, 11,+∅,✓,✓,0.0,segis:all, 0.033, 1,++∅,✓,✓,0.005699253082275391
+unrealizable/eval_psum.ml,se2gis:all, 1.999, 17,+..∅,~,~,0.0,segis:all, 0.046, 0,++∅,✓,✓,0.009261608123779297
+unrealizable/common_elt.ml,se2gis:all, 0.021, 0,+∅,✓,✓,0.0,segis:all, 0.022, 0,++∅,✓,✓,0.005580377578735351
+unrealizable/interval_intersection.ml,se2gis:all, 0.051, 1,++∅,✓,✓,0.004041147232055664,segis:all,N/A,N/A,None,N/A,N/A,N/A

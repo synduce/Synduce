@@ -71,7 +71,7 @@ def run_n(progress, bench_id, realizable, command, algo,
             info = DataObj({})
             info.is_successful = False
 
-        if info.is_successful and (realizable or info.is_unrealizable):
+        if info.is_successful and ((realizable and not info.is_unrealizable) or info.is_unrealizable):
             total_elapsed += info.elapsed
             verif_elapsed += info.verif_elapsed
             max_e = max(info.elapsed, max_e)
@@ -90,7 +90,7 @@ def run_n(progress, bench_id, realizable, command, algo,
     sp = " "
     csvline = "?,?,?,?,?,?"
 
-    if info.is_successful and (realizable or info.is_unrealizable):
+    if info.is_successful and ((realizable and not info.is_unrealizable) or info.is_unrealizable):
         delta_str = f"{delta : .0f}ms"
         if (float(delta) / (1000.0 * elapsed)) > 0.05:
             delta_str = f"{delta_str} !"
