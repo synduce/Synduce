@@ -35,7 +35,9 @@ let target hi lo t =
     | Node (a, b, l, r) ->
       if b > hi && a < lo
       then [%synt xi_1] (g r)
-      else [%synt xi_2] ([%synt comb] hi lo b a) (g l) (g r)
+      else (
+        let comp = [%synt f0] hi lo b a in
+        [%synt xi_2] comp (g l) (g r))
   in
   g t
   [@@requires is_bst]

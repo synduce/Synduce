@@ -902,7 +902,9 @@ module Solve = struct
         ~f:(fun (_, prev_sol) r -> combine prev_sol r)
     in
     List.fold_until
-      split_eqn_systems
+      (List.stable_sort
+         ~compare:(fun (vs1, _) (vs2, _) -> compare (Set.length vs1) (Set.length vs2))
+         (List.rev split_eqn_systems))
       ~init:(RSuccess [], Either.first partial_soln)
       ~finish:identity
       ~f:(fun (_, prev_soln) subsystem ->

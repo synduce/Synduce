@@ -143,7 +143,7 @@ let create_or_update_term_state_with_ctex
                   in
                   Some pre')
             ; negative_ctexs = ctex :: det.negative_ctexs
-            ; positive_ctexs = []
+            ; positive_ctexs = det.positive_ctexs
             })
 ;;
 

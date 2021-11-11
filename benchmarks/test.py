@@ -45,7 +45,7 @@ def run_one(progress, bench_id, command, algo, optim, filename, extra_opt):
     return info
 
 
-def run_n(progress, bench_id, command, algo,
+def run_n(progress, bench_id, realizable, command, algo,
           optim, filename, extra_opt, errors, num_runs, csv_output):
 
     total_elapsed = 0.0
@@ -71,7 +71,7 @@ def run_n(progress, bench_id, command, algo,
             info = DataObj({})
             info.is_successful = False
 
-        if info.is_successful:
+        if info.is_successful and (realizable or info.is_unrealizable):
             total_elapsed += info.elapsed
             verif_elapsed += info.verif_elapsed
             max_e = max(info.elapsed, max_e)
@@ -90,7 +90,7 @@ def run_n(progress, bench_id, command, algo,
     sp = " "
     csvline = "?,?,?,?,?,?"
 
-    if info.is_successful:
+    if info.is_successful and (realizable or info.is_unrealizable):
         delta_str = f"{delta : .0f}ms"
         if (float(delta) / (1000.0 * elapsed)) > 0.05:
             delta_str = f"{delta_str} !"
@@ -135,6 +135,10 @@ def run_benchmarks(input_files, algos, optims, num_runs=1, csv_output=None, exit
         filename = filename_with_opt[0]
         category = os.path.dirname(filename)
         extra_opt = filename_with_opt[1]
+        if len(filename_with_opt) >= 3:
+            realizable = filename_with_opt[2]
+        else:
+            realizable = True
         csvline_all_algos = []
         for algo in algos:
             for optim in optims:
@@ -167,7 +171,7 @@ def run_benchmarks(input_files, algos, optims, num_runs=1, csv_output=None, exit
                     print(f"\n⏺ Category: {bench_cat}")
                     prev_bench_cat = bench_cat
                 # Run the benchmark n times.
-                errors, elapsed, csvline = run_n(progress, bench_id, command, algo,
+                errors, elapsed, csvline = run_n(progress, bench_id, realizable, command, algo,
                                                  optim, filename, extra_opt, errors, num_runs, csv_output)
                 csvline_all_algos += [f"{algo[0]}:{optim[0]}", csvline]
 

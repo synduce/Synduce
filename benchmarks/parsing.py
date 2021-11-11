@@ -74,7 +74,7 @@ class DataObj:
         self.elapsed = data.get("total_elapsed")
         self.verif_elapsed = data.get("verif_elapsed")
         self.is_successful = is_successful(data)
-     #   self.is_unrealizable = is_unrealizable(data)
+        self.is_unrealizable = is_unrealizable(data)
         cex_classif_flag, lemma_proof_flag = all_proved_by_induction(data)
         self.proved_by_induction = lemma_proof_flag
         self.classified_by_induction = cex_classif_flag

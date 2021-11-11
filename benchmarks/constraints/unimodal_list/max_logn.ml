@@ -1,4 +1,4 @@
-(** @synduce -N -B -k -n 30 *)
+(** @synduce -lkNB -n 30 *)
 
 (* A data type representing lists in a tree format, where the list elements
    are kept where the list is "split" as opposed to concat-lists where

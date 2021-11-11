@@ -1,42 +1,40 @@
-(** @synduce -NB -n 10 *)
+(** @synduce --no-lifting *)
 
-type tree =
-  | Leaf of int * int
-  | Node of int * int * tree * tree
+type 'a btree =
+  | Empty
+  | Node of 'a * 'a btree * 'a btree
 
-let rec tree_min = function
-  | Leaf (x, y) -> x
-  | Node (a, b, l, r) -> min a (min (tree_min l) (tree_min r))
+type sel =
+  | Left
+  | Right
+
+type 'c zipper =
+  | Top
+  | Zip of sel * 'c * 'c btree * 'c zipper
+
+let rec spec t = mips (0, 0) t
+
+and mips s = function
+  | Empty -> s
+  | Node (a, l, r) ->
+    let sum1, m1 = mips s l in
+    mips (sum1 + a, max (sum1 + a) m1) r
 ;;
 
-let rec tree_max = function
-  | Leaf (x, y) -> x
-  | Node (a, b, l, r) -> max a (max (tree_max l) (tree_max r))
+let rec target = function
+  | Top -> [%synt s0]
+  | Zip (c, a, child, z) -> aux a child z c
+
+and aux a child z = function
+  | Left -> [%synt joinl] a (spec child) (target z)
+  | Right -> [%synt joinr] a (spec child) (target z)
 ;;
 
-let rec is_bst = function
-  | Leaf (a, b) -> a < b
-  | Node (a, b, l, r) -> a < b && a > tree_max l && a < tree_min r && is_bst l && is_bst r
-;;
+let rec repr = function
+  | Top -> Empty
+  | Zip (w, lbl, child, z) -> h lbl child z w
 
-let repr x = x
-
-let spec hi lo t =
-  let rec f = function
-    | Leaf (a, b) -> lo < a && b < hi
-    | Node (a, b, l, r) -> (lo < a && b < hi) || f l || f r
-  in
-  f t
-;;
-
-let target hi lo t =
-  let rec g = function
-    | Leaf (a, b) -> [%synt xi_0] hi lo a b
-    | Node (a, b, l, r) ->
-      if b > hi && a < lo
-      then [%synt xi_1] (g r)
-      else [%synt xi_2] ([%synt comb] hi lo b a) (g l) (g r)
-  in
-  g t
-  [@@requires is_bst]
+and h lbl child z = function
+  | Left -> Node (lbl, child, repr z)
+  | Right -> Node (lbl, repr z, child)
 ;;
