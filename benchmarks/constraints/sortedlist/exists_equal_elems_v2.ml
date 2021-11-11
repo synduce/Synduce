@@ -15,8 +15,8 @@ and is_sorted_l = function
   | Cons (hd, tl) -> aux hd tl
 
 and aux prev = function
-  | Elt x -> prev >= x
-  | Cons (hd, tl) -> prev >= hd && aux hd tl
+  | Elt x -> prev < x
+  | Cons (hd, tl) -> prev < hd && aux hd tl
 ;;
 
 (* Reference function in quadratic time. *)
@@ -37,23 +37,23 @@ let rec target = function
   | TwoLists (x, y) -> seek x y
   [@@requires is_sorted]
 
-and seek y = function
-  | Elt a -> find2 a y
-  | Cons (hd, tl) -> aux hd tl y
+and seek x = function
+  | Elt a -> find2 a x
+  | Cons (hd, tl) -> aux hd tl x
 
 and aux a l = function
-  | Elt b -> a = b
+  | Elt b -> [%synt base_case_0] a b (find2 b l)
   | Cons (b, l2) ->
     if a = b
-    then true
+    then [%synt ab]
     else if a < b
-    then target (TwoLists (Cons (b, l2), l))
-    else target (TwoLists (l2, Cons (a, l)))
+    then target (TwoLists (l, Cons (b, l2)))
+    else target (TwoLists (Cons (a, l), l2))
 
 and find2 a = function
   | Elt b -> [%synt base_case] a b
   | Cons (hd, tl) ->
-    if a > hd then [%synt fstop] a hd else [%synt fcontinue] hd a (find2 a tl)
+    if a < hd then [%synt fstop] a hd else [%synt fcontinue] hd a (find2 a tl)
 ;;
 
 assert (target = is_intersection_nonempty)

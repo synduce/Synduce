@@ -263,6 +263,7 @@ constraint_benchmarks = [
     # sortedlist
     ["constraints/sortedlist/count_lt.ml", ""],
     ["constraints/sortedlist/exists_equal_elems.ml", ""],
+    ["constraints/sortedlist/exists_equal_elems_v2.ml", ""],
     ["constraints/sortedlist/index_of.ml", ""],
     ["constraints/sortedlist/interval_intersection.ml", ""],
     ["constraints/sortedlist/is_intersection_empty.ml", ""],
