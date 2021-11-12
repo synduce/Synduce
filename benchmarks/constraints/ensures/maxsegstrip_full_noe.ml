@@ -40,11 +40,17 @@ and sum = function
 ;;
 
 let rec spec = function
-  | Line a -> max 0 (bsum a), bsum a
+  | Line a ->
+    let s = bsum a in
+    let sm = max s 0 in
+    sm, sm, sm, s
   | NCons (hd, tl) ->
-    let mtss, csum = spec tl in
+    let mtss, mss, mpss, csum = spec tl in
     let line_sum = bsum hd in
-    max (mtss + line_sum) 0, csum + line_sum
+    ( max (mtss + line_sum) 0
+    , max mss (max (mtss + line_sum) 0)
+    , max (csum + line_sum) mpss
+    , csum + line_sum )
 
 and bsum = function
   | Elt x -> x
@@ -52,12 +58,12 @@ and bsum = function
 ;;
 
 let rec target = function
-  | Sglt x -> [%synt s0] (inner x)
+  | Sglt x -> [%synt s0] (tsum x)
   | Cat (l, r) -> [%synt s1] (target r) (target l)
 
-and inner = function
+and tsum = function
   | Elt x -> [%synt inner0] x
-  | Cons (hd, tl) -> [%synt inner1] hd (inner tl)
+  | Cons (hd, tl) -> [%synt inner1] hd (tsum tl)
 ;;
 
 assert (target = clist_to_list @@ spec)

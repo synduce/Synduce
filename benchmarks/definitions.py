@@ -202,8 +202,11 @@ constraint_benchmarks = [
     ["constraints/ensures/mts_no_ensures.ml", ""],
     ["constraints/ensures/mss_no_ensures.ml", "-B"],
     ["constraints/ensures/mtss_noe.ml", ""],
+    ["constraints/ensures/mtss_full_noe.ml", ""],
     ["constraints/ensures/mpss_noe.ml", ""],
-    ["ensures/maxsegstrip_noe.ml", ""],
+    ["constraints/ensures/mpss_full_noe.ml", ""],
+    ["constraints/ensures/maxsegstrip_noe.ml", ""],
+    ["constraints/ensures/maxsegstrip_full_noe.ml", ""],
     # alist
     ["constraints/alist/count_eq2.ml", "-NB"],
     ["constraints/alist/count_eq.ml", ""],

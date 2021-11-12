@@ -42,9 +42,9 @@ and sum = function
 let rec spec = function
   | Line a -> max 0 (bsum a), bsum a
   | NCons (hd, tl) ->
-    let mtss, csum = spec tl in
+    let mpss, csum = spec tl in
     let line_sum = bsum hd in
-    max (mtss + line_sum) 0, csum + line_sum
+    max (csum + line_sum) mpss, csum + line_sum
 
 and bsum = function
   | Elt x -> x
