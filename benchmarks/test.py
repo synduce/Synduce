@@ -409,8 +409,7 @@ if __name__ == "__main__":
         elif table_no == 4:
             input_files = constraint_benchmarks
         elif table_no == 5:
-            input_files = constraint_benchmarks + \
-                lifting_benchmarks + unrealizable_benchmarks
+            input_files = constraint_benchmarks + unrealizable_benchmarks
         else:
             input_files = kick_the_tires_set
 

@@ -146,6 +146,8 @@ base_benchmark_set = [
     ["list_to_tree/search_v2.pmrs", ""],
     ["list_to_tree/search_v3.pmrs", ""],
     ["list_to_tree/mls.pmrs", ""],
+    # Nested lists
+    ["nested_lists/mtss.ml", ""],
     # Numbers
     ["numbers/int_nat_toint.ml", ""],
     ["numbers/int_nat_twosum.ml", ""],
@@ -199,6 +201,9 @@ constraint_benchmarks = [
     ["constraints/ensures/mps_no_ensures.ml", "-B"],
     ["constraints/ensures/mts_no_ensures.ml", ""],
     ["constraints/ensures/mss_no_ensures.ml", "-B"],
+    ["constraints/ensures/mtss_noe.ml", ""],
+    ["constraints/ensures/mpss_noe.ml", ""],
+    ["ensures/maxsegstrip_noe.ml", ""],
     # alist
     ["constraints/alist/count_eq2.ml", "-NB"],
     ["constraints/alist/count_eq.ml", ""],
@@ -333,7 +338,24 @@ unrealizable_benchmarks = [
     ["unrealizable/eval_psum.ml", "", False],
     ["unrealizable/common_elt.ml", "", False],
     ["unrealizable/interval_intersection.ml", "", False],
-    ["unrealizable/max_low_table_sum", "", False]
+    ["unrealizable/max_low_table_sum.ml", "", False],
+    ["indexed_list/position_polynomial_no_index.ml", " --no-lifting", False],
+    ["indexed_list/search_no_index.ml", " --no-lifting", False],
+    ["indexed_list/sum_elts_lt_pos_no_len.ml",
+        "--no-assumptions --no-lifting", False],
+    ["list/atoi_no_fac.ml", "--no-gropt --no-lifting", False],
+    ["list/is_sorted_no_last.ml", " --no-lifting", False],
+    ["list/largest_diff_sorted_list_nohead.ml", " --no-lifting", False],
+    ["list/mps_no_sum.ml", " --no-lifting", False],
+    ["list/poly_no_fac.ml", " --no-lifting", False],
+    ["list/zero_after_one_no.ml", " --no-lifting", False],
+    ["tailopt/mps_no_sum.ml", " --no-lifting", False],
+    ["combine/mts_and_mps_nosum.ml", " --no-lifting", False],
+    ["sort_list/sndmax.ml", " --no-lifting", False],
+    ["sort_list/sndmin.ml", " --no-lifting", False],
+    ["tree/gradient.ml", " --no-lifting", False],
+    ["tree/mits_nosum.ml", " --no-lifting", False],
+    ["unimodal_lists/prod_needs_aux.ml",  "--no-lifting", False]
 ]
 
 benchmark_set = constraint_benchmarks + base_benchmark_set + lifting_benchmarks
