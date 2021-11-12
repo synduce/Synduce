@@ -120,6 +120,14 @@ type ctex =
   ; ctex_stat : ctex_stat (** The spuriousness status of the counterexample. *)
   }
 
+(** A counterexample to realizability is a pair of models: a pair of maps from variable ids to terms. *)
+type unrealizability_ctex =
+  { i : int
+  ; j : int
+  ; ci : ctex
+  ; cj : ctex
+  }
+
 type equation_system = equation list
 
 (** Contains the last equation system used to solved the problem when a solution is found. *)
@@ -164,6 +172,14 @@ type refinement_loop_state =
   ; lifting : lifting
   ; assumptions : equation list
   }
+
+(** The algorithm may answere with realizable, in which case it provides a solution, unrealizable,
+in which case it provides a list of counterexamples, or failure.
+*)
+type 'a segis_response =
+  | Realizable of soln
+  | Unrealizable of unrealizability_ctex list
+  | Failed of 'a
 
 (* ============================================================================================= *)
 (*          Pretty printing functions.                                                           *)

@@ -6,7 +6,9 @@ open Option.Let_syntax
 open Syguslib.Sygus
 open Utils
 
-let rec refinement_loop ?(major = true) (p : psi_def) (lstate_in : refinement_loop_state) =
+let rec refinement_loop ?(major = true) (p : psi_def) (lstate_in : refinement_loop_state)
+    : solver_response segis_response
+  =
   let tsize, usize = Set.length lstate_in.t_set, Set.length lstate_in.u_set in
   if major
   then (
@@ -73,29 +75,29 @@ let rec refinement_loop ?(major = true) (p : psi_def) (lstate_in : refinement_lo
              turn_off use_syntactic_definitions;
              turn_off make_partial_correctness_assumption);
            refinement_loop ~major p lstate_in)
-         else Error RFail
+         else Failed RFail
        | `Correct ->
          (* This case happens when verification succeeded.
                Store the equation system, return the solution. *)
          Stats.log_major_step_end ~synth_time ~verif_time ~t:tsize ~u:usize true;
          AState.solved_eqn_system := Some eqns;
          Log.print_ok ();
-         Ok { soln_rec_scheme = p.psi_target; soln_implems = sol }
+         Realizable { soln_rec_scheme = p.psi_target; soln_implems = sol }
      with
     | Failure s ->
       Log.error_msg Fmt.(str "Failure: %s" s);
       Log.error_msg "Solution cannot be proved correct, solver failed.";
-      Error RFail
+      Failed RFail
     | e -> raise e)
   | _ as synt_failure_info ->
     (* On synthesis failure, start by trying to synthesize lemmas. *)
     (match
        Stats.timed (fun () -> Lemmas.synthesize_lemmas ~p synt_failure_info lstate)
      with
-    | lsynt_time, Ok new_lstate ->
+    | lsynt_time, Ok (First new_lstate) ->
       Stats.log_minor_step ~synth_time ~auxtime:lsynt_time false;
       refinement_loop ~major:false p new_lstate
-    | lsynt_time, Error _synt_failure
+    | lsynt_time, Ok (Second ctexs)
       when !Config.Optims.attempt_lifting
            && Lifting.lifting_count p < !Config.Optims.max_lifting_attempts ->
       (* If all no counterexample is spurious, lemma synthesis fails, we need lifting. *)
@@ -109,13 +111,15 @@ let rec refinement_loop ?(major = true) (p : psi_def) (lstate_in : refinement_lo
         (match r' with
         | RInfeasible ->
           Stats.log_major_step_end ~synth_time ~verif_time:0. ~t:tsize ~u:usize false;
-          Error RInfeasible
-        | _ -> Error r'))
-    | _, Error RInfeasible ->
-      (* Infeasible is not a failure! *)
+          Unrealizable ctexs
+        | _ -> Failed r'))
+    | _, Ok (Second ctexs) ->
+      (* Infeasible is not a failure! When the sygus solver answers infeasible,
+        we do not have witnesses of unrealizability.
+       *)
       Stats.log_major_step_end ~synth_time ~verif_time:0. ~t:tsize ~u:usize false;
-      Error RInfeasible
-    | _ -> Error RFail)
+      Unrealizable ctexs
+    | _ -> Failed RFail)
 ;;
 
 let psi (p : psi_def) =
@@ -325,7 +329,7 @@ let find_problem_components
 let solve_problem
     (psi_comps : (string * string * string) option)
     (pmrs : (string, PMRS.t, Base.String.comparator_witness) Map.t)
-    : psi_def * (soln, solver_response) Result.t
+    : psi_def * solver_response segis_response
   =
   (*  Find problem components *)
   let target_fname, spec_fname, repr_fname =

@@ -792,8 +792,7 @@ module Solve = struct
   ;;
 
   let solve_eqns (unknowns : VarSet.t) (eqns : equation list)
-      : solver_response
-        * (partial_soln, Counterexamples.unrealizability_ctex list) Either.t
+      : solver_response * (partial_soln, unrealizability_ctex list) Either.t
     =
     let opt_cst =
       Set.exists unknowns ~f:(fun v -> RType.is_base (Variable.vtype_or_new v))
@@ -953,10 +952,8 @@ module Preprocess = struct
     { pre_unknowns : VarSet.t
     ; pre_equations : equation list
     ; pre_postprocessing :
-        solver_response
-        * (partial_soln, Counterexamples.unrealizability_ctex list) Either.t
-        -> solver_response
-           * (partial_soln, Counterexamples.unrealizability_ctex list) Either.t
+        solver_response * (partial_soln, unrealizability_ctex list) Either.t
+        -> solver_response * (partial_soln, unrealizability_ctex list) Either.t
     }
 
   (** An empty preprocessing action. *)
@@ -1066,7 +1063,7 @@ end
   function and body of a function) or a list of unrealizability counterexamples.
 *)
 let solve ~(p : psi_def) (eqns : equation list)
-    : solver_response * (partial_soln, Counterexamples.unrealizability_ctex list) Either.t
+    : solver_response * (partial_soln, unrealizability_ctex list) Either.t
   =
   let unknowns = p.psi_target.psyntobjs in
   let preprocessing_actions =

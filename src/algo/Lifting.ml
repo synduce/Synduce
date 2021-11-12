@@ -415,12 +415,12 @@ let scalar
     ~(p : psi_def)
     (l : refinement_loop_state)
     ((_s_resp, synt_failure_info) :
-      solver_response * ('a, Counterexamples.unrealizability_ctex list) Either.t)
+      solver_response * ('a, unrealizability_ctex list) Either.t)
     : (psi_def * refinement_loop_state, solver_response) Result.t
   =
   (* Select the type of lifting from the synt_failure_info.  *)
   let lifting_type =
-    let m (uc : Counterexamples.unrealizability_ctex) =
+    let m uc =
       let hint_1 =
         let common_vars = Set.union uc.ci.ctex_vars uc.cj.ctex_vars in
         let f type_decision var =

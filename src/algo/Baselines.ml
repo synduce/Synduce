@@ -20,7 +20,7 @@ open Syguslib.Sygus
     will be taken as counterexamples during the refinement loop.
     Use the option [--segis] in the executable to use this synthesis algorithm.
 *)
-let rec segis_loop (p : psi_def) (t_set : TermSet.t) =
+let rec segis_loop (p : psi_def) (t_set : TermSet.t) : solver_response segis_response =
   Int.incr refinement_steps;
   let elapsed = Stats.get_glob_elapsed () in
   Log.info (fun frmt () -> Fmt.pf frmt "Refinement step %i." !refinement_steps);
@@ -59,11 +59,8 @@ let rec segis_loop (p : psi_def) (t_set : TermSet.t) =
     | verif_time, None ->
       Stats.log_major_step_end ~synth_time ~verif_time ~t:tsize ~u:0 true;
       Log.print_ok ();
-      Ok { soln_rec_scheme = p.psi_target; soln_implems = sol })
-  | RFail, _ ->
-    Log.error_msg "<SEGIS> SyGuS solver failed to find a solution.";
-    Error RFail
-  | RInfeasible, _ ->
+      Realizable { soln_rec_scheme = p.psi_target; soln_implems = sol })
+  | RInfeasible, Second ctexs ->
     Stats.log_major_step_end ~synth_time ~verif_time:0. ~t:tsize ~u:0 false;
     Log.info
       Fmt.(
@@ -73,11 +70,14 @@ let rec segis_loop (p : psi_def) (t_set : TermSet.t) =
             "@[<hov 2><SEGIS> This problem has no solution. Counterexample set:@;%a@]"
             (list ~sep:sp pp_term)
             (Set.elements t_set));
-    Error RInfeasible
+    Unrealizable ctexs
+  | RFail, _ ->
+    Log.error_msg "<SEGIS> SyGuS solver failed to find a solution.";
+    Failed RFail
   | RUnknown, _ ->
     Log.error_msg "<SEGIS> SyGuS solver returned unknown.";
-    Error RUnknown
-  | _ -> Error s_resp
+    Failed RUnknown
+  | _ -> Failed s_resp
 ;;
 
 let algo_segis (p : psi_def) =
@@ -95,7 +95,7 @@ let algo_segis (p : psi_def) =
     will be taken as counterexamples during the refinement loop: this is a concrete CEGIS algorithm.
     Use the option [--cegis] in the executable to use this synthesis algorithm.
 *)
-let rec cegis_loop (p : psi_def) (t_set : TermSet.t) =
+let rec cegis_loop (p : psi_def) (t_set : TermSet.t) : solver_response segis_response =
   Int.incr refinement_steps;
   let elapsed = Stats.get_glob_elapsed () in
   Log.info (fun frmt () -> Fmt.pf frmt "Refinement step %i." !refinement_steps);
@@ -136,11 +136,8 @@ let rec cegis_loop (p : psi_def) (t_set : TermSet.t) =
       cegis_loop p (Set.add t_set eqn.eterm)
     | None ->
       Log.print_ok ();
-      Ok { soln_rec_scheme = p.psi_target; soln_implems = sol })
-  | RFail, _ ->
-    Log.error_msg "<CEGIS> SyGuS solver failed to find a solution.";
-    Error RFail
-  | RInfeasible, _ ->
+      Realizable { soln_rec_scheme = p.psi_target; soln_implems = sol })
+  | RInfeasible, Second ctexs ->
     Log.info
       Fmt.(
         fun frmt () ->
@@ -149,11 +146,14 @@ let rec cegis_loop (p : psi_def) (t_set : TermSet.t) =
             "@[<hov 2><CEGIS> This problem has no solution. Counterexample set:@;%a@]"
             (list ~sep:sp pp_term)
             (Set.elements t_set));
-    Error RInfeasible
+    Unrealizable ctexs
+  | RFail, _ ->
+    Log.error_msg "<CEGIS> SyGuS solver failed to find a solution.";
+    Failed RFail
   | RUnknown, _ ->
     Log.error_msg "<CEGIS> SyGuS solver returned unknown.";
-    Error RUnknown
-  | _ -> Error s_resp
+    Failed RUnknown
+  | _ -> Failed s_resp
 ;;
 
 let algo_cegis (p : psi_def) =

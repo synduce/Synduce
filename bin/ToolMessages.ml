@@ -3,6 +3,7 @@
 open Base
 open Fmt
 open Utils
+open Algo.AState
 
 let cvc_message () =
   Utils.Log.debug_msg
@@ -12,8 +13,8 @@ let cvc_message () =
 let prep_final_json
     ~(is_ocaml_syntax : bool)
     (source_filename : string ref)
-    (pb : Algo.AState.psi_def)
-    (soln : (Algo.AState.soln, bool) Either.t)
+    (pb : psi_def)
+    (soln : (soln, unrealizability_ctex list) Either.t)
     (elapsed : float)
     (verif : float)
     : Yojson.t
@@ -54,8 +55,8 @@ let prep_final_json
 let on_success
     ~(is_ocaml_syntax : bool)
     (source_filename : string ref)
-    (pb : Algo.AState.psi_def)
-    (result : (Algo.AState.soln, bool) Either.t)
+    (pb : psi_def)
+    (result : (soln, unrealizability_ctex list) Either.t)
     : unit
   =
   let elapsed = Stats.get_glob_elapsed () in

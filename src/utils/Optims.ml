@@ -88,7 +88,7 @@ let expand_depth = ref 2
 let num_expansions_check = ref 124
 
 (* Cut expansion after `expand_cut` terms generated. *)
-let expand_cut = ref 124
+let expand_cut = ref 240
 
 (** num_expansions_check is set by the -n or --verification option of the CLI. *)
 let set_num_expansions_check (s : string) =

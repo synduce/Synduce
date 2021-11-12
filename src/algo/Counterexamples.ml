@@ -68,14 +68,6 @@ let smt_unsatisfiability_check (unknowns : VarSet.t) (eqns : equation list) : un
   SyncSmt.close_solver z3
 ;;
 
-(** A counterexample to realizability is a pair of models: a pair of maps from variable ids to terms. *)
-type unrealizability_ctex =
-  { i : int
-  ; j : int
-  ; ci : ctex
-  ; cj : ctex
-  }
-
 let pp_unrealizability_ctex (frmt : Formatter.t) (uc : unrealizability_ctex) : unit =
   let pp_model frmt model =
     (* Print as comma-separated list of variable -> term *)

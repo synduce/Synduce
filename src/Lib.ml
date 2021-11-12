@@ -21,7 +21,9 @@ let reinit () =
   Specifications.reinit ()
 ;;
 
-let solve_file ?(print_info = false) (filename : string) : problem_descr * soln option =
+let solve_file ?(print_info = false) (filename : string)
+    : problem_descr * (soln option, unrealizability_ctex list) Either.t
+  =
   Utils.Config.problem_name
     := Caml.Filename.basename (Caml.Filename.chop_extension filename);
   Utils.Config.info := print_info;
@@ -34,8 +36,9 @@ let solve_file ?(print_info = false) (filename : string) : problem_descr * soln 
   let all_pmrs = Parsers.translate prog in
   let problem, maybe_soln =
     match Refinement.solve_problem psi_comps all_pmrs with
-    | problem, Ok soln -> problem, Some soln
-    | problem, Error _ -> problem, None
+    | problem, Realizable soln -> problem, Either.First (Some soln)
+    | problem, Unrealizable soln -> problem, Either.Second soln
+    | problem, Failed _ -> problem, Either.First None
   in
   problem_descr_of_psi_def problem, maybe_soln
 ;;

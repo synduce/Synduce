@@ -332,7 +332,8 @@ unrealizable_benchmarks = [
     ["unrealizable/approximately_pareto.ml", "", False],
     ["unrealizable/eval_psum.ml", "", False],
     ["unrealizable/common_elt.ml", "", False],
-    ["unrealizable/interval_intersection.ml", "", False]
+    ["unrealizable/interval_intersection.ml", "", False],
+    ["unrealizable/max_low_table_sum", "", False]
 ]
 
 benchmark_set = constraint_benchmarks + base_benchmark_set + lifting_benchmarks
