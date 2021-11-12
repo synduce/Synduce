@@ -1,4 +1,4 @@
-(** @synduce --no-lifting -NB -n 30 *)
+(** @synduce --no-lifting -NB -n 50 *)
 
 type list =
   | Elt of int
@@ -22,19 +22,21 @@ and dec l1 = function
 ;;
 
 let rec spec = function
-  | Line a -> max 0 (bsum a), bsum a
+  | Line a -> brange a
   | NCons (hd, tl) ->
-    let mpss, csum = spec tl in
-    let line_sum = bsum hd in
-    max (csum + line_sum) mpss, csum + line_sum
+    let hi, lo = spec tl in
+    let line_lo, line_hi = brange hd in
+    min line_lo lo, max line_hi hi
 
-and bsum = function
-  | Elt x -> x
-  | Cons (hd, tl) -> hd + bsum tl
+and brange = function
+  | Elt x -> x, x
+  | Cons (hd, tl) ->
+    let lo, hi = brange tl in
+    min lo hd, max hi hd
 ;;
 
 let rec target = function
-  | Sglt x -> [%synt s0] (inner x)
+  | Sglt x -> inner x
   | Cat (l, r) -> [%synt s1] (target r) (target l)
 
 and inner = function

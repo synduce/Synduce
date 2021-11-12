@@ -21,24 +21,6 @@ and dec l1 = function
   | Cat (x, y) -> dec (Cat (y, l1)) x
 ;;
 
-(** Predicate asserting that a concat-list is partitioned.  *)
-let rec is_partitioned = function
-  | Sglt x -> true
-  | Cat (x, y) -> nlmax x < nlmin y && is_partitioned x && is_partitioned y
-
-and nlmax = function
-  | Sglt x -> sum x
-  | Cat (x, y) -> max (nlmax x) (nlmax y)
-
-and nlmin = function
-  | Sglt x -> sum x
-  | Cat (x, y) -> min (nlmin x) (nlmin y)
-
-and sum = function
-  | Elt x -> x
-  | Cons (hd, tl) -> hd + sum tl
-;;
-
 let rec spec = function
   | Line a -> max 0 (bsum a), bsum a
   | NCons (hd, tl) ->
@@ -52,6 +34,7 @@ and bsum = function
   | Cons (hd, tl) -> hd + bsum tl
 ;;
 
+(** Skeleton: parallel on nested lists.  *)
 let rec target = function
   | Sglt x -> [%synt s0] (tsum x)
   | Cat (l, r) -> [%synt s1] (target r) (target l)

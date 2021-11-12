@@ -207,6 +207,7 @@ constraint_benchmarks = [
     ["constraints/ensures/mpss_full_noe.ml", ""],
     ["constraints/ensures/maxsegstrip_noe.ml", ""],
     ["constraints/ensures/maxsegstrip_full_noe.ml", ""],
+    ["constraints/ensures/nested_minmax_noe.ml", ""],
     # alist
     ["constraints/alist/count_eq2.ml", "-NB"],
     ["constraints/alist/count_eq.ml", ""],
@@ -358,7 +359,9 @@ unrealizable_benchmarks = [
     ["sort_list/sndmin.ml", " --no-lifting", False],
     ["tree/gradient.ml", " --no-lifting", False],
     ["tree/mits_nosum.ml", " --no-lifting", False],
-    ["unimodal_lists/prod_needs_aux.ml",  "--no-lifting", False]
+    ["unimodal_lists/prod_needs_aux.ml",  "--no-lifting", False],
+    ["unrealizable/nested_min_sum_max_mts.ml", "", False],
+    ["unrealizable/nested_min_max_mixed.ml", "", False]
 ]
 
 benchmark_set = constraint_benchmarks + base_benchmark_set + lifting_benchmarks
@@ -379,14 +382,16 @@ def summarize():
     num_unr = len(unrealizable_benchmarks)
     total = num_constraint + num_base + num_lifting + num_extrs
     print("%i benchmarks in total:" % total)
-    print("\t- %i basic benchmarks (run with --base)." % num_base)
+    print("\t• %i basic benchmarks (run with --base)." % num_base)
     print("\t\tincluding %i in kick-the-tires set (run with --kick-the-tires or -b small)." %
           len(kick_the_tires_set))
-    print("\t- %i benchmarks with requires constraints (run with -b constraint)." %
+    print("\t• %i benchmarks with requires constraints (run with -b constraint)." %
           num_constraint)
-    print("\t- %i unrealizable benchmarks (run with -b unr)." % num_unr)
-    print("\t- %i benchmarks with lifting (run with -b lifting)." % num_lifting)
-    print("\t- %i extras benchmarks." % num_extrs)
+    print("\t• %i unrealizable benchmarks (run with -b unr)." % num_unr)
+    print("\t• %i benchmarks with lifting (run with -b lifting)." % num_lifting)
+    print("\t• %i extras benchmarks." % num_extrs)
+    print("\t🎉 that means %i benchmarks in T5, %i in T6." % (num_unr + num_constraint,  (num_unr + num_constraint + num_lifting))
+          )
 
 
 algorithms = ["se2gis", "segis", "cegis"]

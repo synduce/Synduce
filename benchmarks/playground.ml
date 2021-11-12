@@ -1,4 +1,4 @@
-(** @synduce --no-lifting -NB -n 30 *)
+(** @synduce --no-lifting -NB *)
 
 type list =
   | Elt of int
@@ -21,38 +21,22 @@ and dec l1 = function
   | Cat (x, y) -> dec (Cat (y, l1)) x
 ;;
 
-(** Predicate asserting that a concat-list is partitioned.  *)
-let rec is_partitioned = function
-  | Sglt x -> true
-  | Cat (x, y) -> nlmax x < nlmin y && is_partitioned x && is_partitioned y
-
-and nlmax = function
-  | Sglt x -> sum x
-  | Cat (x, y) -> max (nlmax x) (nlmax y)
-
-and nlmin = function
-  | Sglt x -> sum x
-  | Cat (x, y) -> min (nlmin x) (nlmin y)
-
-and sum = function
-  | Elt x -> x
-  | Cons (hd, tl) -> hd + sum tl
-;;
-
 let rec spec = function
-  | Line a -> max 0 (bsum a), bsum a
+  | Line a -> bmts a
   | NCons (hd, tl) ->
-    let mtss, csum = spec tl in
-    let line_sum = bsum hd in
-    max (mtss + line_sum) 0, csum + line_sum
+    let hi, lo = spec tl in
+    let line_lo, line_hi = bmts hd in
+    min line_lo lo, max line_hi hi
 
-and bsum = function
-  | Elt x -> x
-  | Cons (hd, tl) -> hd + bsum tl
+and bmts = function
+  | Elt x -> x, max x 0
+  | Cons (hd, tl) ->
+    let asum, amts = bmts tl in
+    asum + hd, max (amts + hd) 0
 ;;
 
 let rec target = function
-  | Sglt x -> [%synt s0] (inner x)
+  | Sglt x -> inner x
   | Cat (l, r) -> [%synt s1] (target r) (target l)
 
 and inner = function

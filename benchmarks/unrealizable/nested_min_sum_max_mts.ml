@@ -22,19 +22,21 @@ and dec l1 = function
 ;;
 
 let rec spec = function
-  | Line a -> max 0 (bsum a), bsum a
+  | Line a -> bmts a
   | NCons (hd, tl) ->
-    let mpss, csum = spec tl in
-    let line_sum = bsum hd in
-    max (csum + line_sum) mpss, csum + line_sum
+    let hi, lo = spec tl in
+    let line_lo, line_hi = bmts hd in
+    min line_lo lo, max line_hi hi
 
-and bsum = function
-  | Elt x -> x
-  | Cons (hd, tl) -> hd + bsum tl
+and bmts = function
+  | Elt x -> x, max x 0
+  | Cons (hd, tl) ->
+    let asum, amts = bmts tl in
+    asum + hd, max (amts + hd) 0
 ;;
 
 let rec target = function
-  | Sglt x -> [%synt s0] (inner x)
+  | Sglt x -> inner x
   | Cat (l, r) -> [%synt s1] (target r) (target l)
 
 and inner = function
