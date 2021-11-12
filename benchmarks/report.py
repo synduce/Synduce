@@ -7,8 +7,7 @@ from definitions import *
 import matplotlib.pyplot as plt
 
 
-caption = "Experimental Results.  Benchmarks are grouped by categories introduced in Section \\ref{sec:cstudies}. All times are in seconds. The best time is highlighted in bold font.  A '-' indicates timeout ($>$ 10 min). The ``B'' column indicates if using bounded checking was used to classify a counterexample or validate a lemma. The refinements is a sequence of 'r' (refinement) and 'c' (coarsening) or 'l' (lifting). Experiments are run on %s" % experimental_setup
-
+caption = "Experimental Results.  Benchmarks are grouped by categories introduced in Section \\ref{sec:cstudies}. All times are in seconds. The best time is highlighted in bold font.  A '-' indicates timeout ($>$ 10 min). The ``B'' column indicates if using bounded checking was used to classify a counterexample or validate a lemma. Steps is a sequence of 'r' (refinement) and 'c' (coarsening). Experiments are run on %s" % experimental_setup
 
 def empty_exp_data(info):
     #        category   benchmark NB time  ref. time  ref.
@@ -58,7 +57,15 @@ def with_exp_data(info, data, data2):
     rounds = roundfix(data['rounds'])
     rounds2 = roundcount(data2['rounds'])
 
-    return f"{info[0]} & {info[1]} & { req_bounding } & {timefix(data['time'])} & {rounds} & {timefix(data2['time'])}  & {rounds2}  \\\\ \n"
+    time1 = timefix(data['time'])
+    time2 = timefix(data2['time'])
+
+    if (not data['time'] in timeout_names) and (data2['time'] in timeout_names or data2['time'] > data['time']):
+        time1 = "{\\bf" + data['time'] + "}"
+    elif not data2['time'] in timeout_names:
+        time2 = "{\\bf" + data2['time'] + "}"
+
+    return f"{info[0]} & {info[1]} & { req_bounding } & {time1} & {rounds} & {time2}  & {rounds2}  \\\\ \n"
 
 
 def make_tex_table(data, output_file_name):
@@ -80,7 +87,7 @@ def make_tex_table(data, output_file_name):
                 \multicolumn{2}{c|}{Baseline}\\\\ \n")
     tex.write("\t\t\t\\cline{4-7}\n")
     tex.write(
-        "\t\t\t &   & & time & refinements & time & \\#'r' \\\\ \n")
+        "\t\t\t &   & & time & steps & time & \\#'r' \\\\ \n")
     speedups = []
     for benchmark_class, benchmarks in show_benchmarks:
         tex.write("\t\t\t\\hline\n")
