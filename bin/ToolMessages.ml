@@ -4,6 +4,7 @@ open Base
 open Fmt
 open Utils
 open Algo.AState
+open Lang.Term
 
 let cvc_message () =
   Utils.Log.debug_msg
@@ -52,6 +53,36 @@ let prep_final_json
     @ soln_or_refutation)
 ;;
 
+let explain_unrealizable (ctexs : unrealizability_ctex list) : unit =
+  let f ctex =
+    let common_vars =
+      Set.inter (VarMap.keyset ctex.ci.ctex_model) (VarMap.keyset ctex.cj.ctex_model)
+    in
+    let diff =
+      Set.fold common_vars ~init:[] ~f:(fun accum key ->
+          let vi = Map.find_exn ctex.ci.ctex_model key in
+          let vj = Map.find_exn ctex.cj.ctex_model key in
+          if Terms.equal vi vj then accum else (key, (vi, vj)) :: accum)
+    in
+    let ti = substitution ctex.ci.ctex_eqn.eelim ctex.ci.ctex_eqn.eterm
+    and tj = substitution ctex.cj.ctex_eqn.eelim ctex.cj.ctex_eqn.eterm in
+    Log.(
+      info (fun fmt () ->
+          pf
+            fmt
+            "@[@[Terms: %a vs %a@].@;@[Ctex differs in %a.@]@]"
+            pp_term
+            ti
+            pp_term
+            tj
+            Fmt.(
+              list
+                (parens (pair Variable.pp ~sep:colon (pair pp_term ~sep:comma pp_term))))
+            diff))
+  in
+  List.iter ~f ctexs
+;;
+
 let on_success
     ~(is_ocaml_syntax : bool)
     (source_filename : string ref)
@@ -65,17 +96,17 @@ let on_success
   (* Print the solution. *)
   (match result with
   | Either.First soln ->
-    Log.info
-      Fmt.(
-        fun frmt () ->
-          pf
-            frmt
-            "Solution found in %4.4fs (%3.1f%% verifying):@.%a@]"
-            elapsed
-            verif_ratio
-            (box (Algo.AState.pp_soln ~use_ocaml_syntax:is_ocaml_syntax))
-            soln)
-  | Either.Second _ -> Log.(info (wrap "No solution: problem is unrealizable.")));
+    Log.info (fun frmt () ->
+        pf
+          frmt
+          "Solution found in %4.4fs (%3.1f%% verifying):@.%a@]"
+          elapsed
+          verif_ratio
+          (box (Algo.AState.pp_soln ~use_ocaml_syntax:is_ocaml_syntax))
+          soln)
+  | Either.Second ctexs ->
+    Log.(info (wrap "No solution: problem is unrealizable."));
+    explain_unrealizable ctexs);
   (* If output specified, write the solution in file. *)
   (match result with
   | Either.First soln ->

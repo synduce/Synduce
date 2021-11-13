@@ -68,25 +68,6 @@ let smt_unsatisfiability_check (unknowns : VarSet.t) (eqns : equation list) : un
   SyncSmt.close_solver z3
 ;;
 
-let pp_unrealizability_ctex (frmt : Formatter.t) (uc : unrealizability_ctex) : unit =
-  let pp_model frmt model =
-    (* Print as comma-separated list of variable -> term *)
-    Fmt.(list ~sep:comma (pair ~sep:Utils.rightarrow Variable.pp pp_term))
-      frmt
-      (Map.to_alist model)
-  in
-  Fmt.(
-    pf
-      frmt
-      "@[M<%i> = [%a]@]@;@[M'<%i> = [%a]@]"
-      uc.i
-      pp_model
-      uc.ci.ctex_model
-      uc.j
-      pp_model
-      uc.cj.ctex_model)
-;;
-
 let merge_all (cl : unrealizability_ctex list) : unrealizability_ctex list =
   let same_origin orig other =
     Terms.equal other.ci.ctex_eqn.eterm orig.ci.ctex_eqn.eterm
@@ -338,30 +319,7 @@ let check_unrealizable (unknowns : VarSet.t) (eqns : equation_system)
     let+ _ = AsyncSmt.close_solver solver in
     let elapsed = Unix.gettimeofday () -. start_time in
     Log.debug (fun f () -> Fmt.(pf f "... finished in %3.4fs" elapsed));
-    Log.info (fun f () ->
-        match ctexs with
-        | [] ->
-          Fmt.(
-            pf
-              f
-              "(%a) no counterexample to realizability found."
-              VarSet.pp_var_names
-              unknowns)
-        | _ :: _ ->
-          Fmt.(
-            pf
-              f
-              "@[%a) Counterexamples found!@;\
-               @[<hov 2>❔ Equations:@;\
-               @[<v>%a@]@]@;\
-               @[<hov 2>❔ Counterexample models:@;\
-               @[<v>%a@]@]@]"
-              VarSet.pp_var_names
-              unknowns
-              (list ~sep:sp (box (pair ~sep:colon int (box pp_equation))))
-              (List.mapi ~f:(fun i eqn -> i, eqn) eqns)
-              (list ~sep:sep_and pp_unrealizability_ctex)
-              ctexs));
+    AlgoLog.show_unrealizability_witnesses unknowns eqns ctexs;
     ctexs
   in
   AsyncSmt.(cancellable_task (make_solver "z3") task)

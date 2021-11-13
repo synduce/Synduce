@@ -427,7 +427,7 @@ let handle_ensures_verif_response (response : S.solver_response) (ensures : term
   match response with
   | Unsat ->
     Log.verbose (fun f () -> Fmt.(pf f "This ensures has been proven correct."));
-    Log.info (fun frmt () -> Fmt.pf frmt "Ensures is %a" pp_term ensures);
+    Log.verbose (fun frmt () -> Fmt.pf frmt "Ensures is %a" pp_term ensures);
     true, None
   | SmtLib.SExps x ->
     Log.verbose (fun f () ->

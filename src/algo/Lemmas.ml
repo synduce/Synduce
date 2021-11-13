@@ -1193,7 +1193,9 @@ let refine_ensures_predicates
   | None -> lstate.term_state, `CoarseningFailure
   | Some ensures ->
     (match Specifications.get_ensures p.psi_reference.pvar with
-    | None -> Specifications.set_ensures p.psi_reference.pvar ensures
+    | None ->
+      AlgoLog.show_new_ensures_predicate p.psi_reference.pvar ensures;
+      Specifications.set_ensures p.psi_reference.pvar ensures
     | Some old_ensures ->
       let var : variable =
         Variable.mk ~t:(Some p.psi_reference.poutput_typ) (Alpha.fresh ())
@@ -1206,6 +1208,7 @@ let refine_ensures_predicates
              (mk_app old_ensures [ mk_var var ])
              (mk_app ensures [ mk_var var ]))
       in
+      AlgoLog.show_new_ensures_predicate p.psi_reference.pvar new_pred;
       Specifications.set_ensures p.psi_reference.pvar new_pred);
     lstate.term_state, `CoarseningOk
 ;;
