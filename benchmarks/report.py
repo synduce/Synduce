@@ -9,6 +9,7 @@ import matplotlib.pyplot as plt
 
 caption = "Experimental Results.  Benchmarks are grouped by categories introduced in Section \\ref{sec:cstudies}. All times are in seconds. The best time is highlighted in bold font.  A '-' indicates timeout ($>$ 10 min). The ``B'' column indicates if using bounded checking was used to classify a counterexample or validate a lemma. Steps is a sequence of 'r' (refinement) and 'c' (coarsening). Experiments are run on %s" % experimental_setup
 
+
 def empty_exp_data(info):
     #        category   benchmark NB time  ref. time  ref.
     return f"{info[0]}&{info[1]}& ? & ?   & ?  & ?  & ?  \\\\ %chktex 26\n"
@@ -30,6 +31,10 @@ def roundfix(s):
     s = s.replace("+", "r")
     s = s.replace(".", "c")
     return s
+
+
+def unrealizable(s):
+    return s.endswith("∅")
 
 
 def roundcount(s):
@@ -195,20 +200,23 @@ def make_table_5(input_file, output_file):
     fig.savefig(scatter_file)
 
     # Plot a scatter plot with a diagonal line, omitting timeouts
-    no_timeouts = list(filter(lambda d : d[0] != timeout_value and d[1] != timeout_value, zip(segis_series, se2gis_series)))
+    no_timeouts = list(filter(lambda d: d[0] != timeout_value and d[1] != timeout_value, zip(
+        segis_series, se2gis_series)))
     segis_series_no_timeout = [d[0] for d in no_timeouts]
     se2gis_series_no_timeout = [d[1] for d in no_timeouts]
     fig, ax = plt.subplots(figsize=(6, 6))
-    ax.plot(segis_series_no_timeout, se2gis_series_no_timeout, "x", color="firebrick")
+    ax.plot(segis_series_no_timeout,
+            se2gis_series_no_timeout, "x", color="firebrick")
     ax_min = 0.5*min(segis_series_no_timeout + se2gis_series_no_timeout)
     ax_max = 5*max(segis_series_no_timeout + se2gis_series_no_timeout)
-    ax.set(xlim=(ax_min,ax_max),
+    ax.set(xlim=(ax_min, ax_max),
            ylim=(ax_min, ax_max))
     ax.set_xscale("log")
     ax.set_yscale("log")
     ax.set(xlabel="Synthesis time using SEGIS (log)",
            ylabel="Synthesis time using SE²GIS (log)")
-    diag_max = int(min(max(segis_series_no_timeout), max(se2gis_series_no_timeout)))
+    diag_max = int(min(max(segis_series_no_timeout),
+                   max(se2gis_series_no_timeout)))
     ax.plot([0, 1], [0, 1], color="black",
             linestyle="dotted", transform=ax.transAxes)
     ax.plot(list(range(diag_max)), list(range(diag_max)), color="black",
