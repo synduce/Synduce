@@ -1,4 +1,4 @@
-(** @synduce -NB --no-lifting *)
+(** @synduce -NB -n 30 --no-lifting *)
 
 type list =
   | Elt of int
@@ -17,8 +17,8 @@ and lmax = function
   | Cons (hd, tl) -> max (lmax tl) hd
 
 and aux prev = function
-  | Line x -> prev <= lmax x
-  | NCons (hd, tl) -> prev <= lmax hd && aux (lmax hd) tl
+  | Line x -> prev >= lmax x
+  | NCons (hd, tl) -> prev >= lmax hd && aux (lmax hd) tl
 ;;
 
 let rec spec = function
@@ -38,21 +38,14 @@ and interval = function
 ;;
 
 let rec target = function
-  | Line x -> [%synt s0] (inter x) true
-  | NCons (hd, tl) -> [%synt s1] (plmin hd) (target tl)
-  [@@requires is_sorted]
+  | Line x -> [%synt s0] (tinterval x) true
+  | NCons (hd, tl) -> [%synt s1] (tinterval hd) (target tl)
 
-and inter = function
+and tinterval = function
   | Elt x -> x, x
   | Cons (hd, tl) ->
-    let lo, hi = inter tl in
+    let lo, hi = tinterval tl in
     min hd lo, max hd hi
-
-and plmin = function
-  | Elt x -> x
-  | Cons (hd, tl) ->
-    let lo = plmin tl in
-    min hd lo
 ;;
 
 assert (target = clist_to_list @@ spec)

@@ -7,6 +7,9 @@ module IC = Stdio.In_channel
 open Lwt.Syntax
 
 (* Logging utilities. *)
+let pp_link frmt target =
+  Fmt.(styled `Underline (styled (`Fg `Green) string)) frmt ("file://" ^ target)
+;;
 
 (** Logger for the solvers. A solver might log error, debug and verbose messages.
 *)
@@ -111,7 +114,7 @@ struct
   ;;
 
   let fetch_solution pid filename =
-    Log.debug Fmt.(fun fmt () -> pf fmt "Fetching solution in %s" filename);
+    Log.debug Fmt.(fun fmt () -> pf fmt "Fetching solution in %a" pp_link filename);
     let r = reponse_of_sexps (Sexp.input_sexps (Stdio.In_channel.create filename)) in
     Stats.log_proc_quit pid;
     r
@@ -129,9 +132,10 @@ struct
               fun fmt () ->
                 pf
                   fmt
-                  "Terminating solver %s (PID : %i) (log: %s)"
+                  "Terminating solver %s (PID : %i) (log: %a)"
                   s.s_name
                   s.s_pid
+                  pp_link
                   s.s_output_file);
           s.s_process#terminate)
   ;;
@@ -164,10 +168,12 @@ struct
         fun fmt () ->
           pf
             fmt
-            "%s (pid : %i) solving %s -> %s"
+            "%s (pid : %i) solving %a -> %a"
             solver.s_name
             solver.s_pid
+            pp_link
             inputfile
+            pp_link
             outputfile);
     try
       let t, r = Lwt.task () in

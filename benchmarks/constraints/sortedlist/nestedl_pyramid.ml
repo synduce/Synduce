@@ -1,4 +1,4 @@
-(** @synduce -NB --no-lifting *)
+(** @synduce -NB -n 30 --no-lifting *)
 
 type list =
   | Elt of int

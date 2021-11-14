@@ -33,7 +33,7 @@ let target hi lo t =
   let rec g = function
     | Leaf (a, b) -> [%synt xi_0] hi lo a b
     | Node (a, b, l, r) ->
-      if b > hi && a < lo then [%synt xi_1] (g r) else [%synt xi_2] hi lo a b (g l) (g r)
+      if b > hi && a < lo then [%synt xi_1] (g r) else [%synt xi_2] hi lo a (g l) (g r)
   in
   g t
   [@@requires is_bst]

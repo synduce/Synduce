@@ -27,7 +27,6 @@ let spec hi lo t =
     | Node (a, l, r) -> if hi > a && a > lo then 1 + f l + f r else f l + f r
   in
   f t
-  [@@ensures fun x -> x >= 0]
 ;;
 
 let target hi lo t =
@@ -35,9 +34,9 @@ let target hi lo t =
     | Leaf a -> [%synt xi_0] hi lo a
     | Node (a, l, r) ->
       if a < lo
-      then [%synt f_a_lt_lo] (g l)
-      else if a > hi
-      then [%synt f_a_gt_hi] (g r)
+      then [%synt f_a_lt_lo] (g r)
+      else if a < hi
+      then [%synt f_a_gt_hi] (g l)
       else [%synt f_else] a hi lo (g r) (g l)
   in
   g t

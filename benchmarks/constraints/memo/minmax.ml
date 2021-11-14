@@ -1,4 +1,4 @@
-(** @synduce -NBl --no-lifting *)
+(** @synduce -NB --no-lifting -n 20 *)
 
 type tree =
   | Leaf of int
@@ -7,20 +7,29 @@ type tree =
 let rec is_memo = function
   | Leaf x -> true
   | Node (lmin, lmax, rmin, rmax, val_, l, r) ->
-    is_memo l && is_memo r && val_btw lmin lmax l && val_btw rmin rmax r
+    is_memo l
+    && is_memo r
+    && lmin = amin l
+    && lmax = amax l
+    && rmin = amin r
+    && rmax = amax r
 
-and val_btw lo hi = function
-  | Leaf x -> lo = hi && hi = x
-  | Node (lmin, lmax, rmin, rmax, val_, l, r) ->
-    lo <= val_ && val_ <= hi && val_btw hi lo l && val_btw hi lo r
+and amin = function
+  | Leaf x -> x
+  | Node (x, y, z, w, a, l, r) -> min a (min (amin l) (amin r))
+
+and amax = function
+  | Leaf x -> x
+  | Node (x, y, z, w, a, l, r) -> max a (max (amax l) (amax r))
 ;;
 
-let rec height = function
+let rec minmax = function
   | Leaf x -> x, x
   | Node (lmin, lmax, rmin, rmax, val_, l, r) ->
-    let aminl, amaxl = height l in
-    let aminr, amaxr = height r in
+    let aminl, amaxl = minmax l in
+    let aminr, amaxr = minmax r in
     min val_ (min aminl aminr), max val_ (max amaxl amaxr)
+  [@@ensures fun (x, y) -> x <= y]
 ;;
 
 (* A small variation of height. *)
@@ -30,4 +39,4 @@ let rec target = function
   [@@requires is_memo]
 ;;
 
-assert (target = height)
+assert (target = minmax)

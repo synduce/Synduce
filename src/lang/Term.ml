@@ -266,6 +266,7 @@ module Binop = struct
     | Mod
     | And
     | Or
+    | Implies
 
   let compare = Poly.compare
   let equal = Poly.equal
@@ -286,6 +287,7 @@ module Binop = struct
     | Mod -> "%"
     | And -> "&&"
     | Or -> "||"
+    | Implies -> "=>"
   ;;
 
   let to_string (op : t) =
@@ -304,6 +306,7 @@ module Binop = struct
     | Mod -> "mod"
     | And -> "and"
     | Or -> "or"
+    | Implies -> "=>"
   ;;
 
   let of_string (s : string) : t option =
@@ -331,7 +334,7 @@ module Binop = struct
       | Lt | Gt | Ge | Le -> [ TInt, TInt ]
       | Eq -> [ TInt, TInt; TBool, TBool ]
       | Max | Min | Plus | Minus | Times | Div | Mod -> [ TInt, TInt ]
-      | And | Or -> [ TBool, TBool ])
+      | Implies | And | Or -> [ TBool, TBool ])
   ;;
 
   let result_type (op : t) =
@@ -340,7 +343,7 @@ module Binop = struct
       | Lt | Gt | Ge | Le -> TBool
       | Eq -> TBool
       | Max | Min | Plus | Minus | Times | Div | Mod -> TInt
-      | And | Or -> TBool)
+      | Implies | And | Or -> TBool)
   ;;
 
   let pp (frmt : Formatter.t) (op : t) = Fmt.string frmt (to_pp_string op)

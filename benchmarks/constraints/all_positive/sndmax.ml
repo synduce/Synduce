@@ -1,4 +1,4 @@
-(** @synduce -NB -n 10 -l --no-lifting *)
+(** @synduce -NB -n 20 -l --no-lifting *)
 
 type clist =
   | Empty
@@ -21,7 +21,7 @@ let rec spec = function
   | Cons (hd, tl) ->
     let amax, sec_max = spec tl in
     max hd amax, max sec_max (min hd amax)
-  [@@ensures fun (x, y) -> x >= y]
+  [@@ensures fun (x, y) -> x >= y && y >= 0]
 ;;
 
 let rec target = function

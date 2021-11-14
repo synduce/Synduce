@@ -105,7 +105,9 @@ let on_success
           (box (Algo.AState.pp_soln ~use_ocaml_syntax:is_ocaml_syntax))
           soln)
   | Either.Second ctexs ->
-    Log.(info (wrap "No solution: problem is unrealizable."));
+    Log.(
+      info (fun frmt () ->
+          pf frmt "No solution: problem is unrealizable (found answer in %4.4fs)." elapsed));
     explain_unrealizable ctexs);
   (* If output specified, write the solution in file. *)
   (match result with

@@ -6,6 +6,10 @@ module IC = Stdio.In_channel
 
 let log_out = ref None
 
+let pp_link frmt target =
+  Fmt.(styled `Underline (styled (`Fg `Blue) string)) frmt ("file://" ^ target)
+;;
+
 (** Logger for the solvers. A solver might log error, debug and verbose messages.
 *)
 module type Logger = sig
@@ -198,7 +202,7 @@ module Synchronous (Log : Logger) (Stats : Statistics) = struct
           Log.debug
             Fmt.(
               fun fmt () ->
-                pf fmt "Solver %s log is in: %s" solver.s_name solver.s_log_file);
+                pf fmt "Solver %s log is in: %a" solver.s_name pp_link solver.s_log_file);
         IC.close solver.s_outputc;
         OC.close solver.s_inputc
       | None -> ())
@@ -240,9 +244,10 @@ module Synchronous (Log : Logger) (Stats : Statistics) = struct
         fun fmt () ->
           pf
             fmt
-            "Solver %s started:  pid: %i log: %s"
+            "Solver %s started:  pid: %i log: %a"
             solver.s_name
             solver.s_pid
+            pp_link
             solver.s_log_file);
     try
       match exec_command solver mk_print_success with
@@ -266,7 +271,7 @@ module Synchronous (Log : Logger) (Stats : Statistics) = struct
             "Closing %s (spent %.3fs), log can be found in %a"
             solver.s_name
             elapsed
-            (styled (`Fg `Blue) string)
+            (styled (`Fg `Blue) pp_link)
             solver.s_log_file);
     OC.output_string solver.s_inputc (Sexp.to_string (sexp_of_command mk_exit));
     IC.close solver.s_outputc;
@@ -536,9 +541,10 @@ module Asyncs (Log : Logger) (Stats : Statistics) = struct
           fun fmt () ->
             pf
               fmt
-              "Solver %s started:  pid: %i log: %s"
+              "Solver %s started:  pid: %i log: %a"
               solver.s_name
               solver.s_pid
+              pp_link
               solver.s_log_file);
       ( solver
       , Lwt.bind m (fun i ->
@@ -564,9 +570,10 @@ module Asyncs (Log : Logger) (Stats : Statistics) = struct
               fun fmt () ->
                 pf
                   fmt
-                  "Terminating solver %s (PID : %i) (log: %s)"
+                  "Terminating solver %s (PID : %i) (log: %a)"
                   s.s_name
                   s.s_pid
+                  pp_link
                   s.s_log_file);
           s.s_pinfo#terminate)
   ;;
@@ -583,7 +590,7 @@ module Asyncs (Log : Logger) (Stats : Statistics) = struct
             "Closing %s (spent %.3fs), log can be found in %a"
             solver.s_name
             elapsed
-            (styled (`Fg `Blue) string)
+            pp_link
             solver.s_log_file);
     let%lwt _ = exec_command solver mk_exit in
     let%lwt () = Lwt_io.close solver.s_outputc in

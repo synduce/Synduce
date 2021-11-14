@@ -1,4 +1,4 @@
-(** @synduce -NB --no-lifting *)
+(** @synduce -NB -n 30 --no-lifting *)
 
 type list =
   | Elt of int
@@ -38,15 +38,9 @@ and interval = function
 ;;
 
 let rec target = function
-  | Line x -> [%synt s0] (inter x) true
+  | Line x -> [%synt s0] (plmin x) true
   | NCons (hd, tl) -> [%synt s1] (plmin hd) (target tl)
   [@@requires is_sorted]
-
-and inter = function
-  | Elt x -> x, x
-  | Cons (hd, tl) ->
-    let lo, hi = inter tl in
-    min hd lo, max hd hi
 
 and plmin = function
   | Elt x -> x
