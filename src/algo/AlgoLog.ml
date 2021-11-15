@@ -205,15 +205,13 @@ let lemma_proved_correct
         (Stats.verif_method_to_str proof_method));
   let lemma_str =
     str
-      "(%a)[%a]->%s(%s)= %a%a"
+      "(%a)[%a]->%s(%s)= %a"
       pp_term
       det.term
       (list ~sep:comma (Fmt.pair ~sep:rightarrow pp_term pp_term))
       det.recurs_elim
       det.lemma.vname
       (String.concat ~sep:", " (List.map ~f:(fun v -> v.vname) det.scalar_vars))
-      (option (fun frmt t -> pf frmt "%a =>" pp_term t))
-      det.current_preconds
       (box pp_term)
       lemma_term
   in
@@ -224,13 +222,11 @@ let lemma_proved_correct
   Log.info (fun frmt () ->
       pf
         frmt
-        "Lemma for term %a:@;\"%s %s =@;@[%a%a@]\"."
+        "Lemma for term %a:@;\"%s %s =@;@[%a@]\"."
         pp_term
         det.term
         det.lemma.vname
         (String.concat ~sep:" " (List.map ~f:(fun v -> v.vname) det.scalar_vars))
-        (option (fun frmt t -> pf frmt "%a =>" pp_term t))
-        det.current_preconds
         (box pp_term)
         lemma_term)
 ;;

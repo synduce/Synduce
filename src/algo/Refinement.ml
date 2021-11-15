@@ -82,7 +82,8 @@ let rec refinement_loop ?(major = true) (p : psi_def) (lstate_in : refinement_lo
          Stats.log_major_step_end ~synth_time ~verif_time ~t:tsize ~u:usize true;
          AState.solved_eqn_system := Some eqns;
          Log.print_ok ();
-         Realizable { soln_rec_scheme = p.psi_target; soln_implems = sol }
+         Realizable
+           { soln_rec_scheme = p.psi_target; soln_implems = Analysis.rename_nicely sol }
      with
     | Failure s ->
       Log.error_msg Fmt.(str "Failure: %s" s);
