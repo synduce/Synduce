@@ -219,14 +219,17 @@ if __name__ == "__main__":
         "-o", "--output", help="Dump Synduce output in -i mode to file (appending to file).", type=str, default=-1)
     aparser.add_argument(
         "-b", "--benchmarks", help="Run a set of benchmarks.", type=str,
-        choices=["all", "constraint", "lifting", "base", "unr", "small"], default=None)
+        choices=["all", "constraint", "lifting", "base", "unr", "small"], nargs="+", default=None)
     aparser.add_argument(
         "-c", "--compare", help="Compare with segis or cegis", type=str,
-        choices=["segis", "cegis", "segis0"], default=None)
+        choices=["segis", "cegis", "segis0"], default=None, nargs="+")
     aparser.add_argument(
         "--single", help="Run the lifting benchmark in benchmarks/[FILE]", type=str, default=None)
     aparser.add_argument(
         "-n", "--num-runs", help="Run each benchmark NUM times.", type=int, default=1
+    )
+    aparser.add_argument(
+        "-x", "--unrealizable", help="Benchmark is unrealizable.", default=True, action="store_false"
     )
     aparser.add_argument(
         "-t", "--table", help=table_info, type=int, default=-1)
@@ -263,34 +266,35 @@ if __name__ == "__main__":
     run_unrealizable = False
     run_kick_the_tires_only = False
 
-    if args.benchmarks == "constraint":
-        run_constraint_benchmarks = True
-    elif args.benchmarks == "lifting":
-        run_lifting_benchmarks = True
-    elif args.benchmarks == "base":
-        run_base_benchmarks = True
-    elif args.benchmarks == "small":
-        run_kick_the_tires_only = True
-    elif args.benchmarks == "unr":
-        run_unrealizable = True
-    elif args.benchmarks is not None:  # e.g. benchmarks = "all"
-        run_lifting_benchmarks = True
-        run_constraint_benchmarks = True
-        run_base_benchmarks = True
+    if args.benchmarks is not None:
+        if "constraint" in args.benchmarks:
+            run_constraint_benchmarks = True
+        if "lifting" in args.benchmarks:
+            run_lifting_benchmarks = True
+        if "base" in args.benchmarks:
+            run_base_benchmarks = True
+        if "small" in args.benchmarks:
+            run_kick_the_tires_only = True
+        if "unr" in args.benchmarks:
+            run_unrealizable = True
+        if "all" in args.benchmarks:  # e.g. benchmarks = "all"
+            run_lifting_benchmarks = True
+            run_constraint_benchmarks = True
+            run_base_benchmarks = True
 
     # Background solver selection : cvc4 by default.
     cvc = "--cvc4"
     if args.cvc5:
         cvc = "--cvc5"
 
-    if args.compare == "segis":
-        other_alg = [["segis", "--segis " + cvc]]
-    elif args.compare == "segis0":
-        other_alg = [["segis", "--segis -u" + cvc]]
-    elif args.compare == "cegis":
-        other_alg = [["cegis", "--cegis " + cvc]]
-    else:
-        other_alg = []
+    other_alg = []
+    print(args.compare)
+    if "segis" in args.compare:
+        other_alg += [["segis", "--segis " + cvc]]
+    if "segis0" in args.compare:
+        other_alg += [["segis0", "--segis -u " + cvc]]
+    if "cegis" in args.compare:
+        other_alg += [["cegis", "--cegis " + cvc]]
 
     # Run a single file if --single has an argument
     if args.single and args.single != "":
@@ -298,8 +302,9 @@ if __name__ == "__main__":
         algos = [["se2gis", cvc]] + other_alg
         optims = [["all", ""]]
         binfo = str(args.single).split("+")
+
         if len(binfo) == 1:
-            binfo = [str(binfo[0]), ""]
+            binfo = [str(binfo[0]), "", args.unrealizable]
         run_benchmarks([binfo], algos, optims,
                        csv_output=csv_output, num_runs=runs)
         exit()

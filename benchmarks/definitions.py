@@ -336,25 +336,27 @@ lifting_benchmarks = [
 ]
 
 unrealizable_benchmarks = [
-    ["unrealizable/po_sorted.ml", "", False],
+    ["unrealizable/approximately_pareto.ml", "", False],
     ["unrealizable/balanced_tree_logn_sum.ml", "", False],
-    ["unrealizable/twosum.ml", "", False],
-    ["unrealizable/minmax.ml", "", False],
+    ["unrealizable/common_elt.ml", "", False],
     ["unrealizable/count_between.ml", "", False],
     ["unrealizable/count_between_wrong_comparison.ml", "", False],
     ["unrealizable/contains.ml", "", False],
     ["unrealizable/contains2.ml", "", False],
-    ["unrealizable/simple_parity.ml", "", False],
-    ["unrealizable/largest_even_pos.ml", "", False],
-    ["unrealizable/minmax_mistake.ml", "", False],
-    ["unrealizable/approximately_pareto.ml", "", False],
     ["unrealizable/eval_psum.ml", "", False],
-    ["unrealizable/common_elt.ml", "", False],
     ["unrealizable/interval_intersection.ml", "", False],
+    ["unrealizable/largest_even_pos.ml", "", False],
+    ["unrealizable/minmax.ml", "", False],
+    ["unrealizable/minmax_mistake.ml", "", False],
     ["unrealizable/max_low_table_sum.ml", "", False],
     ["unrealizable/nested_min_sum_max_mts.ml", "", False],
+    ["unrealizable/lpeak_noimf.ml", "", False],
+    ["unrealizable/memo_max.ml", "", False],
     ["unrealizable/nested_min_max_mixed.ml", "", False],
     ["unrealizable/pyramid_maxsort.ml", "", False],
+    ["unrealizable/po_sorted.ml", "", False],
+    ["unrealizable/simple_parity.ml", "", False],
+    ["unrealizable/twosum.ml", "", False],
     ["indexed_list/position_polynomial_no_index.ml", " --no-lifting", False],
     ["indexed_list/search_no_index.ml", " --no-lifting", False],
     ["indexed_list/sum_elts_lt_pos_no_len.ml",
@@ -595,6 +597,7 @@ unrealizable_show_set = {
         "nested_min_sum_max_mts": ["          ", "min max mts", "nested list->concat list", False],
         "nested_min_max_mixed": ["          ", "min max mixed", "nested list->concat list", False],
         "pyramid_maxsort": ["          ", "pyramid sort", "nested list->list", False],
+        "lpeak_noims":     ["          ", "largest peak", "list->concat list", False],
     }
 
 }
