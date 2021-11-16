@@ -167,6 +167,22 @@ let replace_id_calls ~(func : variable) (t : term) : term =
   substitution subs t
 ;;
 
+let rename_nicely (soln : (string * variable list * term) list)
+    : (string * variable list * term) list
+  =
+  let f (sname, args, body) =
+    let newargs =
+      List.map args ~f:(fun v ->
+          v, Variable.mk ~t:(Some (Variable.vtype_or_new v)) (Alpha.Nice.next ()))
+    in
+    ( sname
+    , snd (List.unzip newargs)
+    , Rewriter.simplify_term
+        (substitution (List.map newargs ~f:(fun (v1, v2) -> mk_var v1, mk_var v2)) body) )
+  in
+  List.map ~f soln
+;;
+
 (* ============================================================================================= *)
 (*                                  NAIVE TERM EXPANSION                                         *)
 (* ============================================================================================= *)
