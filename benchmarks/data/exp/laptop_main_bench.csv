@@ -124,4 +124,4 @@ tree/mits_nosum.ml,se2gis:all, 0.066, 20,++∅,✓,✓,0.005220627784729004,segi
 unimodal_lists/prod_needs_aux.ml,se2gis:all, 0.678, 29,+∅,✓,✓,0.0,segis:all,N/A,N/A,f203,N/A,N/A,N/A,segis0:all,N/A,N/A,f506,N/A,N/A,N/A
 unrealizable/memo_max.ml,se2gis:all, 0.063, 2,+∅,✓,✓,0.0,segis:all, 0.031, 3,++∅,✓,✓,0.007214593887329102,segis0:all,N/A,N/A,f2,N/A,N/A,N/A
 unrealizable/lpeak_noimf.ml,se2gis:all, 89.134, 3731,+...∅,~,✓,0.0,segis:all, 331.260, 4363,++++∅,✓,✓,0.06697428226470947,segis0:all,N/A,N/A,f4,N/A,N/A,N/A
-constraints/ensures/bal_2.ml,se2gis:all,N/A,N/A,f1,N/A,N/A,N/A,segis:all,N/A,N/A,f73,N/A,N/A,N/A,segis0:all,N/A,N/A,f202,N/A,N/A,N/A
+constraints/ensures/bal_2.ml,se2gis:all,N/A,N/A,+,N/A,N/A,N/A,segis:all,N/A,N/A,f73,N/A,N/A,N/A,segis0:all,N/A,N/A,f202,N/A,N/A,N/A

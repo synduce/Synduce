@@ -9,11 +9,11 @@ import shutil
 
 
 def caption(exp_setup):
-    return "Experimental Results for Realizable Benchmarks.  Benchmarks are grouped by categories introduced in Section \\ref{sec:evaluation}. All times are in seconds. The best time is highlighted in bold font.  A '-' indicates timeout ($>$ 10 min). The ``B'' column indicates if using bounded checking was used to classify a counterexample or validate a lemma. Steps is a sequence of '$\\bullet$' (refinement) and '$\\circ$' (coarsening). Experiments are run on %s." % exp_setup
+    return "Experimental Results for Realizable Benchmarks.  Benchmarks are grouped by categories introduced in Section \\ref{sec:evaluation}. All times are in seconds. The best time is highlighted in bold font.  A '-' indicates timeout ($>$ 10 min). The ``I'' column indicates whether intermediate lemmas were proven by induction. Steps is a sequence of '$\\bullet$' (refinement) and '$\\circ$' (coarsening). Experiments are run on %s." % exp_setup
 
 
 def caption_unrealizable(exp_setup):
-    return "Experimental Results for Unrealizable Benchmarks. All synthesis times are in seconds. The best time is highlighted in bold font.  A '-' indicates timeout ($>$ 10 min). The ``B'' column indicates if using bounded checking was used to classify a counterexample or validate a lemma. Steps is a sequence of '$\\bullet$' (refinement) and '$\\circ$' (coarsening). Experiments are run on %s." % exp_setup
+    return "Experimental Results for Unrealizable Benchmarks. All synthesis times are in seconds. The best time is highlighted in bold font.  A '-' indicates timeout ($>$ 10 min). The ``I'' column indicates whether intermediate lemmas were proven by induction. Steps is a sequence of '$\\bullet$' (refinement) and '$\\circ$' (coarsening). Experiments are run on %s." % exp_setup
 
 
 def timefix(x):
@@ -41,7 +41,7 @@ def unrealizable(s):
 def roundcount(s):
 
     if s.startswith("f"):
-        return s[:1]
+        return s[1:]
 
     if s == "None":
         s = "-"
@@ -53,13 +53,13 @@ def roundcount(s):
 def empty_exp_data(info, realizable=True):
     #        category   benchmark NB time  ref. time  ref.
     if realizable:
-        res = f"{info[0]}&{info[1]}& ? & ?   & ?  & ?  & ?  \\\\ %chktex 26\n"
+        res = f"{info[0]}&{info[1]}& ? & ?   & ?  & ?  & ? & ? & ? \\\\ %chktex 26\n"
     else:
-        res = f"{info[1]}& ? & ?   & ?  & ?  & ?  \\\\ %chktex 26\n"
+        res = f"{info[1]}& ? & ?   & ?  & ?  & ? & ? & ?  \\\\ %chktex 26\n"
     return res
 
 
-def with_exp_data(info, data, data2, realizable=True):
+def with_exp_data(info, data, data2, data3, realizable=True):
     #    se2gis_result = {
     #                 "time": info[2],
     #                 "delta": info[3],
@@ -69,25 +69,33 @@ def with_exp_data(info, data, data2, realizable=True):
     #                 "verif": info[7],
     #             }
     if data['B'] == "✓":
-        req_bounding = "y"
+        by_induction = "y"
     else:
-        req_bounding = "n"
+        by_induction = "n"
 
     rounds = f"${roundfix(data['rounds'])}$"
     rounds2 = roundcount(data2['rounds'])
+    if data3 is not None:
+        rounds3 = roundcount(data2['rounds'])
+        time3 = timefix(data3['time'])
+    else:
+        rounds3 = "?"
+        time3 = "?"
 
     time1 = timefix(data['time'])
     time2 = timefix(data2['time'])
 
-    if (not data['time'] in timeout_names) and (data2['time'] in timeout_names or data2['time'] > data['time']):
-        time1 = "{\\bf" + data['time'] + "}"
-    elif not data2['time'] in timeout_names:
-        time2 = "{\\bf" + data2['time'] + "}"
+    if floti(time1) < floti(time2) and floti(time1) < floti(time3):
+        time1 = "{\\bf" + time1 + "}"
+    elif floti(time2) < floti(time3):
+        time2 = "{\\bf" + time2 + "}"
+    elif time3 not in timeout_names:
+        time3 = "{\\bf" + time3 + "}"
 
     if realizable:
-        res = f"{info[0]} & {info[1]} & { req_bounding } & {time1} & {rounds} & {time2}  & {rounds2}  \\\\ \n"
+        res = f"{info[0]} & {info[1]} & { by_induction } & {time1} & {rounds} & {time2}  & {rounds2} & {time3} & {rounds3} \\\\ \n"
     else:
-        res = f"{info[1]} & { req_bounding } & {time1} & {rounds} & {time2}  & {rounds2}  \\\\ \n"
+        res = f"{info[1]} & { by_induction } & {time1} & {rounds} & {time2}  & {rounds2} \\\\ \n"
     return res
 
 
@@ -100,17 +108,18 @@ def make_tex_table(exp_setup, data, output_file_name):
     tex.write("%s ====================================\n" % '%')
     # open table
     tex.write("\t{\n")
-    tex.write("\t\t\\begin{longtable}[h]{|c|c|c|c|c||c|c|}\n")
+    tex.write("\t\t\\begin{longtable}[h]{|c|c|c|c|c||c|c||c|c|}\n")
     tex.write("\t\t\t\\hline\n")
     tex.write(
         "\t\t\t \multirow{2}{*}{Class} &\
                 \multirow{2}{*}{Benchmark} & \
-                \multirow{2}{*}{B?} & \
+                \multirow{2}{*}{I?} & \
                 \multicolumn{2}{c||}{\\tool} & \
-                \multicolumn{2}{c|}{Baseline}\\\\ \n")
-    tex.write("\t\t\t\\cline{4-7}\n")
+                \multicolumn{2}{c|}{SEGIS+UC} & \
+                \multicolumn{2}{c|}{SEGIS}\\\\ \n")
+    tex.write("\t\t\t\\cline{4-9}\n")
     tex.write(
-        "\t\t\t &   & & time & steps & time & \\#'r' \\\\ \n")
+        "\t\t\t &   & & time & steps & time & \\#'r' & time & \\#'r' \\\\ \n")
     speedups = []
     for benchmark_class, benchmarks in show_benchmarks.items():
         tex.write("\t\t\t\\hline\n")
@@ -120,8 +129,12 @@ def make_tex_table(exp_setup, data, output_file_name):
             if experimental_data is None:
                 tex.write(empty_exp_data(benchmark_info))
             else:
-                tex.write(with_exp_data(benchmark_info,
-                          experimental_data[0], experimental_data[1]))
+                if len(experimental_data) >= 3:
+                    tex.write(with_exp_data(benchmark_info,
+                                            experimental_data[0], experimental_data[1], experimental_data[2]))
+                else:
+                    tex.write(with_exp_data(benchmark_info,
+                                            experimental_data[0], experimental_data[1], None))
 
     tex.write("\t\t\t\\hline\n")
     tex.write("\t\caption{%s}\label{table:experiments}\n" % caption(exp_setup))
@@ -143,9 +156,9 @@ def make_tex_unrealizables_table(exp_setup, data, output_file_name):
     tex.write("\t\t\t\\hline\n")
     tex.write(
         "\t\t\t\multirow{2}{*}{Benchmark} & \
-                \multirow{2}{*}{B?} & \
+                \multirow{2}{*}{I?} & \
                 \multicolumn{2}{c||}{\\tool} & \
-                \multicolumn{2}{c|}{Baseline}\\\\ \n")
+                \multicolumn{2}{c|}{SEGIS+UC}\\\\ \n")
     tex.write("\t\t\t\\cline{3-6}\n")
     tex.write(
         "\t\t\t & & time & steps & time & \\#'r' \\\\ \n")
@@ -159,7 +172,7 @@ def make_tex_unrealizables_table(exp_setup, data, output_file_name):
                 tex.write(empty_exp_data(benchmark_info, False))
             else:
                 tex.write(with_exp_data(benchmark_info,
-                          experimental_data[0], experimental_data[1], False))
+                          experimental_data[0], experimental_data[1], None, False))
 
     tex.write("\t\t\t\\hline\n")
     tex.write(
@@ -169,17 +182,38 @@ def make_tex_unrealizables_table(exp_setup, data, output_file_name):
     tex.close()
 
 
-def quantile_plot(quantile_file, segis_series, se2gis_series):
+def quantile_plot(quantile_file, segis_series, se2gis_series, segis0_series):
     fig, ax = plt.subplots(figsize=(6, 4))
     s1 = [x for x in sorted(
         se2gis_series) if x < timeout_value]
     s2 = [x for x in sorted(
         segis_series) if x < timeout_value]
+    s3 = [x for x in sorted(
+        segis0_series) if x < timeout_value]
     ax.plot(s1, color="purple", label="SE²GIS",
             linestyle="solid", linewidth=1.5)
-    ax.plot(s2, color="darkorange", label="SEGIS (baseline)",
+    ax.plot(s2, color="darkorange", label="SEGIS+UC",
+            linestyle="solid", linewidth=1.5)
+    ax.plot(s3, color="green", label="SEGIS",
             linestyle="solid", linewidth=1.5)
     ax.set_xlabel("Number of benchmarks solved", fontsize=plot_fontsize)
+    ax.set_ylabel("Time", fontsize=plot_fontsize)
+    ax.legend(fontsize=plot_fontsize)
+    fig.savefig(quantile_file, bbox_inches='tight')
+
+
+def quantile_plot2(quantile_file, segis_series, se2gis_series):
+    fig, ax = plt.subplots(figsize=(6, 2))
+    s1 = [x for x in sorted(
+        se2gis_series) if x < timeout_value]
+    s2 = [x for x in sorted(
+        segis_series) if x < timeout_value]
+    ax.plot(s1, color="purple", label="SE²GIS", marker='o')
+    # linestyle="solid", linewidth=1.5)
+    ax.plot(s2, color="darkorange", label="SEGIS+UC", marker='o')
+    # linestyle="solid", linewidth=1.5)
+    ax.set_xlabel("Number of unrealizable benchmarks solved",
+                  fontsize=plot_fontsize)
     ax.set_ylabel("Time", fontsize=plot_fontsize)
     ax.legend(fontsize=plot_fontsize)
     fig.savefig(quantile_file, bbox_inches='tight')
@@ -266,6 +300,7 @@ def make_table_5(input_file, output_file):
     exp_setup = experimental_setup_2
     input_name = input_file.split(".")[0]
     quantile_file = input_name + "_quantile.pdf"
+    quantile_unrealizable_file = input_name + "_unrealizable_quantile.pdf"
     scatter_file = input_name + "_scatter.pdf"
     scatter_no_timeouts_file = input_name + "_no_timeouts_scatter.pdf"
     tex_table = input_name + "_table.tex"
@@ -307,24 +342,29 @@ def make_table_5(input_file, output_file):
 
                 # We may have data for SEGIS base
                 segis0_data = False
-                if len(info) == 21:
+                c = "N/A"
+                if len(info) == 22:
                     segis0_data = True
                     segis0_result = {
-                        "time": info[15],
-                        "delta": info[16],
-                        "rounds": info[17],
-                        "N": info[18],
-                        "B": info[19],
-                        "verif": info[20],
+                        "time": info[16],
+                        "delta": info[17],
+                        "rounds": info[18],
+                        "N": info[19],
+                        "B": info[20],
+                        "verif": info[21],
                     }
                     c = segis0_result['time']
 
-                table[benchmark] = (se2gis_result, segis_result)
+                if segis0_data:
+                    table[benchmark] = (
+                        se2gis_result, segis_result, segis0_result)
+                else:
+                    table[benchmark] = (se2gis_result, segis_result)
 
                 a = se2gis_result['time']
                 b = segis_result['time']
 
-                if floti(a) < floti(b):
+                if floti(a) < floti(b) and floti(a) < floti(c):
                     speedups += 1
 
                 if floti(a) == timeout_value:
@@ -337,15 +377,22 @@ def make_table_5(input_file, output_file):
                     se2gis_unrealizable_series.append(floti(a))
                     segis_unrealizable_series.append(floti(b))
                     if segis0_data:
-                        segis0_unrealizable_series.append(floti(b))
+                        segis0_unrealizable_series.append(floti(c))
                 else:
                     se2gis_series.append(floti(a))
                     segis_series.append(floti(b))
                     if segis0_data:
-                        segis0_series.append(floti(b))
+                        segis0_series.append(floti(c))
 
-                print("%54s, %7s, %7s : %5s" %
-                      (benchmark, a, b, speedup(a, b)))
+                warning_b = c == "N/A" and floti(
+                    b) < timeout_value and not unrealizable(info[4])
+
+                if warning_b:
+                    print("%54s, %7s, %7s, %7s: %5s !!!" %
+                          (benchmark, a, b, c, speedup(a, b)))
+                else:
+                    print("%54s, %7s, %7s, %7s: %5s" %
+                          (benchmark, a, b, c, speedup(a, b)))
 
     # Plot a scatter plot with a diagonal line
     save_scatter_plot(scatter_file, segis_series, se2gis_series,
@@ -357,8 +404,11 @@ def make_table_5(input_file, output_file):
 
     segis_series = segis_series + segis_unrealizable_series
     se2gis_series = se2gis_series + se2gis_unrealizable_series
-    # Plot a quantile plot
-    quantile_plot(quantile_file, segis_series, se2gis_series)
+    segis0_series = segis0_series + segis0_unrealizable_series
+    # Plot two quantile plots
+    quantile_plot(quantile_file, segis_series, se2gis_series, segis0_series)
+    quantile_plot2(quantile_unrealizable_file,
+                   segis_unrealizable_series, se2gis_unrealizable_series)
     # Output a tex table for  realizable benchmarks
     make_tex_table(exp_setup, table, tex_table)
     # Output a tex table for unrealizable benchmarks
@@ -369,10 +419,13 @@ def make_table_5(input_file, output_file):
     print(f"SE2GIS is faster on {speedups} benchmarks.")
     print(f"Tex table    : { tex_table}  ")
     print(f"Quantile plot: {quantile_file}")
+    print(
+        f"Quantile unrealizable benchmarks plot: {quantile_unrealizable_file}")
     print(f"Scatter plot : {scatter_file}")
     print(f"Scatter plot (omitting timeouts) : {scatter_no_timeouts_file}")
     return {
         "quantile": quantile_file,
+        "quantile_unrealizable": quantile_unrealizable_file,
         "scatter": scatter_file,
         "scatter_no_timeouts": scatter_no_timeouts_file,
         "table": tex_table,
@@ -449,6 +502,8 @@ if __name__ == "__main__":
                     LOCAL_COPY, "tables/table_unrealizable.tex"))
                 shutil.copyfile(filenames['quantile'], os.path.join(
                     LOCAL_COPY, "figures/quantile.pdf"))
+                shutil.copyfile(filenames['quantile_unrealizable'], os.path.join(
+                    LOCAL_COPY, "figures/quantile_unrealizable.pdf"))
                 shutil.copyfile(filenames['scatter'], os.path.join(
                     LOCAL_COPY, "figures/scatter.pdf"))
                 shutil.copyfile(filenames['scatter_no_timeouts'], os.path.join(
