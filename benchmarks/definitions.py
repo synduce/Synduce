@@ -212,6 +212,7 @@ constraint_benchmarks = [
     ["constraints/ensures/maxsegstrip_noe.ml", ""],
     ["constraints/ensures/maxsegstrip_full_noe.ml", ""],
     ["constraints/ensures/nested_minmax_noe.ml", ""],
+    ["constraints/ensures/bal_2.ml", ""],
     # alist
     ["constraints/alist/count_eq2.ml", "-NB"],
     ["constraints/alist/count_eq.ml", ""],
@@ -423,6 +424,7 @@ show_benchmarks = {
         "maxsegstrip_noe": ["", "max segment strip", "nested list->concat-list", True],
         "maxsegstrip_full_noe": ["", "max seg. strip (no hint)", "nested list->concat-list", True],
         "nested_minmax_noe": ["", "min-max nested", "nested list->concat-list", True],
+        "bal_2": ["", "balanced parens", "list->concat-list", True],
     },
     # All positive
     "constraints/all_positive": {
@@ -597,7 +599,8 @@ unrealizable_show_set = {
         "nested_min_sum_max_mts": ["          ", "min max mts", "nested list->concat list", False],
         "nested_min_max_mixed": ["          ", "min max mixed", "nested list->concat list", False],
         "pyramid_maxsort": ["          ", "pyramid sort", "nested list->list", False],
-        "lpeak_noims":     ["          ", "largest peak", "list->concat list", False],
+        "lpeak_noimf":     ["          ", "largest peak", "list->concat list", False],
+        "memo_max":       ["          ", "height memoizing max", "tree->tree", False],
     }
 
 }
