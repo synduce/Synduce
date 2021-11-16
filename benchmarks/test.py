@@ -21,6 +21,7 @@ def run_one(progress, bench_id, command, algo, optim, filename, extra_opt):
     last_refinement_string = ""
     last_verif_time = 0.0
     last_elapsed = 0.0
+    last_info = None
     # Poll process for new output until finished
     while True:
         try:
@@ -30,6 +31,7 @@ def run_one(progress, bench_id, command, algo, optim, filename, extra_opt):
             last_refinement_string = info.get_refinement_summary()
             last_verif_time = info.verif_elapsed
             last_elapsed = info.elapsed
+            last_info = info
         except Exception as e:
             info = DataObj({})
             info.is_successful = False
@@ -42,7 +44,7 @@ def run_one(progress, bench_id, command, algo, optim, filename, extra_opt):
         print(
             f"{progress : >11s}.. benchmarks/{filename} {extra_opt} {algo[1]} {optim[1]} 🏃 at step {info.major_step_count}:{info.minor_step_count}", end="\r")
 
-    return info
+    return last_info
 
 
 def run_n(progress, bench_id, realizable, command, algo,
@@ -113,12 +115,12 @@ def run_n(progress, bench_id, realizable, command, algo,
         else:
             induction_info = "        "
 
-        msg = f"{progress : >11s} ✅ {info.algo: <6s} : {bench_name : <33s} ×{num_runs} runs, {str(timing): <30s} {induction_info} | R: {refinement_rounds} {sp : <30s} "
+        msg = f"{progress : >11s} ✅ {info.algo: <6s} : {bench_name : <33s} ×{num_runs} runs, {str(timing): <30s} {induction_info} | R: {refinement_rounds} {sp : <20s} "
         print(msg)
         csvline = f"{elapsed: 4.3f},{delta : .0f},{refinement_rounds},{c_by_induction},{p_by_induction},{verif_elapsed}"
     else:
-        print(f"{progress: >11s} ❌ {bench_id : <120s}")
-        csvline = f"N/A,N/A,{info.get_refinement_summary()},N/A,N/A,N/A"
+        print(f"{progress: >11s} ❌ {bench_id : <90s}")
+        csvline = f"N/A,N/A,f{info.major_step_count},N/A,N/A,N/A"
 
     sys.stdout.flush()
 
@@ -220,7 +222,7 @@ if __name__ == "__main__":
         choices=["all", "constraint", "lifting", "base", "unr", "small"], default=None)
     aparser.add_argument(
         "-c", "--compare", help="Compare with segis or cegis", type=str,
-        choices=["segis", "cegis"], default=None)
+        choices=["segis", "cegis", "segis0"], default=None)
     aparser.add_argument(
         "--single", help="Run the lifting benchmark in benchmarks/[FILE]", type=str, default=None)
     aparser.add_argument(
@@ -283,6 +285,8 @@ if __name__ == "__main__":
 
     if args.compare == "segis":
         other_alg = [["segis", "--segis " + cvc]]
+    elif args.compare == "segis0":
+        other_alg = [["segis", "--segis -u" + cvc]]
     elif args.compare == "cegis":
         other_alg = [["cegis", "--cegis " + cvc]]
     else:
@@ -381,7 +385,9 @@ if __name__ == "__main__":
 
     # Table 5 / Test with cvc4 against baseline comparison
     elif table_no == 5:
-        algos = [["se2gis", "--cvc4"], ["segis", "--segis --cvc4"]]
+        algos = [["se2gis", "--cvc4"],
+                 ["segis", "--segis --cvc4"],
+                 ["segis0", "--segis --cvc4 -u"]]
         optims = [["all", ""]]
 
     # No table - just run the base algorithm.

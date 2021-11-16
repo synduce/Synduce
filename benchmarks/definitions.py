@@ -19,6 +19,7 @@ kw_baseline = "Baseline"
 kw_segis = "Symbolic CEGIS"
 kw_cegis = "Concrete CEGIS"
 kw_path = "Path"
+plot_fontsize = 11
 
 if sys.platform.startswith('linux'):
     timeout = ("timeout %i" %
