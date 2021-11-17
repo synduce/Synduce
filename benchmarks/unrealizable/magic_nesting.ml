@@ -7,7 +7,7 @@ type list =
 let rec spec = function
   | Elt (a, b) -> b
   | Cons (hd, tl) ->
-    let _ = spec tl in
+    let a = spec tl in
     hd
 ;;
 

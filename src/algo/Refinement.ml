@@ -90,6 +90,7 @@ let rec refinement_loop ?(major = true) (p : psi_def) (lstate_in : refinement_lo
       Log.error_msg "Solution cannot be proved correct, solver failed.";
       Failed RFail
     | e -> raise e)
+  | RUnknown, _ -> Failed RUnknown
   | _ as synt_failure_info ->
     (* On synthesis failure, start by trying to synthesize lemmas. *)
     (match

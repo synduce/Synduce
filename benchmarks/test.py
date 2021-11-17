@@ -289,12 +289,13 @@ if __name__ == "__main__":
 
     other_alg = []
     print(args.compare)
-    if "segis" in args.compare:
-        other_alg += [["segis", "--segis " + cvc]]
-    if "segis0" in args.compare:
-        other_alg += [["segis0", "--segis -u " + cvc]]
-    if "cegis" in args.compare:
-        other_alg += [["cegis", "--cegis " + cvc]]
+    if args.compare is not None:
+        if "segis" in args.compare:
+            other_alg += [["segis", "--segis " + cvc]]
+        if "segis0" in args.compare:
+            other_alg += [["segis0", "--segis -u " + cvc]]
+        if "cegis" in args.compare:
+            other_alg += [["cegis", "--cegis " + cvc]]
 
     # Run a single file if --single has an argument
     if args.single and args.single != "":

@@ -349,6 +349,7 @@ unrealizable_benchmarks = [
     ["unrealizable/largest_even_pos.ml", "", False],
     ["unrealizable/minmax.ml", "", False],
     ["unrealizable/minmax_mistake.ml", "", False],
+    ["unrealizable/magic_nesting.ml", "", False],
     ["unrealizable/max_low_table_sum.ml", "", False],
     ["unrealizable/nested_min_sum_max_mts.ml", "", False],
     ["unrealizable/lpeak_noimf.ml", "", False],
@@ -358,6 +359,7 @@ unrealizable_benchmarks = [
     ["unrealizable/po_sorted.ml", "", False],
     ["unrealizable/simple_parity.ml", "", False],
     ["unrealizable/swap_game.ml", "", False],
+    ["unrealizable/swap_game_2.ml", "", False],
     ["unrealizable/twosum.ml", "", False],
     ["indexed_list/position_polynomial_no_index.ml", " --no-lifting", False],
     ["indexed_list/search_no_index.ml", " --no-lifting", False],
@@ -416,8 +418,8 @@ show_benchmarks = {
     # Ensures only
     "constraints/ensures": {
         "mps_no_ensures": ["", "mps", "list->concat-list", True],
-        "mts_no_ensures": ["", "mps", "list->concat-list", True],
-        "mss_no_ensures": ["Inferring", "mps", "list->concat-list", True],
+        "mts_no_ensures": ["", "mts", "list->concat-list", True],
+        "mss_no_ensures": ["Inferring", "mss", "list->concat-list", True],
         "mtss_noe": ["Postconditions", "max top strip", "nested list->concat-list", True],
         "mtss_full_noe": ["", "max top strip (no hint)", "nested list->concat-list", True],
         "mpss_noe": ["", "max bottom strip", "nested list->concat-nested list", True],
@@ -541,7 +543,7 @@ show_benchmarks = {
     # Sorted and indexed
     "constraints/sorted_and_indexed": {
         "count_lt0": [" Sorted and ", "count smaller 0", "list->list", True],
-        "count_lt":  [" Indexed     ", "count smaller", "list->list", True],
+        "count_lt":  [" Indexed     ", "count smaller x", "list->list", True],
     },
     # unimodal
     "constraints/unimodal_list": {
@@ -593,6 +595,8 @@ unrealizable_show_set = {
         "largest_even_pos": ["          ", "largest even positive", "list->tree", False],
         "minmax_mistake": ["          ", "minmax (v2)", "list->list", False],
         "swap_game": ["          ", "swapping components", "list->concat list", False],
+        "swap_game": ["          ", "swapping, missing call", "list->concat list", False],
+        "magic_nesting": ["          ", "forced unknown nesting", "list->list", False],
         "approximately_pareto": ["          ", "pareto approx.", "list->alist", False],
         "eval_psum": ["          ", "partial sum", "program->program", False],
         "common_elt": ["          ", "common elt.", "list*list->list*list", False],
