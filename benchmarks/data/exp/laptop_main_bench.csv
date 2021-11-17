@@ -130,3 +130,5 @@ unrealizable/swap_game_2.ml,se2gis:all, 0.040, 2,+∅,✓,✓,0.0,segis:all, 0.0
 unrealizable/magic_nesting.ml,se2gis:all,N/A,N/A,f2,N/A,N/A,N/A,segis:all,N/A,N/A,f507,N/A,N/A,N/A,segis0:all,N/A,N/A,f507,N/A,N/A,N/A
 constraints/sortedlist/max_point_sum.ml,se2gis:all, 0.023, 1,+✓,✓,✓,0.01768655776977539,segis:all, 0.039, 1,+✓,✓,✓,0.03314807415008545,segis0:all, 0.042, 6,+✓,✓,✓,0.036250901222229
 unrealizable/mps_in_partitioned_list.ml,se2gis:all, 0.289, 4,+..∅,~,~,0.0,segis:all, 3.385, 216,++++∅,✓,✓,0.02358119487762451,segis0:all,N/A,N/A,f4,N/A,N/A,N/A
+constraints/sortedlist/slsp.ml,se2gis:all, 0.526, 15,+..✓,~,~,0.09842133522033691,segis:all, 0.323, 4,++✓,✓,✓,0.2056190252304077,segis0:all, 0.313, 9,++✓,✓,✓,0.1983093023300171
+constraints/sortedlist/failing_slspplus.ml,se2gis:all,N/A,N/A,+..+..+....,N/A,N/A,N/A,segis:all, 0.463, 51,++++✓,✓,✓,0.04928512573242187,segis0:all, 0.428, 18,++++✓,✓,✓,0.04984495639801025
