@@ -27,6 +27,7 @@ let spec hi lo t =
     | Node (a, l, r) -> if hi > a && a > lo then 1 + f l + f r else f l + f r
   in
   f t
+  [@@ensures fun x -> x >= 0]
 ;;
 
 let target hi lo t =

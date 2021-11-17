@@ -156,6 +156,17 @@ let print_infeasible_message t_set =
         (Set.elements t_set))
 ;;
 
+let announce_new_term_state ctex =
+  Log.debug (fun fmt () ->
+      pf
+        fmt
+        "Creating new term state for term@;%a@;under condition %a@;"
+        pp_term
+        ctex.ctex_eqn.eterm
+        (option pp_term)
+        ctex.ctex_eqn.esplitter)
+;;
+
 let announce_new_lemma_synthesis (thread_no : int) (det : term_state_detail) =
   Log.debug (fun f () ->
       match det.current_preconds with

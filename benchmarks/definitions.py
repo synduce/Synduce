@@ -530,6 +530,7 @@ show_benchmarks = {
         "exists_equal_elems_v2":  ["   ", "exists duplicates (v2)", "list->list", True],
         "largest_diff":           ["        ", "largest diff ", "list->list", True],
         "smallest_diff":           ["        ", "smallest diff ", "list->list", True],
+        "interval_intersection": ["         ", "interval intersection ", "list->list", True],
         "largest_diff_poslist":   ["        ", "largest diff (pos elts) ", "list->list", True],
         "largest_even":           ["        ", "largest even", "list->list", True],
         "largest_even_pos":       ["        ", "largest even positive", "list->list", True],

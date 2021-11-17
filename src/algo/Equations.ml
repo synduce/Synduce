@@ -233,7 +233,7 @@ let make
                   | None -> Some im_f)
                 | None -> precond
               in
-              { eterm; eprecond; elhs; erhs; eelim })
+              { eterm; esplitter = None; eprecond; elhs; erhs; eelim })
             projs
       , lifting' )
     in
@@ -261,7 +261,7 @@ let make
         | None -> precond
       in
       let eelim = filter_elims all_subs t0 in
-      { eterm = t0; elhs; erhs; eprecond; eelim }
+      { eterm = t0; esplitter = None; elhs; erhs; eprecond; eelim }
     in
     List.map ~f:constraint_of_lift_expr lifting.tmap
   in
@@ -615,6 +615,7 @@ module Solve = struct
       | RType.TInt ->
         [ { eterm = Terms.(int 0)
           ; eelim = []
+          ; esplitter = None
           ; elhs = (if mul then Terms.(int 1) else Terms.(int 0))
           ; erhs = Terms.(~^v)
           ; eprecond = None
@@ -623,6 +624,7 @@ module Solve = struct
       | RType.TBool ->
         [ { eterm = Terms.(int 0)
           ; eelim = []
+          ; esplitter = None
           ; elhs = Terms.(if mul then bool false else bool true)
           ; erhs = Terms.(~^v)
           ; eprecond = None
@@ -1007,20 +1009,28 @@ module Preprocess = struct
               split_if
                 { eqn with
                   eprecond = and_opt eqn.eprecond rhs_c
+                ; esplitter = and_opt eqn.esplitter rhs_c
                 ; elhs = lhs_bt
                 ; erhs = rhs_bt
                 }
               @ split_if
                   { eqn with
                     eprecond = and_opt eqn.eprecond (mk_un Not rhs_c)
+                  ; esplitter = and_opt eqn.esplitter (mk_un Not rhs_c)
                   ; elhs = lhs_bf
                   ; erhs = rhs_bf
                   }
             | _ ->
-              split_if { eqn with eprecond = and_opt eqn.eprecond rhs_c; erhs = rhs_bt }
+              split_if
+                { eqn with
+                  eprecond = and_opt eqn.eprecond rhs_c
+                ; esplitter = and_opt eqn.esplitter rhs_c
+                ; erhs = rhs_bt
+                }
               @ split_if
                   { eqn with
                     eprecond = and_opt eqn.eprecond (mk_un Not rhs_c)
+                  ; esplitter = and_opt eqn.esplitter (mk_un Not rhs_c)
                   ; erhs = rhs_bf
                   })
           else [ eqn ]
@@ -1130,6 +1140,7 @@ let update_assumptions
           { elhs = f_body
           ; erhs = mk_app_v fvar (List.map ~f:mk_var f_args)
           ; eprecond = None
+          ; esplitter = None
           ; (* Dummy term; this equation forces a syntactic definition. *) eterm = t0
           ; eelim = []
           }

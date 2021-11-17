@@ -14,12 +14,13 @@ open SmtInterface
 module S = Smtlib.SmtLib
 module T = Term
 
-let empty_term_state : term_state = Map.empty (module Terms)
+let empty_term_state : term_state = Map.empty (module KeyedTerms)
 
 let placeholder_ctex (det : term_state_detail) : ctex =
   { ctex_eqn =
       { eterm = det.term
       ; eprecond = det.current_preconds
+      ; esplitter = None
       ; eelim = det.recurs_elim
       ; (* Placeholder values for elhs, erhs, these don't matter for us *)
         elhs = det.term
@@ -94,6 +95,7 @@ let term_state_of_context ~(is_pos_ctex : bool) (ctex : ctex) : term_state_detai
       (Alpha.fresh ~s:"lemma" ())
   in
   { term = ctex.ctex_eqn.eterm
+  ; splitter = ctex.ctex_eqn.esplitter
   ; lemmas = []
   ; lemma = lemma_f
   ; lemma_candidate = None
@@ -115,16 +117,15 @@ let create_or_update_term_state_with_ctex
     (ctex : ctex)
     : term_state
   =
-  match Map.find ts ctex.ctex_eqn.eterm with
+  match Map.find ts (ctex.ctex_eqn.eterm, ctex.ctex_eqn.esplitter) with
   | None ->
-    Log.debug (fun fmt () ->
-        Fmt.pf fmt "Creating new term state for term@;%a" pp_term ctex.ctex_eqn.eterm);
+    AlgoLog.announce_new_term_state ctex;
     Map.add_exn
-      ~key:ctex.ctex_eqn.eterm
+      ~key:(ctex.ctex_eqn.eterm, ctex.ctex_eqn.esplitter)
       ~data:(term_state_of_context ~is_pos_ctex ctex)
       ts
   | Some _ ->
-    Map.update ts ctex.ctex_eqn.eterm ~f:(fun maybe_det ->
+    Map.update ts (ctex.ctex_eqn.eterm, ctex.ctex_eqn.esplitter) ~f:(fun maybe_det ->
         match maybe_det with
         | None -> failwith "Term detail does not exist."
         | Some det ->
@@ -422,7 +423,9 @@ let mk_f_compose_r_main ~(p : psi_def) (t : term) : term =
   mk_app_v p.psi_reference.pmain_symb [ repr_of_v ]
 ;;
 
-let get_lemma ~(p : psi_def) (ts : term_state) ~(key : term) : term option =
+let get_precise_lemma ~(p : psi_def) (ts : term_state) ~(key : term * term option)
+    : term option
+  =
   let term_detail_to_lemma det =
     let subst =
       List.concat_map
@@ -439,6 +442,31 @@ let get_lemma ~(p : psi_def) (ts : term_state) ~(key : term) : term option =
   match Map.find ts key with
   | None -> None
   | Some det -> term_detail_to_lemma det
+;;
+
+let get_lemma ~(p : psi_def) (ts : term_state) ~(key : term) : term option =
+  let term_detail_to_lemma det =
+    let subst =
+      List.concat_map
+        ~f:(fun (t1, t2) ->
+          let frt1 = mk_f_compose_r_main ~p t1 in
+          match t2.tkind with
+          | TTup t2s -> List.mapi t2s ~f:(fun i t2_i -> t2_i, mk_sel frt1 i)
+          | _ -> [ t2, frt1 ])
+        det.recurs_elim
+    in
+    let f lem = Term.substitution subst lem in
+    Option.map ~f:simplify_term (T.mk_assoc Binop.And (List.map ~f det.lemmas))
+  in
+  match
+    List.unzip (Map.to_alist (Map.filter_keys ~f:(fun (k, _) -> Terms.equal k key) ts))
+  with
+  | _, [] -> None
+  | _, dets ->
+    (match List.filter_opt (List.map ~f:term_detail_to_lemma dets) with
+    | [] -> None
+    | [ a ] -> Some a
+    | _ as conds -> mk_assoc Binop.And conds)
 ;;
 
 let smt_of_recurs_elim_eqns (elim : (term * term) list) ~(p : psi_def) : S.smtTerm =
@@ -889,6 +917,7 @@ module Interactive = struct
         (Alpha.fresh ~s:"lemma" ())
     in
     { term
+    ; splitter = None
     ; lemmas = []
     ; lemma = lemma_f
     ; lemma_candidate = None
@@ -913,7 +942,11 @@ module Interactive = struct
     List.map ~f ctexs
   ;;
 
-  let set_term_lemma ~(p : psi_def) (ts : term_state) ~(key : term) ~(lemma : term)
+  let set_term_lemma
+      ~(p : psi_def)
+      (ts : term_state)
+      ~(key : term * term option)
+      ~(lemma : term)
       : term_state
     =
     match Map.find ts key with
@@ -921,7 +954,7 @@ module Interactive = struct
       Map.add_exn
         ts
         ~key
-        ~data:{ (make_term_state_detail ~p key) with lemmas = [ lemma ] }
+        ~data:{ (make_term_state_detail ~p (fst key)) with lemmas = [ lemma ] }
     | Some det -> Map.add_exn ts ~key ~data:{ det with lemmas = [ lemma ] }
   ;;
 
@@ -955,13 +988,13 @@ module Interactive = struct
         in
         let pred_term = term_of_smt env in
         let term x =
-          match get_lemma ~p existing_lemmas ~key:t with
+          match get_precise_lemma ~p existing_lemmas ~key:(t, None) with
           | None -> pred_term x
           | Some inv -> mk_bin Binop.And inv (pred_term x)
         in
         (match smtterm with
         | None -> existing_lemmas
-        | Some x -> set_term_lemma ~p existing_lemmas ~key:t ~lemma:(term x))
+        | Some x -> set_term_lemma ~p existing_lemmas ~key:(t, None) ~lemma:(term x))
     in
     { lstate with term_state = Set.fold ~f ~init:lstate.term_state lstate.t_set }
   ;;
@@ -1119,13 +1152,12 @@ let rec lemma_refinement_loop ~(p : psi_def) (det : term_state_detail)
     else (
       match verify_lemma_candidate ~p { det with lemma_candidate = Some lemma_term } with
       | vmethod, Unsat ->
-        AlgoLog.lemma_proved_correct vmethod det lemma_term;
         let lemma =
-          match det.current_preconds with
+          match det.splitter with
           | None -> lemma_term
-          | Some _pre -> lemma_term
-          (* mk_bin Binop.And (mk_un Unop.Not pre) lemma_term *)
+          | Some pre -> Terms.(pre => lemma_term)
         in
+        AlgoLog.lemma_proved_correct vmethod det lemma;
         Some { det with lemma_candidate = None; lemmas = lemma :: det.lemmas }
       | vmethod, SmtLib.SExps x ->
         AlgoLog.lemma_not_proved_correct vmethod;
@@ -1284,7 +1316,7 @@ let synthesize_lemmas ~(p : psi_def) synt_failure_info (lstate : refinement_loop
       let new_ts, success =
         Map.fold
           ts
-          ~init:(Map.empty (module Terms), true)
+          ~init:(Map.empty (module KeyedTerms), true)
           ~f:(fun ~key ~data:det (acc, status) ->
             if Analysis.is_bounded det.term
             then acc, status (* Skip lemma synth for bounded terms. *)

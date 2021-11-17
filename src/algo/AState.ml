@@ -88,6 +88,7 @@ type soln =
 type equation =
   { eterm : term (** The term from which the equation originates. *)
   ; eprecond : term option (** An optional precondition to the equation. *)
+  ; esplitter : term option
   ; elhs : term (** The left-hand side of the equation, containing no unknowns. *)
   ; erhs : term (** The right-hand side of the equation, possibly with unknowns. *)
   ; eelim : (term * term) list (** The substitution used to eliminate recursion. *)
@@ -135,6 +136,7 @@ let solved_eqn_system : equation_system option ref = ref None
 
 type term_state_detail =
   { term : term
+  ; splitter : term option
   ; lemmas : term list
   ; lemma : variable
   ; lemma_candidate : term option
@@ -145,7 +147,8 @@ type term_state_detail =
   ; current_preconds : term option
   }
 
-type term_state = (term, term_state_detail, Terms.comparator_witness) Map.t
+type term_state =
+  (term * term option, term_state_detail, KeyedTerms.comparator_witness) Map.t
 (*
   A type for lemmas.
   For now, it only contains a map from terms to terms.

@@ -75,7 +75,11 @@ let partial_bounding_checker
         let bt = Expand.make_bounded t in
         let lem_t = Reduce.reduce_term (mk_app req [ bt ]) in
         let lem_info =
-          Lemmas.Interactive.set_term_lemma ~p acc_lstate.term_state ~key:bt ~lemma:lem_t
+          Lemmas.Interactive.set_term_lemma
+            ~p
+            acc_lstate.term_state
+            ~key:(bt, None)
+            ~lemma:lem_t
         in
         acc_tset @ [ t, bt ], { acc_lstate with term_state = lem_info })
     | None -> acc_tset @ [ t, t ], acc_lstate
@@ -257,6 +261,7 @@ let bounded_check
           Some
             { eterm = concr t
             ; eprecond = Option.map ~f:concr inv
+            ; esplitter = eqn.esplitter
             ; elhs = concr lhs
             ; erhs = concr rhs
             ; eelim = []

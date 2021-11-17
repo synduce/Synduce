@@ -1,52 +1,45 @@
-(** @synduce --no-lifting -NB -n 10  *)
+(** @synduce --no-lifting -NB -n 10 *)
 
-type list =
-  | Elt of int
-  | Cons of int * list
+type 'a tree =
+  | Leaf of 'a
+  | Node of 'a * 'a tree * 'a tree
 
-(* Concat-list of nested list with pivot *)
-type cnlist =
-  | Sglt of int
-  | Cat of cnlist * int * cnlist
-
-let rec clist_to_list = function
-  | Sglt a -> Elt a
-  | Cat (x, piv, y) -> dec y x
-
-and dec l1 = function
-  | Sglt a -> Cons (a, clist_to_list l1)
-  | Cat (x, piv, y) -> dec (Cat (y, piv, l1)) x
+let rec tree_min = function
+  | Leaf x -> x
+  | Node (a, l, r) -> min a (min (tree_min l) (tree_min r))
 ;;
 
-(* Type invariant: partitioned by sum value *)
-let rec sorted = function
-  | Sglt a -> true
-  | Cat (x, piv, y) -> lmax x < piv && piv < lmin y && sorted x && sorted y
-
-and lmin = function
-  | Sglt a -> a
-  | Cat (x, piv, y) -> min (lmin x) (lmin y)
-
-and lmax = function
-  | Sglt a -> a
-  | Cat (x, piv, y) -> max (lmax x) (lmax y)
+let rec tree_max = function
+  | Leaf x -> x
+  | Node (a, l, r) -> max a (max (tree_max l) (tree_max r))
 ;;
 
-(* Reference function : sum of longest suffis of positive elements. *)
-let rec spec = function
-  | Elt a -> max 0 a, a >= 0
-  | Cons (hd, tl) ->
-    let mtss, cond = spec tl in
-    let new_cond = hd >= 0 && cond in
-    (if new_cond then mtss + hd else mtss), new_cond
-  [@@ensures fun (x, b) -> x >= 0]
+let rec is_bst = function
+  | Leaf x -> true
+  | Node (a, l, r) -> a > tree_max l && a < tree_min r && is_bst l && is_bst r
 ;;
 
-let rec target = function
-  | Sglt x -> [%synt s0] x
-  | Cat (l, piv, r) ->
-    if piv <= 0 then [%synt f1] (target r) else [%synt f2] piv (target r) (target l)
-  [@@requires sorted]
+let repr x = x
+
+let spec hi lo t =
+  let rec f = function
+    | Leaf a -> if hi > a && a > lo then 1 else 0
+    | Node (a, l, r) -> if hi > a && a > lo then 1 + f l + f r else f l + f r
+  in
+  f t
+  [@@ensures fun x -> x >= 0]
 ;;
 
-assert (target = clist_to_list @@ spec)
+let target hi lo t =
+  let rec g = function
+    | Leaf a -> [%synt xi_0] hi lo a
+    | Node (a, l, r) ->
+      if a < lo
+      then [%synt f_a_lt_lo] (g r)
+      else if a > hi
+      then [%synt f_a_gt_hi] (g l)
+      else [%synt f_else] a hi lo (g r)
+  in
+  g t
+  [@@requires is_bst]
+;;

@@ -1,4 +1,4 @@
-(** @synduce -lkNB -n 30 *)
+(** @synduce -lkNB -n 20 *)
 
 (* A data type representing lists in a tree format, where the list elements
    are kept where the list is "split" as opposed to concat-lists where
@@ -44,8 +44,9 @@ and aux_down pr = function
 
 (* This is just a sum to test the tool on accepting the unimodal list specification. *)
 let rec spec = function
-  | Nil -> 1
+  | Nil -> 0
   | Cons (hd, tl) -> max hd (spec tl)
+  [@@ensures fun x -> x >= 0]
 ;;
 
 let rec target = function
