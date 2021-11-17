@@ -1,3 +1,5 @@
+(** @synduce -NB *)
+
 type 'a clist =
   | CNil
   | Single of 'a
@@ -13,13 +15,12 @@ let rec fbal = function
     let cnt, min_cnt, bal = fbal tl in
     let cnt2 = if hd then cnt + 1 else cnt - 1 in
     cnt2, min min_cnt cnt2, bal && cnt2 >= 0
-  [@@ensures fun (cnt, min_cnt, bal) -> min_cnt <= 0 && min_cnt <= cnt]
 ;;
 
 let rec target = function
-  | CNil -> [%synt s0]
-  | Single a -> [%synt f0] a
-  | Concat (x, y) -> [%synt odot] (target x) (target y)
+  | CNil -> [%synt f0]
+  | Single a -> [%synt f1] a
+  | Concat (x, y) -> [%synt f2] (target x) (target y)
 ;;
 
 let rec repr = function

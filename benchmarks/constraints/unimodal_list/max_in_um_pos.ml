@@ -1,3 +1,5 @@
+(** @synduce -NBl --no-lifting *)
+
 (* A data type representing lists in a tree format, where the list elements
    are kept where the list is "split" as opposed to concat-lists where
    all the elements are in the leaves.
@@ -13,6 +15,7 @@ type list =
   | Cons of int * list
 
 (* Representation function from ulist -> list *)
+
 let rec repr = function
   | UNil -> Nil
   | UElt a -> Cons (a, Nil)
@@ -40,7 +43,6 @@ and aux_down pr = function
   | Cons (x, l) -> pr >= 0 && pr > x && aux_down x l
 ;;
 
-(* This is just a sum to test the tool on accepting the unimodal list specification. *)
 let rec spec = function
   | Nil -> 0
   | Cons (hd, tl) -> max hd (spec tl)

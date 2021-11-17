@@ -1,28 +1,40 @@
-(** @synduce -NB --no-lifting *)
+(** @synduce -NB -n 30 --no-lifting *)
 
 type 'a tree =
-  | Nil
+  | Leaf of 'a
   | Node of 'a * 'a tree * 'a tree
 
-let rec is_balanced = function
-  | Nil -> true
-  | Node (a, b, c) -> aux b = aux c && is_balanced b && is_balanced c
-
-and aux = function
-  | Nil -> 0
-  | Node (a, b, c) -> 1 + max (aux b) (aux c)
+let rec tree_min = function
+  | Leaf x -> x
+  | Node (a, l, r) -> min a (min (tree_min l) (tree_min r))
 ;;
 
-let rec height = function
-  | Nil -> 0
-  | Node (a, l, r) -> a + max (height l) (height r)
+let rec tree_max = function
+  | Leaf x -> x
+  | Node (a, l, r) -> max a (max (tree_max l) (tree_max r))
 ;;
 
-(* A small variation of height. *)
-let rec target = function
-  | Nil -> [%synt s0]
-  | Node (a, l, r) -> [%synt f0] a (target l)
-  [@@requires is_balanced]
+let rec is_bst = function
+  | Leaf x -> true
+  | Node (a, l, r) -> a >= tree_max l && a <= tree_min r && is_bst l && is_bst r
 ;;
 
-assert (target = height)
+let repr x = x
+
+let spec x t =
+  let rec f = function
+    | Leaf a -> if a < x then 1 else 0
+    | Node (a, l, r) -> f l + f r
+  in
+  f t
+  [@@ensures fun x -> x >= 0]
+;;
+
+let target y t =
+  let rec g = function
+    | Leaf a -> [%synt xi_0] y a
+    | Node (a, l, r) -> if a < y then [%synt xi_1] (g l) (g r) else [%synt xi_2] (g l)
+  in
+  g t
+  [@@requires is_bst]
+;;

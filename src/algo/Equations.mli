@@ -37,7 +37,7 @@ val solve
   :  p:AState.psi_def
   -> AState.equation list
   -> Syguslib.Sygus.solver_response
-     * (partial_soln, Counterexamples.unrealizability_ctex list) Either.t
+     * (partial_soln, AState.unrealizability_ctex list) Either.t
 
 val update_assumptions
   :  p:AState.psi_def

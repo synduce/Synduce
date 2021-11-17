@@ -50,7 +50,7 @@ let get_ty_const (typ : RType.t) : term =
   RType.(
     match typ with
     | TInt -> mk_const (Constant.of_int 0)
-    | TBool -> mk_const (Constant.of_int 1)
+    | TBool -> mk_const (Constant.of_bool true)
     | _ -> mk_const (Constant.of_int 0))
 ;;
 
@@ -443,6 +443,7 @@ module Expression = struct
       | TData (c, tl) -> mk_e_data c (List.map ~f tl)
       | TTup tl -> mk_e_tup (List.map ~f tl)
       | TIte (c, tt, tf) -> mk_e_ite (f c) (f tt) (f tf)
+      | TBin (Or, { tkind = TUn (Not, a); _ }, b) -> mk_e_bin Implies (f a) (f b)
       | TBin (op, t1, t2) ->
         Binop.(
           (match op with
@@ -459,7 +460,8 @@ module Expression = struct
           | Le -> mk_e_bin Ge (f t2) (f t1)
           | Eq -> mk_e_bin Eq (f t1) (f t2)
           | Mod -> mk_e_bin Mod (f t1) (f t2)
-          | Minus -> mk_e_assoc (Binary Plus) [ f t1; mk_e_un Neg (f t2) ]))
+          | Minus -> mk_e_assoc (Binary Plus) [ f t1; mk_e_un Neg (f t2) ]
+          | Implies -> failwith "=> is only for expressions"))
       | TUn (op, t) ->
         Unop.(
           (match op with
@@ -503,9 +505,15 @@ module Expression = struct
           let%map a' = f a in
           mk_un op a'
         | [ a; b ], Binary op ->
-          let%map a' = f a
-          and b' = f b in
-          mk_bin op a' b'
+          (match op with
+          | Implies ->
+            let%map a' = f a
+            and b' = f b in
+            mk_bin Or (mk_un Not a') b'
+          | _ ->
+            let%map a' = f a
+            and b' = f b in
+            mk_bin op a' b')
         | _ ->
           Binop.(
             (match op with
@@ -620,7 +628,16 @@ module Expression = struct
         (match rest with
         | [] -> Some ETrue
         | _ -> Some (mk_e_assoc (Binary And) rest))
-      | EOp (Binary And, EFalse :: _) -> Some EFalse
+        (* Simple And rules *)
+      | EOp (Binary And, EFalse :: _) -> Some EFalse (* a && a => b -> a && b *)
+      | EOp
+          ( Binary And
+          , EOp (Binary Implies, [ a; b ]) :: EOp (Binary Implies, [ a'; b' ]) :: tl )
+        when equal a a' ->
+        Some (mk_e_assoc (Binary And) (mk_e_bin Implies a (mk_e_bin And b b') :: tl))
+      | EOp (Binary And, EOp (Binary Implies, [ a; b ]) :: tl) ->
+        if List.mem tl b ~equal then Some (EOp (Binary And, a :: tl)) else None
+      (* Simple or Rules *)
       | EOp (Binary Or, EFalse :: rest) ->
         (match rest with
         | [] -> Some EFalse
@@ -1142,7 +1159,7 @@ let match_as_subexpr ?(lemma = None) (bid : boxkind) (sube : t) ~(of_ : t) : t o
 let simplify_term (t : term) : term =
   let simpl =
     let%bind expr = of_term t in
-    to_term (simplify expr)
+    to_term (normalize expr)
   in
   match simpl with
   | Some s -> s

@@ -59,6 +59,7 @@ let use_cegis = ref false
 
 (**
   Simplify equations before feeding them to equations solver.
+  Turn off with --no-simplify
 *)
 let simplify_eqns = ref true
 
@@ -88,7 +89,7 @@ let expand_depth = ref 2
 let num_expansions_check = ref 124
 
 (* Cut expansion after `expand_cut` terms generated. *)
-let expand_cut = ref 124
+let expand_cut = ref 240
 
 (** num_expansions_check is set by the -n or --verification option of the CLI. *)
 let set_num_expansions_check (s : string) =
@@ -165,4 +166,14 @@ let set_max_lifting_attempts (s : string) =
     if i >= 0 && i < 64 then max_lifting_attempts := i
   with
   | _ -> ()
+;;
+
+let some_eager_optim_on () =
+  !simplify_eqns || !use_syntactic_definitions || !make_partial_correctness_assumption
+;;
+
+let turn_off_eager_optims () =
+  turn_off simplify_eqns;
+  turn_off use_syntactic_definitions;
+  turn_off make_partial_correctness_assumption
 ;;

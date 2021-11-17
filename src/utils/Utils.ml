@@ -61,6 +61,7 @@ let dot frmt () = Fmt.(pf frmt ".")
 let rightarrow frmt () = Fmt.(pf frmt " ⟶ @;")
 let leftarrow frmt () = Fmt.(pf frmt " <-@;")
 let sep_and : Formatter.t -> unit -> unit = Fmt.any "@;and@;"
+let pp_link frmt target = Fmt.pf frmt "file://%s" target
 
 (** list_or_space prints the list using f for each element, and sep for the separator.
   If the list is empty, prints a space.

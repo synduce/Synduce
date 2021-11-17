@@ -89,3 +89,23 @@ let check_source_variable_name
           loc1.pos_cnum);
     failwith "Bad variable name.")
 ;;
+
+module Nice = struct
+  let nicenames = [ "a"; "b"; "c"; "x"; "y"; "z"; "w"; "u"; "v" ]
+  let index = ref 0
+  let nice_queue = Queue.of_list nicenames
+
+  let reset () =
+    Int.incr index;
+    Queue.clear nice_queue;
+    Queue.enqueue_all nice_queue nicenames
+  ;;
+
+  let next () =
+    match Queue.dequeue nice_queue with
+    | Some x -> if !index > 0 then x ^ Int.to_string !index else x
+    | None ->
+      reset ();
+      Queue.dequeue_exn nice_queue
+  ;;
+end

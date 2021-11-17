@@ -26,3 +26,7 @@ val get_exn : int -> string
 
 (** Check that a variable name from the source file obeys some basic restriction with synduce. *)
 val check_source_variable_name : Lexing.position * Lexing.position -> string -> unit
+
+module Nice : sig
+  val next : unit -> string
+end

@@ -266,6 +266,7 @@ module Binop = struct
     | Mod
     | And
     | Or
+    | Implies
 
   let compare = Poly.compare
   let equal = Poly.equal
@@ -286,6 +287,7 @@ module Binop = struct
     | Mod -> "%"
     | And -> "&&"
     | Or -> "||"
+    | Implies -> "=>"
   ;;
 
   let to_string (op : t) =
@@ -304,6 +306,7 @@ module Binop = struct
     | Mod -> "mod"
     | And -> "and"
     | Or -> "or"
+    | Implies -> "=>"
   ;;
 
   let of_string (s : string) : t option =
@@ -331,7 +334,7 @@ module Binop = struct
       | Lt | Gt | Ge | Le -> [ TInt, TInt ]
       | Eq -> [ TInt, TInt; TBool, TBool ]
       | Max | Min | Plus | Minus | Times | Div | Mod -> [ TInt, TInt ]
-      | And | Or -> [ TBool, TBool ])
+      | Implies | And | Or -> [ TBool, TBool ])
   ;;
 
   let result_type (op : t) =
@@ -340,7 +343,7 @@ module Binop = struct
       | Lt | Gt | Ge | Le -> TBool
       | Eq -> TBool
       | Max | Min | Plus | Minus | Times | Div | Mod -> TInt
-      | And | Or -> TBool)
+      | Implies | And | Or -> TBool)
   ;;
 
   let pp (frmt : Formatter.t) (op : t) = Fmt.string frmt (to_pp_string op)
@@ -1607,7 +1610,6 @@ let type_of (t : term) = t.ttyp
 (* ============================================================================================= *)
 (*                                  SETS OF TERMS                                                *)
 (* ============================================================================================= *)
-
 module Terms = struct
   module E = struct
     type t = term
@@ -1664,6 +1666,9 @@ module Terms = struct
   (** Create a term equal to the equality of two terms. *)
   let ( == ) : t -> t -> t = mk_bin Binop.Eq
 
+  (** Create a term equivalent to the implication of two terms  *)
+  let ( => ) t1 t2 : t = mk_bin Binop.Or (mk_un Unop.Not t1) t2
+
   (** Create a term equal to the max of two terms. *)
   let max : t -> t -> t = mk_bin Binop.Max
 
@@ -1690,6 +1695,24 @@ module Terms = struct
     assigned.
   *)
   let typed (te : t) : t = fst (infer_type te)
+end
+
+module KeyedTerms = struct
+  module E = struct
+    type t = term * term option
+
+    let compare (t1, o1) (t2, o2) =
+      let c = Terms.compare t1 t2 in
+      if c = 0 then Option.compare Terms.compare o1 o2 else c
+    ;;
+
+    let equal (t1, o1) (t2, o2) = Terms.equal t1 t2 && (Option.equal Terms.equal) o1 o2
+    let sexp_of_t (t1, o1) = Sexp.List [ sexp_of_term t1; sexp_of_option sexp_of_term o1 ]
+  end
+
+  include E
+  module C = Comparator.Make (E)
+  include C
 end
 
 module TermSet = struct

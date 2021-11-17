@@ -46,6 +46,8 @@ let simplify t =
       (match t1.tkind, t2.tkind with
       | _, TConst Constant.CTrue -> t1
       | TConst Constant.CTrue, _ -> t2
+      | TBin (Binop.Or, { tkind = TUn (Unop.Not, ta); _ }, tb), _
+        when Term.term_equal ta t2 -> Terms.(ta && tb)
       | TConst Constant.CFalse, _ | _, TConst Constant.CFalse -> mk_const Constant.CFalse
       | _, _ -> t)
     (* t1 = t2 *)

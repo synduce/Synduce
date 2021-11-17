@@ -59,13 +59,16 @@ let show_summary (spec_fname, repr_fname, target_fname) target_f =
   Log.info (fun fmt () ->
       pf
         fmt
-        " Ψ (%a) := ∀ x : %a. (%s o %s)(x) = %s(x)"
+        " Ψ (%a) := ∀ x : %a. (%a o %a)(x) = %a(x)"
         (list ~sep:comma Term.Variable.pp)
         (Set.elements target_f.PMRS.psyntobjs)
-        (list ~sep:sp RType.pp)
+        (styled (`Fg `Yellow) (list ~sep:sp RType.pp))
         target_f.pinput_typ
+        (styled (`Fg `Blue) string)
         spec_fname
+        (styled (`Fg `Blue) string)
         repr_fname
+        (styled (`Fg `Blue) string)
         target_fname)
 ;;
 
@@ -79,6 +82,56 @@ let msg_too_many_opts () =
         fmt
         "@[It seems some optimizations caused an error.@;\
          Turning them off and trying again.@]")
+;;
+
+(* ============================================================================================= *)
+(*                           Messages from the Counterexamples                                   *)
+(* ============================================================================================= *)
+
+let pp_unrealizability_ctex (frmt : Formatter.t) (uc : unrealizability_ctex) : unit =
+  let pp_model frmt model =
+    (* Print as comma-separated list of variable -> term *)
+    Fmt.(list ~sep:comma (pair ~sep:Utils.rightarrow Variable.pp pp_term))
+      frmt
+      (Map.to_alist model)
+  in
+  Fmt.(
+    pf
+      frmt
+      "@[M<%i> = [%a]@]@;@[M'<%i> = [%a]@]"
+      uc.i
+      pp_model
+      uc.ci.ctex_model
+      uc.j
+      pp_model
+      uc.cj.ctex_model)
+;;
+
+let show_unrealizability_witnesses unknowns eqns ctexs =
+  Log.verbose (fun f () ->
+      match ctexs with
+      | [] ->
+        Fmt.(
+          pf
+            f
+            "(%a) no counterexample to realizability found."
+            VarSet.pp_var_names
+            unknowns)
+      | _ :: _ ->
+        Fmt.(
+          pf
+            f
+            "@[%a) Counterexamples found!@;\
+             @[<hov 2>❔ Equations:@;\
+             @[<v>%a@]@]@;\
+             @[<hov 2>❔ Counterexample models:@;\
+             @[<v>%a@]@]@]"
+            VarSet.pp_var_names
+            unknowns
+            (list ~sep:sp (box (pair ~sep:colon int (box pp_equation))))
+            (List.mapi ~f:(fun i eqn -> i, eqn) eqns)
+            (list ~sep:sep_and pp_unrealizability_ctex)
+            ctexs))
 ;;
 
 (* ============================================================================================= *)
@@ -101,6 +154,17 @@ let print_infeasible_message t_set =
         "@[<hov 2>This problem has no solution. Counterexample set:@;%a@]"
         (list ~sep:sp Term.pp_term)
         (Set.elements t_set))
+;;
+
+let announce_new_term_state ctex =
+  Log.debug (fun fmt () ->
+      pf
+        fmt
+        "Creating new term state for term@;%a@;under condition %a@;"
+        pp_term
+        ctex.ctex_eqn.eterm
+        (option pp_term)
+        ctex.ctex_eqn.esplitter)
 ;;
 
 let announce_new_lemma_synthesis (thread_no : int) (det : term_state_detail) =
@@ -203,12 +267,31 @@ let positives_ensures p positives =
         positives)
 ;;
 
-let log_new_ensures (new_pred : term) : unit =
-  Stats.set_lemma_synthesized "ensures_lemma" (String.strip (str "%a" pp_term new_pred))
+let show_new_ensures_predicate (f : variable) (ensures : term) =
+  let ensures = Reduce.reduce_term ensures in
+  Stats.set_lemma_synthesized "ensures_lemma" (String.strip (str "%a" pp_term ensures));
+  Log.info
+    Fmt.(
+      fun fmt () ->
+        let input_t =
+          let in_t_l, _ = RType.fun_typ_unpack (Variable.vtype_or_new f) in
+          match in_t_l with
+          | [ a ] -> a
+          | _ -> RType.TTup in_t_l
+        in
+        pf
+          fmt
+          "@[Learned that ∀x : %a,@;@[%a(x) satifies@;%a@]@]"
+          (styled (`Fg `Yellow) RType.pp)
+          input_t
+          (styled (`Fg `Blue) string)
+          f.vname
+          (box pp_term)
+          ensures)
 ;;
 
 (* ============================================================================================= *)
-(*                           Messages from the Lemma Synthesis                                   *)
+(*                  Messages from the Counterexamples Classification                             *)
 (* ============================================================================================= *)
 
 let image_ctex_class

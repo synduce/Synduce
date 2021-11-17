@@ -40,11 +40,12 @@ let main () =
   if !parse_only then Caml.exit 1;
   (* Solve the problem proper. *)
   (match Algo.Refinement.solve_problem psi_comps all_pmrs with
-  | pb, Ok soln ->
+  | pb, Realizable soln ->
     ToolMessages.on_success ~is_ocaml_syntax filename pb (Either.First soln)
-  | pb, Error RInfeasible ->
-    ToolMessages.on_success ~is_ocaml_syntax filename pb (Either.Second true)
-  | _, Error _ -> Utils.Log.error_msg "No solution found.");
+  | pb, Unrealizable ctexs ->
+    ToolMessages.on_success ~is_ocaml_syntax filename pb (Either.Second ctexs)
+  | _, Failed _ ->
+    Utils.Log.error_msg "Failed to find a solution or a witness of unrealizability");
   if !Config.show_vars then Term.Variable.print_summary stdout ()
 ;;
 

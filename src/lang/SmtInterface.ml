@@ -154,55 +154,69 @@ let decl_of_tup_type (tl : RType.t list) : smtSymbol * command =
           ] ) )
 ;;
 
-let rec declare_datatype_of_rtype (t0 : RType.t) : (smtSymbol list * command) list =
-  let declare_orig tname t =
-    let params =
-      match t with
-      | RType.TParam (params, _t) ->
-        List.concat_map
-          ~f:
-            RType.(
-              function
-              | TVar i ->
-                let param_name = "T" ^ Int.to_string i in
-                [ mk_symb param_name, (TVar i, TNamed param_name) ]
-              | _ -> [])
-          params
-      | _ -> []
+let declare_datatype_of_rtype (t0 : RType.t) : (smtSymbol list * command) list =
+  let rec aux declared_types t0 =
+    let is_decl tname =
+      List.exists declared_types ~f:(fun (decl_names, _) ->
+          List.mem (List.map ~f:string_of_smtSymbol decl_names) tname ~equal:String.equal)
     in
-    let smt_sort : smtSortDec = mk_symb tname, List.length params in
-    let constructors =
-      List.map
-        ~f:(fun (cstr_name, cstr_args) ->
-          ( mk_symb cstr_name
-          , List.mapi cstr_args ~f:(fun i t ->
-                ( mk_symb Fmt.(str "%s_%i" cstr_name i)
-                , sort_of_rtype (RType.sub_all (snd (List.unzip params)) t) )) ))
-        (RType.get_variants t)
+    let declare_orig tname t =
+      let params =
+        match t with
+        | RType.TParam (params, _t) ->
+          List.concat_map
+            ~f:
+              RType.(
+                function
+                | TVar i ->
+                  let param_name = "T" ^ Int.to_string i in
+                  [ mk_symb param_name, (TVar i, TNamed param_name) ]
+                | _ -> [])
+            params
+        | _ -> []
+      in
+      let smt_sort : smtSortDec = mk_symb tname, List.length params in
+      let constructors =
+        List.map
+          ~f:(fun (cstr_name, cstr_args) ->
+            ( mk_symb cstr_name
+            , List.mapi cstr_args ~f:(fun i t ->
+                  ( mk_symb Fmt.(str "%s_%i" cstr_name i)
+                  , sort_of_rtype (RType.sub_all (snd (List.unzip params)) t) )) ))
+          (RType.get_variants t)
+      in
+      let smt_constrs : datatype_dec =
+        match params with
+        | [] -> DDConstr constructors
+        | _ -> DDParametric (fst (List.unzip params), constructors)
+      in
+      [ [ fst smt_sort ], DeclareDatatypes ([ smt_sort ], [ smt_constrs ]) ]
     in
-    let smt_constrs : datatype_dec =
-      match params with
-      | [] -> DDConstr constructors
-      | _ -> DDParametric (fst (List.unzip params), constructors)
-    in
-    [ [ fst smt_sort ], DeclareDatatypes ([ smt_sort ], [ smt_constrs ]) ]
-  in
-  match t0 with
-  (* No declaration needed for base types. *)
-  | _ when RType.is_base t0 -> []
-  | RType.TTup tl ->
-    let s, decl = decl_of_tup_type tl in
-    [ [ s ], decl ]
-  | _ ->
-    (match RType.base_name t0 with
-    | Some tname ->
-      let deps = RType.get_datatype_depends t0 in
-      List.concat_map ~f:declare_datatype_of_rtype deps
-      @
-      (match RType.get_type tname with
-      | Some orig_t -> declare_orig tname orig_t
+    match t0 with
+    (* No declaration needed for base types. *)
+    | _ when RType.is_base t0 -> []
+    | RType.TTup tl ->
+      let s, decl = decl_of_tup_type tl in
+      [ [ s ], decl ]
+    | _ ->
+      (match RType.base_name t0 with
+      | Some tname ->
+        if is_decl tname
+        then declared_types
+        else (
+          let deps = RType.get_datatype_depends t0 in
+          let decl_one =
+            match RType.get_type tname with
+            | Some orig_t -> declare_orig tname orig_t
+            | None -> []
+          in
+          let decls =
+            List.fold ~init:(decl_one @ declared_types) ~f:(fun d newt -> aux d newt) deps
+          in
+          List.rev decls)
       | None -> [])
-    | None -> [])
+  in
+  aux [] t0
 ;;
 
 let smtPattern_of_pattern (p : pattern) =

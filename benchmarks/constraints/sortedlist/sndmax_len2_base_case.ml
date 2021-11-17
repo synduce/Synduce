@@ -1,3 +1,5 @@
+(** @synduce -lNB -n 20 *)
+
 (* Target type. *)
 type list =
   | Nil

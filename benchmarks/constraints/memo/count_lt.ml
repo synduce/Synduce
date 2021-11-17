@@ -1,4 +1,4 @@
-(** @synduce -NB -n 30 *)
+(** @synduce -NB -n 10 *)
 
 type 'a tree =
   | Leaf of 'a
@@ -12,7 +12,7 @@ let rec is_memo_count_lt_2 = function
   | MLeaf (n, a) -> n >= 0 && if a < 2 then n = 1 else n = 0
   | MNode (n, a, l, r) ->
     n >= 0
-    && (if a < 2 then n = 1 + memo l + memo r else n = memo l + memo r)
+    && (n = memo l + memo r + if a < 2 then 1 else 0)
     && is_memo_count_lt_2 l
     && is_memo_count_lt_2 r
 
@@ -34,6 +34,6 @@ let rec spec = function
 
 let rec target = function
   | MLeaf (n, a) -> if a < 2 then [%synt c0] else [%synt c1]
-  | MNode (n, a, l, r) -> if a < 2 then [%synt f0] n else [%synt f1] n
+  | MNode (n, a, l, r) -> if a < 2 then [%synt f1] n else [%synt f2] n
   [@@requires is_memo_count_lt_2]
 ;;

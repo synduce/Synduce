@@ -68,33 +68,6 @@ let smt_unsatisfiability_check (unknowns : VarSet.t) (eqns : equation list) : un
   SyncSmt.close_solver z3
 ;;
 
-(** A counterexample to realizability is a pair of models: a pair of maps from variable ids to terms. *)
-type unrealizability_ctex =
-  { i : int
-  ; j : int
-  ; ci : ctex
-  ; cj : ctex
-  }
-
-let pp_unrealizability_ctex (frmt : Formatter.t) (uc : unrealizability_ctex) : unit =
-  let pp_model frmt model =
-    (* Print as comma-separated list of variable -> term *)
-    Fmt.(list ~sep:comma (pair ~sep:Utils.rightarrow Variable.pp pp_term))
-      frmt
-      (Map.to_alist model)
-  in
-  Fmt.(
-    pf
-      frmt
-      "@[M<%i> = [%a]@]@;@[M'<%i> = [%a]@]"
-      uc.i
-      pp_model
-      uc.ci.ctex_model
-      uc.j
-      pp_model
-      uc.cj.ctex_model)
-;;
-
 let merge_all (cl : unrealizability_ctex list) : unrealizability_ctex list =
   let same_origin orig other =
     Terms.equal other.ci.ctex_eqn.eterm orig.ci.ctex_eqn.eterm
@@ -185,19 +158,35 @@ let skeleton_match ~unknowns (e1 : term) (e2 : term) : (term * term) list option
 let components_of_unrealizability ~unknowns (eqn1 : equation) (eqn2 : equation)
     : ((term * term) list * (term * term)) option
   =
+  let validate terms =
+    List.for_all terms ~f:(fun (t, t') ->
+        Set.is_empty (Set.inter (Analysis.free_variables t) unknowns)
+        && Set.is_empty (Set.inter (Analysis.free_variables t') unknowns))
+  in
   match skeleton_match ~unknowns eqn1.erhs eqn2.erhs with
-  | Some args_1_2 -> Some (args_1_2, (eqn1.elhs, eqn2.elhs))
+  | Some args_1_2 ->
+    if validate ((eqn1.elhs, eqn2.elhs) :: args_1_2)
+    then Some (args_1_2, (eqn1.elhs, eqn2.elhs))
+    else None
   | None ->
-    if Terms.equal eqn1.erhs eqn2.erhs then Some ([], (eqn1.elhs, eqn2.erhs)) else None
+    if Terms.equal eqn1.erhs eqn2.erhs
+       && validate [ eqn1.erhs, eqn2.erhs; eqn1.elhs, eqn2.elhs ]
+    then Some ([], (eqn1.elhs, eqn2.erhs))
+    else None
 ;;
 
 let gen_info (eqn_i, eqn_j) unknowns =
   let fv e =
     VarSet.union_list
-      [ Analysis.free_variables e.elhs
-      ; Analysis.free_variables e.erhs
-      ; Option.value_map ~default:VarSet.empty ~f:Analysis.free_variables e.eprecond
-      ]
+      (List.map e.eelim ~f:(fun (_, elim) -> Analysis.free_variables elim)
+      @ [ Set.filter
+            ~f:(fun v -> RType.is_base (Variable.vtype_or_new v))
+            (Analysis.free_variables e.eterm)
+        ]
+      @ [ Analysis.free_variables e.elhs
+        ; Analysis.free_variables e.erhs
+        ; Option.value_map ~default:VarSet.empty ~f:Analysis.free_variables e.eprecond
+        ])
   in
   let vseti = Set.diff (fv eqn_i) unknowns
   and vsetj = Set.diff (fv eqn_j) unknowns in
@@ -252,6 +241,7 @@ let check_unrealizable (unknowns : VarSet.t) (eqns : equation_system)
             AsyncSmt.smt_assert solver (smt_of_term pre_i)
           | None -> return ()
         in
+        (* Assert the precondition for j *)
         let* () =
           match eqn_j.eprecond with
           | Some pre_j ->
@@ -329,30 +319,7 @@ let check_unrealizable (unknowns : VarSet.t) (eqns : equation_system)
     let+ _ = AsyncSmt.close_solver solver in
     let elapsed = Unix.gettimeofday () -. start_time in
     Log.debug (fun f () -> Fmt.(pf f "... finished in %3.4fs" elapsed));
-    Log.info (fun f () ->
-        match ctexs with
-        | [] ->
-          Fmt.(
-            pf
-              f
-              "(%a) no counterexample to realizability found."
-              VarSet.pp_var_names
-              unknowns)
-        | _ :: _ ->
-          Fmt.(
-            pf
-              f
-              "@[%a) Counterexamples found!@;\
-               @[<hov 2>❔ Equations:@;\
-               @[<v>%a@]@]@;\
-               @[<hov 2>❔ Counterexample models:@;\
-               @[<v>%a@]@]@]"
-              VarSet.pp_var_names
-              unknowns
-              (list ~sep:sp (box (pair ~sep:colon int (box pp_equation))))
-              (List.mapi ~f:(fun i eqn -> i, eqn) eqns)
-              (list ~sep:sep_and pp_unrealizability_ctex)
-              ctexs));
+    AlgoLog.show_unrealizability_witnesses unknowns eqns ctexs;
     ctexs
   in
   AsyncSmt.(cancellable_task (make_solver "z3") task)
@@ -697,7 +664,10 @@ let check_tinv_sat ~(p : psi_def) (tinv : PMRS.t) (ctex : ctex)
       let vars =
         VarSet.union_list
           (Option.(to_list (map ~f:Analysis.free_variables ctex.ctex_eqn.eprecond))
-          @ [ Analysis.free_variables t; Analysis.free_variables (f_compose_r t) ])
+          @ [ ctex.ctex_vars
+            ; Analysis.free_variables t
+            ; Analysis.free_variables (f_compose_r t)
+            ])
       in
       (* Start sequence of solver commands, bind on accum. *)
       let* _ = binder in

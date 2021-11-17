@@ -132,7 +132,7 @@ let compute_preconds ~p ~term_state subst eterm =
     then
       Option.map
         ~f:(fun req ->
-          let t = Eval.simplify (Reduce.reduce_term (mk_app req [ eterm ])) in
+          let t = Reduce.reduce_term (mk_app req [ eterm ]) in
           t)
         (Specifications.get_requires p.psi_target.PMRS.pvar)
     else None
@@ -233,7 +233,7 @@ let make
                   | None -> Some im_f)
                 | None -> precond
               in
-              { eterm; eprecond; elhs; erhs; eelim })
+              { eterm; esplitter = None; eprecond; elhs; erhs; eelim })
             projs
       , lifting' )
     in
@@ -261,7 +261,7 @@ let make
         | None -> precond
       in
       let eelim = filter_elims all_subs t0 in
-      { eterm = t0; elhs; erhs; eprecond; eelim }
+      { eterm = t0; esplitter = None; elhs; erhs; eprecond; eelim }
     in
     List.map ~f:constraint_of_lift_expr lifting.tmap
   in
@@ -615,6 +615,7 @@ module Solve = struct
       | RType.TInt ->
         [ { eterm = Terms.(int 0)
           ; eelim = []
+          ; esplitter = None
           ; elhs = (if mul then Terms.(int 1) else Terms.(int 0))
           ; erhs = Terms.(~^v)
           ; eprecond = None
@@ -623,6 +624,7 @@ module Solve = struct
       | RType.TBool ->
         [ { eterm = Terms.(int 0)
           ; eelim = []
+          ; esplitter = None
           ; elhs = Terms.(if mul then bool false else bool true)
           ; erhs = Terms.(~^v)
           ; eprecond = None
@@ -792,8 +794,7 @@ module Solve = struct
   ;;
 
   let solve_eqns (unknowns : VarSet.t) (eqns : equation list)
-      : solver_response
-        * (partial_soln, Counterexamples.unrealizability_ctex list) Either.t
+      : solver_response * (partial_soln, unrealizability_ctex list) Either.t
     =
     let opt_cst =
       Set.exists unknowns ~f:(fun v -> RType.is_base (Variable.vtype_or_new v))
@@ -895,13 +896,24 @@ module Solve = struct
     let solve_eqn_aux (unknowns, equations) =
       if Set.length unknowns > 0 then [ solve_eqns_proxy unknowns equations ] else []
     in
-    (* First solve by mapping to subsystems. Will be done in parallel. *)
-    let solved = List.concat_map split_eqn_systems ~f:solve_eqn_aux in
-    (* Then combine the solutions. *)
-    List.fold
-      solved
-      ~init:(RSuccess [], Either.First partial_soln)
-      ~f:(fun (_, prev_sol) r -> combine prev_sol r)
+    let comb_l l =
+      List.fold
+        l
+        ~init:(RSuccess [], Either.First partial_soln)
+        ~f:(fun (_, prev_sol) r -> combine prev_sol r)
+    in
+    List.fold_until
+      (List.stable_sort
+         ~compare:(fun (vs1, _) (vs2, _) -> compare (Set.length vs1) (Set.length vs2))
+         (List.rev split_eqn_systems))
+      ~init:(RSuccess [], Either.first partial_soln)
+      ~finish:identity
+      ~f:(fun (_, prev_soln) subsystem ->
+        match comb_l (solve_eqn_aux subsystem) with
+        | resp, Either.First solution ->
+          Continue (combine prev_soln (resp, Either.First solution))
+        | resp, Either.Second counterexamples ->
+          Stop (combine prev_soln (resp, Either.Second counterexamples)))
   ;;
 
   let solve_stratified (unknowns : VarSet.t) (eqns : equation list) =
@@ -942,10 +954,8 @@ module Preprocess = struct
     { pre_unknowns : VarSet.t
     ; pre_equations : equation list
     ; pre_postprocessing :
-        solver_response
-        * (partial_soln, Counterexamples.unrealizability_ctex list) Either.t
-        -> solver_response
-           * (partial_soln, Counterexamples.unrealizability_ctex list) Either.t
+        solver_response * (partial_soln, unrealizability_ctex list) Either.t
+        -> solver_response * (partial_soln, unrealizability_ctex list) Either.t
     }
 
   (** An empty preprocessing action. *)
@@ -999,20 +1009,28 @@ module Preprocess = struct
               split_if
                 { eqn with
                   eprecond = and_opt eqn.eprecond rhs_c
+                ; esplitter = and_opt eqn.esplitter rhs_c
                 ; elhs = lhs_bt
                 ; erhs = rhs_bt
                 }
               @ split_if
                   { eqn with
                     eprecond = and_opt eqn.eprecond (mk_un Not rhs_c)
+                  ; esplitter = and_opt eqn.esplitter (mk_un Not rhs_c)
                   ; elhs = lhs_bf
                   ; erhs = rhs_bf
                   }
             | _ ->
-              split_if { eqn with eprecond = and_opt eqn.eprecond rhs_c; erhs = rhs_bt }
+              split_if
+                { eqn with
+                  eprecond = and_opt eqn.eprecond rhs_c
+                ; esplitter = and_opt eqn.esplitter rhs_c
+                ; erhs = rhs_bt
+                }
               @ split_if
                   { eqn with
                     eprecond = and_opt eqn.eprecond (mk_un Not rhs_c)
+                  ; esplitter = and_opt eqn.esplitter (mk_un Not rhs_c)
                   ; erhs = rhs_bf
                   })
           else [ eqn ]
@@ -1055,7 +1073,7 @@ end
   function and body of a function) or a list of unrealizability counterexamples.
 *)
 let solve ~(p : psi_def) (eqns : equation list)
-    : solver_response * (partial_soln, Counterexamples.unrealizability_ctex list) Either.t
+    : solver_response * (partial_soln, unrealizability_ctex list) Either.t
   =
   let unknowns = p.psi_target.psyntobjs in
   let preprocessing_actions =
@@ -1122,6 +1140,7 @@ let update_assumptions
           { elhs = f_body
           ; erhs = mk_app_v fvar (List.map ~f:mk_var f_args)
           ; eprecond = None
+          ; esplitter = None
           ; (* Dummy term; this equation forces a syntactic definition. *) eterm = t0
           ; eelim = []
           }
