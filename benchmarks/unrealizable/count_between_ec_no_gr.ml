@@ -35,10 +35,10 @@ let target hi lo t =
     | Leaf a -> [%synt xi_0] hi lo a
     | Node (a, l, r) ->
       if a <= lo
-      then [%synt f_a_lt_lo] (g l)
+      then [%synt f_a_lt_lo] (g r)
       else if a >= hi
-      then [%synt f_a_gt_hi] (g r)
-      else [%synt f_else] a hi lo
+      then [%synt f_a_gt_hi] (g l)
+      else [%synt f_else] a hi lo (g l)
   in
   g t
   [@@requires is_bst]
