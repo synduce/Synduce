@@ -22,6 +22,12 @@ open Syguslib.Sygus
 *)
 let rec segis_loop (p : psi_def) (t_set : TermSet.t) : solver_response segis_response =
   Int.incr refinement_steps;
+  if !refinement_steps > !Config.refinement_rounds_warning_limit
+     && Config.Optims.some_eager_optim_on ()
+  then (
+    Log.info (fun frmt () ->
+        Fmt.pf frmt "Turning off eager optimizations after %i rounds." !refinement_steps);
+    Config.Optims.turn_off_eager_optims ());
   let elapsed = Stats.get_glob_elapsed () in
   Log.info (fun frmt () -> Fmt.pf frmt "Refinement step %i." !refinement_steps);
   let tsize = Set.length t_set
@@ -97,6 +103,11 @@ let algo_segis (p : psi_def) =
 *)
 let rec cegis_loop (p : psi_def) (t_set : TermSet.t) : solver_response segis_response =
   Int.incr refinement_steps;
+  if !refinement_steps > !Config.refinement_rounds_warning_limit
+  then (
+    Log.info (fun frmt () ->
+        Fmt.pf frmt "Turning off eager optimizations after %i rounds." !refinement_steps);
+    Config.Optims.turn_off_eager_optims ());
   let elapsed = Stats.get_glob_elapsed () in
   Log.info (fun frmt () -> Fmt.pf frmt "Refinement step %i." !refinement_steps);
   (if not !Config.info

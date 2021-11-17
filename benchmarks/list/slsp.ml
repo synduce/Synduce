@@ -1,5 +1,3 @@
-(** @synduce --no-lifting -NB -n 10  *)
-
 type list =
   | Elt of int
   | Cons of int * list
@@ -21,7 +19,7 @@ and dec l1 = function
 (* Type invariant: partitioned by sum value *)
 let rec sorted = function
   | Sglt a -> true
-  | Cat (x, piv, y) -> lmax x < piv && piv < lmin y && sorted x && sorted y
+  | Cat (x, piv, y) -> lmax x < piv && piv < lmin y
 
 and lmin = function
   | Sglt a -> a
@@ -39,14 +37,11 @@ let rec spec = function
     let mtss, cond = spec tl in
     let new_cond = hd >= 0 && cond in
     (if new_cond then mtss + hd else mtss), new_cond
-  [@@ensures fun (x, b) -> x >= 0]
 ;;
 
 let rec target = function
   | Sglt x -> [%synt s0] x
-  | Cat (l, piv, r) ->
-    if piv <= 0 then [%synt f1] (target r) else [%synt f2] piv (target r) (target l)
-  [@@requires sorted]
+  | Cat (l, piv, r) -> [%synt f2] piv (target r) (target l)
 ;;
 
 assert (target = clist_to_list @@ spec)

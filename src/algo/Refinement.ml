@@ -71,9 +71,7 @@ let rec refinement_loop ?(major = true) (p : psi_def) (lstate_in : refinement_lo
              ~t:tsize
              ~u:usize
              false;
-           Config.Optims.(
-             turn_off use_syntactic_definitions;
-             turn_off make_partial_correctness_assumption);
+           Config.Optims.turn_off_eager_optims ();
            refinement_loop ~major p lstate_in)
          else Failed RFail
        | `Correct ->

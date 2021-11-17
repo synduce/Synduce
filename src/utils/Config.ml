@@ -24,6 +24,11 @@ let timings = ref true
 (** Maximum steps of rewrites to apply during PMRS reduction (symbolic evaluation). *)
 let reduction_limit = ref 100
 
+(** After 50 refinement rounds, synthesized is probably using too many eager optimizations and
+  the solution does not follow occam's razor.
+ *)
+let refinement_rounds_warning_limit = ref 20
+
 (* Toggle to show a summary of variables used and their types. *)
 let show_vars = ref false
 

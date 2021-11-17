@@ -59,6 +59,7 @@ let use_cegis = ref false
 
 (**
   Simplify equations before feeding them to equations solver.
+  Turn off with --no-simplify
 *)
 let simplify_eqns = ref true
 
@@ -165,4 +166,14 @@ let set_max_lifting_attempts (s : string) =
     if i >= 0 && i < 64 then max_lifting_attempts := i
   with
   | _ -> ()
+;;
+
+let some_eager_optim_on () =
+  !simplify_eqns || !use_syntactic_definitions || !make_partial_correctness_assumption
+;;
+
+let turn_off_eager_optims () =
+  turn_off simplify_eqns;
+  turn_off use_syntactic_definitions;
+  turn_off make_partial_correctness_assumption
 ;;
