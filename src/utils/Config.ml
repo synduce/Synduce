@@ -89,7 +89,7 @@ let check_unrealizable = ref true
 (** Check whether a synthesis problem is unrealizable by checking whether the problem with
 second-order quantification is unrealizable, using a SMT solver (Z3 by default).
 *)
-let check_unrealizable_smt_unsatisfiable = ref true
+let check_unrealizable_smt_unsatisfiable = ref false
 
 (**
   Accept no-sat in bounded checking as unsat.
@@ -234,6 +234,7 @@ open Optims
 let options print_usage parse_only =
   [ 'b', "bmc", None, Some set_check_depth
   ; 'c', "simple-init", set simple_init true, None
+  ; 'C', "check-smt-unrealizable", set check_unrealizable_smt_unsatisfiable true, None
   ; 'u', "no-check-unrealizable", set check_unrealizable false, None
   ; 'd', "debug", set debug true, None
   ; 'f', "force-nonlinear", set force_nonlinear true, None
@@ -254,18 +255,17 @@ let options print_usage parse_only =
   ; 't', "no-detupling", set detupling_on false, None
   ; 'v', "verbose", set verbose true, None
   ; 'X', "classify-ctex", set classify_ctex true, None
-  ; 'C', "interactive-check-lemma", set interactive_check_lemma true, None
   ; '\000', "segis", set use_segis true, None
   ; '\000', "cegis", set use_cegis true, None
   ; '\000', "cvc4", set use_cvc4 true, None
   ; '\000', "cvc5", set use_cvc4 false, None
-  ; '\000', "check-smt-unrealizable", set check_unrealizable_smt_unsatisfiable true, None
   ; '\000', "const-grammars", set no_grammar_for_constants false, None
   ; '\000', "eusolver", set use_eusolver true, None
   ; '\000', "fuzzing", None, Some set_fuzzing_count
   ; '\000', "gropt-level", None, Some set_grammar_optimization_level
   ; '\000', "generate-benchmarks", None, Some set_benchmark_generation_dir
   ; '\000', "generate-proof", None, Some set_proof_output_file
+  ; '\000', "interactive-check-lemma", set interactive_check_lemma true, None
   ; '\000', "json-progress", set json_progressive true, None
   ; '\000', "max-lifting", None, Some set_max_lifting_attempts
   ; '\000', "no-assumptions", set make_partial_correctness_assumption false, None

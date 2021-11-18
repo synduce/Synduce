@@ -208,7 +208,7 @@ let print_usage () =
      unsat.\n\
     \  -B   --bounded-lemma-check       Use depth-bounded check to verify lemma \
      candidates and generate positive examples for lemma synth.\n\
-    \  -C   --interactive-check-lemma   Manually set if a lemma is true and, if not, \
+    \       --interactive-check-lemma   Manually set if a lemma is true and, if not, \
      give counterexample.\n\
     \       --parse-only                Just parse the input.\n\
     \       --show-vars                 Print variables and their types at the end.\n\
@@ -216,7 +216,7 @@ let print_usage () =
      that are provably unrealizable.\n\
     \       --generate-proof=FILE       Save a Dafny proof skeleton in file \
      (experimental).\n\
-    \       --check-smt-unrealizable    Check unrealizability using a SMT query directly.\n\
+    \  -C   --check-smt-unrealizable    Check unrealizability using a SMT query directly.\n\
     \     -> Try:\n\
      ./Synduce benchmarks/list/mps.ml@.";
   Caml.exit 0

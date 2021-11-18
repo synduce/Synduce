@@ -59,19 +59,20 @@ let smt_unsatisfiability_check (unknowns : VarSet.t) (eqns : equation list) : un
   SyncSmt.smt_assert z3 constraint_of_eqns;
   let resp = SyncSmt.check_sat z3 in
   (match resp with
-  | Unsat -> ()
+  | Unsat ->
+    Log.debug
+      Fmt.(
+        fun fmt () ->
+          pf
+            fmt
+            "Z3 query answer for unsatisfiability of synthesis problem: %a"
+            SyncSmt.pp_solver_response
+            Unsat)
   | x ->
-    Fmt.(pf stdout "Z3 unsat check failed with %a@." SyncSmt.pp_solver_response x);
-    SyncSmt.close_solver z3;
-    Caml.exit 1);
-  Log.debug
-    Fmt.(
-      fun fmt () ->
-        pf
-          fmt
-          "Z3 query answer for unsatisfiability of synthesis problem: %a"
-          SyncSmt.pp_solver_response
-          (SyncSmt.check_sat z3));
+    Log.error
+      Fmt.(
+        fun fmt () ->
+          pf fmt "Z3 unsat check failed with %a@." SyncSmt.pp_solver_response x));
   SyncSmt.close_solver z3
 ;;
 
