@@ -57,6 +57,13 @@ let smt_unsatisfiability_check (unknowns : VarSet.t) (eqns : equation list) : un
   in
   SyncSmt.exec_all z3 (preamble @ Commands.decls_of_vars unknowns);
   SyncSmt.smt_assert z3 constraint_of_eqns;
+  let resp = SyncSmt.check_sat z3 in
+  (match resp with
+  | Unsat -> ()
+  | x ->
+    Fmt.(pf stdout "Z3 unsat check failed with %a@." SyncSmt.pp_solver_response x);
+    SyncSmt.close_solver z3;
+    Caml.exit 1);
   Log.debug
     Fmt.(
       fun fmt () ->

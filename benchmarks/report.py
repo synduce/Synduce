@@ -9,11 +9,11 @@ import shutil
 
 
 def caption(exp_setup):
-    return "Experimental Results for Realizable Benchmarks.  Benchmarks are grouped by categories introduced in Section \\ref{sec:evaluation}. All times are in seconds. The best time is highlighted in bold font.  A '-' indicates timeout ($>$ 10 min). The ``I'' column indicates whether intermediate lemmas were proven by induction. Steps is a sequence of '$\\bullet$' (refinement) and '$\\circ$' (coarsening). Experiments are run on %s." % exp_setup
+    return "Experimental Results for Realizable Benchmarks.  Benchmarks are grouped by categories introduced in Section \\ref{sec:evaluation}. All times are in seconds. The best time is highlighted in bold font.  A '-' indicates timeout ($>$ 400s). The ``I'' column indicates whether intermediate lemmas were proven by induction. Steps is a sequence of '$\\bullet$' (refinement) and '$\\circ$' (coarsening). Experiments are run on %s." % exp_setup
 
 
 def caption_unrealizable(exp_setup):
-    return "Experimental Results for Unrealizable Benchmarks. All synthesis times are in seconds. The best time is highlighted in bold font.  A '-' indicates timeout ($>$ 10 min). The ``I'' column indicates whether intermediate lemmas were proven by induction. Steps is a sequence of '$\\bullet$' (refinement) and '$\\circ$' (coarsening). Experiments are run on %s." % exp_setup
+    return "Experimental Results for Unrealizable Benchmarks. All synthesis times are in seconds. The best time is highlighted in bold font.  A '-' indicates timeout ($>$ 400s). The ``I'' column indicates whether intermediate lemmas were proven by induction. Steps is a sequence of '$\\bullet$' (refinement) and '$\\circ$' (coarsening). Experiments are run on %s." % exp_setup
 
 
 def timefix(x):
@@ -107,14 +107,14 @@ def make_tex_table(exp_setup, data, output_file_name):
         ('%', str(datetime.now())))
     tex.write("%s ====================================\n" % '%')
     # open table
-    tex.write("\t{\n")
+    tex.write("\t{\small\n")
     tex.write("\t\t\\begin{longtable}[h]{|c|c|c|c|c||c|c||c|c|}\n")
     tex.write("\t\t\t\\hline\n")
     tex.write(
         "\t\t\t \multirow{2}{*}{Class} &\
                 \multirow{2}{*}{Benchmark} & \
                 \multirow{2}{*}{I?} & \
-                \multicolumn{2}{c||}{\\tool} & \
+                \multicolumn{2}{c||}{\setwogis} & \
                 \multicolumn{2}{c|}{SEGIS+UC} & \
                 \multicolumn{2}{c|}{SEGIS}\\\\ \n")
     tex.write("\t\t\t\\cline{4-9}\n")
@@ -151,13 +151,13 @@ def make_tex_unrealizables_table(exp_setup, data, output_file_name):
         ('%', str(datetime.now())))
     tex.write("%s ====================================\n" % '%')
     # open table
-    tex.write("\t{\n")
+    tex.write("\t{\small\n")
     tex.write("\t\t\\begin{longtable}[h]{|c|c|c|c||c|c|}\n")
     tex.write("\t\t\t\\hline\n")
     tex.write(
         "\t\t\t\multirow{2}{*}{Benchmark} & \
                 \multirow{2}{*}{I?} & \
-                \multicolumn{2}{c||}{\\tool} & \
+                \multicolumn{2}{c||}{\setwogis} & \
                 \multicolumn{2}{c|}{SEGIS+UC}\\\\ \n")
     tex.write("\t\t\t\\cline{3-6}\n")
     tex.write(
@@ -235,7 +235,7 @@ def save_scatter_plot(scatter_file, segis_series, se2gis_series,
         ax_max = 5*max(all_points)
         ax.set(xlim=(ax_min, ax_max),
                ylim=(ax_min, ax_max))
-        ax.set_xlabel("Synthesis time using SEGIS baseline (log)",
+        ax.set_xlabel("Synthesis time using SEGIS+UC (log)",
                       fontsize=plot_fontsize)
         ax.set_ylabel("Synthesis time using SE²GIS (log)",
                       fontsize=plot_fontsize)
@@ -266,7 +266,7 @@ def save_scatter_plot(scatter_file, segis_series, se2gis_series,
                ylim=(ax_min, ax_max))
         ax.set_xscale("log")
         ax.set_yscale("log")
-        ax.set_xlabel("Synthesis time using SEGIS (log)",
+        ax.set_xlabel("Synthesis time using SEGIS+UC (log)",
                       fontsize=plot_fontsize)
         ax.set_ylabel("Synthesis time using SE²GIS (log)",
                       fontsize=plot_fontsize)
@@ -305,6 +305,8 @@ def make_table_5(input_file, output_file):
     scatter_no_timeouts_file = input_name + "_no_timeouts_scatter.pdf"
     tex_table = input_name + "_table.tex"
     tex_table2 = input_name + "_table_unrealizable.tex"
+
+    unrealizable_benchmarks = 0
 
     table = {}
 
@@ -374,6 +376,7 @@ def make_table_5(input_file, output_file):
                     segis_timeouts += 1
 
                 if unrealizable(info[4]):
+                    unrealizable_benchmarks += 1
                     se2gis_unrealizable_series.append(floti(a))
                     segis_unrealizable_series.append(floti(b))
                     if segis0_data:
@@ -414,7 +417,14 @@ def make_table_5(input_file, output_file):
     # Output a tex table for unrealizable benchmarks
     make_tex_unrealizables_table(exp_setup, table, tex_table2)
 
-    print(f"Number of benchmarks: {len(segis_series)}")
+    print(
+        f"Number of benchmarks: {len(segis_series)} ({unrealizable_benchmarks} unrealizable cases)")
+    print(
+        f"SEGIS solves {len([x for x in segis0_series if x < timeout_value])}")
+    print(
+        f"SEGIS+UC solves {len([x for x in segis_series if x < timeout_value])}")
+    print(
+        f"SE2GIS solves {len([x for x in se2gis_series if x < timeout_value])}")
     print(f"{segis_timeouts} timeouts for SEGIS, {se2gis_timeouts} timeouts for SE2GIS.")
     print(f"SE2GIS is faster on {speedups} benchmarks.")
     print(f"Tex table    : { tex_table}  ")

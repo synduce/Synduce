@@ -243,7 +243,8 @@ constraint_benchmarks = [
     ["constraints/bst/minmax_separate.ml", ""],
     ["constraints/bst/minmax_sim.ml", ""],
     ["constraints/bst/most_frequent_v1.ml", ""],
-    ["constraints/bst/sum_gt_by_key.ml", "-NB -n 50"],
+    ["constraints/bst/sum_gt_by_key.ml", ""],
+    ["constraints/bst/sum_between.ml", ""],
     # constantlist
     ["constraints/constantlist/contains.ml", ""],
     ["constraints/constantlist/index_of.ml", ""],
@@ -473,7 +474,8 @@ show_benchmarks = {
         "minmax_separate":    [" ", "minmax (2 traversals)", "tree->tree", True],
         "minmax_sim":    [" ", "minmax (1 traversal)", "tree->tree", True],
         "most_frequent_v1":    [" ", "most frequent", "tree->tree", True],
-        "sum_gt_by_key":       [" ", "sum if key larger", "list->tree", True]
+        "sum_gt_by_key":       [" ", "sum if key larger", "list->tree", True],
+        "sum_between": [" ", "sum between", "list->tree", True],
     },
     # Constant list
     "constraints/constantlist": {
@@ -602,9 +604,9 @@ unrealizable_show_set = {
         "minmax": ["          ", "minmax", "list->list", False],
         "count_between": ["          ", "count between", "tree->tree", False],
         "count_between": ["          ", "count between (swap calls)", "tree->tree", False],
-        "count_between_swap_ec_no_gr_gl.ml": ["          ", "count between (try 1 intro)", "tree->tree", False],
-        "count_between_ec_no_gr_gl.ml": ["          ", "count between (try 2 intro)", "tree->tree", False],
-        "count_between_ec_no_gr.ml": ["          ", "count between (try 3 intro)", "tree->tree", False],
+        "count_between_swap_ec_no_gr_gl": ["          ", "count between (try 1 intro)", "tree->tree", False],
+        "count_between_ec_no_gr_gl": ["          ", "count between (try 2 intro)", "tree->tree", False],
+        "count_between_ec_no_gr": ["          ", "count between (try 3 intro)", "tree->tree", False],
         "count_between_wrong_comparison": ["          ", "count between v2", "tree->tree", False],
         "contains": ["          ", "contains", "tree->tree", False],
         "contains2": ["          ", "contains (v2)", "tree->tree", False],
