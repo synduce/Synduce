@@ -89,7 +89,6 @@ constraints/symmetric_tree/min.ml,se2gis:all, 1.207, 72,+.✓,~,✓,0.0041326522
 constraints/symmetric_tree/sum.ml,se2gis:all, 0.267, 10,+.✓,~,✓,0.003927993774414063,segis:all, 0.040, 3,++✓,✓,✓,0.02241215705871582,segis0:all, 0.040, 1,++✓,✓,✓,0.023293161392211915
 constraints/unimodal_list/max_logn_v2.ml,se2gis:all, 1.290, 51,+..✓,~,~,0.10567312240600586,segis:all, 0.216, 9,++✓,✓,✓,0.17597970962524415,segis0:all, 0.214, 12,++✓,✓,✓,0.1759119749069214
 constraints/unimodal_list/max_in_um_pos.ml,se2gis:all, 77.533, 1937,+...✓,✓,~,3.1130441427230835,segis:all, 19.548, 968,+++++✓,✓,✓,19.279350066184996,segis0:all, 19.700, 597,+++++✓,✓,✓,19.43949427604675
-constraints/unimodal_list/max_logn.ml,se2gis:all,N/A,N/A,+....,~,~,N/A,segis:all, 14.682, 803,++✓,✓,✓,14.66873278617859,segis0:all, 14.850, 862,++✓,✓,✓,14.838329100608826
 unrealizable/approximately_pareto.ml,se2gis:all, 0.023, 4,+∅,✓,✓,0.0,segis:all, 0.041, 5,++∅,✓,✓,0.007956385612487793,segis0:all,N/A,N/A,f2,N/A,N/A,N/A
 unrealizable/balanced_tree_logn_sum.ml,se2gis:all, 0.028, 4,+∅,✓,✓,0.0,segis:all, 0.023, 0,++∅,✓,✓,0.008712959289550782,segis0:all,N/A,N/A,f2,N/A,N/A,N/A
 unrealizable/common_elt.ml,se2gis:all, 0.030, 11,+∅,✓,✓,0.0,segis:all, 0.026, 2,++∅,✓,✓,0.007726311683654785,segis0:all,N/A,N/A,f2,N/A,N/A,N/A
@@ -136,3 +135,4 @@ tree/mits_nosum.ml,se2gis:all, 0.064, 3,++∅,✓,✓,0.005246496200561524,segis
 unimodal_lists/prod_needs_aux.ml,se2gis:all, 0.691, 84,+∅,✓,✓,0.0,segis:all,N/A,N/A,f21,N/A,N/A,N/A,segis0:all,N/A,N/A,f21,N/A,N/A,N/A
 constraints/bst/check_no_subtree_sum_gt2.ml,se2gis:all, 6.490, 42,+........✓,~,~,0.011095023155212403,segis:all, 0.169, 52,++✓,✓,✓,0.0894860029220581,segis0:all, 0.157, 17,++✓,✓,✓,0.0868694543838501
 constraints/bst/sum_between.ml,se2gis:all, 0.684, 18,+..✓,~,✓,0.004299330711364746,segis:all,N/A,N/A,f2,N/A,N/A,N/A,segis0:all,N/A,N/A,f2,N/A,N/A,N/A
+constraints/unimodal_list/max_logn.ml,se2gis:all, 5.299, 329,+...✓,~,✓,0.33604476451873777,segis:all, 21.125, 1247,++✓,✓,✓,21.11149835586548,segis0:all, 21.065, 1201,++✓,✓,✓,21.04673659801483
