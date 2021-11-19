@@ -218,6 +218,7 @@ constraint_benchmarks = [
     ["constraints/alist/count_eq2.ml", "-NB"],
     ["constraints/alist/count_eq.ml", ""],
     ["constraints/alist/most_frequent.ml", ""],
+    ["constraints/alist/most_frequent_v2.ml", ""],
     ["constraints/alist/sums.ml", ""],
     # all positive
     ["constraints/all_positive/list_mps.ml", ""],
@@ -362,6 +363,7 @@ unrealizable_benchmarks = [
     ["unrealizable/nested_min_sum_max_mts.ml", "", False],
     ["unrealizable/lpeak_noimf.ml", "", False],
     ["unrealizable/memo_max.ml", "", False],
+    ["unrealizable/most_frequent_noinv.ml", "", False],
     ["unrealizable/mps_in_partitioned_list.ml", "", False],
     ["unrealizable/nested_min_max_mixed.ml", "", False],
     ["unrealizable/pyramid_maxsort.ml", "", False],
@@ -450,7 +452,9 @@ show_benchmarks = {
         "count_eq":      ["  Association ", "count mems", "list->list", True],
         "sums":          ["   List       ",  "sum for matching keys", "list->list", True],
         "most_frequent":  ["              ",
-                           "most frequent val.", "list->list", True],
+                           "most frequent (alist)", "list->list", True],
+        "most_frequent_v2":  ["              ",
+                              "most frequent (unique keys)", "list->alist", True],
     },
     # Balanced tree
     "constraints/balanced_tree": {
@@ -602,6 +606,7 @@ unrealizable_show_set = {
         "balanced_tree_logn_sum": ["          ", "sum ", "tree->tree", False],
         "twosum": ["          ", "two-sum", "list->list", False],
         "minmax": ["          ", "minmax", "list->list", False],
+        "most_frequent_noinv": ["  ", "most freq. no invariant", "list->alist", False],
         "count_between": ["          ", "count between", "tree->tree", False],
         "count_between": ["          ", "count between (swap calls)", "tree->tree", False],
         "count_between_swap_ec_no_gr_gl": ["          ", "count between (try 1 intro)", "tree->tree", False],

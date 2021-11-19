@@ -1,26 +1,38 @@
-type list = Nil | Cons of int * list
+(** @synduce --no-lifting *)
 
-type nat = Z | S of nat
+type list =
+  | Nil
+  | Cons of int * list
 
-type unique_list = ANil | ACons of int * unique_list
-
-let rec is_alist = function ANil -> true | ACons (hdk, tl) -> keys_differ hdk tl && is_alist tl
+let rec is_unique_list = function
+  | Nil -> true
+  | Cons (hdk, tl) -> keys_differ hdk tl && is_unique_list tl
 
 and keys_differ key = function
-  | ANil -> true
-  | ACons (hdk, tl) -> (not (hdk = key)) && keys_differ key tl
+  | Nil -> true
+  | Cons (hdk, tl) -> (not (hdk = key)) && keys_differ key tl
+;;
 
-let rec repr = function ANil -> Nil | ACons (hdk, tl) -> Cons (hdk, repr tl)
+let rec repr = function
+  | Nil -> Nil
+  | Cons (hdk, tl) -> Cons (hdk, repr tl)
+;;
 
 (* Count keys matching a. *)
 let spec a l =
-  let rec f = function Nil -> 0 | Cons (hd, tl) -> if hd = a then 1 + f tl else f tl in
+  let rec f = function
+    | Nil -> 0
+    | Cons (hd, tl) -> if hd = a then 1 + f tl else f tl
+  in
   f l
+;;
 
 let target a l =
   let rec g = function
-    | ANil -> [%synt s0] a
-    | ACons (hd_key, tl) -> if hd_key = a then [%synt f0] hd_key else [%synt f1] hd_key (g tl)
+    | Nil -> [%synt s0] a
+    | Cons (hd_key, tl) ->
+      if hd_key = a then [%synt f0] hd_key else [%synt f1] hd_key (g tl)
   in
   g l
-  [@@requires is_alist]
+  [@@requires is_unique_list]
+;;
