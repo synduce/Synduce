@@ -136,3 +136,5 @@ unimodal_lists/prod_needs_aux.ml,se2gis:all, 0.691, 84,+∅,✓,✓,0.0,segis:al
 constraints/bst/check_no_subtree_sum_gt2.ml,se2gis:all, 6.490, 42,+........✓,~,~,0.011095023155212403,segis:all, 0.169, 52,++✓,✓,✓,0.0894860029220581,segis0:all, 0.157, 17,++✓,✓,✓,0.0868694543838501
 constraints/bst/sum_between.ml,se2gis:all, 0.684, 18,+..✓,~,✓,0.004299330711364746,segis:all,N/A,N/A,f2,N/A,N/A,N/A,segis0:all,N/A,N/A,f2,N/A,N/A,N/A
 constraints/unimodal_list/max_logn.ml,se2gis:all, 5.299, 329,+...✓,~,✓,0.33604476451873777,segis:all, 21.125, 1247,++✓,✓,✓,21.11149835586548,segis0:all, 21.065, 1201,++✓,✓,✓,21.04673659801483
+constraints/alist/most_frequent_v2.ml,se2gis:all, 8.766, 655,++++✓,✓,✓,8.321503901481629,segis:all, 2.121, 143,+++++✓,✓,✓,0.08858199119567871,segis0:all, 2.082, 133,+++++✓,✓,✓,0.09140598773956299
+unrealizable/most_frequent_noinv.ml,se2gis:all, 0.523, 18,++++∅,✓,✓,0.0392153263092041,segis:all,N/A,N/A,f6,N/A,N/A,N/A,segis0:all,N/A,N/A,f6,N/A,N/A,N/A
