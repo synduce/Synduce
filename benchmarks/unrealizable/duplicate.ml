@@ -1,4 +1,8 @@
-type 'a list = Nil | Cons of 'a * 'a list
+(** @synduce --no-lifting *)
+
+type 'a list =
+  | Nil
+  | Cons of 'a * 'a list
 
 let rec has_dup = function
   | Nil -> 0
@@ -7,10 +11,14 @@ let rec has_dup = function
 and dups_of x = function
   | Nil -> 0
   | Cons (hd, tl) ->
-      let i = dups_of x tl in
-      if hd = x then i + 1 else i
+    let i = dups_of x tl in
+    if hd = x then i + 1 else i
+;;
 
-type 'a clist = CNil | Single of 'a | Concat of 'a clist * 'a clist
+type 'a clist =
+  | CNil
+  | Single of 'a
+  | Concat of 'a clist * 'a clist
 
 let rec clist_to_list = function
   | CNil -> Nil
@@ -21,11 +29,12 @@ and dec l1 = function
   | CNil -> clist_to_list l1
   | Single a -> Cons (a, clist_to_list l1)
   | Concat (x, y) -> dec (Concat (y, l1)) x
+;;
 
 let rec target = function
   | CNil -> [%synt s0]
   | Single a -> [%synt f0] a
   | Concat (x, y) -> [%synt join] (target x) (target y)
-
 ;;
+
 assert (target = clist_to_list @@ has_dup)

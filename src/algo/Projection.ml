@@ -18,12 +18,15 @@ let rec simple_flattening (tl : term list) =
 (* ============================================================================================= *)
 
 (** Construct the projection functions for the given variable.
+  The character '$' is used to build projections and should not be used anywhere else.
+  (It is compatible with usage in smtlib but not in the ocaml program.)
 *)
 let mk_projs (targs : RType.t list) (tl : RType.t list) (xi : Variable.t) =
   let f i t =
     match targs with
-    | [] -> Variable.mk ~t:(Some t) (xi.vname ^ Int.to_string i)
-    | _ -> Variable.mk ~t:(Some (RType.fun_typ_pack targs t)) (xi.vname ^ Int.to_string i)
+    | [] -> Variable.mk ~t:(Some t) (xi.vname ^ "$" ^ Int.to_string i)
+    | _ ->
+      Variable.mk ~t:(Some (RType.fun_typ_pack targs t)) (xi.vname ^ "$" ^ Int.to_string i)
   in
   List.mapi ~f tl
 ;;
