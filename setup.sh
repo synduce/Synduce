@@ -184,16 +184,15 @@ git submodule update
 # Running tests
 sep "Calling the tool, should print help message..."
 ./Synduce -h
-echo "Running the tool on the benchmarks should take 10 to 40 minutes."
+echo "Running the tool on a small suite of benchmarks should take less than a minute."
 echo "Would you like to run Synduce on the benchmarks [y/N] ?"
 read RUNTESTS
 case $RUNTESTS in
     'y')
-    sep "Running tests: should take about 10mins..."
-    ./test/runtests.sh
+    sep "Running small test suite: should take less than a minute.."
+    python3 benchmarks/test.py -b small
     ;;
     *)
     echo "Skipping tests."
 esac
-sep "  Please update your environment (source $HOME/.profile) before running the tool."
-
+sep "  Please update your environment (\"source $HOME/.profile\" or relevant dotfile) before running the tool."
