@@ -7,12 +7,11 @@ module IC = Stdio.In_channel
 open Lwt.Syntax
 
 (* Logging utilities. *)
+
 let pp_link frmt target =
   Fmt.(styled `Underline (styled (`Fg `Green) string)) frmt ("file://" ^ target)
 ;;
 
-(** Logger for the solvers. A solver might log error, debug and verbose messages.
-*)
 module type Logger = sig
   val error : (Formatter.t -> unit -> unit) -> unit
   val debug : (Formatter.t -> unit -> unit) -> unit
@@ -22,7 +21,6 @@ module type Logger = sig
   val log_queries : bool
 end
 
-(** An empty logging module that can be used to create silent solver instances.  *)
 module EmptyLog : Logger = struct
   let error _ = ()
   let debug _ = ()
@@ -32,7 +30,6 @@ module EmptyLog : Logger = struct
   let log_queries = false
 end
 
-(** A module signature to log satistics about solver usage. *)
 module type Statistics = sig
   val log_proc_start : int -> unit
   val log_solver_start : int -> string -> unit

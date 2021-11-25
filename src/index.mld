@@ -16,7 +16,7 @@ and SyGuS components. Some program analysis algorithms are also implemented in L
 algorithms should be reusable for other synthesis problems and not only the ones of Synduce.
 
 {1 Front End }
-{!module-Parsers} provides the front-end functionality of Synduce.
+{!module-Frontend} provides the front-end functionality of Synduce.
 
 {1 SmtLib Interface }
 {!module-Smtlib} provides an implementation to interact with SMT-LIB compliant solvers. The internal
