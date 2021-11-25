@@ -229,7 +229,7 @@ let check_unrealizable (unknowns : VarSet.t) (eqns : equation_system)
       | Some (rhs_args_ij, (lhs_i, lhs_j)) ->
         let lhs_diff =
           let projs = projection_eqns lhs_i (substitution sub lhs_j) in
-          List.map ~f:(fun (ei, ej) -> mk_un Not (mk_bin Eq ei ej)) projs
+          List.map ~f:(fun (ei, ej) -> Terms.(~!(ei == ej))) projs
         in
         (* (push). *)
         let* () = AsyncSmt.spush solver in
@@ -276,7 +276,7 @@ let check_unrealizable (unknowns : VarSet.t) (eqns : equation_system)
               in
               Lwt_list.iter_s
                 (fun (lhs, rhs) ->
-                  AsyncSmt.smt_assert solver (smt_of_term (mk_bin Eq lhs rhs)))
+                  AsyncSmt.smt_assert solver (smt_of_term Terms.(lhs == rhs)))
                 rhs_eqs)
             rhs_args_ij
         in

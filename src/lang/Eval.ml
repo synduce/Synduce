@@ -5,6 +5,15 @@ open Utils
 let simplify t =
   let rrule t =
     match t.tkind with
+    | TUn (Unop.Neg, t1) ->
+      (match t1.tkind with
+      | TConst (Constant.CInt i) -> mk_const (Constant.CInt (-i))
+      | _ -> t)
+    | TUn (Unop.Not, t1) ->
+      (match t1.tkind with
+      | TConst Constant.CTrue -> mk_const Constant.CFalse
+      | TConst Constant.CFalse -> mk_const Constant.CTrue
+      | _ -> t)
     | TBin (Binop.Plus, t1, t2) ->
       (match t1.tkind, t2.tkind with
       | TConst (Constant.CInt i1), TConst (Constant.CInt i2) ->
@@ -18,6 +27,36 @@ let simplify t =
         mk_const (Constant.CInt (i1 - i2))
       | TConst (Constant.CInt 0), _ -> mk_un Unop.Neg t2
       | _, TConst (Constant.CInt 0) -> t1
+      | _, _ -> t)
+    | TBin (Binop.Max, t1, t2) ->
+      (match t1.tkind, t2.tkind with
+      | TConst (Constant.CInt i1), TConst (Constant.CInt i2) ->
+        mk_const (Constant.CInt (max i1 i2))
+      | _, _ -> t)
+    | TBin (Binop.Min, t1, t2) ->
+      (match t1.tkind, t2.tkind with
+      | TConst (Constant.CInt i1), TConst (Constant.CInt i2) ->
+        mk_const (Constant.CInt (max i1 i2))
+      | _, _ -> t)
+    | TBin (Binop.Gt, t1, t2) ->
+      (match t1.tkind, t2.tkind with
+      | TConst (Constant.CInt i1), TConst (Constant.CInt i2) ->
+        mk_const (if i1 > i2 then CTrue else CFalse)
+      | _, _ -> if Terms.equal t1 t2 then mk_const CFalse else t)
+    | TBin (Binop.Lt, t1, t2) ->
+      (match t1.tkind, t2.tkind with
+      | TConst (Constant.CInt i1), TConst (Constant.CInt i2) ->
+        mk_const (if i1 < i2 then CTrue else CFalse)
+      | _, _ -> if Terms.equal t1 t2 then mk_const CFalse else t)
+    | TBin (Binop.Ge, t1, t2) ->
+      (match t1.tkind, t2.tkind with
+      | TConst (Constant.CInt i1), TConst (Constant.CInt i2) ->
+        mk_const (if i1 >= i2 then CTrue else CFalse)
+      | _, _ -> t)
+    | TBin (Binop.Le, t1, t2) ->
+      (match t1.tkind, t2.tkind with
+      | TConst (Constant.CInt i1), TConst (Constant.CInt i2) ->
+        mk_const (if i1 <= i2 then CTrue else CFalse)
       | _, _ -> t)
     | TBin (Binop.Times, t1, t2) ->
       (match t1.tkind, t2.tkind with
@@ -93,7 +132,8 @@ let simplify t =
   until_stable 0 t
 ;;
 
-let in_model (vmap : term VarMap.t) (t : term) =
+let in_model ?(no_simplify = false) (vmap : term VarMap.t) (t : term) =
+  let simplify = if no_simplify then identity else simplify in
   let remap _ t =
     match t.tkind with
     | TVar v -> Map.find vmap v

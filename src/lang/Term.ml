@@ -4,6 +4,7 @@ open Utils
 module O = Option
 
 let dummy_loc : position * position = dummy_pos, dummy_pos
+let pp_nice = ref true
 
 (* ----------------------------------------------------- *)
 
@@ -184,6 +185,7 @@ module VarSet = struct
   let max_elt = Set.max_elt
   let min_elt = Set.max_elt
   let find_by_id vs id : elt option = max_elt (Set.filter ~f:(fun elt -> elt.vid = id) vs)
+  let filter_map (vs : t) ~f = Set.filter_map ~f (module Variable) vs
   let has_name vs name : bool = Set.exists ~f:(fun elt -> String.equal elt.vname name) vs
 
   let find_by_name vs name : elt option =
@@ -1265,8 +1267,8 @@ let rec pp_pattern (frmt : Formatter.t) (p : pattern) =
 let pp_term (frmt : Formatter.t) (x : term) =
   let rec aux (paren : bool) (frmt : Formatter.t) (t : term) =
     match t.tkind with
-    | TConst c -> pf frmt "%a" Constant.pp c
-    | TVar v -> pf frmt "%a" Variable.pp v
+    | TConst c -> pf frmt "%a" (styled (`Fg `Cyan) Constant.pp) c
+    | TVar v -> pf frmt "%a" (styled (`Fg `Blue) Variable.pp) v
     | TBox t -> (aux paren) frmt t
     | TBin (op, t1, t2) ->
       (match op with
@@ -1274,6 +1276,16 @@ let pp_term (frmt : Formatter.t) (x : term) =
         if paren
         then pf frmt "@[<hov 2>(%a@;%a@;%a)@]" Binop.pp op (aux true) t1 (aux true) t2
         else pf frmt "@[<hov 2>%a@;%a@;%a@]" Binop.pp op (aux true) t1 (aux true) t2
+      | Binop.Or when !pp_nice ->
+        (match t1.tkind with
+        | TUn (Unop.Not, ante) ->
+          if paren
+          then pf frmt "@[<hov 2>(%a@;=>@;%a)@]" (aux false) ante (aux false) t2
+          else pf frmt "@[<hov 2>%a@;=>@;%a@]" (aux false) ante (aux false) t2
+        | _ ->
+          if paren
+          then pf frmt "@[<hov 2>(%a@;%a@;%a)@]" (aux true) t1 Binop.pp op (aux true) t2
+          else pf frmt "@[<hov 2>%a@;%a@;%a@]" (aux true) t1 Binop.pp op (aux true) t2)
       | _ ->
         if paren
         then pf frmt "@[<hov 2>(%a@;%a@;%a)@]" (aux true) t1 Binop.pp op (aux true) t2
