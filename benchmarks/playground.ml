@@ -1,8 +1,6 @@
-include ConsList
+(** @synduce -I ConsList.ml *)
 
-type 'a slist =
-  | Elt of 'a
-  | Cons of 'a * 'a slist
+open ConsList
 
 let spec x l =
   let rec f = function

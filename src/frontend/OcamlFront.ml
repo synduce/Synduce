@@ -13,7 +13,9 @@ let psi_comps : (string * string * string) option ref = ref None
 
 let option_parse (vals : string list) =
   let placeholder = ref false in
-  Log.debug_msg Fmt.(str "Option given in file: %a." (list ~sep:comma string) vals);
+  Log.debug
+    Fmt.(
+      fun fmt () -> pf fmt "@[Option given in file:@;%a@]" (list ~sep:comma string) vals);
   Getopt.parse
     (Config.options (fun _ -> ()) placeholder)
     (fun _ -> ())
@@ -478,14 +480,26 @@ let declare_synt_obj (assert_expr : expression) =
     ()
 ;;
 
-let parse_ocaml (filename : string) =
-  let definitions = read_sig filename in
-  let per_def def =
+let parse_ocaml (input_file_name : string) =
+  let input_folder_name = FilePath.dirname input_file_name in
+  let definitions = read_sig input_file_name in
+  let seek_options def =
     match def.pstr_desc with
     (* Toplevel attributes can be used to set some options *)
-    | Pstr_attribute attribute ->
-      parse_option attribute;
-      []
+    | Pstr_attribute attribute -> parse_option attribute
+    | _ -> ()
+  in
+  List.iter definitions ~f:seek_options;
+  let pre_definitions =
+    List.concat_map
+      ~f:(fun pre_f ->
+        let include_file_name = FilePath.make_filename [ input_folder_name; pre_f ] in
+        Log.debug_msg (Fmt.str "Parsing %s" include_file_name);
+        read_sig include_file_name)
+      !Config.included_files
+  in
+  let seek_defs def =
+    match def.pstr_desc with
     | Pstr_type (rec_flag, ps_type_decls) ->
       (* match type definitions. *)
       type_definitions rec_flag ps_type_decls
@@ -500,6 +514,6 @@ let parse_ocaml (filename : string) =
     | Pstr_open _include_declaration -> []
     | _ -> []
   in
-  let defs = List.concat (List.map ~f:per_def definitions) in
+  let defs = List.concat (List.map ~f:seek_defs (pre_definitions @ definitions)) in
   defs, !psi_comps
 ;;
