@@ -25,8 +25,8 @@
    (run menhir %{parser} --base %{parser} --compile-errors %{msg}))))
 
 (library
- (name parsers)
- (public_name Synduce.Lib.Parsers)
+ (name frontend)
+ (public_name Synduce.Lib.Frontend)
  (libraries str lang sexplib utils fmt menhirLib stdio compiler-libs)
  (preprocess
   (pps ppx_optcomp)))

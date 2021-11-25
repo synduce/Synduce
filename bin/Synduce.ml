@@ -1,8 +1,8 @@
-open Lang
 open Base
 open Fmt
-open Parsers
-open Utils
+open Lib.Lang
+open Lib.Parsers
+open Lib.Utils
 
 let parse_only = ref false
 

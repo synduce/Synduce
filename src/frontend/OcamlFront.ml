@@ -496,6 +496,8 @@ let parse_ocaml (filename : string) =
       (* match assert ... for declaration of synthesis objectives. *)
       declare_synt_obj maybe_synt_obj;
       []
+    | Pstr_include _include_declaration -> []
+    | Pstr_open _include_declaration -> []
     | _ -> []
   in
   let defs = List.concat (List.map ~f:per_def definitions) in

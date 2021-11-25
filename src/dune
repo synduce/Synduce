@@ -1,7 +1,7 @@
 (library
  (name Lib)
  (public_name Synduce.Lib)
- (libraries base fmt unix ppx_let utils lang parsers algo codegen))
+ (libraries base fmt unix ppx_let utils lang frontend algo codegen))
 
 (documentation
  (mld_files index))

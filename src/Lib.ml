@@ -1,8 +1,8 @@
-module Parsers = Parsers
+(* Expose part of the functionality of the executable in the Lib.  *)
+module Parsers = Frontend.Parsers
 module Utils = Utils
 module Algos = Algo.Refinement
-
-(* Expose part of the functionality of the executable in the Lib.  *)
+module Lang = Lang
 open Algo
 open AState
 open Base
