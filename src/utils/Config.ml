@@ -220,6 +220,13 @@ let set_proof_output_file (s : string) =
   proof_generation_file := s
 ;;
 
+let included_files : string list ref = ref []
+
+let set_included_files (s : string) =
+  let files = String.split ~on:',' s in
+  included_files := List.map ~f:String.strip files
+;;
+
 (* ============================================================================================= *)
 (*                  SYSTEM OF EQUATIONS OPTIMIZATION FLAGS                                       *)
 (* ============================================================================================= *)
@@ -240,7 +247,7 @@ let options print_usage parse_only =
   ; 'f', "force-nonlinear", set force_nonlinear true, None
   ; 'h', "help", Some print_usage, None
   ; 'i', "info-off", set info false, None
-  ; 'I', "interactive", set interactive_lemmas true, None
+  ; 'I', "include", None, Some set_included_files
   ; 'j', "json", Some set_json_out, None
   ; 'J', "interactive-lifting", set interactive_lifting true, None
   ; 'k', "post-bounding", set bound_after_verif true, None
@@ -265,6 +272,7 @@ let options print_usage parse_only =
   ; '\000', "gropt-level", None, Some set_grammar_optimization_level
   ; '\000', "generate-benchmarks", None, Some set_benchmark_generation_dir
   ; '\000', "generate-proof", None, Some set_proof_output_file
+  ; '\000', "interactive", set interactive_lemmas true, None
   ; '\000', "interactive-check-lemma", set interactive_check_lemma true, None
   ; '\000', "json-progress", set json_progressive true, None
   ; '\000', "max-lifting", None, Some set_max_lifting_attempts

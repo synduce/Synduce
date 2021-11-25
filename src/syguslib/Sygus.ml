@@ -503,12 +503,16 @@ let sexp_of_command (c : command) : Sexp.t =
         ; gramm
         ]
     | None ->
-      List
-        [ Atom "synth-inv"
-        ; Atom name
-        ; List (List.map ~f:sexp_of_sorted_var args)
-        ; sexp_of_sygus_sort (SId (IdSimple "Bool"))
-        ])
+      if !use_v1
+      then
+        List [ Atom "synth-inv"; Atom name; List (List.map ~f:sexp_of_sorted_var args) ]
+      else
+        List
+          [ Atom "synth-fun"
+          ; Atom name
+          ; List (List.map ~f:sexp_of_sorted_var args)
+          ; sexp_of_sygus_sort (SId (IdSimple "Bool"))
+          ])
   | CDeclareDataType (name, dtdecls) ->
     List
       [ Atom "declare-datatype"
@@ -675,11 +679,6 @@ let is_setter_command (c : SyCommand.t) =
   | _ -> false
 ;;
 
-(**
-   A SyGuS input is not well-formed if it specifies a list of commands that do not meet the restrictions given
-   in this section regarding their order. The order is specified by the following regular pattern:
-   ```(set logic command)? (setter commands)∗(other sygus_commands)∗```
-*)
 let is_well_formed (p : program) : bool =
   let setter_then_other l =
     let _, b =
