@@ -55,21 +55,28 @@ let find_missing_argument
   let unknowns_in_use =
     VarSet.filter_map fv ~f:(find_matching_unknown pb.psi_target.psyntobjs)
   in
-  List.iter diff ~f:(fun (v, (_val1, _val2)) ->
-      if (not (Set.mem rhs_args v))
-         && not Variable.(List.mem ~equal pb.psi_target.pargs v)
-      then (
-        match
-          List.find c.ctex_eqn.eelim ~f:(fun (_, tscalar) ->
-              Set.mem (Analysis.free_variables tscalar) v)
-        with
-        | Some (trec, _) ->
-          msg_missing_arg
-            true
-            unknowns_in_use
-            (mk_app (mk_var pb.psi_target.pmain_symb) [ trec ])
-        | _ -> msg_missing_arg false unknowns_in_use (mk_var v))
-      else ())
+  let say_diff (v, (_val1, _val2)) =
+    if not (Set.mem rhs_args v)
+    then (
+      match
+        List.find c.ctex_eqn.eelim ~f:(fun (_, tscalar) ->
+            Set.mem (Analysis.free_variables tscalar) v)
+      with
+      | Some (trec, _) ->
+        msg_missing_arg
+          true
+          unknowns_in_use
+          (mk_app (mk_var pb.psi_target.pmain_symb) [ trec ])
+      | _ -> msg_missing_arg false unknowns_in_use (mk_var v))
+    else ()
+  in
+  let pargs_diffs, pnonargs_diff =
+    List.partition_tf diff ~f:(fun (v, _) ->
+        Variable.(List.mem ~equal pb.psi_target.pargs v))
+  in
+  match pnonargs_diff with
+  | [] -> List.iter pargs_diffs ~f:say_diff
+  | _ -> List.iter pnonargs_diff ~f:say_diff
 ;;
 
 let find_missing_delta (pb : psi_def) (ctex : unrealizability_ctex) =
