@@ -367,14 +367,18 @@ let infer_pmrs_types (prog : t) =
       let%map invariant =
         Option.map ~f:(fun ens -> first (infer_type ens)) spec.requires
       in
-      (* Check that input of requires is same as input of function. *)
+      (* Check that input of requires is same as input of function (without parameters). *)
       let req_t_in, _ = RType.fun_typ_unpack invariant.ttyp in
       let err_msg =
         Fmt.(
           str
-            "Input type of @@requires of %s does not match input type of %s."
+            "Input type of @@requires of %s (%a) does not match input type of %s (%a)."
             prog.pvar.vname
-            prog.pvar.vname)
+            (list ~sep:ast RType.pp)
+            req_t_in
+            prog.pvar.vname
+            (list ~sep:ast RType.pp)
+            typ_in)
       in
       match List.zip req_t_in typ_in with
       | List.Or_unequal_lengths.Ok t ->

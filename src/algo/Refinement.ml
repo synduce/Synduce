@@ -141,7 +141,7 @@ let psi (p : psi_def) =
   if Set.is_empty t_set
   then (
     Log.error_msg "Empty set of terms for equation system.";
-    failwith "Cannot solve problem.")
+    Failed RFail)
   else (
     refinement_steps := 0;
     refinement_loop
