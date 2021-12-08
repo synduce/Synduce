@@ -21,11 +21,11 @@ type proc_time_info =
 let _TIME_TABLE_ : (int, proc_time_info) Hashtbl.t = Hashtbl.create ~size:100 (module Int)
 let _PID_TABLE_ : (int, string) Hashtbl.t = Hashtbl.create ~size:100 (module Int)
 
-let solver_kind_pids : (string, int list) Hashtbl.t =
+let _SOLVER_KIND_PIDS_ : (string, int list) Hashtbl.t =
   Hashtbl.create ~size:3 (module String)
 ;;
 
-let get_solver_pids () = Hashtbl.to_alist solver_kind_pids
+let get_solver_pids () = Hashtbl.to_alist _SOLVER_KIND_PIDS_
 let _PID_ = ref (-2)
 
 let log_proc_start (pid : int) =
@@ -140,7 +140,7 @@ let add_verif_time (t : float) = verif_time := !verif_time +. t
 let log_solver_start (pid : int) (name : string) =
   log_proc_start pid;
   Hashtbl.set _PID_TABLE_ ~key:pid ~data:name;
-  Hashtbl.add_multi solver_kind_pids ~key:name ~data:pid
+  Hashtbl.add_multi _SOLVER_KIND_PIDS_ ~key:name ~data:pid
 ;;
 
 (* ============================================================================================= *)
@@ -263,4 +263,21 @@ let log_minor_step ~(synth_time : float) ~(auxtime : float) (lifted : bool) : un
     let entry_name = Fmt.(str "failure_%i" (List.length x - 2)) in
     Stack.push refinement_log (x @ [ entry_name, json ])
   | None -> Stack.push refinement_log [ "failure_0", json ]
+;;
+
+let restart () =
+  (* Clear process loggin fields. *)
+  _PID_ := -2;
+  Hashtbl.clear _PID_TABLE_;
+  Hashtbl.clear _TIME_TABLE_;
+  Hashtbl.clear _SOLVER_KIND_PIDS_;
+  verif_time := 0.0;
+  (* Clear refinement step logging fields. *)
+  Stack.clear refinement_log;
+  major_step_counter := 0;
+  last_lemma_proved := None;
+  last_lemma_synthesized := None;
+  counterexample_classification_method := None;
+  (* Restart global time. *)
+  glob_start ()
 ;;

@@ -258,7 +258,7 @@ let options print_usage parse_only =
   ; 'N', "no-sat-as-unsat", set no_bounded_sat_as_unsat true, None
   ; 'B', "bounded-lemma-check", set bounded_lemma_check true, None
   ; 'o', "output", None, Some set_output_folder
-  ; 's', "no-splitting", set split_solve_on false, None
+  ; 's', "max-solutions", None, Some set_max_solutions
   ; 't', "no-detupling", set detupling_on false, None
   ; 'v', "verbose", set verbose true, None
   ; 'X', "classify-ctex", set classify_ctex true, None
@@ -278,6 +278,7 @@ let options print_usage parse_only =
   ; '\000', "max-lifting", None, Some set_max_lifting_attempts
   ; '\000', "no-assumptions", set make_partial_correctness_assumption false, None
   ; '\000', "no-gropt", set optimize_grammars 0, None
+  ; '\000', "no-splitting", set split_solve_on false, None
   ; '\000', "no-lifting", set attempt_lifting false, None
   ; '\000', "no-simplify", set simplify_eqns false, None
   ; '\000', "no-syndef", set use_syntactic_definitions false, None

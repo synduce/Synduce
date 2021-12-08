@@ -122,7 +122,7 @@ let rec refinement_loop ?(major = true) (p : psi_def) (lstate_in : refinement_lo
     | _ -> Failed RFail)
 ;;
 
-let psi (p : psi_def) =
+let se2gis (p : psi_def) =
   (* Initialize sets with the most general terms. *)
   let t_set, u_set =
     if !Config.Optims.simple_init
@@ -215,7 +215,7 @@ let find_problem_components
       no_synth ()
   in
   (* Target recursion scheme. *)
-  let target_f, theta =
+  let target_f, theta_0 =
     let target_f =
       match Map.find pmrs_map target_fname with
       | Some pmrs -> pmrs
@@ -229,11 +229,14 @@ let find_problem_components
       no_synth ()
   in
   (* Match origin and target recursion scheme types. *)
-  (match RType.fun_typ_unpack theta_to_tau with
-  | [ theta' ], tau' -> PMRS.unify_two_with_update (theta, theta') (tau, tau')
-  | _ ->
-    Log.error_msg "Representation function should be a function.";
-    Log.fatal ());
+  let subtheta =
+    match RType.fun_typ_unpack theta_to_tau with
+    | [ theta' ], tau' -> PMRS.unify_two_with_vartype_update (theta_0, theta') (tau, tau')
+    | _ ->
+      Log.error_msg "Representation function should be a function.";
+      Log.fatal ()
+  in
+  let theta = RType.(sub_all (mkv subtheta) theta_0) in
   Term.(
     let reference_out = Variable.vtype_or_new reference_f.pmain_symb in
     let target_out = Variable.vtype_or_new target_f.pmain_symb in
@@ -275,7 +278,8 @@ let find_problem_components
   in
   let problem =
     sync_args
-      { psi_target = target_f
+      { psi_id = AState.new_psi_id ()
+      ; psi_target = target_f
       ; psi_reference = reference_f
       ; psi_repr = repr_pmrs
       ; psi_tinv = tinv_pmrs
@@ -329,7 +333,7 @@ let find_problem_components
 let solve_problem
     (psi_comps : (string * string * string) option)
     (pmrs : (string, PMRS.t, Base.String.comparator_witness) Map.t)
-    : psi_def * solver_response segis_response
+    : (psi_def * solver_response segis_response) list
   =
   (*  Find problem components *)
   let target_fname, spec_fname, repr_fname =
@@ -339,12 +343,37 @@ let solve_problem
       Utils.Log.debug_msg "Using default names.";
       "target", "spec", "repr"
   in
-  let problem = find_problem_components (target_fname, spec_fname, repr_fname) pmrs in
-  (* Solve the problem. *)
-  ( problem
-  , if !Config.Optims.use_segis
-    then Baselines.algo_segis problem
+  let top_userdef_problem =
+    find_problem_components (target_fname, spec_fname, repr_fname) pmrs
+  in
+  let algo =
+    if !Config.Optims.use_segis
+    then Baselines.algo_segis
     else if !Config.Optims.use_cegis
-    then Baselines.algo_cegis problem
-    else psi problem )
+    then Baselines.algo_cegis
+    else se2gis
+  in
+  (* Solve the problem. *)
+  let problems =
+    if !Config.Optims.max_solutions < 0
+    then [ top_userdef_problem ]
+    else PEnum.enumerate_p top_userdef_problem
+  in
+  let rec f (i, sols, fails) l =
+    if List.length sols >= max 1 !Config.Optims.max_solutions
+    then sols, fails
+    else (
+      match l with
+      | low_problem :: tl ->
+        AlgoLog.show_new_rskel i low_problem;
+        let maybe_solution = algo low_problem in
+        (* Print state and save. *)
+        LogJson.save_stats_and_restart low_problem.psi_id;
+        (match maybe_solution with
+        | Realizable soln -> f (i + 1, (low_problem, Realizable soln) :: sols, fails) tl
+        | _ as res -> f (i + 1, sols, (low_problem, res) :: fails) tl)
+      | _ -> sols, fails)
+  in
+  let solutions, unrealized_or_failed = f (1, [], []) problems in
+  List.rev solutions @ List.rev unrealized_or_failed
 ;;

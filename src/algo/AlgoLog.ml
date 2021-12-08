@@ -76,6 +76,18 @@ let show_pmrs pmrs =
   Log.info (fun fmt () -> pf fmt "%a" (box (PMRS.pp ~short:(not !Config.verbose))) pmrs)
 ;;
 
+let show_new_rskel i p =
+  if !Config.Optims.max_solutions > 0
+  then (
+    Log.sep ~i:(Some i) ();
+    Log.info (fun fmt () ->
+        pf
+          fmt
+          "💁 Attempting to find solution to skeleton:@;<1 10>%a"
+          (box (PMRS.pp ~short:(not !Config.verbose)))
+          p.psi_target))
+;;
+
 let msg_too_many_opts () =
   Log.info (fun fmt () ->
       pf

@@ -1,5 +1,9 @@
 open Base
 
+let saved_solver_stats : (int, Yojson.t) Hashtbl.t = Hashtbl.create ~size:10 (module Int)
+let saved_summaries : (int, Yojson.t) Hashtbl.t = Hashtbl.create ~size:10 (module Int)
+let saved_timings : (int, float * float) Hashtbl.t = Hashtbl.create ~size:10 (module Int)
+
 (** Outputs a JSON summarizing the time spent in each solver as well as the number
   of solver instances used during the execution of the algorithm.  *)
 let solvers_summary () : Yojson.t =
@@ -23,3 +27,15 @@ let refinement_steps_summary () : Yojson.t =
   let steps = List.rev (Stack.to_list Stats.refinement_log) in
   `Assoc (List.mapi steps ~f:(fun i s -> Fmt.str "step_%i" i, `Assoc s))
 ;;
+
+(** Save the stats in a json format, and reset the counters. *)
+let save_stats_and_restart (id : int) : unit =
+  Hashtbl.set saved_solver_stats ~key:id ~data:(solvers_summary ());
+  Hashtbl.set saved_summaries ~key:id ~data:(refinement_steps_summary ());
+  Hashtbl.set saved_timings ~key:id ~data:(Stats.get_glob_elapsed (), !Stats.verif_time);
+  Stats.restart ()
+;;
+
+let get_solver_stats (id : int) = Hashtbl.find saved_solver_stats id
+let get_summary (id : int) = Hashtbl.find saved_summaries id
+let get_simple_stats (id : int) = Hashtbl.find saved_timings id

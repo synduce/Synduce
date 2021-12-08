@@ -141,6 +141,20 @@ let info (msg : Formatter.t -> unit -> unit) : unit =
   else ()
 ;;
 
+let hline = String.concat (List.init 100 ~f:(fun _ -> "-"))
+
+let sep ?(i = None) () =
+  if !Config.info
+  then (
+    match i with
+    | Some i ->
+      let is = Int.to_string i in
+      let hline = String.drop_suffix hline (String.length is + 3) in
+      pf Fmt.stdout "@.%s[%s]-" hline is
+    | None -> pf Fmt.stdout "@.%s" hline)
+  else ()
+;;
+
 (** Debug messaging is used mostly for printing status of interactions with external solvers.  *)
 let debug (msg : Formatter.t -> unit -> unit) : unit =
   if !Config.debug
@@ -221,27 +235,36 @@ let to_file (file : string) (msg : Formatter.t -> unit -> unit) : unit =
   Stdio.Out_channel.close oc
 ;;
 
-let print_solvers_summary (frmt : Formatter.t) () : unit =
+let print_solvers_summary (i : int) (frmt : Formatter.t) () : unit =
   let open Fmt in
-  let total_solvers_time = ref 0.0 in
-  let total_instances = ref 0 in
-  let f (key, data) =
-    let total_time = List.sum (module Float) ~f:Stats.get_elapsed data in
-    let instances = List.length data in
-    total_solvers_time := !total_solvers_time +. total_time;
-    total_instances := !total_instances + instances;
-    key, total_time, instances
-  in
-  let pp frmt (key, time, instances) =
-    Fmt.(pf frmt "@[<v 0>%-10s [%4i instances] %.3fs @]" key instances time)
-  in
-  let l = List.map ~f (Stats.get_solver_pids ()) in
-  pf
-    frmt
-    "@[<v 0>Total time spent in solvers:@;@[%a@]@;> %-8s [%4i instances]: %.3f@]@;"
-    (list ~sep:(fun fmt () -> pf fmt "@;<80 0>") pp)
-    l
-    "TOTAL"
-    !total_instances
-    !total_solvers_time
+  let json_data = LogJson.get_solver_stats i in
+  match json_data with
+  | Some data ->
+    (match data with
+    | `Assoc solver_stats ->
+      let total_solvers_time = ref 0.0 in
+      let total_instances = ref 0 in
+      let f (key, data) =
+        match data with
+        | `Assoc [ ("total_time", `Float total_time); ("num_instances", `Int instances) ]
+          ->
+          total_solvers_time := !total_solvers_time +. total_time;
+          total_instances := !total_instances + instances;
+          key, total_time, instances
+        | _ -> key, -1.0, -1
+      in
+      let l = List.map ~f solver_stats in
+      let pp frmt (key, time, instances) =
+        Fmt.(pf frmt "@[<v 0>%-10s [%4i instances] %.3fs @]" key instances time)
+      in
+      pf
+        frmt
+        "@[<v 0>Total time spent in solvers:@;@[%a@]@;> %-8s [%4i instances]: %.3fs@]@;"
+        (list ~sep:(fun fmt () -> pf fmt "@;<80 0>") pp)
+        l
+        "TOTAL"
+        !total_instances
+        !total_solvers_time
+    | _ -> ())
+  | _ -> ()
 ;;

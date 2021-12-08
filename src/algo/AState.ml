@@ -14,7 +14,8 @@ open Utils
   that target = orig ∘ repr
 *)
 type psi_def =
-  { psi_target : PMRS.t (**
+  { psi_id : int (** An identifier for the problem. *)
+  ; psi_target : PMRS.t (**
   The target recursion skeleton in the problem.
   *)
   ; psi_reference : PMRS.t (**
@@ -39,6 +40,14 @@ type psi_def =
 let psi_def_logics p = [ p.psi_repr.plogic; p.psi_reference.plogic; p.psi_target.plogic ]
 
 (* State variables for the algorithm. *)
+
+let psi_id = ref 0
+
+let new_psi_id () =
+  let id = !psi_id in
+  Int.incr psi_id;
+  id
+;;
 
 (** The type τ in the paper, input type of the reference function.  *)
 let _tau = ref RType.TInt

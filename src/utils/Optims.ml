@@ -168,6 +168,23 @@ let set_max_lifting_attempts (s : string) =
   | _ -> ()
 ;;
 
+(**
+  The maximum number of different solutions Synduce attempts to find.
+  If set to (-1), Synduce only attempt to solve the given skeleton.
+*)
+let max_solutions = ref (-1)
+
+(** Set the maximum number of solutions. The string argument must represent
+  a number between 1 and 32.
+*)
+let set_max_solutions (s : string) =
+  try
+    let i = Int.of_string s in
+    if i > 0 && i <= 32 then max_solutions := i
+  with
+  | _ -> ()
+;;
+
 let some_eager_optim_on () =
   !simplify_eqns || !use_syntactic_definitions || !make_partial_correctness_assumption
 ;;

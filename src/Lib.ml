@@ -22,7 +22,7 @@ let reinit () =
 ;;
 
 let solve_file ?(print_info = false) (filename : string)
-    : problem_descr * (soln option, unrealizability_ctex list) Either.t
+    : (problem_descr * (soln option, unrealizability_ctex list) Either.t) list
   =
   Utils.Config.problem_name
     := Caml.Filename.basename (Caml.Filename.chop_extension filename);
@@ -34,13 +34,13 @@ let solve_file ?(print_info = false) (filename : string)
   in
   Parsers.seek_types prog;
   let all_pmrs = Parsers.translate prog in
-  let problem, maybe_soln =
-    match Refinement.solve_problem psi_comps all_pmrs with
-    | problem, Realizable soln -> problem, Either.First (Some soln)
-    | problem, Unrealizable soln -> problem, Either.Second soln
-    | problem, Failed _ -> problem, Either.First None
-  in
-  problem_descr_of_psi_def problem, maybe_soln
+  let outputs = Refinement.solve_problem psi_comps all_pmrs in
+  List.map outputs ~f:(fun (problem, result) ->
+      let pd = problem_descr_of_psi_def problem in
+      match result with
+      | Realizable soln -> pd, Either.First (Some soln)
+      | Unrealizable soln -> pd, Either.Second soln
+      | Failed _ -> pd, Either.First None)
 ;;
 
 (**

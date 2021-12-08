@@ -400,17 +400,19 @@ let infer_pmrs_types (prog : t) =
     failwith "Type inference failed for pmrs."
 ;;
 
-let unify_two_with_update
+let unify_two_with_vartype_update
     ((theta, theta') : RType.t * RType.t)
     ((tau, tau') : RType.t * RType.t)
-    : unit
+    : RType.substitution
   =
   let sb1 = RType.unify_one theta theta' in
   let sb2 = RType.unify_one tau tau' in
   match sb1, sb2 with
   | Ok sb1, Ok sb2 ->
     (match RType.unify (RType.mkv (sb1 @ sb2)) with
-    | Ok sb' -> Term.Variable.update_var_types (RType.mkv sb')
+    | Ok sb' ->
+      Term.Variable.update_var_types (RType.mkv sb');
+      sb'
     | Error e ->
       Log.error_msg Fmt.(str "Error: %a" Sexp.pp_hum e);
       Log.error_msg "Could not unify θ and τ in problem definition.";

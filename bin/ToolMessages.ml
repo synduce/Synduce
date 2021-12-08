@@ -24,8 +24,12 @@ let prep_final_json
     : Yojson.t
   =
   let _ = is_ocaml_syntax, source_filename, pb, soln in
-  let solvers = Utils.LogJson.solvers_summary () in
-  let refinement_steps = Utils.LogJson.refinement_steps_summary () in
+  let solvers =
+    Option.value ~default:(`String "unknown") (Utils.LogJson.get_solver_stats pb.psi_id)
+  in
+  let refinement_steps =
+    Option.value ~default:(`String "unknown") (Utils.LogJson.get_summary pb.psi_id)
+  in
   let algo =
     if !Config.Optims.use_segis
     then "SEGIS"
@@ -63,9 +67,14 @@ let on_success
     (result : (soln, unrealizability_ctex list) Either.t)
     : unit
   =
-  let elapsed = Stats.get_glob_elapsed () in
-  let verif_ratio = 100.0 *. (!Stats.verif_time /. elapsed) in
-  Log.(info print_solvers_summary);
+  let elapsed, verif_time =
+    Option.value
+      ~default:(Stats.get_glob_elapsed (), !Stats.verif_time)
+      (LogJson.get_simple_stats pb.psi_id)
+  in
+  let verif_ratio = 100.0 *. (verif_time /. elapsed) in
+  Log.sep ();
+  Log.(info (print_solvers_summary pb.psi_id));
   (* Print the solution. *)
   (match result with
   | Either.First soln ->

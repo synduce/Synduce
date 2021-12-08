@@ -39,13 +39,14 @@ let main () =
   in
   if !parse_only then Caml.exit 1;
   (* Solve the problem proper. *)
-  (match Algo.Refinement.solve_problem psi_comps all_pmrs with
-  | pb, Realizable soln ->
-    ToolMessages.on_success ~is_ocaml_syntax filename pb (Either.First soln)
-  | pb, Unrealizable ctexs ->
-    ToolMessages.on_success ~is_ocaml_syntax filename pb (Either.Second ctexs)
-  | _, Failed _ ->
-    Utils.Log.error_msg "Failed to find a solution or a witness of unrealizability");
+  let outputs = Algo.Refinement.solve_problem psi_comps all_pmrs in
+  List.iter outputs ~f:(function
+      | pb, Realizable soln ->
+        ToolMessages.on_success ~is_ocaml_syntax filename pb (Either.First soln)
+      | pb, Unrealizable ctexs ->
+        ToolMessages.on_success ~is_ocaml_syntax filename pb (Either.Second ctexs)
+      | _, Failed _ ->
+        Utils.Log.error_msg "Failed to find a solution or a witness of unrealizability");
   if !Config.show_vars then Term.Variable.print_summary stdout ()
 ;;
 
