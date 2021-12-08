@@ -134,6 +134,16 @@ let subst_args (fpatterns : fpattern list) (args : term list)
       | _ -> Stop (Error "Too many arguments in function application."))
 ;;
 
+let argset_of (f : variable) =
+  let case _ t =
+    match t.tkind with
+    | TApp ({ tkind = TVar f'; _ }, args) when Variable.equal f f' ->
+      Some (VarSet.union_list (List.map ~f:free_variables args))
+    | _ -> None
+  in
+  reduce ~init:VarSet.empty ~case ~join:Set.union
+;;
+
 (** [replace_calls_to functions t] replaces all calls to functions in [functions]
   by a fresh variable.
  *)

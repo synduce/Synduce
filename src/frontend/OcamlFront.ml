@@ -300,7 +300,16 @@ let rules_of_case_list
       | Ppat_or _ -> failwith "Or pattern."
       | _ -> failwith "All match cases should be constructors.")
   in
-  List.map ~f cases
+  match cases with
+  | [ c ] when Option.is_none c.pc_guard ->
+    (match c.pc_lhs.ppat_desc with
+    | Ppat_construct _ -> [ f c ]
+    | Ppat_var x ->
+      let rhs = fterm_of_expr c.pc_rhs in
+      let loc = wloc x.loc in
+      [ loc, mk_app loc fsymb (preargs @ [ mk_var loc x.txt ]), rhs ]
+    | _ -> failwith "Did not recognize case.")
+  | _ -> List.map ~f cases
 ;;
 
 (** `as_pmrs pat expr _` interprets the binding let pat = expr as a definition of

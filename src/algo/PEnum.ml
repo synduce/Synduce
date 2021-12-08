@@ -37,7 +37,7 @@ let safe_remove_unknown (r : rloc) p =
   else Set.remove p.psi_target.psyntobjs r.rxi
 ;;
 
-let applicable_nonterminals (p : psi_def) (args : VarSet.t) =
+let applicable_nonterminals (p : psi_def) (args : TermSet.t) =
   let f nont =
     let in_typs, _ = RType.fun_typ_unpack (Variable.vtype_or_new nont) in
     let arg_choices =
@@ -48,7 +48,7 @@ let applicable_nonterminals (p : psi_def) (args : VarSet.t) =
           List.concat_map args_so_far ~f:(fun (ts, rem_args) ->
               List.map
                 ~f:(fun v -> ts @ [ v ], Set.remove rem_args v)
-                (Set.elements (VarSet.filter_by_type rem_args in_ty))))
+                (Set.elements (TermSet.filter_by_type rem_args in_ty))))
     in
     List.map ~f:(fun (argvs, _) -> nont, argvs) arg_choices
   in
@@ -80,11 +80,9 @@ let new_recursive_cases p xi (nt, args, decons_arg, rhs) (constrname, constrargs
     let possible_rec_calls =
       applicable_nonterminals
         p
-        (Set.union (VarSet.of_list args) (VarSet.of_list pat_vars))
+        (TermSet.of_varset (Set.union (VarSet.of_list args) (VarSet.of_list pat_vars)))
     in
-    List.map
-      ~f:(fun (nont, arg) -> mk_app (mk_var nont) (List.map ~f:mk_var arg))
-      possible_rec_calls
+    List.map ~f:(fun (nont, arg) -> mk_app (mk_var nont) arg) possible_rec_calls
   in
   let new_scalars =
     List.filter ~f:(fun v -> RType.is_base (Variable.vtype_or_new v)) pat_vars
@@ -141,7 +139,8 @@ let mk_with_deconstruction
       | Some (n_xis, nr) ->
         let psyntobjs = safe_remove_unknown r p in
         [ { p with
-            psi_target =
+            psi_id = new_psi_id ()
+          ; psi_target =
               { p.psi_target with psyntobjs = Set.union n_xis psyntobjs; prules = nr }
           }
         ]
@@ -154,18 +153,16 @@ let mk_with_deconstruction
   | None -> []
 ;;
 
-let mk_with_constant_args ~(p : psi_def) (r : rloc) cargs =
+let mk_with_constant_args ~(p : psi_def) (r : rloc) (cargs : term list) =
   let new_xi =
     let in_t, re_t = RType.fun_typ_unpack (Variable.vtype_or_new r.rxi) in
     (* Input type is extended by adding arguments *)
-    let t =
-      Some (RType.fun_typ_pack (in_t @ List.map ~f:Variable.vtype_or_new cargs) re_t)
-    in
+    let t = Some (RType.fun_typ_pack (in_t @ List.map ~f:type_of cargs) re_t) in
     Variable.mk ~t (Alpha.fresh ~s:r.rxi.vname ())
   in
   let add_arg_and_replace_unknown _t =
     let nt, lhs, pat, rhs = r.rrule in
-    nt, lhs, pat, extend_function ~from:r.rxi ~to_:new_xi (List.map ~f:mk_var cargs) rhs
+    nt, lhs, pat, extend_function ~from:r.rxi ~to_:new_xi cargs rhs
   in
   let new_psi_target =
     { p.psi_target with
@@ -183,7 +180,16 @@ let mk_with_rec_args ~(p : psi_def) (r : rloc) =
   else (
     (* Analayse whether the arguments are usable as-is or need to be unpacked. *)
     let args_require_deconstruction, args_usable = analyze_rec_args_at_loc p r in
-    (if not (Set.is_empty args_usable) then [] else [])
+    (if not (Set.is_empty args_usable)
+    then (
+      let arg_choices =
+        List.map
+          ~f:(fun (f, args) -> mk_app (mk_var f) args)
+          (applicable_nonterminals p (TermSet.of_varset args_usable))
+      in
+      let new_p, _ = mk_with_constant_args ~p r arg_choices in
+      new_p)
+    else [])
     @
     if not (Set.is_empty args_require_deconstruction)
     then mk_with_deconstruction ~p r (args_require_deconstruction, args_usable)
@@ -201,7 +207,7 @@ let mk_new_problem ~(p : psi_def) (r : rloc) : psi_def list =
     in
     if List.length cargs > 0
     then (
-      let new_p, new_r = mk_with_constant_args ~p r cargs in
+      let new_p, new_r = mk_with_constant_args ~p r (List.map ~f:mk_var cargs) in
       new_p, { new_r with rtokens = rargs })
     else [], r
   in
@@ -235,8 +241,13 @@ let mk_extra_toplevel_problems (p : psi_def) =
         Should new unknowns be a 1-to-1 map with original unknowns, or should we allow splitting?
         *)
         let unknowns = Set.inter p.psi_target.psyntobjs (Analysis.free_variables rhs) in
-        List.map
-          ~f:(fun rxi -> { rid = i; rrule; rxi; rtokens = more_args })
+        List.concat_map
+          ~f:(fun rxi ->
+            let _, _, _, rhs_rrule = rrule in
+            let more_args = Set.diff more_args (Analysis.argset_of rxi rhs_rrule) in
+            if Set.is_empty more_args
+            then []
+            else [ { rid = i; rrule; rxi; rtokens = more_args } ])
           (Set.elements unknowns))
       else [])
     else []

@@ -1495,7 +1495,9 @@ module TermSet = struct
   let map (s : S.t) = Set.map (module Terms) s
   let singleton = Set.singleton (module Terms)
   let of_list = Set.of_list (module Terms)
+  let of_varset : VarSet.t -> t = Set.map (module Terms) ~f:mk_var
   let union_list = Set.union_list (module Terms)
+  let filter_by_type t typ = Set.filter ~f:(fun t -> RType.t_equals (type_of t) typ) t
 
   let pp (f : Formatter.t) (s : t) =
     Fmt.(pf f "@[{%a}@]" (list ~sep:comma pp_term) (Set.elements s))
