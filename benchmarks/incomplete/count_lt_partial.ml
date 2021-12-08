@@ -32,7 +32,7 @@ let spec x t =
 
 let target y t =
   let rec g l =
-    [%synt unknown_body]
+    [%synt g_body]
     (*   function
     | Leaf a -> [%synt xi_0] y a
     | Node (a, l, r) -> [%synt f0] *)

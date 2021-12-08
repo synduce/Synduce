@@ -1,0 +1,146 @@
+open Base
+open Term
+open Utils
+
+(**
+  A PMRS rewrite rule [(v, args, pattern, rhs)] is the rewrite rule
+  v(args,pattern) -> rhs.
+  [v] which is a non-terminal (a recursive function in the OCaml code),
+  [args] is a possibly empty list of arguments,
+  [pattern] is an optional pattern,
+  [rhs] is the production of the rule.
+*)
+type rewrite_rule = variable * variable list * pattern option * term
+
+(**
+  A toplevel function is a triple of a variable (the variable representing
+  the function itself), a list of variables (the arguments of the function) and
+  a term (the body of the function).
+*)
+type top_function = variable * variable list * term
+
+(** The main PMRS type.  *)
+type t =
+  { pvar : Variable.t
+        (**
+    The main function symbol, storing general information about the PMRS.
+    The specification associated to the PMRS may be found using:
+    [get_spec pvar]
+    The type of the PMRS (the main function of the group of mutually recursive
+    functions) is stored as the type of pvar.
+  *)
+  ; pinput_typ : RType.t list
+        (**
+    The input type(s). For now, it should be a singleton list.
+    The input type is only the type of the recursively-typed argument of the PMRS, not the parameters.
+  *)
+  ; poutput_typ : RType.t (** Output type and optional invariant on output of function. *)
+  ; pargs : Variable.t list (** Parameter arguments.  *)
+  ; psyntobjs : Variables.VarSet.t (** The unknowns to synthesize.*)
+  ; prules : rewrite_rule IntMap.t (** The rules of the PMRS. *)
+  ; pnon_terminals : VarSet.t (** Non-terminals of the PMRS. *)
+  ; pmain_symb : variable (** The main symbol of the PMRS. *)
+  ; porder : int (** The order of the PMRS (mostly useless for now). *)
+  ; plogic : SmtLogic.logic_info
+  }
+
+(** Register a PMRS that should be accesible globally. *)
+val register_global : t -> unit
+
+(** Find a globally registered PMRS.  *)
+val find_global : int -> t option
+
+(** Find a PMRS by name. The name of a PMRS is the name of its pvar.  *)
+val find_by_name : string -> variable option
+
+(** Register a nonterminal that points back to a PMRS. *)
+val register_nonterminal : int -> t -> unit
+
+(** Find the PMRS corresponding to a nonterminal. *)
+val find_nonterminal : int -> t option
+
+(** Find a non-terminal (represented by a variable) from its name. *)
+val find_nonterminal_by_name : string -> variable option
+
+(** Update tables with a new PMRS definition.*)
+val update : t -> unit
+
+(** Reinitialize tables of PMRS and nonterminals. *)
+val reinit : unit -> unit
+
+(** Update the order of a PMRS.  *)
+val update_order : t -> t
+
+(** Set the logic info field of a PMRS.  *)
+val set_logic_info_of_pmrs : t -> t
+
+(** {-1 Utility functions, transformation, conversion to functions.} *)
+
+(** Translate a recursive function to a PMRS (currently only work for identity).  *)
+val func_to_pmrs : Variables.variable -> Term.fpattern list -> Term.term -> t
+
+(** Translate a PMRS to a set of (mutually) recursive functions. *)
+val func_of_pmrs : t -> function_descr list
+
+(**
+  inverted_rule_lookup searches for rules whose rhs match (func args), and return
+  a map from rule id to the lhs of the rules matching (func args), with the appropriate
+  substitutions performed.
+*)
+val inverted_rule_lookup
+  :  ?boundvars:(Variables.variable, Term.Variable.comparator_witness) Base.Set.t
+  -> ( 'a
+     , Variables.variable * Variables.variable list * Term.pattern option * Term.term
+     , 'b )
+     Base.Map.t
+  -> Term.term
+  -> Term.term list
+  -> ('a, Term.term, 'b) Base.Map.t
+
+(**
+  Apply a substitution to all the right hand side of the PMRS rules.
+*)
+val subst_rule_rhs : p:t -> (Term.term * Term.term) list -> t
+
+(**
+  Given an input PMRS, returns a list of PMRS that this PMRS depends on.
+  *)
+val depends : t -> t list
+
+(**
+  Generate the term that corresponds to the left hand side of a rewrite rule in
+  a PMRS.
+*)
+val lhs : variable * variable list * pattern option * term -> term
+
+(**
+  Updates and returns the output type of a PMRS.
+*)
+val update_output_type : t -> t
+
+(**{-1 PMRS and Types }*)
+
+(** Clear the type information inside a PMRS.  *)
+val clear_pmrs_types : t -> t
+
+(** Infer the types inside a PMRS. *)
+val infer_pmrs_types : t -> t
+
+val unify_two_with_vartype_update
+  :  RType.t * RType.t
+  -> RType.t * RType.t
+  -> RType.substitution
+
+val unify_one_with_update : RType.t * RType.t -> unit
+val extract_rec_input_typ : t -> RType.t
+
+(**{-1 Pretty printing functions.}*)
+
+(** Pretty print a rewrite rule, as in a PMRS. *)
+val pp_rewrite_rule : Formatter.t -> rewrite_rule -> unit
+
+(** Pretty print a PMRS. *)
+val pp : Formatter.t -> ?short:bool -> t -> unit
+
+(** Pretty print a PMRS using Ocaml syntax (as a set of recursive functions). *)
+val pp_ocaml : Formatter.t -> ?short:bool -> t -> unit

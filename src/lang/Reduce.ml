@@ -107,10 +107,10 @@ let resolve_func (func : term) =
     (match Hashtbl.find Term._globals x.vname with
     | Some (_, vargs, _, body) -> FRFun (vargs, body)
     | None ->
-      (match Hashtbl.find PMRS._globals x.vid with
+      (match PMRS.find_global x.vid with
       | Some pm -> FRPmrs pm
       | None ->
-        (match Hashtbl.find PMRS._nonterminals x.vid with
+        (match PMRS.find_nonterminal x.vid with
         | Some pm -> FRNonT pm
         | None -> FRUnknown)))
   | TFun (vargs, body) -> FRFun (vargs, body)

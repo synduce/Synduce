@@ -21,8 +21,38 @@ let analyze_rec_args_at_loc (p : psi_def) (r : rloc) =
   | Some (_, lhs_args, _, _) ->
     Set.partition_tf r.rtokens ~f:(fun v ->
         (not (RType.is_base (Variable.vtype_or_new v)))
-        && List.mem lhs_args ~equal:Variable.equal v)
+        (* Only the last element can be deconstructed in the PMRS model. *)
+        && List.is_prefix lhs_args ~equal:Variable.equal ~prefix:[ v ])
   | None -> VarSet.empty, VarSet.empty
+;;
+
+let safe_remove_unknown (r : rloc) p =
+  let unknown_in_other_rules =
+    Map.existsi p.psi_target.prules ~f:(fun ~key ~data ->
+        let _, _, _, rhs = data in
+        (not (key = r.rid)) && Set.mem (Analysis.free_variables rhs) r.rxi)
+  in
+  if unknown_in_other_rules
+  then p.psi_target.psyntobjs
+  else Set.remove p.psi_target.psyntobjs r.rxi
+;;
+
+let applicable_nonterminals (p : psi_def) (args : VarSet.t) =
+  let f nont =
+    let in_typs, _ = RType.fun_typ_unpack (Variable.vtype_or_new nont) in
+    let arg_choices =
+      List.fold_left
+        in_typs
+        ~init:[ [], args ]
+        ~f:(fun args_so_far in_ty ->
+          List.concat_map args_so_far ~f:(fun (ts, rem_args) ->
+              List.map
+                ~f:(fun v -> ts @ [ v ], Set.remove rem_args v)
+                (Set.elements (VarSet.filter_by_type rem_args in_ty))))
+    in
+    List.map ~f:(fun (argvs, _) -> nont, argvs) arg_choices
+  in
+  List.concat_map ~f (Set.elements p.psi_target.pnon_terminals)
 ;;
 
 (* ============================================================================================= *)
@@ -40,45 +70,81 @@ let extend_function ~from:(f : variable) ~to_:(g : variable) (extra_args : term 
   transform ~case
 ;;
 
+let new_recursive_cases p xi (nt, args, decons_arg, rhs) (constrname, constrargs) =
+  let pat_vars =
+    List.map
+      ~f:(fun typ -> Variable.mk ~t:(Some typ) (Alpha.fresh ~s:decons_arg.vname ()))
+      constrargs
+  in
+  let new_rec_calls =
+    let possible_rec_calls =
+      applicable_nonterminals
+        p
+        (Set.union (VarSet.of_list args) (VarSet.of_list pat_vars))
+    in
+    List.map
+      ~f:(fun (nont, arg) -> mk_app (mk_var nont) (List.map ~f:mk_var arg))
+      possible_rec_calls
+  in
+  let new_scalars =
+    List.filter ~f:(fun v -> RType.is_base (Variable.vtype_or_new v)) pat_vars
+  in
+  let f extra_args =
+    let pat = PatConstr (constrname, List.map ~f:mk_pat_var pat_vars) in
+    let new_args = List.map ~f:mk_var new_scalars @ extra_args in
+    let new_unknown =
+      (* Input type is extended by adding arguments *)
+      let in_t, out_t = RType.fun_typ_unpack (Variable.vtype_or_new xi) in
+      let extra_t = List.map ~f:type_of new_args in
+      let t = Some (RType.fun_typ_pack (in_t @ extra_t) out_t) in
+      Variable.mk ~t (Alpha.fresh ~s:xi.vname ())
+    in
+    let new_rhs = extend_function ~from:xi ~to_:new_unknown new_args rhs in
+    let new_rewrite_rule = nt, args, Some pat, new_rhs in
+    new_unknown, new_rewrite_rule
+  in
+  f new_rec_calls
+;;
+
 let mk_with_deconstruction
     ~(p : psi_def)
     (r : rloc)
     ((dec, _no_dec) : VarSet.t * VarSet.t)
   =
-  let deconstruct_one (nt, lhs_args, lhs_pat, rhs) v =
+  let deconstruct_one (nt, lhs_args, _, rhs) v =
     match RType.get_variants (Variable.vtype_or_new v) with
     | _ :: _ as cases ->
-      let f (constrname, constrargs) =
-        Fmt.(
-          pf
-            stdout
-            "---> Construct %s(%a) -> %a@."
-            constrname
-            (list ~sep:comma RType.pp)
-            constrargs
-            pp_term
-            rhs);
-        nt, lhs_args, lhs_pat, rhs
-      in
+      let last_arg = List.last_exn lhs_args in
+      let other_args = List.drop_last_exn lhs_args in
+      let f = new_recursive_cases p r.rxi (nt, other_args, last_arg, rhs) in
       let new_rules =
         match List.map ~f cases with
-        | [ a ] -> Some (Map.set p.psi_target.prules ~key:r.rid ~data:a)
-        | hd :: tl ->
-          let map0 = Map.set p.psi_target.prules ~key:r.rid ~data:hd in
+        | [ (a, b) ] ->
+          Some (VarSet.singleton a, Map.set p.psi_target.prules ~key:r.rid ~data:b)
+        | (new_unknown, new_rewrite_rule) :: tl ->
+          let map0 = Map.set p.psi_target.prules ~key:r.rid ~data:new_rewrite_rule in
           (* Map cannot be empty here. *)
           let max_rule_id, _ = Map.max_elt_exn map0 in
-          let new_rules =
+          let new_unknowns, new_rules, _ =
             List.fold_left
               tl
-              ~init:(map0, max_rule_id + 1)
-              ~f:(fun (rules, mrid) new_rule ->
-                Map.add_exn rules ~key:mrid ~data:new_rule, mrid + 1)
+              ~init:(VarSet.singleton new_unknown, map0, max_rule_id + 1)
+              ~f:(fun (xis, rules, mrid) (new_unknown, new_rule) ->
+                ( Set.add xis new_unknown
+                , Map.add_exn rules ~key:mrid ~data:new_rule
+                , mrid + 1 ))
           in
-          Some (fst new_rules)
+          Some (new_unknowns, new_rules)
         | _ -> None
       in
       (match new_rules with
-      | Some nr -> [ { p with psi_target = { p.psi_target with prules = nr } } ]
+      | Some (n_xis, nr) ->
+        let psyntobjs = safe_remove_unknown r p in
+        [ { p with
+            psi_target =
+              { p.psi_target with psyntobjs = Set.union n_xis psyntobjs; prules = nr }
+          }
+        ]
       | None -> [])
     | _ -> []
     (* No variants, nothing to be done here. *)
@@ -101,19 +167,9 @@ let mk_with_constant_args ~(p : psi_def) (r : rloc) cargs =
     let nt, lhs, pat, rhs = r.rrule in
     nt, lhs, pat, extend_function ~from:r.rxi ~to_:new_xi (List.map ~f:mk_var cargs) rhs
   in
-  let unknowns =
-    let unknown_in_other_rules =
-      Map.existsi p.psi_target.prules ~f:(fun ~key ~data ->
-          let _, _, _, rhs = data in
-          (not (key = r.rid)) && Set.mem (Analysis.free_variables rhs) r.rxi)
-    in
-    if unknown_in_other_rules
-    then p.psi_target.psyntobjs
-    else Set.remove p.psi_target.psyntobjs r.rxi
-  in
   let new_psi_target =
     { p.psi_target with
-      psyntobjs = Set.add unknowns new_xi
+      psyntobjs = Set.add (safe_remove_unknown r p) new_xi
     ; prules = Map.update p.psi_target.prules r.rid ~f:add_arg_and_replace_unknown
     }
   in

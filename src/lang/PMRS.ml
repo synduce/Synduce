@@ -8,7 +8,7 @@ open Option.Let_syntax
 (*                      TYPE DEFINITIONS AND UTILS                                               *)
 (* ============================================================================================= *)
 
-(**
+(*
   A pattern in a PMRS rewrite rule is limited to matching
   terms of the form "Constructor_name(arguments)" where each argument is a term,
   and the Constructor_name is the name of a valid datatype constructor.
@@ -55,39 +55,42 @@ type t =
   ; plogic : SmtLogic.logic_info
   }
 
-(* Type shortcuts *)
-
-(** A result type with error messages in the form of title x s-expression. *)
-type 'a xresult = ('a, (string * Sexp.t) list) Result.t
-
-(** A result type with error messages in the form of title x term. *)
-type 'a sresult = ('a, (string * term) list) Result.t
-
-(** The type for maps from variable name to variable.  *)
-type variables = variable Map.M(String).t
-
 (** Table of all the PMRS in the file, indexed by the function
     variable id.
 *)
-let _globals : (int, t) Hashtbl.t = Hashtbl.create (module Int)
+let _GLOBALS : (int, t) Hashtbl.t = Hashtbl.create (module Int)
+
+let register_global (p : t) = Hashtbl.set _GLOBALS ~key:p.pvar.vid ~data:p
+let find_global (id : int) = Hashtbl.find _GLOBALS id
 
 (** Find a PMRS by name. The name of a PMRS is the name of its pvar.  *)
 let find_by_name (pmrs_name : string) : variable option =
-  let matches = Hashtbl.filter ~f:(fun p -> String.(p.pvar.vname = pmrs_name)) _globals in
+  let matches = Hashtbl.filter ~f:(fun p -> String.(p.pvar.vname = pmrs_name)) _GLOBALS in
   Option.map ~f:(fun (_, p) -> p.pvar) (Hashtbl.choose matches)
 ;;
 
 (** Mapping nonterminals to the PMRS they belong to, index by the nonterminal
     variable id.
 *)
-let _nonterminals : (int, t) Hashtbl.t = Hashtbl.create (module Int)
+let _NONTERMINALS : (int, int) Hashtbl.t = Hashtbl.create (module Int)
+
+let register_nonterminal (id : int) (pmrsid : t) =
+  Hashtbl.set _NONTERMINALS ~key:id ~data:pmrsid.pvar.vid
+;;
+
+let find_nonterminal (id : int) =
+  Option.(Hashtbl.find _NONTERMINALS id >>= fun pid -> Hashtbl.find _GLOBALS pid)
+;;
 
 (** Find a non-terminal (represented by a variable) from its name. *)
 let find_nonterminal_by_name (name : string) : variable option =
   let r = ref None in
-  Hashtbl.iter _nonterminals ~f:(fun t ->
-      match VarSet.find_by_name t.pnon_terminals name with
-      | Some x -> r := Some x
+  Hashtbl.iter _NONTERMINALS ~f:(fun pid ->
+      match Hashtbl.find _GLOBALS pid with
+      | Some t ->
+        (match VarSet.find_by_name t.pnon_terminals name with
+        | Some x -> r := Some x
+        | None -> ())
       | None -> ());
   !r
 ;;
@@ -107,10 +110,14 @@ let lhs (nt, args, pat, rhs) =
   t
 ;;
 
-(** Reinitialize tables of PMRS and nonterminals. *)
+let update (p : t) =
+  register_global p;
+  Set.iter p.pnon_terminals ~f:(fun v -> register_nonterminal v.vid p)
+;;
+
 let reinit () =
-  Hashtbl.clear _globals;
-  Hashtbl.clear _nonterminals
+  Hashtbl.clear _GLOBALS;
+  Hashtbl.clear _NONTERMINALS
 ;;
 
 (* ============================================================================================= *)
@@ -651,7 +658,7 @@ let subst_rule_rhs ~(p : t) (substs : (term * term) list) =
 let depends (p : t) : t list =
   let f (_, _, _, rule_body) =
     let vars = Analysis.free_variables rule_body in
-    List.filter_map ~f:(fun v -> Hashtbl.find _globals v.vid) (Set.elements vars)
+    List.filter_map ~f:(fun v -> Hashtbl.find _GLOBALS v.vid) (Set.elements vars)
   in
   List.dedup_and_sort
     ~compare:(fun p1 p2 -> String.compare p1.pvar.vname p2.pvar.vname)

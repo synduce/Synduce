@@ -309,13 +309,8 @@ let translate (prog : program) =
           let pmrs =
             pmrs_of_rules loc globals vparams vargs pvar (requires, ensures) body
           in
-          (match Hashtbl.add PMRS._globals ~key:pvar.vid ~data:pmrs with
-          | `Ok -> Log.verbose_msg ("Parsed " ^ pname)
-          | `Duplicate -> Log.error_msg (pname ^ " already declared, ignoring."));
-          Set.iter pmrs.pnon_terminals ~f:(fun x ->
-              match Hashtbl.add PMRS._nonterminals ~key:x.vid ~data:pmrs with
-              | `Ok -> Log.verbose_msg ("Referenced " ^ x.vname)
-              | `Duplicate -> ());
+          PMRS.register_global pmrs;
+          Set.iter pmrs.pnon_terminals ~f:(fun x -> PMRS.register_nonterminal x.vid pmrs);
           Map.set pmrses ~key:pname ~data:pmrs
         | FunDef (loc, fname, args, invariant, body) ->
           let vargs = List.map ~f:Term.Variable.mk args in

@@ -273,7 +273,7 @@ let find_problem_components
     let%bind spec = Specifications.get_spec target_f.pvar in
     let%bind t = spec.requires in
     match t.tkind with
-    | TVar func_var -> Hashtbl.find PMRS._globals func_var.vid
+    | TVar func_var -> PMRS.find_global func_var.vid
     | _ -> None
   in
   let problem =
@@ -322,6 +322,12 @@ let find_problem_components
   problem
 ;;
 
+let update_context (p : psi_def) =
+  let target = PMRS.infer_pmrs_types p.psi_target in
+  PMRS.update target;
+  AState.refinement_steps := 0
+;;
+
 (**
   [solve_problem (Some (target, reference, representation))] solves the synthesis problem
   associated with the target function named [target], the reference function named
@@ -365,6 +371,7 @@ let solve_problem
     else (
       match l with
       | low_problem :: tl ->
+        update_context low_problem;
         AlgoLog.show_new_rskel i low_problem;
         let maybe_solution = algo low_problem in
         (* Print state and save. *)

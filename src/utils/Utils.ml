@@ -132,6 +132,14 @@ let all_or_none (l : 'a option list) : 'a list option =
   | None -> None
 ;;
 
+let subsets l =
+  let rec aux x = function
+    | [] -> x
+    | hd :: tl -> aux (([ hd ] :: x) @ List.map ~f:(fun l -> hd :: l) x) tl
+  in
+  aux [] l
+;;
+
 (* ============================================================================================= *)
 (*                  FILE MANAGEMENT HELPERS                                                      *)
 (* ============================================================================================= *)
