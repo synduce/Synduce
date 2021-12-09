@@ -84,7 +84,7 @@ let show_new_rskel i p =
         pf
           fmt
           "💁 Attempting to find solution to skeleton:@;<1 10>%a"
-          (box (PMRS.pp ~short:(not !Config.verbose)))
+          (box (PMRS.pp ~short:false))
           p.psi_target))
 ;;
 

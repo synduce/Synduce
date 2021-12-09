@@ -7,10 +7,13 @@ open Utils
 
 type rloc =
   { rid : int
-  ; rrule : rewrite_rule
   ; rxi : variable
   ; rtokens : VarSet.t
   }
+
+let _pp_rloc (frmt : Formatter.t) (r : rloc) =
+  Fmt.(pf frmt "@[[%i:%a]<%a>@]" r.rid Variable.pp r.rxi VarSet.pp r.rtokens)
+;;
 
 (* ============================================================================================= *)
 (*                    ANALYSIS FUNCTIONS                                                         *)
@@ -101,7 +104,9 @@ let new_recursive_cases p xi (nt, args, decons_arg, rhs) (constrname, constrargs
     let new_rewrite_rule = nt, args, Some pat, new_rhs in
     new_unknown, new_rewrite_rule
   in
-  f new_rec_calls
+  match new_rec_calls with
+  | [] -> [ f [] ]
+  | _ -> List.map ~f (subsets new_rec_calls)
 ;;
 
 let mk_with_deconstruction
@@ -114,37 +119,45 @@ let mk_with_deconstruction
     | _ :: _ as cases ->
       let last_arg = List.last_exn lhs_args in
       let other_args = List.drop_last_exn lhs_args in
-      let f = new_recursive_cases p r.rxi (nt, other_args, last_arg, rhs) in
-      let new_rules =
-        match List.map ~f cases with
-        | [ (a, b) ] ->
-          Some (VarSet.singleton a, Map.set p.psi_target.prules ~key:r.rid ~data:b)
-        | (new_unknown, new_rewrite_rule) :: tl ->
-          let map0 = Map.set p.psi_target.prules ~key:r.rid ~data:new_rewrite_rule in
-          (* Map cannot be empty here. *)
-          let max_rule_id, _ = Map.max_elt_exn map0 in
-          let new_unknowns, new_rules, _ =
-            List.fold_left
-              tl
-              ~init:(VarSet.singleton new_unknown, map0, max_rule_id + 1)
-              ~f:(fun (xis, rules, mrid) (new_unknown, new_rule) ->
-                ( Set.add xis new_unknown
-                , Map.add_exn rules ~key:mrid ~data:new_rule
-                , mrid + 1 ))
-          in
-          Some (new_unknowns, new_rules)
-        | _ -> None
+      let new_rulesets =
+        cartesian_nary_product
+          (List.map
+             ~f:(new_recursive_cases p r.rxi (nt, other_args, last_arg, rhs))
+             cases)
       in
-      (match new_rules with
-      | Some (n_xis, nr) ->
-        let psyntobjs = safe_remove_unknown r p in
-        [ { p with
-            psi_id = new_psi_id ()
-          ; psi_target =
-              { p.psi_target with psyntobjs = Set.union n_xis psyntobjs; prules = nr }
-          }
-        ]
-      | None -> [])
+      let f new_cases =
+        let new_rules =
+          match new_cases with
+          | [ (a, b) ] ->
+            Some (VarSet.singleton a, Map.set p.psi_target.prules ~key:r.rid ~data:b)
+          | (new_unknown, new_rewrite_rule) :: tl ->
+            let map0 = Map.set p.psi_target.prules ~key:r.rid ~data:new_rewrite_rule in
+            (* Map cannot be empty here. *)
+            let max_rule_id, _ = Map.max_elt_exn map0 in
+            let new_unknowns, new_rules, _ =
+              List.fold_left
+                tl
+                ~init:(VarSet.singleton new_unknown, map0, max_rule_id + 1)
+                ~f:(fun (xis, rules, mrid) (new_unknown, new_rule) ->
+                  ( Set.add xis new_unknown
+                  , Map.add_exn rules ~key:mrid ~data:new_rule
+                  , mrid + 1 ))
+            in
+            Some (new_unknowns, new_rules)
+          | _ -> None
+        in
+        match new_rules with
+        | Some (n_xis, nr) ->
+          let psyntobjs = safe_remove_unknown r p in
+          [ { p with
+              psi_id = new_psi_id ()
+            ; psi_target =
+                { p.psi_target with psyntobjs = Set.union n_xis psyntobjs; prules = nr }
+            }
+          ]
+        | None -> []
+      in
+      List.concat_map ~f new_rulesets
     | _ -> []
     (* No variants, nothing to be done here. *)
   in
@@ -161,7 +174,7 @@ let mk_with_constant_args ~(p : psi_def) (r : rloc) (cargs : term list) =
     Variable.mk ~t (Alpha.fresh ~s:r.rxi.vname ())
   in
   let add_arg_and_replace_unknown _t =
-    let nt, lhs, pat, rhs = r.rrule in
+    let nt, lhs, pat, rhs = Map.find_exn p.psi_target.prules r.rid in
     nt, lhs, pat, extend_function ~from:r.rxi ~to_:new_xi cargs rhs
   in
   let new_psi_target =
@@ -187,8 +200,12 @@ let mk_with_rec_args ~(p : psi_def) (r : rloc) =
           ~f:(fun (f, args) -> mk_app (mk_var f) args)
           (applicable_nonterminals p (TermSet.of_varset args_usable))
       in
-      let new_p, _ = mk_with_constant_args ~p r arg_choices in
-      new_p)
+      let new_ps =
+        List.concat_map
+          ~f:(fun arg_choices -> fst (mk_with_constant_args ~p r arg_choices))
+          (subsets arg_choices)
+      in
+      new_ps)
     else [])
     @
     if not (Set.is_empty args_require_deconstruction)
@@ -237,9 +254,6 @@ let mk_extra_toplevel_problems (p : psi_def) =
       let more_args = Set.diff (Set.union paramset lhs_argset) rhs_argset in
       if not (Set.is_empty more_args)
       then (
-        (* TODO: come up with a better strategy to find extensions.
-        Should new unknowns be a 1-to-1 map with original unknowns, or should we allow splitting?
-        *)
         let unknowns = Set.inter p.psi_target.psyntobjs (Analysis.free_variables rhs) in
         List.concat_map
           ~f:(fun rxi ->
@@ -247,13 +261,28 @@ let mk_extra_toplevel_problems (p : psi_def) =
             let more_args = Set.diff more_args (Analysis.argset_of rxi rhs_rrule) in
             if Set.is_empty more_args
             then []
-            else [ { rid = i; rrule; rxi; rtokens = more_args } ])
+            else [ { rid = i; rxi; rtokens = more_args } ])
           (Set.elements unknowns))
       else [])
     else []
   in
   let subspecs = List.concat_map ~f (Map.to_alist g.prules) in
-  p :: List.concat_map ~f:(mk_new_problem ~p) subspecs
+  let new_ps =
+    if List.length subspecs > 0
+    then
+      List.fold_left subspecs ~init:[ p ] ~f:(fun accum subspec ->
+          Fmt.(
+            pf
+              stdout
+              "@.༆ Apply %a to:@.%a@."
+              _pp_rloc
+              subspec
+              (list (PMRS.pp ~short:false))
+              (List.map ~f:(fun p' -> p'.psi_target) accum);
+            List.concat_map ~f:(fun p' -> mk_new_problem ~p:p' subspec) accum))
+    else []
+  in
+  p :: new_ps
 ;;
 
 (* ============================================================================================= *)
