@@ -143,24 +143,18 @@ let print_usage () =
     \    -v --verbose                   Print verbose.\n\
     \       --fuzzing=NUM               Fuzz SMT solutions on some problems.(Default=0, \
      no fuzzing).\n\
-    \  Otimizations off/on:\n\
+    \  Optimizations off/on:\n\
     \    -s --no-splitting              Do not split systems into subsystems.\n\
     \       --no-syndef                 Do not use syntactic definitions.\n\
     \    -t --no-detupling              Turn off detupling.\n\
     \    -c --simple-init               Initialize T naively.\n\
     \    -l --lemma-sketch              Sketch lemmas in synthesis.\n\
-     <<<<<<< HEAD\n\
-    \           --acegis                    Use the Abstract CEGIS algorithm. Turns bmc \
-     on.\n\
-    \       --ccegis                    Use the Concrete CEGIS algorithm. Turns bmc on.\n\
-     =======\n\
-    \           --segis                    Use the Abstract CEGIS algorithm. Turns bmc on.\n\
+    \       --segis                    Use the Abstract CEGIS algorithm. Turns bmc on.\n\
     \       --cegis                    Use the Concrete CEGIS algorithm. Turns bmc on.\n\
-     >>>>>>> 54628d9a06d33c9eb1d7db2a5596c3beda02d2a4\n\
-    \           --no-assumptions            Don't  partial correctness assumptions.\n\
+    \       --no-assumptions            Don't  partial correctness assumptions.\n\
     \       --no-simplify               Don't simplify equations with partial evaluation.\n\
     \       --no-gropt                  Don't optimize grammars (level 0)\n\
-    \       --set-gropt=NUM             Set grammar optimization level (NUM=0,1 or 2)\n\
+    \       --gropt-level=NUM           Set grammar optimization level (NUM=0,1 or 2)\n\
     \       --no-lifting                Don't attempt lifting.\n\
     \       --max-lifting=NUM           Set how many times Synduce attempts to lift.\n\
     \    -u --no-check-unrealizable     Do not check if synthesis problems are \
