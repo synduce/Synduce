@@ -8,7 +8,7 @@
   sexplib
   ppx_let
   utils
-  syguslib
+  syguslib-utils
   smtlib
   compiler-libs)
  (preprocess

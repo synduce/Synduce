@@ -6,7 +6,8 @@ open Lang
 open Lang.Term
 open Lwt.Syntax
 open Rewriter
-open Syguslib.Sygus
+open Syguslib
+open Sygus
 open SygusInterface
 open Utils
 open Smtlib
@@ -1101,7 +1102,7 @@ let synthesize_new_lemma ~(p : psi_def) (det : term_state_detail) : term option 
     AlgoLog.announce_new_lemma_synthesis i det;
     let neg_constraints = List.map ~f:(constraint_of_neg_ctex det) det.negative_ctexs in
     let pos_constraints = List.map ~f:(constraint_of_pos_ctex det) det.positive_ctexs in
-    let extra_defs = [ max_definition; min_definition ] in
+    let extra_defs = Semantic.[ max_definition; min_definition ] in
     let commands =
       CSetLogic logic
       :: (extra_defs @ [ synth_obj ] @ neg_constraints @ pos_constraints @ [ CCheckSynth ])

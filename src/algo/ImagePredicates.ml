@@ -6,9 +6,10 @@ open Term
 open Utils
 open Smtlib
 open SmtInterface
-module Solvers = SyncSmt
-open Syguslib.Sygus
+open Syguslib
+open Sygus
 open SygusInterface
+module Solvers = SyncSmt
 module S = Smtlib.SmtLib
 
 let _NUM_POSIIVE_EXAMPLES_ = 30
@@ -475,7 +476,7 @@ let rec synthesize
   AlgoLog.positives_ensures p new_positives;
   let id = 0 in
   let synth_objs, var, _logic = synthfun_ensures ~p id in
-  let extra_defs = [ max_definition; min_definition ] in
+  let extra_defs = Semantic.[ max_definition; min_definition ] in
   let solver =
     HLSolver.(
       make ~extra_defs ()

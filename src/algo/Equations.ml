@@ -4,7 +4,8 @@ open EquationShow
 open Lang
 open Lang.Term
 open Projection
-open Syguslib.Sygus
+open Syguslib
+open Sygus
 open SygusInterface
 open Utils
 open Lwt.Syntax
@@ -715,8 +716,8 @@ module Solve = struct
       (* Second case: we only got hints or the base grammar. *)
     | Either.Second synth_objs ->
       let extra_defs =
-        (if Set.mem all_operators (Binary Max) then [ max_definition ] else [])
-        @ if Set.mem all_operators (Binary Min) then [ min_definition ] else []
+        (if Set.mem all_operators (Binary Max) then Semantic.[ max_definition ] else [])
+        @ if Set.mem all_operators (Binary Min) then Semantic.[ min_definition ] else []
       in
       let solver =
         HLSolver.(

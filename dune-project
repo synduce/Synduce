@@ -55,5 +55,8 @@
   (ppx_optcomp
    (>= v0.14.0))
   (sexplib
-  (>= v0.14.0))
-   (yojson (>= 1.6.0))))
+   (>= v0.14.0))
+  (syguslib-utils
+   (>= 0.1))
+  (yojson
+   (>= 1.6.0))))

@@ -1,7 +1,8 @@
 open Base
 open Option.Let_syntax
 open Rewriter
-open Syguslib.Sygus
+open Syguslib
+open Sygus
 open Term
 open Utils
 
@@ -310,7 +311,7 @@ and let_bindings_of_sygus
        by the new symbol.
     *)
     let varname = Alpha.fresh ~s:bsymb () in
-    let bterm' = rename [ bsymb, varname ] bterm in
+    let bterm' = Semantic.rename [ bsymb, varname ] bterm in
     let var = Variable.mk varname in
     (bsymb, var), (var, term_of_sygus (Map.set env ~key:varname ~data:var) bterm')
   in
@@ -323,7 +324,7 @@ and let_bindings_of_sygus
        t_bindings
        (term_of_sygus
           env'
-          (rename (List.map ~f:(fun (s, var) -> s, var.vname) subs) body)))
+          (Semantic.rename (List.map ~f:(fun (s, var) -> s, var.vname) subs) body)))
 ;;
 
 let grammar_production_of_skeleton
@@ -526,7 +527,7 @@ let collect_tuple_decls (commands : command list) =
   in
   Set.diff
     (Set.of_list (module String) (List.concat_map ~f:of_command commands))
-    (Set.of_list (module String) (List.concat_map ~f:declares commands))
+    (Set.of_list (module String) (List.concat_map ~f:Semantic.declares commands))
 ;;
 
 module HLSolver = struct
@@ -610,7 +611,7 @@ module HLSolver = struct
   let set_logic (name : string) (solver : t) : t = { solver with logic = name }
 
   let all_commands (solver : t) =
-    let pre c = List.dedup_and_sort ~compare:compare_declares c in
+    let pre c = List.dedup_and_sort ~compare:Semantic.compare_declares c in
     let core =
       solver.sorts
       @ solver.extra_defs

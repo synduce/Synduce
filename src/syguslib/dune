@@ -1,4 +1,0 @@
-(library
- (name syguslib)
- (public_name Synduce.Lib.SygusLib)
- (libraries core fmt sexplib lwt lwt.unix))
