@@ -1,0 +1,11 @@
+(set-logic NIA)
+(define-fun max ((x Int) (y Int)) Int (ite (>= x y) x y))
+(synth-fun f0 ((x7 Int)) Int ((IStart Int) (Ix Int) (Ic Int) (Ipred Bool))
+ ((IStart Int ((max Ix Ix))) (Ix Int (Ic x7 (- Ix) (+ Ix Ix) (max Ix Ix) (ite Ipred Ix Ix)))
+  (Ic Int ((Constant Int)))
+  (Ipred Bool ((= Ix Ix) (> Ix Ix) (not Ipred) (and Ipred Ipred) (or Ipred Ipred)))))
+(declare-var i16 Int)
+(declare-var i Int)
+(constraint
+ (or (not (and (or (not (= (mod i 2) 0)) (>= i i16)) (= (mod i 2) 0))) (= (max i i16) (f0 i))))
+(check-synth)

@@ -1,0 +1,6 @@
+(set-logic NIA)
+(synth-fun f0 () Int)
+(declare-var i Int)
+(declare-var p Int)
+(constraint (= (ite (= (mod p 2) 1) p i) f0))
+(check-synth)

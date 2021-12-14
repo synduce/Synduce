@@ -1,0 +1,5 @@
+(set-logic LIA)
+(synth-fun f0 () Int)
+(declare-var i0 Int)
+(constraint (or (not (= i0 0)) (= i0 f0)))
+(check-synth)

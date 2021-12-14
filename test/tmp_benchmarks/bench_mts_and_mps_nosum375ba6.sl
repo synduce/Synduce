@@ -1,0 +1,35 @@
+(set-logic DTLIA)
+(declare-datatype synd_tup_Int_Int_Int
+ ((mk_synd_tup_Int_Int_Int (proj_synd_tup_Int_Int_Int_0 Int) (proj_synd_tup_Int_Int_Int_1 Int)
+   (proj_synd_tup_Int_Int_Int_2 Int))))
+(define-fun max ((x Int) (y Int)) Int (ite (>= x y) x y))
+(synth-fun s0$2 () Int)
+(synth-fun oplus$0 ((x33 Int) (x34 synd_tup_Int_Int_Int)) Int ((IStart Int) (Ix Int) (Ic Int))
+ ((IStart Int ((max Ix Ix)))
+  (Ix Int
+   (Ic x33 (proj_synd_tup_Int_Int_Int_0 x34) (proj_synd_tup_Int_Int_Int_1 x34)
+    (proj_synd_tup_Int_Int_Int_2 x34) (- Ix) (+ Ix Ix) (max Ix Ix)))
+  (Ic Int ((Constant Int)))))
+(synth-fun oplus$1 ((x35 Int) (x36 synd_tup_Int_Int_Int)) Int ((IStart Int) (Ix Int) (Ic Int))
+ ((IStart Int ((max Ix Ix)))
+  (Ix Int
+   (Ic x35 (proj_synd_tup_Int_Int_Int_0 x36) (proj_synd_tup_Int_Int_Int_1 x36)
+    (proj_synd_tup_Int_Int_Int_2 x36) (- Ix) (+ Ix Ix) (max Ix Ix)))
+  (Ic Int ((Constant Int)))))
+(synth-fun oplus$2 ((x37 Int) (x38 synd_tup_Int_Int_Int)) Int ((Ix Int) (Ic Int))
+ ((Ix Int
+   (Ic x37 (proj_synd_tup_Int_Int_Int_0 x38) (proj_synd_tup_Int_Int_Int_1 x38)
+    (proj_synd_tup_Int_Int_Int_2 x38) (- Ix) (+ Ix Ix) (max Ix Ix)))
+  (Ic Int ((Constant Int)))))
+(declare-var p1 Int)
+(declare-var p Int)
+(constraint (= (max p 0) (oplus$0 p (mk_synd_tup_Int_Int_Int 0 0 s0$2))))
+(constraint (= (max p 0) (oplus$1 p (mk_synd_tup_Int_Int_Int 0 0 s0$2))))
+(constraint
+ (= (max (+ (max p 0) p1) 0)
+  (oplus$0 p (mk_synd_tup_Int_Int_Int (max (+ 0 p1) 0) (max (+ 0 p1) 0) p1))))
+(constraint
+ (= (max (+ (max p1 0) p) 0)
+  (oplus$1 p (mk_synd_tup_Int_Int_Int (max (+ 0 p1) 0) (max (+ 0 p1) 0) p1))))
+(constraint (= p1 (oplus$2 p1 (mk_synd_tup_Int_Int_Int 0 0 s0$2))))
+(check-synth)

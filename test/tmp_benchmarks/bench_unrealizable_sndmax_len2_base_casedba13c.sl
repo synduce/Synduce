@@ -1,0 +1,20 @@
+(set-logic LIA)
+(define-fun max ((x Int) (y Int)) Int (ite (>= x y) x y))
+(define-fun min ((x Int) (y Int)) Int (ite (<= x y) x y))
+(synth-fun odot$1 ((x22 Int) (x23 Int)) Int ((IStart Int) (Ix Int) (Ic Int) (Ipred Bool))
+ ((IStart Int ((max Ix Ix)))
+  (Ix Int (Ic x22 x23 (- Ix) (+ Ix Ix) (min Ix Ix) (max Ix Ix) (ite Ipred Ix Ix)))
+  (Ic Int ((Constant Int)))
+  (Ipred Bool ((= Ix Ix) (> Ix Ix) (not Ipred) (and Ipred Ipred) (or Ipred Ipred)))))
+(declare-var i88 Int)
+(declare-var i87 Int)
+(declare-var i0 Int)
+(declare-var i Int)
+(constraint
+ (or
+  (not
+   (and (>= i87 i88)
+    (and (and (and (> i i0) (and (> i i87) (> i0 0))) (and (> i i0) (and (= i i) (> i0 0))))
+     (and (> i i0) (and (= i i) (> i 0))))))
+  (= (max (max i88 (min i0 i87)) (min i (max i0 i87))) (odot$1 i i0))))
+(check-synth)

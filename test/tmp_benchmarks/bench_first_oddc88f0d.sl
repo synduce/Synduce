@@ -1,0 +1,5 @@
+(set-logic NIA)
+(declare-var i21 Int)
+(declare-var p Int)
+(constraint (or (not (and (= i21 (mod p 2)) (> p 1))) (= (ite (= (mod p 2) 1) p i21) 0)))
+(check-synth)

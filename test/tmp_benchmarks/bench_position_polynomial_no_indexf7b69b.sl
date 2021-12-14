@@ -1,0 +1,8 @@
+(set-logic NIA)
+(synth-fun f ((x4 Int) (x5 Int)) Int ((Ix Int) (Ic Int))
+ ((Ix Int (Ic x4 x5 (- Ix) (+ Ix Ix) (* Ix Ix) (div Ix Ix))) (Ic Int ((Constant Int)))))
+(declare-var i1 Int)
+(declare-var i0 Int)
+(constraint (= 0 (f i0 0)))
+(constraint (= i0 (f i0 (+ (* i1 0) 0))))
+(check-synth)

@@ -1,0 +1,13 @@
+(set-logic LIA)
+(define-fun max ((x Int) (y Int)) Int (ite (>= x y) x y))
+(synth-fun join ((x17 Int) (x18 Int)) Int ((IStart Int) (Ix Int) (Ic Int) (Ipred Bool))
+ ((IStart Int ((max Ix Ix))) (Ix Int (Ic x17 x18 (- Ix) (+ Ix Ix) (max Ix Ix) (ite Ipred Ix Ix)))
+  (Ic Int ((Constant Int)))
+  (Ipred Bool ((= Ix Ix) (> Ix Ix) (not Ipred) (and Ipred Ipred) (or Ipred Ipred)))))
+(declare-var i0 Int)
+(declare-var i44 Int)
+(constraint (or (not (and (>= i44 0) (= i44 i44))) (= i44 (join 0 i44))))
+(constraint
+ (or (not (and (>= (+ i0 i44) (max i0 i44)) (>= i0 0)))
+  (= (max (+ i44 i0) 0) (join (max (+ 0 i0) 0) i44))))
+(check-synth)

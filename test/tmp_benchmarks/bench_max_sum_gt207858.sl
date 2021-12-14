@@ -1,0 +1,8 @@
+(set-logic LIA)
+(declare-var i1 Int)
+(declare-var i0 Int)
+(declare-var p Int)
+(declare-var i Int)
+(declare-var input Int)
+(constraint (or (not (> input i)) (= (+ (+ i0 i1) (ite (> p input) p 0)) 1)))
+(check-synth)

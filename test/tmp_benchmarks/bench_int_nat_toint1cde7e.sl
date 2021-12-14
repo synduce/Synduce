@@ -1,0 +1,7 @@
+(set-logic LIA)
+(synth-fun add1 ((x6 Int)) Int ((Ix Int) (Ic Int) (Ipred Bool))
+ ((Ix Int (Ic x6 (- Ix) (+ Ix Ix) (ite Ipred Ix Ix))) (Ic Int ((Constant Int)))
+  (Ipred Bool ((= Ix Ix) (> Ix Ix) (not Ipred) (and Ipred Ipred) (or Ipred Ipred)))))
+(constraint (= 1 (add1 0)))
+(constraint (= 2 (add1 (+ 1 0))))
+(check-synth)

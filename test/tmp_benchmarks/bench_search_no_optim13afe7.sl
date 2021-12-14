@@ -1,0 +1,13 @@
+(set-logic LIA)
+(synth-fun join ((x2 Bool) (x3 Bool) (x4 Bool) (x5 Bool)) Bool ((IStart Bool) (Ipred Bool))
+ ((IStart Bool ((or Ipred Ipred)))
+  (Ipred Bool (x2 x3 x4 x5 (not Ipred) (and Ipred Ipred) (or Ipred Ipred)))))
+(declare-var i4 Int)
+(declare-var b0 Bool)
+(declare-var i0 Int)
+(declare-var i Int)
+(declare-var x Int)
+(constraint (= (or (= i x) (or (= i0 x) b0)) (join (= x i) (= x i0) false b0)))
+(constraint
+ (= (or (= i4 x) (or (= i x) (or (= i0 x) b0))) (join (= x i) (= x i0) (or (= i4 x) false) b0)))
+(check-synth)

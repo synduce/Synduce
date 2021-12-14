@@ -1,0 +1,7 @@
+(set-logic LIA)
+(synth-fun s0$0 ((x30 Int) (x31 Int)) Int ((Ix Int) (Ic Int))
+ ((Ix Int (Ic x30 x31 (- Ix) (+ Ix Ix))) (Ic Int ((Constant Int)))))
+(declare-var i0 Int)
+(constraint (or (not true) (= 1 (s0$0 i0 1))))
+(constraint (or (not true) (= 2 (s0$0 i0 (+ 1 1)))))
+(check-synth)

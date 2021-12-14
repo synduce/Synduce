@@ -1,0 +1,10 @@
+(set-logic LIA)
+(declare-var i4383 Int)
+(declare-var i4382 Int)
+(declare-var p Int)
+(declare-var i Int)
+(declare-var input Int)
+(constraint
+ (or (not (and (or (not (> input i)) (= i4382 0)) (> input i)))
+  (= (+ (+ i4382 i4383) (ite (> p input) p 0)) 0)))
+(check-synth)

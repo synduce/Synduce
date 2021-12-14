@@ -1,0 +1,6 @@
+(set-logic LIA)
+(synth-fun add ((x4 Int) (x5 Int)) Int ((Ix Int) (Ic Int))
+ ((Ix Int (Ic x4 x5 (- Ix) (+ Ix Ix))) (Ic Int ((Constant Int)))))
+(synth-fun c0 () Int)
+(constraint (= 0 (add c0 c0)))
+(check-synth)

@@ -1,0 +1,20 @@
+(set-logic DTLIA)
+(declare-datatype synd_tup_Int_Int
+ ((mk_synd_tup_Int_Int (proj_synd_tup_Int_Int_0 Int) (proj_synd_tup_Int_Int_1 Int))))
+(define-fun max ((x Int) (y Int)) Int (ite (>= x y) x y))
+(define-fun min ((x Int) (y Int)) Int (ite (<= x y) x y))
+(synth-fun inner1$0 ((x48 Int) (x49 synd_tup_Int_Int)) Int
+ ((IStart Int) (Ix Int) (Ic Int) (Ipred Bool))
+ ((IStart Int ((min Ix Ix)))
+  (Ix Int
+   (Ic x48 (proj_synd_tup_Int_Int_0 x49) (proj_synd_tup_Int_Int_1 x49) 
+    (- Ix) (+ Ix Ix) (min Ix Ix) (max Ix Ix) (ite Ipred Ix Ix)))
+  (Ic Int ((Constant Int)))
+  (Ipred Bool ((= Ix Ix) (> Ix Ix) (not Ipred) (and Ipred Ipred) (or Ipred Ipred)))))
+(declare-var i22 Int)
+(declare-var i3 Int)
+(declare-var i4 Int)
+(declare-var i Int)
+(constraint (= (min i4 i) (inner1$0 i (mk_synd_tup_Int_Int i4 i4))))
+(constraint (= (min (min i22 i3) i) (inner1$0 i (mk_synd_tup_Int_Int (min i22 i3) (max i22 i3)))))
+(check-synth)
