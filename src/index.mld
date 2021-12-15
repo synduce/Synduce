@@ -23,7 +23,7 @@ algorithms should be reusable for other synthesis problems and not only the ones
 representation interfaces with this implementation through {!module-Lang.SmtInterface}.
 
 {1 SyGuS Interface }
-{!module-Syguslib} provides an implementation to interact with SyGuS solvers. The internal
+The library [syguslib-utils] provides an implementation to interact with SyGuS solvers. The internal
 representation interfaces with this implementation through {!module-Lang.SygusInterface}.
 
 {1 Utils and Configuration }
