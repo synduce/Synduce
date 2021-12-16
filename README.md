@@ -1,4 +1,5 @@
 # Synduce
+[![CI](https://github.com/synduce/Synduce/actions/workflows/build.yml/badge.svg?branch=dev)](https://github.com/synduce/Synduce/actions/workflows/build.yml)
 
 *Synduce* is a program synthesizer: you specify a reference function, and a target recursion skeleton, and *Synduce* completes it for you.
 
