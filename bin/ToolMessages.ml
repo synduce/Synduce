@@ -56,6 +56,7 @@ let prep_final_json
      ; "verif_elapsed", `Float verif
      ; "solver-usage", solvers
      ; "refinement-steps", refinement_steps
+     ; "id", `Int pb.psi_id
      ]
     @ soln_or_refutation)
 ;;
@@ -65,7 +66,7 @@ let on_success
     (source_filename : string ref)
     (pb : psi_def)
     (result : (soln, unrealizability_ctex list) Either.t)
-    : unit
+    : Yojson.t
   =
   let elapsed, verif_time =
     Option.value
@@ -114,16 +115,7 @@ let on_success
     Fmt.(
       pf stdout "%i,%.4f,%.4f@." !Algo.AState.refinement_steps !Stats.verif_time elapsed);
     Fmt.(pf stdout "success@."));
-  if !Config.json_out
-  then (
-    let json =
-      prep_final_json ~is_ocaml_syntax source_filename pb result elapsed !Stats.verif_time
-    in
-    if !Config.json_progressive
-    then (
-      Yojson.to_channel ~std:true Stdio.stdout json;
-      Stdio.(Out_channel.flush stdout))
-    else Fmt.(pf stdout "%a@." (Yojson.pretty_print ~std:false) json))
+  prep_final_json ~is_ocaml_syntax source_filename pb result elapsed !Stats.verif_time
 ;;
 
 (** Print a summary of the options available. The options are in the Lib.Utils.Config module.  *)

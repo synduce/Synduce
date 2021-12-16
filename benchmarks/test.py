@@ -8,10 +8,10 @@ import subprocess
 import json
 # Local helper modules
 from definitions import *
-from parsing import DataObj
+from parsing import DataObj, MultiDataObj
 
 
-def run_one(progress, bench_id, command, algo, optim, filename, extra_opt):
+def run_one(progress, bench_id, command, algo, optim, filename, extra_opt, expect_more):
     print(f"{progress : >11s}  {bench_id} 🏃", end="\r")
     sys.stdout.flush()
 
@@ -27,13 +27,12 @@ def run_one(progress, bench_id, command, algo, optim, filename, extra_opt):
         try:
             line = process.stdout.readline()
             data = json.loads(line)
-            info = DataObj(data)
-            last_refinement_string = info.get_refinement_summary()
+            info = MultiDataObj(data)
             last_verif_time = info.verif_elapsed
             last_elapsed = info.elapsed
             last_info = info
         except Exception as e:
-            info = DataObj({})
+            info = MultiDataObj({})
             info.is_successful = False
             info.verif_elapsed = last_verif_time
             info.elapsed = last_elapsed
@@ -42,14 +41,15 @@ def run_one(progress, bench_id, command, algo, optim, filename, extra_opt):
         if process.poll() is not None or info.is_successful:
             break
         print(
-            f"{progress : >11s}.. benchmarks/{filename} {extra_opt} {algo[1]} {optim[1]} 🏃 at step {info.major_step_count}:{info.minor_step_count}", end="\r")
+            f"{progress : >11s}.. benchmarks/{filename} {extra_opt} {algo[1]} {optim[1]} 🏃 at step {info.major_step_count(0)}:{info.minor_step_count(0)}", end="\r")
 
+    if info is not None and last_info is None:
+        last_info = info
     return last_info
 
 
-def run_n(progress, bench_id, realizable, command, algo,
-          optim, filename, extra_opt, errors, num_runs, csv_output):
-
+def run_n(progress, bench_id, command, filename, realizable=True, expect_many=False, algo="se2gis",
+          optim="", extra_opt="", errors=[], num_runs=1, csv_output=None):
     total_elapsed = 0.0
     verif_elapsed = 0.0
     max_e = 0
@@ -59,7 +59,7 @@ def run_n(progress, bench_id, realizable, command, algo,
     sp = " "
     bench_parts = bench_id.split(".")[0].split("/")
     bench_name = bench_parts[-1]
-    info = DataObj({})
+    info = MultiDataObj({})
     info.is_successful = False
     print(
         f"{progress : >11s} {bench_name: <25s}", end="\r")
@@ -68,9 +68,9 @@ def run_n(progress, bench_id, realizable, command, algo,
     for i in range(num_runs):
         try:
             info = run_one(progress, bench_id, command,
-                           algo, optim, filename, extra_opt)
+                           algo, optim, filename, extra_opt, expect_many)
         except:
-            info = DataObj({})
+            info = MultiDataObj({})
             info.is_successful = False
 
         if info.is_successful and ((realizable and not info.is_unrealizable) or (not realizable and info.is_unrealizable)):
@@ -100,22 +100,30 @@ def run_n(progress, bench_id, realizable, command, algo,
             delta_str = f"{delta_str}  "
         timing = f"average: {elapsed: 4.3f}s ±{delta_str}"
 
-        if info.proved_by_induction:
-            p_by_induction = "✓"
-        else:
-            p_by_induction = "~"
-
-        if info.classified_by_induction:
-            c_by_induction = "✓"
-        else:
-            c_by_induction = "~"
-        refinement_rounds = info.get_refinement_summary()
-        if "." in refinement_rounds:
-            induction_info = f"B:{c_by_induction},B':{p_by_induction}"
-        else:
+        if expect_many:
+            p_by_induction = "∅"
+            c_by_induction = "∅"
             induction_info = "        "
+            refinement_rounds = "∅"
+            current_algo = "Portfolio"
+        else:
+            current_algo = info.algo(0)
+            if info.is_proved_by_induction(0):
+                p_by_induction = "✓"
+            else:
+                p_by_induction = "~"
 
-        msg = f"{progress : >11s} ✅ {info.algo: <6s} : {bench_name : <33s} ×{num_runs} runs, {str(timing): <30s} {induction_info} | R: {refinement_rounds} {sp : <20s} "
+            if info.is_classified_by_induction(0):
+                c_by_induction = "✓"
+            else:
+                c_by_induction = "~"
+            refinement_rounds = info.get_refinement_summary(0)
+            if "." in refinement_rounds:
+                induction_info = f"B:{c_by_induction},B':{p_by_induction}"
+            else:
+                induction_info = "        "
+
+        msg = f"{progress : >11s} ✅ {current_algo: <6s} : {bench_name : <33s} ×{num_runs} runs, {str(timing): <30s} {induction_info} | R: {refinement_rounds} {sp : <20s} "
         print(msg)
         csvline = f"{elapsed: 4.3f},{delta : .0f},{refinement_rounds},{c_by_induction},{p_by_induction},{verif_elapsed}"
     else:
@@ -137,10 +145,17 @@ def run_benchmarks(input_files, algos, optims, num_runs=1, csv_output=None, exit
         filename = filename_with_opt[0]
         category = os.path.dirname(filename)
         extra_opt = filename_with_opt[1]
+
         if len(filename_with_opt) >= 3:
             realizable = filename_with_opt[2]
         else:
             realizable = True
+
+        if len(filename_with_opt) >= 4:
+            expect_many = int(filename_with_opt[3]) > 0
+        else:
+            expect_many = False
+
         csvline_all_algos = []
         for algo in algos:
             for optim in optims:
@@ -172,9 +187,13 @@ def run_benchmarks(input_files, algos, optims, num_runs=1, csv_output=None, exit
                 if not bench_cat == prev_bench_cat:
                     print(f"\n⏺ Category: {bench_cat}")
                     prev_bench_cat = bench_cat
+
                 # Run the benchmark n times.
-                errors, elapsed, csvline = run_n(progress, bench_id, realizable, command, algo,
-                                                 optim, filename, extra_opt, errors, num_runs, csv_output)
+                errors, elapsed, csvline = run_n(progress, bench_id, command, filename, realizable=realizable,
+                                                 algo=algo, expect_many=expect_many, optim=optim, extra_opt=extra_opt,
+                                                 errors=errors, num_runs=num_runs,
+                                                 csv_output=csv_output)
+
                 csvline_all_algos += [f"{algo[0]}:{optim[0]}", csvline]
 
         if csv_output:
@@ -219,7 +238,7 @@ if __name__ == "__main__":
         "-o", "--output", help="Dump Synduce output in -i mode to file (appending to file).", type=str, default=-1)
     aparser.add_argument(
         "-b", "--benchmarks", help="Run a set of benchmarks.", type=str,
-        choices=["all", "constraint", "lifting", "base", "unr", "small"], nargs="+", default=None)
+        choices=["all", "constraint", "lifting", "base", "unr", "small", "incomplete"], nargs="+", default=None)
     aparser.add_argument(
         "-c", "--compare", help="Compare with segis or cegis", type=str,
         choices=["segis", "cegis", "segis0"], default=None, nargs="+")
@@ -265,6 +284,7 @@ if __name__ == "__main__":
     run_base_benchmarks = False
     run_unrealizable = False
     run_kick_the_tires_only = False
+    run_incomplete = False
 
     if args.benchmarks is not None:
         if "constraint" in args.benchmarks:
@@ -277,6 +297,8 @@ if __name__ == "__main__":
             run_kick_the_tires_only = True
         if "unr" in args.benchmarks:
             run_unrealizable = True
+        if "incomplete" in args.benchmarks:
+            run_incomplete = True
         if "all" in args.benchmarks:  # e.g. benchmarks = "all"
             run_lifting_benchmarks = True
             run_constraint_benchmarks = True
@@ -320,7 +342,8 @@ if __name__ == "__main__":
         exit(0)
 
     # If we were supposed to run a specific set of benchmarks, we're done
-    if run_base_benchmarks or run_constraint_benchmarks or run_lifting_benchmarks or run_unrealizable:
+    if (run_base_benchmarks or run_constraint_benchmarks or
+            run_lifting_benchmarks or run_unrealizable or run_incomplete):
         algos = [["se2gis", cvc]] + other_alg
 
         if run_lifting_benchmarks:
@@ -338,6 +361,10 @@ if __name__ == "__main__":
         if run_unrealizable:
             optims = [["all", ""]]
             bench_set += unrealizable_benchmarks
+
+        if run_incomplete:
+            optims = [["all", ""]]
+            bench_set += incomplete_benchmarks
 
         run_benchmarks(bench_set, algos,
                        optims, csv_output=csv_output, num_runs=runs)

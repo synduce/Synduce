@@ -1,5 +1,6 @@
 open Base
 open Fmt
+open Lib
 open Lib.Lang
 open Lib.Parsers
 open Lib.Utils
@@ -39,14 +40,36 @@ let main () =
   in
   if !parse_only then Caml.exit 1;
   (* Solve the problem proper. *)
-  let outputs = Algo.Refinement.solve_problem psi_comps all_pmrs in
-  List.iter outputs ~f:(function
+  let outputs = Many.find_and_solve_problem psi_comps all_pmrs in
+  let f (pb, soln) =
+    Algo.AState.(
+      match pb, soln with
       | pb, Realizable soln ->
-        ToolMessages.on_success ~is_ocaml_syntax filename pb (Either.First soln)
+        ( pb.psi_id
+        , ToolMessages.on_success ~is_ocaml_syntax filename pb (Either.First soln) )
       | pb, Unrealizable ctexs ->
-        ToolMessages.on_success ~is_ocaml_syntax filename pb (Either.Second ctexs)
+        ( pb.psi_id
+        , ToolMessages.on_success ~is_ocaml_syntax filename pb (Either.Second ctexs) )
       | _, Failed _ ->
-        Utils.Log.error_msg "Failed to find a solution or a witness of unrealizability");
+        Utils.Log.error_msg "Failed to find a solution or a witness of unrealizability";
+        failwith "Solving failure")
+  in
+  let json_out =
+    match outputs with
+    | [ a ] -> snd (f a)
+    | _ ->
+      let subproblem_jsons = List.map ~f outputs in
+      `Assoc
+        (List.map subproblem_jsons ~f:(fun (psi_id, json) ->
+             Fmt.(str "problem_%i" psi_id), json))
+  in
+  (if !Config.json_out
+  then
+    if !Config.json_progressive
+    then (
+      Yojson.to_channel ~std:true Stdio.stdout json_out;
+      Stdio.(Out_channel.flush stdout))
+    else Fmt.(pf stdout "%a@." (Yojson.pretty_print ~std:false) json_out));
   if !Config.show_vars then Term.Variable.print_summary stdout ()
 ;;
 

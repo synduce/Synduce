@@ -79,6 +79,9 @@ class DataObj:
         self.proved_by_induction = lemma_proof_flag
         self.classified_by_induction = cex_classif_flag
 
+    def __str__(self,):
+        return f"<{self.algo}>[{self.elapsed}][{self.is_successful}(R:{self.is_unrealizable})]"
+
     def get_refinement_summary(self, set_sizes=False) -> str:
         rsteps = self.data.get("refinement-steps")
         if not rsteps:
@@ -105,3 +108,80 @@ class DataObj:
             str_summary += "∅"
 
         return str_summary
+
+
+class MultiDataObj():
+    def __init__(self, data):
+        algo = data.get("algorithm")
+        # If algo is specified, then this is a single entry
+        if algo:
+            final_dat = DataObj(data)
+            if final_dat is not None:
+                self.data_objs = [final_dat]
+            self.is_progress = False
+        # This is a progress message
+        elif "progress" in data:
+            progress_data = DataObj(data)
+            if progress_data is not None:
+                self.data_objs = [progress_data]
+            self.is_progress = True
+        # Otherwise, it should be a set of responses:
+        else:
+            self.data_objs = []
+            self.is_progress = False
+            for problem_id, problem_data in data.items():
+                data_obj = DataObj(problem_data)
+                if data_obj is not None:
+                    self.data_objs.append(data_obj)
+
+        self.is_successful = False
+        self.is_unrealizable = True
+        self.verif_elapsed = 0
+        self.elapsed = 0
+        for dat in self.data_objs:
+            if dat.elapsed is not None and dat.elapsed > 0:
+                self.elapsed += dat.elapsed
+            if dat.verif_elapsed is not None and dat.verif_elapsed > 0:
+                self.verif_elapsed += dat.verif_elapsed
+            self.is_unrealizable = self.is_unrealizable and dat.is_unrealizable
+            if dat.is_successful:
+                self.is_successful = True
+
+    def __str__(self,):
+        return f"({self.is_progress}/{self.is_successful})(R:{self.is_unrealizable})" + " ".join([str(x) for x in self.data_objs])
+
+    def get_refinement_summary(self, i: int) -> str:
+        if len(self.data_objs) <= i:
+            return "?"
+        dat = self.data_objs[i]
+        return dat.get_refinement_summary()
+
+    def is_proved_by_induction(self, i: int) -> bool:
+        if len(self.data_objs) <= i:
+            return False
+        dat = self.data_objs[i]
+        return dat.proved_by_induction
+
+    def major_step_count(self, i: int) -> int:
+        if len(self.data_objs) <= i:
+            return False
+        dat = self.data_objs[i]
+        return dat.major_step_count
+
+    def minor_step_count(self, i: int) -> int:
+        if len(self.data_objs) <= i:
+            return False
+        dat = self.data_objs[i]
+        return dat.minor_step_count
+
+    def algo(self, i: int) -> str:
+        if len(self.data_objs) <= i:
+            return "None"
+        dat = self.data_objs[i]
+        return dat.algo
+
+    def is_classified_by_induction(self, i: int) -> bool:
+        if len(self.data_objs) <= i:
+            return False
+        dat = self.data_objs[i]
+        return dat.classified_by_induction

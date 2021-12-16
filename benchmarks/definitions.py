@@ -393,6 +393,14 @@ unrealizable_benchmarks = [
     ["unimodal_lists/prod_needs_aux.ml",  "--no-lifting", False],
 ]
 
+incomplete_benchmarks = [
+    ["incomplete/bst/count_lt_partial.ml", "", True, 1],
+    ["incomplete/bst/count_lt_partial_2.ml", "", True, 1],
+    ["incomplete/sortedlist/count_lt_p1.ml", "", True, 1],
+    ["incomplete/list/sum_p1.ml", "", True, 1],
+    ["incomplete/list/sum_p2.ml", "", True, 1],
+]
+
 benchmark_set = constraint_benchmarks + base_benchmark_set + lifting_benchmarks
 
 # Extra extra benchmarks (takes extra time..)

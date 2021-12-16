@@ -271,15 +271,17 @@ let mk_extra_toplevel_problems (p : psi_def) =
     if List.length subspecs > 0
     then
       List.fold_left subspecs ~init:[ p ] ~f:(fun accum subspec ->
-          Fmt.(
-            pf
-              stdout
-              "@.༆ Apply %a to:@.%a@."
-              _pp_rloc
-              subspec
-              (list (PMRS.pp ~short:false))
-              (List.map ~f:(fun p' -> p'.psi_target) accum);
-            List.concat_map ~f:(fun p' -> mk_new_problem ~p:p' subspec) accum))
+          Log.verbose
+            Fmt.(
+              fun fmt () ->
+                pf
+                  fmt
+                  "@.༆ Apply %a to:@.%a@."
+                  _pp_rloc
+                  subspec
+                  (list (PMRS.pp ~short:false))
+                  (List.map ~f:(fun p' -> p'.psi_target) accum));
+          List.concat_map ~f:(fun p' -> mk_new_problem ~p:p' subspec) accum)
     else []
   in
   p :: new_ps
