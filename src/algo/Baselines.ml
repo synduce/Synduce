@@ -110,16 +110,9 @@ let rec cegis_loop (p : psi_def) (t_set : TermSet.t) : solver_response segis_res
     Config.Optims.turn_off_eager_optims ());
   let elapsed = Stats.get_glob_elapsed () in
   Log.info (fun frmt () -> Fmt.pf frmt "Refinement step %i." !refinement_steps);
-  (if not !Config.info
-  then
-    Fmt.(
-      pf
-        stdout
-        "%i,%3.3f,%3.3f,%i,0@."
-        !refinement_steps
-        (Stats.get_glob_elapsed ())
-        elapsed
-        (Set.length t_set)));
+  let tsize = Set.length t_set in
+  Stats.log_new_major_step ~tsize ~usize:0 ();
+  if !Config.info then AlgoLog.show_steps tsize 0 else AlgoLog.show_stat elapsed tsize 0;
   Log.debug_msg
     Fmt.(str "<CEGIS> Start refinement loop with %i terms in T." (Set.length t_set));
   (* Start of the algorithm. *)
@@ -131,12 +124,15 @@ let rec cegis_loop (p : psi_def) (t_set : TermSet.t) : solver_response segis_res
       ~lifting:Lifting.empty_lifting
       t_set
   in
-  let s_resp, solution = Equations.solve ~p eqns in
+  let synth_time, (s_resp, solution) = Stats.timed (fun () -> Equations.solve ~p eqns) in
   match s_resp, solution with
   | RSuccess _, First sol ->
-    (match Verify.bounded_check ~use_concrete_ctex:true ~p sol with
+    (match
+       Stats.timed (fun () -> Verify.bounded_check ~use_concrete_ctex:true ~p sol)
+     with
     (* A concrete conterexample term is returned. *)
-    | Some eqn ->
+    | verif_time, Some eqn ->
+      Stats.log_major_step_end ~synth_time ~verif_time ~t:(Set.length t_set) ~u:0 false;
       Log.debug (fun frmt () ->
           Fmt.(
             pf
@@ -145,10 +141,12 @@ let rec cegis_loop (p : psi_def) (t_set : TermSet.t) : solver_response segis_res
               pp_term
               eqn.eterm));
       cegis_loop p (Set.add t_set eqn.eterm)
-    | None ->
+    | verif_time, None ->
+      Stats.log_major_step_end ~synth_time ~verif_time ~t:tsize ~u:0 true;
       Log.print_ok ();
       Realizable { soln_rec_scheme = p.psi_target; soln_implems = sol })
   | RInfeasible, Second ctexs ->
+    Stats.log_major_step_end ~synth_time ~verif_time:0. ~t:tsize ~u:0 false;
     Log.info
       Fmt.(
         fun frmt () ->

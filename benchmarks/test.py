@@ -353,8 +353,8 @@ if __name__ == "__main__":
     if table_no == 1:
 
         algos = [
-            ["se2gis", "--no-gropt"],
-            ["segis", "--segis --no-gropt"]
+            ["se2gis", ""],
+            ["segis", "--segis"]
         ]
         optims = [["all", ""]]
 
@@ -362,9 +362,9 @@ if __name__ == "__main__":
     elif table_no == 2:
 
         algos = [
-            ["se2gis", "--no-gropt"],
-            ["segis", "--segis --no-gropt"],
-            ["cegis", "--cegis --no-gropt"]
+            ["se2gis", ""],
+            ["segis", "--segis"],
+            ["cegis", "--cegis"]
         ]
         optims = [["all", ""]]
 
@@ -415,9 +415,9 @@ if __name__ == "__main__":
 
     else:
         if table_no == 2:
-            input_files = reduced_benchmark_set_table2
+            input_files = base_benchmark_set
         elif table_no == 3:
-            input_files = reduced_benchmark_set_table3
+            input_files = base_benchmark_set
         elif table_no == 4:
             input_files = constraint_benchmarks
         elif table_no == 5:
