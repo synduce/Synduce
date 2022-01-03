@@ -241,22 +241,27 @@ end
 module Constant = struct
   type t =
     | CInt of int
+    | CChar of char
     | CTrue
     | CFalse
 
   let compare c1 c2 =
     match c1, c2 with
     | CInt i1, CInt i2 -> Int.compare i1 i2
+    | CChar c1, CChar c2 -> Char.compare c1 c2
     | CTrue, CTrue -> 0
     | CTrue, CFalse -> 1
     | CFalse, CTrue -> -1
     | CFalse, CFalse -> 0
     | CInt _, _ -> 1
     | _, CInt _ -> -1
+    | CChar _, _ -> 1
+    | _, CChar _ -> -1
   ;;
 
   let equal c1 c2 = compare c1 c2 = 0
   let of_int i = CInt i
+  let of_char c = CChar c
   let of_bool b = if b then CTrue else CFalse
 
   let _if c t f =
@@ -268,12 +273,14 @@ module Constant = struct
   let type_of (c : t) =
     match c with
     | CInt _ -> RType.TInt
+    | CChar _ -> RType.TChar
     | CTrue | CFalse -> RType.TBool
   ;;
 
   let pp (frmt : Formatter.t) (c : t) =
     match c with
     | CInt i -> Fmt.int frmt i
+    | CChar c -> Fmt.char frmt c
     | CTrue -> Fmt.bool frmt true
     | CFalse -> Fmt.bool frmt false
   ;;
@@ -396,6 +403,7 @@ let mk_const ?(pos = dummy_loc) (c : Constant.t) =
   let ctyp =
     match c with
     | Constant.CInt _ -> RType.TInt
+    | Constant.CChar _ -> RType.TChar
     | Constant.CTrue | Constant.CFalse -> RType.TBool
   in
   { tpos = pos; tkind = TConst c; ttyp = ctyp }
@@ -1449,6 +1457,9 @@ module Terms = struct
 
   (** Create an integer constant term. *)
   let int (i : int) : t = mk_const (Constant.of_int i)
+
+  (** Create a char constant term.*)
+  let char (c : char) : t = mk_const (Constant.of_char c)
 
   (** Create a boolean constant term. *)
   let bool (b : bool) : t = mk_const (Constant.of_bool b)

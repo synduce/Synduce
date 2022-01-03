@@ -54,6 +54,7 @@ module Expression : sig
     | ETrue
     | EFalse
     | EInt of int
+    | EChar of char
     | EVar of int
     | EBox of boxkind
     | ETup of t list

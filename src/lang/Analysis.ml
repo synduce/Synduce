@@ -351,9 +351,10 @@ let rec rand_const_of_type (typ : RType.t) : term =
     match typ with
     | TInt -> mk_const (Constant.CInt (Random.int (_INT_MAX - _INT_MIN) + _INT_MIN))
     | TBool -> mk_const (if Random.bool () then Constant.CTrue else Constant.CFalse)
-    | TChar -> failwith "Char unsupported."
+    | TChar -> mk_const (Constant.CChar (Random.char ()))
     | TString -> failwith "String unsupported."
     | TVar _ -> mk_const (Constant.CInt (Random.int (_INT_MAX - _INT_MIN) + _INT_MIN))
+    | TTup tl -> mk_tup (List.map ~f:rand_const_of_type tl)
     | _ ->
       (match get_variants typ with
       | [] -> failwith Fmt.(str "Unsupported value type %a" pp typ)
