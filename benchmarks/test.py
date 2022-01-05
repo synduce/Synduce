@@ -73,7 +73,10 @@ def run_n(progress, bench_id, realizable, command, algo,
             info = DataObj({})
             info.is_successful = False
 
-        if info.is_successful and ((realizable and not info.is_unrealizable) or (not realizable and info.is_unrealizable)):
+        if (info is not None and
+            info.is_successful and
+            ((realizable and not info.is_unrealizable) or
+                (not realizable and info.is_unrealizable))):
             total_elapsed += info.elapsed
             verif_elapsed += info.verif_elapsed
             max_e = max(info.elapsed, max_e)
@@ -92,7 +95,7 @@ def run_n(progress, bench_id, realizable, command, algo,
     sp = " "
     csvline = "?,?,?,?,?,?"
 
-    if info.is_successful and ((realizable and not info.is_unrealizable) or (not realizable and info.is_unrealizable)):
+    if info is not None and info.is_successful and ((realizable and not info.is_unrealizable) or (not realizable and info.is_unrealizable)):
         delta_str = f"{delta : .0f}ms"
         if (float(delta) / (1000.0 * elapsed)) > 0.05:
             delta_str = f"{delta_str} !"
@@ -120,7 +123,10 @@ def run_n(progress, bench_id, realizable, command, algo,
         csvline = f"{elapsed: 4.3f},{delta : .0f},{refinement_rounds},{c_by_induction},{p_by_induction},{verif_elapsed}"
     else:
         print(f"{progress: >11s} ❌ {bench_id : <90s}")
-        csvline = f"N/A,N/A,f{info.major_step_count},N/A,N/A,N/A"
+        if info is not None:
+            csvline = f"N/A,N/A,f{info.major_step_count},N/A,N/A,N/A"
+        else:
+            csvline = f"N/A,N/A,N/A,N/A,N/A,N/A"
 
     sys.stdout.flush()
 
