@@ -85,7 +85,7 @@ let show_new_rskel i p =
           fmt
           "💁 Attempting to find solution to skeleton:@;<1 10>%a"
           (box (PMRS.pp ~short:false))
-          p.psi_target))
+          p.PsiDef.target))
 ;;
 
 let msg_too_many_opts () =
@@ -266,7 +266,7 @@ let violates_ensures p ctexs =
                 "%a should not be in the image of %s"
                 pp_term
                 tval
-                p.psi_reference.pvar.vname)))
+                p.PsiDef.reference.pvar.vname)))
 ;;
 
 let positives_ensures p positives =
@@ -274,7 +274,7 @@ let positives_ensures p positives =
       pf
         fmt
         "@[These examples are in the image of %s:@;%a@]"
-        p.psi_reference.pvar.vname
+        p.PsiDef.reference.pvar.vname
         (list ~sep:comma pp_term)
         positives)
 ;;
@@ -307,7 +307,7 @@ let show_new_ensures_predicate (f : variable) (ensures : term) =
 (* ============================================================================================= *)
 
 let image_ctex_class
-    (p : psi_def)
+    (p : PsiDef.t)
     (ctex : ctex)
     (resp : Smtlib.SmtLib.solver_response)
     (vmethod : Stats.verif_method)
@@ -323,7 +323,7 @@ let image_ctex_class
             (Stats.verif_method_to_str vmethod)
             (styled (`Fg `Red) string)
             "SPURIOUS"
-            p.psi_reference.pvar.vname
+            p.PsiDef.reference.pvar.vname
             (box pp_ctex)
             ctex)
       else if SmtInterface.SyncSmt.is_sat resp
@@ -335,7 +335,7 @@ let image_ctex_class
             (Stats.verif_method_to_str vmethod)
             (styled (`Fg `Green) string)
             "VALID"
-            p.psi_reference.pvar.vname
+            p.PsiDef.reference.pvar.vname
             (box pp_ctex)
             ctex)
       else
@@ -346,7 +346,7 @@ let image_ctex_class
             (Stats.verif_method_to_str vmethod)
             (styled (`Fg `White) (styled (`Bg `Red) string))
             "UNKNOWN"
-            p.psi_reference.pvar.vname
+            p.PsiDef.reference.pvar.vname
             (box pp_ctex)
             ctex))
 ;;

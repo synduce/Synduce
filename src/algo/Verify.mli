@@ -13,7 +13,7 @@ open Lang.Term
    not perform bounded checking by expanding unnecessary terms.
 *)
 val check_solution
-  :  p:AState.psi_def
+  :  p:AState.PsiDef.t
   -> refinement_loop_state
   -> (string * variable list * term) list
   -> [ `Incorrect_assumptions
@@ -30,7 +30,7 @@ val check_solution
 *)
 val bounded_check
   :  ?use_concrete_ctex:bool
-  -> p:AState.psi_def
+  -> p:AState.PsiDef.t
   -> (string * variable list * term) list
   -> AState.equation option
 

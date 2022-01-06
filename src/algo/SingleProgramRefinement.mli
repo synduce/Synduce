@@ -4,7 +4,7 @@ open Syguslib
 may use the best portoflio of techniques to solve the problem, with the goal to find whether
 the problem is realizable or not.
  *)
-val solve_problem : AState.psi_def -> Sygus.solver_response AState.segis_response
+val solve_problem : AState.PsiDef.t -> Sygus.solver_response AState.segis_response
 
 (**
   [find_and_solve_problem (Some (target, reference, representation))] solves the synthesis problem
@@ -19,4 +19,4 @@ val solve_problem : AState.psi_def -> Sygus.solver_response AState.segis_respons
 val find_and_solve_problem
   :  (string * string * string) option
   -> (string, Lang.PMRS.t, Base.String.comparator_witness) Base.Map.t
-  -> (AState.psi_def * Syguslib.Sygus.solver_response AState.segis_response) list
+  -> (AState.PsiDef.t * Syguslib.Sygus.solver_response AState.segis_response) list

@@ -4,6 +4,6 @@ open Base
 val find_problem_components
   :  string * string * string
   -> (string, Lang.PMRS.t, String.comparator_witness) Map.t
-  -> psi_def
+  -> PsiDef.t
 
-val update_context : psi_def -> unit
+val update_context : PsiDef.t -> unit

@@ -17,7 +17,7 @@ let cvc_message () =
 let prep_final_json
     ~(is_ocaml_syntax : bool)
     (source_filename : string ref)
-    (pb : psi_def)
+    (pb : PsiDef.t)
     (soln : (soln, unrealizability_ctex list) Either.t)
     (elapsed : float)
     (verif : float)
@@ -25,10 +25,10 @@ let prep_final_json
   =
   let _ = is_ocaml_syntax, source_filename, pb, soln in
   let solvers =
-    Option.value ~default:(`String "unknown") (Utils.LogJson.get_solver_stats pb.psi_id)
+    Option.value ~default:(`String "unknown") (Utils.LogJson.get_solver_stats pb.id)
   in
   let refinement_steps =
-    Option.value ~default:(`String "unknown") (Utils.LogJson.get_summary pb.psi_id)
+    Option.value ~default:(`String "unknown") (Utils.LogJson.get_summary pb.id)
   in
   let algo =
     if !Config.Optims.use_segis
@@ -56,7 +56,7 @@ let prep_final_json
      ; "verif_elapsed", `Float verif
      ; "solver-usage", solvers
      ; "refinement-steps", refinement_steps
-     ; "id", `Int pb.psi_id
+     ; "id", `Int pb.id
      ]
     @ soln_or_refutation)
 ;;
@@ -64,18 +64,18 @@ let prep_final_json
 let on_success
     ~(is_ocaml_syntax : bool)
     (source_filename : string ref)
-    (pb : psi_def)
+    (pb : PsiDef.t)
     (result : (soln, unrealizability_ctex list) Either.t)
     : Yojson.t
   =
   let elapsed, verif_time =
     Option.value
       ~default:(Stats.get_glob_elapsed (), !Stats.verif_time)
-      (LogJson.get_simple_stats pb.psi_id)
+      (LogJson.get_simple_stats pb.id)
   in
   let verif_ratio = 100.0 *. (verif_time /. elapsed) in
   Log.sep ();
-  Log.(info (print_solvers_summary pb.psi_id));
+  Log.(info (print_solvers_summary pb.id));
   (* Print the solution. *)
   (match result with
   | Either.First soln ->

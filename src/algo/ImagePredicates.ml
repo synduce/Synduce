@@ -93,16 +93,16 @@ let set_up_bounded_solver
   return ()
 ;;
 
-let smt_of_aux_ensures ~(p : psi_def) : S.smtTerm list =
+let smt_of_aux_ensures ~(p : PsiDef.t) : S.smtTerm list =
   let mk_sort maybe_rtype =
     match maybe_rtype with
     | None -> S.mk_int_sort
     | Some rtype -> SmtInterface.sort_of_rtype rtype
   in
   let pmrss : PMRS.t list =
-    [ p.psi_reference; p.psi_target; p.psi_reference ]
+    [ p.PsiDef.reference; p.PsiDef.target; p.PsiDef.reference ]
     @
-    match p.psi_tinv with
+    match p.tinv with
     | None -> []
     | Some tinv -> [ tinv ]
   in
@@ -139,7 +139,7 @@ let smt_of_aux_ensures ~(p : psi_def) : S.smtTerm list =
     vars
 ;;
 
-let smt_of_ensures_validity ~(p : psi_def) (ensures : term) =
+let smt_of_ensures_validity ~(p : PsiDef.t) (ensures : term) =
   let mk_sort maybe_rtype =
     match maybe_rtype with
     | None -> S.mk_int_sort
@@ -147,11 +147,11 @@ let smt_of_ensures_validity ~(p : psi_def) (ensures : term) =
   in
   let f_compose_r t =
     let repr_of_v =
-      if p.psi_repr_is_identity then t else Reduce.reduce_pmrs p.psi_repr t
+      if p.PsiDef.repr_is_identity then t else Reduce.reduce_pmrs p.PsiDef.repr t
     in
-    Reduce.reduce_term (Reduce.reduce_pmrs p.psi_reference repr_of_v)
+    Reduce.reduce_term (Reduce.reduce_pmrs p.PsiDef.reference repr_of_v)
   in
-  let t = List.last_exn p.psi_repr.pinput_typ in
+  let t = List.last_exn p.PsiDef.repr.pinput_typ in
   let quants = [ S.SSimple "t", mk_sort (Some t) ] in
   let ensures_app =
     SmtInterface.smt_of_term
@@ -160,14 +160,14 @@ let smt_of_ensures_validity ~(p : psi_def) (ensures : term) =
   [ S.mk_assert (S.mk_not (S.mk_forall quants ensures_app)) ]
 ;;
 
-let set_up_to_get_ensures_model solver ~(p : psi_def) (ensures : term) =
-  let t = List.last_exn p.psi_repr.pinput_typ in
+let set_up_to_get_ensures_model solver ~(p : PsiDef.t) (ensures : term) =
+  let t = List.last_exn p.PsiDef.repr.pinput_typ in
   let var = Variable.mk "t" ~t:(Some t) in
   let f_compose_r t =
     let repr_of_v =
-      if p.psi_repr_is_identity then t else Reduce.reduce_pmrs p.psi_repr t
+      if p.PsiDef.repr_is_identity then t else Reduce.reduce_pmrs p.PsiDef.repr t
     in
-    Reduce.reduce_term (Reduce.reduce_pmrs p.psi_reference repr_of_v)
+    Reduce.reduce_term (Reduce.reduce_pmrs p.PsiDef.reference repr_of_v)
   in
   let%lwt () =
     SmtInterface.(
@@ -203,16 +203,16 @@ let handle_ensures_synth_response
 
 let make_ensures_name (id : int) = "ensures_" ^ Int.to_string id
 
-let synthfun_ensures ~(p : psi_def) (id : int) : command * variable * string =
-  let var = Variable.mk ~t:(Some p.psi_reference.poutput_typ) (Alpha.fresh ()) in
+let synthfun_ensures ~(p : PsiDef.t) (id : int) : command * variable * string =
+  let var = Variable.mk ~t:(Some p.PsiDef.reference.poutput_typ) (Alpha.fresh ()) in
   let opset =
     List.fold
       ~init:OpSet.empty
       ~f:(fun acc func -> Set.union acc (Analysis.operators_of func.f_body))
-      (PMRS.func_of_pmrs p.psi_reference
-      @ PMRS.func_of_pmrs p.psi_repr
+      (PMRS.func_of_pmrs p.PsiDef.reference
+      @ PMRS.func_of_pmrs p.PsiDef.repr
       @
-      match p.psi_tinv with
+      match p.tinv with
       | None -> []
       | Some pmrs -> PMRS.func_of_pmrs pmrs)
   in
@@ -224,7 +224,7 @@ let synthfun_ensures ~(p : psi_def) (id : int) : command * variable * string =
   mk_synthinv (make_ensures_name id) [ var ] grammar, var, logic
 ;;
 
-let set_up_ensures_solver solver ~(p : psi_def) (ensures : term) =
+let set_up_ensures_solver solver ~(p : PsiDef.t) (ensures : term) =
   ignore ensures;
   let preamble = Commands.mk_preamble ~logic:Logics.ALL ~induction:true ~models:true () in
   let%lwt () = SmtInterface.AsyncSmt.exec_all solver preamble in
@@ -233,20 +233,21 @@ let set_up_ensures_solver solver ~(p : psi_def) (ensures : term) =
       (fun x ->
         let%lwt _ = SmtInterface.AsyncSmt.exec_command solver x in
         return ())
-      ((match p.psi_tinv with
+      ((match p.tinv with
        | None -> []
        | Some tinv -> SmtInterface.smt_of_pmrs tinv)
-      @ (if p.psi_repr_is_identity
-        then SmtInterface.smt_of_pmrs p.psi_reference
+      @ (if p.PsiDef.repr_is_identity
+        then SmtInterface.smt_of_pmrs p.PsiDef.reference
         else
-          SmtInterface.smt_of_pmrs p.psi_reference @ SmtInterface.smt_of_pmrs p.psi_repr)
+          SmtInterface.smt_of_pmrs p.PsiDef.reference
+          @ SmtInterface.smt_of_pmrs p.PsiDef.repr)
       (* Assert invariants on functions *)
       @ List.map ~f:S.mk_assert (smt_of_aux_ensures ~p))
   in
   return ()
 ;;
 
-let verify_ensures_unbounded ~(p : psi_def) (ensures : term)
+let verify_ensures_unbounded ~(p : PsiDef.t) (ensures : term)
     : SmtInterface.AsyncSmt.response * int Lwt.u
   =
   let build_task (cvc4_instance, task_start) =
@@ -277,11 +278,11 @@ let verify_ensures_unbounded ~(p : psi_def) (ensures : term)
     cancellable_task (SmtInterface.AsyncSmt.make_solver "cvc") build_task)
 ;;
 
-let verify_ensures_bounded ~(p : psi_def) (ensures : term) (var : variable)
+let verify_ensures_bounded ~(p : PsiDef.t) (ensures : term) (var : variable)
     : SmtInterface.AsyncSmt.response * int Lwt.u
   =
   let base_term =
-    mk_var (Variable.mk "t" ~t:(Some (List.last_exn p.psi_repr.pinput_typ)))
+    mk_var (Variable.mk "t" ~t:(Some (List.last_exn p.PsiDef.repr.pinput_typ)))
   in
   let task (solver, starter) =
     let%lwt _ = starter in
@@ -295,9 +296,9 @@ let verify_ensures_bounded ~(p : psi_def) (ensures : term) (var : variable)
         in
         let f_compose_r t =
           let repr_of_v =
-            if p.psi_repr_is_identity then t else Reduce.reduce_pmrs p.psi_repr t
+            if p.PsiDef.repr_is_identity then t else Reduce.reduce_pmrs p.PsiDef.repr t
           in
-          Reduce.reduce_term (Reduce.reduce_pmrs p.psi_reference repr_of_v)
+          Reduce.reduce_term (Reduce.reduce_pmrs p.PsiDef.reference repr_of_v)
         in
         let%lwt _ =
           SmtInterface.(
@@ -322,7 +323,7 @@ let verify_ensures_bounded ~(p : psi_def) (ensures : term) (var : variable)
         let%lwt _ = SmtInterface.AsyncSmt.smt_assert solver instance_equals in
         (* Assert that TInv is true for this concrete term t *)
         let%lwt _ =
-          match p.psi_tinv with
+          match p.tinv with
           | None -> return ()
           | Some tinv ->
             let tinv_t = Reduce.reduce_pmrs tinv t in
@@ -399,7 +400,10 @@ let verify_ensures_bounded ~(p : psi_def) (ensures : term) (var : variable)
   SmtInterface.AsyncSmt.(cancellable_task (make_solver "cvc") task)
 ;;
 
-let verify_ensures_candidate ~(p : psi_def) (maybe_ensures : term option) (var : variable)
+let verify_ensures_candidate
+    ~(p : PsiDef.t)
+    (maybe_ensures : term option)
+    (var : variable)
     : SmtInterface.SyncSmt.solver_response
   =
   match maybe_ensures with
@@ -445,7 +449,7 @@ let handle_ensures_verif_response (response : S.solver_response) (ensures : term
     false, None
 ;;
 
-let constraint_of_neg (id : int) ~(p : psi_def) (ctex : ctex) : term =
+let constraint_of_neg (id : int) ~(p : PsiDef.t) (ctex : ctex) : term =
   ignore p;
   let params =
     List.concat_map
@@ -460,7 +464,7 @@ let constraint_of_pos (id : int) (term : term) : term =
 ;;
 
 let rec synthesize
-    ~(p : psi_def)
+    ~(p : PsiDef.t)
     (positives : ctex list)
     (negatives : ctex list)
     (prev_positives : term list)
@@ -470,7 +474,7 @@ let rec synthesize
   AlgoLog.violates_ensures p negatives;
   let new_positives =
     match prev_positives with
-    | [] -> gen_pmrs_positive_examples p.psi_reference
+    | [] -> gen_pmrs_positive_examples p.PsiDef.reference
     | _ -> prev_positives
   in
   AlgoLog.positives_ensures p new_positives;
@@ -492,7 +496,7 @@ let rec synthesize
     let _, _, body = List.nth_exn solns 0 in
     let ensures = mk_fun [ FPatVar var ] (Eval.simplify body) in
     Log.debug_msg Fmt.(str "Ensures candidate is %a." pp_term ensures);
-    let var = Variable.mk ~t:(Some p.psi_reference.poutput_typ) (Alpha.fresh ()) in
+    let var = Variable.mk ~t:(Some p.PsiDef.reference.poutput_typ) (Alpha.fresh ()) in
     (match
        handle_ensures_verif_response
          (verify_ensures_candidate ~p (Some ensures) var)

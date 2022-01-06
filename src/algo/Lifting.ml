@@ -51,8 +51,8 @@ let alpha_component_count () =
   | _ -> 1
 ;;
 
-let decompose_t (p : psi_def) (t : term) : (int * term) option =
-  let g = p.psi_target.pmain_symb in
+let decompose_t (p : PsiDef.t) (t : term) : (int * term) option =
+  let g = p.PsiDef.target.pmain_symb in
   match t.tkind with
   | TSel (t', i) ->
     let n = alpha_component_count () in
@@ -65,15 +65,15 @@ let decompose_t (p : psi_def) (t : term) : (int * term) option =
   | _ -> None
 ;;
 
-let recompose_t (p : psi_def) (t : term) (i : int) : term =
-  let g = p.psi_target.pmain_symb in
+let recompose_t (p : PsiDef.t) (t : term) (i : int) : term =
+  let g = p.PsiDef.target.pmain_symb in
   mk_sel (mk_app (mk_var g) [ t ]) i
 ;;
 
 (**
   Find the expression of the lifting for an input term.
 *)
-let get_mapped_value ~(p : psi_def) (l : lifting) (t : term) =
+let get_mapped_value ~(p : PsiDef.t) (l : lifting) (t : term) =
   Option.(decompose_t p t >>= LiftingMap.get l.tmap)
 ;;
 
@@ -84,7 +84,7 @@ let interactive_add_lifting_expression ~p (l : lifting) (a : term) (i : int)
     : lifting * term option
   =
   let env = VarSet.to_env (Analysis.free_variables a) in
-  let g = p.psi_target.pmain_symb in
+  let g = p.PsiDef.target.pmain_symb in
   (* Prompt the user to add lemmas. *)
   Log.info (fun frmt () ->
       Fmt.(pf frmt "Please provide a value for (%s %a).%i:" g.vname pp_term a i));
@@ -109,7 +109,7 @@ let interactive_add_lifting_expression ~p (l : lifting) (a : term) (i : int)
       | None -> { tmap = LiftingMap.set l.tmap (i, a) x }, Some x))
 ;;
 
-let replace_boxed_expressions ~(p : psi_def) (l : lifting) =
+let replace_boxed_expressions ~(p : PsiDef.t) (l : lifting) =
   let case _ t =
     match t.tkind with
     | TBox t' -> get_mapped_value ~p l t'
@@ -122,13 +122,13 @@ let replace_boxed_expressions ~(p : psi_def) (l : lifting) =
   is different from the output type of the reference function (which is unchanged
   and stored in AState._alpha)
 *)
-let is_lifted (p : psi_def) : bool =
-  let _, tout = RType.fun_typ_unpack (Variable.vtype_or_new p.psi_target.pvar) in
+let is_lifted (p : PsiDef.t) : bool =
+  let _, tout = RType.fun_typ_unpack (Variable.vtype_or_new p.PsiDef.target.pvar) in
   not (Result.is_ok (RType.unify_one tout !_alpha))
 ;;
 
-let lifting_types (p : psi_def) : RType.t list =
-  let _, tout = RType.fun_typ_unpack (Variable.vtype_or_new p.psi_target.pvar) in
+let lifting_types (p : PsiDef.t) : RType.t list =
+  let _, tout = RType.fun_typ_unpack (Variable.vtype_or_new p.PsiDef.target.pvar) in
   match tout with
   | RType.TTup tl ->
     let n = alpha_component_count () in
@@ -136,7 +136,7 @@ let lifting_types (p : psi_def) : RType.t list =
   | _ -> []
 ;;
 
-let lifting_count (p : psi_def) : int = List.length (lifting_types p)
+let lifting_count (p : PsiDef.t) : int = List.length (lifting_types p)
 
 (* ============================================================================================= *)
 (*                       PROJECTIONS TO AND FROM LIFTING                                         *)
@@ -145,11 +145,11 @@ let lifting_count (p : psi_def) : int = List.length (lifting_types p)
 (**
   Return a projection function that can be symbolically evaluated.
 *)
-let proj_to_non_lifting (p : psi_def) : term option =
+let proj_to_non_lifting (p : PsiDef.t) : term option =
   if not (is_lifted p)
   then None
   else (
-    let _, tout = RType.fun_typ_unpack (Variable.vtype_or_new p.psi_target.pvar) in
+    let _, tout = RType.fun_typ_unpack (Variable.vtype_or_new p.PsiDef.target.pvar) in
     match tout, !_alpha with
     | TTup tl_lift, TTup tl' ->
       let args =
@@ -169,7 +169,7 @@ let proj_to_non_lifting (p : psi_def) : term option =
       None)
 ;;
 
-let is_proj_function (p : psi_def) (t : term) : bool =
+let is_proj_function (p : PsiDef.t) (t : term) : bool =
   match t.tkind with
   | TFun ([ tuple_arg_pattern ], tuple_body) ->
     (match tuple_arg_pattern with
@@ -188,11 +188,11 @@ let is_proj_function (p : psi_def) (t : term) : bool =
     Return function f such that f(a) = a.i, .. a.i + n if i, .. i+n where
     i, ..., i+n are the components of the lifting.
 *)
-let proj_to_lifting (p : psi_def) : (term -> term) option =
+let proj_to_lifting (p : PsiDef.t) : (term -> term) option =
   if not (is_lifted p)
   then None
   else (
-    let _, tout = RType.fun_typ_unpack (Variable.vtype_or_new p.psi_target.pvar) in
+    let _, tout = RType.fun_typ_unpack (Variable.vtype_or_new p.PsiDef.target.pvar) in
     match tout, !_alpha with
     | TTup tl_lift, TTup tl' ->
       let n = List.length tl' in
@@ -223,11 +223,11 @@ let proj_to_lifting (p : psi_def) : (term -> term) option =
   computes the tuple that corresponds to the lifted function from the original components
   of the function in [oringal_part] and the components of the lifting only in [lifting_part]
 *)
-let compose_parts (p : psi_def) : term option =
+let compose_parts (p : PsiDef.t) : term option =
   if not (is_lifted p)
   then None
   else (
-    let _, tout = RType.fun_typ_unpack (Variable.vtype_or_new p.psi_target.pvar) in
+    let _, tout = RType.fun_typ_unpack (Variable.vtype_or_new p.PsiDef.target.pvar) in
     match tout, !_alpha with
     | TTup tl_lift, TTup tl' ->
       let args =
@@ -269,8 +269,8 @@ let compose_parts (p : psi_def) : term option =
     If the output type is not a tuple and [n] is not [0] then [None] is returned.
       If [n = 0] then the output type is returned.
  *)
-let nth_output_type (p : psi_def) (i : int) : RType.t option =
-  let _, tout = RType.fun_typ_unpack (Variable.vtype_or_new p.psi_target.pvar) in
+let nth_output_type (p : PsiDef.t) (i : int) : RType.t option =
+  let _, tout = RType.fun_typ_unpack (Variable.vtype_or_new p.PsiDef.target.pvar) in
   match tout with
   | RType.TTup tl -> List.nth tl i
   | _ -> if i = 0 then Some tout else None
@@ -299,18 +299,18 @@ let analyze_leftover (expr : Rewriter.Expression.t) : unit =
 (* ============================================================================================= *)
 
 (**
-  [apply_lifting ~p l] lifts [p.psi_target] by extending the output with [l].
+  [apply_lifting ~p l] lifts [p.PsiDef.target] by extending the output with [l].
 *)
-let apply_lifting ~(p : psi_def) (new_lifting : RType.t list) : psi_def =
+let apply_lifting ~(p : PsiDef.t) (new_lifting : RType.t list) : PsiDef.t =
   (* Type inference on p.target to update types *)
   let target' =
     let new_out_type =
       let open RType in
-      match snd (fun_typ_unpack (Variable.vtype_or_new p.psi_target.PMRS.pvar)) with
+      match snd (fun_typ_unpack (Variable.vtype_or_new p.PsiDef.target.PMRS.pvar)) with
       | TTup old_ts -> TTup (old_ts @ new_lifting)
       | t_out -> TTup (t_out :: new_lifting)
     in
-    let target' = PMRS.infer_pmrs_types (PMRS.clear_pmrs_types p.psi_target) in
+    let target' = PMRS.infer_pmrs_types (PMRS.clear_pmrs_types p.PsiDef.target) in
     let free_theta = PMRS.extract_rec_input_typ target' in
     (* Update the input type, w.r.t to the the theta stored. *)
     PMRS.unify_one_with_update (free_theta, !_theta);
@@ -329,7 +329,7 @@ let apply_lifting ~(p : psi_def) (new_lifting : RType.t list) : psi_def =
   (* ⚠️ !TODO! : updates all the "ensures" *)
   Log.debug (fun ft () ->
       Fmt.(pf ft "@[After lifting:@;%a@]" (box (PMRS.pp ~short:true)) target'));
-  { p with psi_target = target'; psi_lifting = p.psi_lifting @ new_lifting }
+  PsiDef.{ p with target = target'; lifting = p.lifting @ new_lifting }
 ;;
 
 let lift_interactive ~p lifting boxes =
@@ -385,13 +385,13 @@ let deduce_lifting_expressions
       |> substitution subs
       |> Deduction.as_unknown_app
            ~match_functions:(is_proj_function p)
-           ~unknowns:p.psi_target.psyntobjs
+           ~unknowns:p.PsiDef.target.psyntobjs
     with
     | Some rhs_args ->
       let var_to_lifting_expr, maybe_leftover_expr =
         let f (x, (_, t)) =
           (* A box completion might also use the parameters of the function. *)
-          x, Set.union (Analysis.free_variables t) (VarSet.of_list p.psi_target.pargs)
+          x, Set.union (Analysis.free_variables t) (VarSet.of_list p.PsiDef.target.pargs)
         in
         boxvar_to_linput
         |> List.map ~f
@@ -412,11 +412,11 @@ let deduce_lifting_expressions
   Perform a scalar lifting.
 *)
 let scalar
-    ~(p : psi_def)
+    ~(p : PsiDef.t)
     (l : refinement_loop_state)
     ((_s_resp, synt_failure_info) :
       solver_response * ('a, unrealizability_ctex list) Either.t)
-    : (psi_def * refinement_loop_state, solver_response) Result.t
+    : (PsiDef.t * refinement_loop_state, solver_response) Result.t
   =
   (* Select the type of lifting from the synt_failure_info.  *)
   let lifting_type =

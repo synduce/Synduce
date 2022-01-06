@@ -14,7 +14,7 @@ open Lwt.Syntax
 (*                               BUILDING SYSTEMS OF EQUATIONS                                   *)
 (* ============================================================================================= *)
 
-let check_equation ~(p : psi_def) (eqn : equation) : bool =
+let check_equation ~(p : PsiDef.t) (eqn : equation) : bool =
   (match
      Expand.nonreduced_terms_all p eqn.elhs, Expand.nonreduced_terms_all p eqn.erhs
    with
@@ -32,16 +32,16 @@ let check_equation ~(p : psi_def) (eqn : equation) : bool =
 (**
    Compute the left hand side of an equation of p from term t.
    The result is a maximally reduced term with some applicative
-   terms of the form (p.psi_reference x) where x is a variable.
+   terms of the form (p.PsiDef.reference x) where x is a variable.
 *)
 let compute_lhs p t =
-  let t' = Reduce.reduce_pmrs p.psi_repr t in
-  let r_t = Expand.replace_rhs_of_main p p.psi_repr t' in
+  let t' = Reduce.reduce_pmrs p.PsiDef.repr t in
+  let r_t = Expand.replace_rhs_of_main p p.PsiDef.repr t' in
   let subst_params =
-    let l = List.zip_exn p.psi_reference.pargs p.psi_target.pargs in
+    let l = List.zip_exn p.PsiDef.reference.pargs p.PsiDef.target.pargs in
     List.map l ~f:(fun (v1, v2) -> mk_var v1, mk_var v2)
   in
-  let f_r_t = Reduce.reduce_pmrs p.psi_reference r_t in
+  let f_r_t = Reduce.reduce_pmrs p.PsiDef.reference r_t in
   let final = substitution subst_params f_r_t in
   Expand.replace_rhs_of_mains p (Reduce.reduce_term final)
 ;;
@@ -49,7 +49,7 @@ let compute_lhs p t =
 let remap_rec_calls p t =
   let proj_func = Lifting.proj_to_lifting p in
   let lift_func = Lifting.compose_parts p in
-  let g = p.psi_target in
+  let g = p.PsiDef.target in
   let lift_wrapper tx =
     match proj_func, lift_func with
     | Some pf, Some lf ->
@@ -78,7 +78,7 @@ let remap_rec_calls p t =
 ;;
 
 let compute_rhs_with_replacing p t =
-  let g = p.psi_target in
+  let g = p.PsiDef.target in
   let custom_reduce x =
     let one_step t0 =
       let rstep = ref false in
@@ -115,7 +115,7 @@ let compute_rhs ?(force_replace_off = false) p t =
     let res =
       Expand.replace_rhs_of_mains
         p
-        (Reduce.reduce_term (Reduce.reduce_pmrs p.psi_target t))
+        (Reduce.reduce_term (Reduce.reduce_pmrs p.PsiDef.target t))
     in
     res)
 ;;
@@ -135,7 +135,7 @@ let compute_preconds ~p ~term_state subst eterm =
         ~f:(fun req ->
           let t = Reduce.reduce_term (mk_app req [ eterm ]) in
           t)
-        (Specifications.get_requires p.psi_target.PMRS.pvar)
+        (Specifications.get_requires p.PsiDef.target.PMRS.pvar)
     else None
 ;;
 
@@ -153,7 +153,7 @@ let filter_elims all_subs t =
 
 let make
     ?(force_replace_off = false)
-    ~(p : psi_def)
+    ~(p : PsiDef.t)
     ~(term_state : term_state)
     ~(lifting : lifting)
     (tset : TermSet.t)
@@ -1073,10 +1073,10 @@ end
   solution as a list of implementations for the unknowns (a triple of unknown name, arguments of a
   function and body of a function) or a list of unrealizability counterexamples.
 *)
-let solve ~(p : psi_def) (eqns : equation list)
+let solve ~(p : PsiDef.t) (eqns : equation list)
     : solver_response * (partial_soln, unrealizability_ctex list) Either.t
   =
-  let unknowns = p.psi_target.psyntobjs in
+  let unknowns = p.PsiDef.target.psyntobjs in
   let preprocessing_actions =
     Preprocess.
       [ preprocess_deconstruct_if
@@ -1117,7 +1117,7 @@ let solve ~(p : psi_def) (eqns : equation list)
 (* ============================================================================================= *)
 
 let update_assumptions
-    ~(p : psi_def)
+    ~(p : PsiDef.t)
     (lstate : refinement_loop_state)
     (sol : partial_soln)
     (t_set : TermSet.t)
@@ -1131,7 +1131,7 @@ let update_assumptions
         ~f:(fun vs t -> Set.union vs (Analysis.free_variables (compute_rhs p t)))
         (Set.elements new_ctexs)
     in
-    Set.diff p.psi_target.psyntobjs free_vars
+    Set.diff p.PsiDef.target.psyntobjs free_vars
   in
   let assumptions =
     let f (fname, f_args, f_body) =

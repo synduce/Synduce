@@ -2,23 +2,23 @@ open Lang
 open Base
 open SmtInterface
 
-val mk_recursion_elimination_term : AState.psi_def -> (Term.term * Term.term) option
+val mk_recursion_elimination_term : AState.PsiDef.t -> (Term.term * Term.term) option
 
 val subst_recursive_calls
-  :  AState.psi_def
+  :  AState.PsiDef.t
   -> Term.term list
   -> (Term.term * Term.term) list * Term.TermSet.t
 
-val maximally_reduced_app : AState.psi_def -> Term.term -> Term.term list -> bool
+val maximally_reduced_app : AState.PsiDef.t -> Term.term -> Term.term list -> bool
 
 val nonreduced_terms
-  :  AState.psi_def
+  :  AState.PsiDef.t
   -> Term.VarSet.t
   -> Term.term
   -> (Term.variable * Term.term list) list
 
 val nonreduced_terms_all
-  :  AState.psi_def
+  :  AState.PsiDef.t
   -> Term.term
   -> (Term.variable * Term.term list) list
 
@@ -27,14 +27,14 @@ val nonreduced_terms_all
 val replace_rhs_of_main
   :  ?verbose:bool
   -> ?for_mr:bool
-  -> AState.psi_def
+  -> AState.PsiDef.t
   -> PMRS.t
   -> Term.term
   -> Term.term
 
 (** Applies `replace_rhs_of_main` with all main functions in the problem definition (psi_def)
 *)
-val replace_rhs_of_mains : AState.psi_def -> Term.term -> Term.term
+val replace_rhs_of_mains : AState.PsiDef.t -> Term.term -> Term.term
 
 (**
 Simple term expansion procedure. [simple t] expands the term [t] into two sets of terms, the first
@@ -51,11 +51,11 @@ val simple
 (** Heuristic to bound terms. Unbounded symbols will be bound using some arbitrary expansion. *)
 val make_bounded : Term.term -> Term.term
 
-val is_mr : AState.psi_def -> PMRS.t -> Term.term -> Term.VarSet.t -> bool
-val is_mr_all : AState.psi_def -> Term.term -> bool
+val is_mr : AState.PsiDef.t -> PMRS.t -> Term.term -> Term.VarSet.t -> bool
+val is_mr_all : AState.PsiDef.t -> Term.term -> bool
 
 val to_maximally_reducible
-  :  AState.psi_def
+  :  AState.PsiDef.t
   -> Term.term
   -> Term.TermSet.t * Term.TermSet.t
 

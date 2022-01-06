@@ -58,13 +58,13 @@ let check_eqn solver has_sat eqn =
    that case, the partially-bounded checking reverts to (fully-)bounded checking.
 *)
 let partial_bounding_checker
-    ~(p : psi_def)
+    ~(p : PsiDef.t)
     (lstate : refinement_loop_state)
     (t_set : TermSet.t)
     : (term * term) list * refinement_loop_state
   =
   let f (acc_tset, acc_lstate) t =
-    match Specifications.get_requires p.psi_target.pvar with
+    match Specifications.get_requires p.PsiDef.target.pvar with
     | Some req ->
       (match Lemmas.get_lemma ~p acc_lstate.term_state ~key:t with
       | Some _ ->
@@ -88,7 +88,7 @@ let partial_bounding_checker
 ;;
 
 let check_solution
-    ~(p : psi_def)
+    ~(p : PsiDef.t)
     (lstate : refinement_loop_state)
     (soln : (string * variable list * term) list)
     : [ `Incorrect_assumptions
@@ -103,7 +103,7 @@ let check_solution
   Config.verbose := false;
   let start_time = Unix.gettimeofday () in
   (* Replace the unknowns with their solution. *)
-  let target_inst = Lang.Reduce.instantiate_with_solution p.psi_target soln in
+  let target_inst = Lang.Reduce.instantiate_with_solution p.PsiDef.target soln in
   let free_vars = VarSet.empty in
   let solver = SyncSmt.make_solver !Config.verification_solver in
   let preamble =
@@ -111,7 +111,7 @@ let check_solution
       SmtLogic.infer_logic
         ~quantifier_free:true
         ~with_uninterpreted_functions:false
-        ~logic_infos:[ p.psi_reference.plogic; p.psi_target.plogic ]
+        ~logic_infos:[ p.PsiDef.reference.plogic; p.PsiDef.target.plogic ]
         []
     in
     Commands.mk_preamble
@@ -130,7 +130,7 @@ let check_solution
       let sys_eqns, _ =
         Equations.make
           ~force_replace_off:true
-          ~p:{ p with psi_target = target_inst }
+          ~p:{ p with target = target_inst }
           ~term_state:tmp_lstate.term_state
           ~lifting:lstate.lifting
           (TermSet.of_list (List.map ~f:snd t_set))
@@ -217,12 +217,12 @@ let bounded_check_eqn ?(use_concrete_ctex = false) solver eqn =
 (* Perform a bounded check of the solution *)
 let bounded_check
     ?(use_concrete_ctex = false)
-    ~(p : psi_def)
+    ~(p : PsiDef.t)
     (soln : (string * variable list * term) list)
   =
   Log.info (fun f () -> Fmt.(pf f "Checking solution (bounded check)..."));
   let start_time = Unix.gettimeofday () in
-  let target_inst = Lang.Reduce.instantiate_with_solution p.psi_target soln in
+  let target_inst = Lang.Reduce.instantiate_with_solution p.PsiDef.target soln in
   let free_vars = VarSet.empty in
   let init_vardecls = Commands.decls_of_vars free_vars in
   let solver = SyncSmt.make_solver !Config.verification_solver in
@@ -231,7 +231,7 @@ let bounded_check
     let sys_eqns, _ =
       Equations.make
         ~force_replace_off:true
-        ~p:{ p with psi_target = target_inst }
+        ~p:{ p with target = target_inst }
         ~term_state:Lemmas.empty_term_state
         ~lifting:Lifting.empty_lifting
         (TermSet.singleton term)

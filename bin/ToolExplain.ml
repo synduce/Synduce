@@ -27,7 +27,7 @@ let is_shallow_value (t : term) (shallow : term) =
 ;;
 
 let find_missing_argument
-    (pb : psi_def)
+    (pb : PsiDef.t)
     (diff : (variable * (term * term)) list)
     (c : ctex)
   =
@@ -51,9 +51,9 @@ let find_missing_argument
           msg)
   in
   let fv = Analysis.free_variables c.ctex_eqn.erhs in
-  let rhs_args = Set.diff fv pb.psi_target.psyntobjs in
+  let rhs_args = Set.diff fv pb.PsiDef.target.psyntobjs in
   let unknowns_in_use =
-    VarSet.filter_map fv ~f:(find_matching_unknown pb.psi_target.psyntobjs)
+    VarSet.filter_map fv ~f:(find_matching_unknown pb.PsiDef.target.psyntobjs)
   in
   let say_diff (v, (_val1, _val2)) =
     if not (Set.mem rhs_args v)
@@ -66,21 +66,21 @@ let find_missing_argument
         msg_missing_arg
           true
           unknowns_in_use
-          (mk_app (mk_var pb.psi_target.pmain_symb) [ trec ])
+          (mk_app (mk_var pb.PsiDef.target.pmain_symb) [ trec ])
       | _ -> msg_missing_arg false unknowns_in_use (mk_var v))
     else ()
   in
   let pargs_diffs, pnonargs_diff =
     List.partition_tf diff ~f:(fun (v, _) ->
-        Variable.(List.mem ~equal pb.psi_target.pargs v))
+        Variable.(List.mem ~equal pb.PsiDef.target.pargs v))
   in
   match pnonargs_diff with
   | [] -> List.iter pargs_diffs ~f:say_diff
   | _ -> List.iter pnonargs_diff ~f:say_diff
 ;;
 
-let find_missing_delta (pb : psi_def) (ctex : unrealizability_ctex) =
-  let g = mk_var pb.psi_target.pmain_symb in
+let find_missing_delta (pb : PsiDef.t) (ctex : unrealizability_ctex) =
+  let g = mk_var pb.PsiDef.target.pmain_symb in
   let summ c =
     let f x = Eval.in_model ~no_simplify:x c.ctex_model in
     let cinput = f false c.ctex_eqn.eterm in
@@ -115,7 +115,7 @@ let find_missing_delta (pb : psi_def) (ctex : unrealizability_ctex) =
       (Analysis.free_variables ctex.cj.ctex_eqn.erhs)
   in
   let unknowns_in_use =
-    VarSet.filter_map fv ~f:(find_matching_unknown pb.psi_target.psyntobjs)
+    VarSet.filter_map fv ~f:(find_matching_unknown pb.PsiDef.target.psyntobjs)
   in
   summ ctex.ci;
   summ ctex.cj;

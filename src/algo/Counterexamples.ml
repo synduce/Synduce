@@ -350,9 +350,9 @@ let add_cause (ctx : ctex_stat) (cause : spurious_cause) =
 let check_image_sat ~p ctex : (Stats.verif_method * SmtLib.solver_response) Lwt.t * int u =
   let f_compose_r t =
     let repr_of_v =
-      if p.psi_repr_is_identity then t else Reduce.reduce_pmrs p.psi_repr t
+      if p.PsiDef.repr_is_identity then t else Reduce.reduce_pmrs p.PsiDef.repr t
     in
-    Reduce.reduce_term (Reduce.reduce_pmrs p.psi_reference repr_of_v)
+    Reduce.reduce_term (Reduce.reduce_pmrs p.PsiDef.reference repr_of_v)
   in
   (* Asynchronous solver task. *)
   let build_task (solver_instance, task_start) =
@@ -417,11 +417,11 @@ let check_image_sat ~p ctex : (Stats.verif_method * SmtLib.solver_response) Lwt.
 let check_image_unsat ~p ctex : (Stats.verif_method * SmtLib.solver_response) t * int u =
   let f_compose_r t =
     let repr_of_v =
-      if p.psi_repr_is_identity then t else mk_app_v p.psi_repr.pvar [ t ]
+      if p.PsiDef.repr_is_identity then t else mk_app_v p.PsiDef.repr.pvar [ t ]
     in
     mk_app_v
-      p.psi_reference.pvar
-      (List.map ~f:mk_var p.psi_reference.pargs @ [ repr_of_v ])
+      p.PsiDef.reference.pvar
+      (List.map ~f:mk_var p.PsiDef.reference.pargs @ [ repr_of_v ])
   in
   let build_task (solver, task_start) =
     let* _ = task_start in
@@ -436,7 +436,7 @@ let check_image_unsat ~p ctex : (Stats.verif_method * SmtLib.solver_response) t 
                 ~quantifier_free:false
                 ~for_induction:true
                 ~with_uninterpreted_functions:true
-                ~logic_infos:(AState.psi_def_logics p)
+                ~logic_infos:(AState.PsiDef.logics p)
                 [])
            ())
     in
@@ -446,8 +446,8 @@ let check_image_unsat ~p ctex : (Stats.verif_method * SmtLib.solver_response) t 
         (fun x ->
           let* _ = AsyncSmt.exec_command solver x in
           return ())
-        (smt_of_pmrs p.psi_reference
-        @ if p.psi_repr_is_identity then [] else smt_of_pmrs p.psi_repr)
+        (smt_of_pmrs p.PsiDef.reference
+        @ if p.PsiDef.repr_is_identity then [] else smt_of_pmrs p.PsiDef.repr)
     in
     let fv, formula =
       (* Substitute recursion elimination by recursive calls. *)
@@ -469,7 +469,7 @@ let check_image_unsat ~p ctex : (Stats.verif_method * SmtLib.solver_response) t 
         SmtLib.mk_assoc_and (List.map ~f:smt_of_term eqns) )
     in
     let* _ =
-      let fv = Set.union fv (VarSet.of_list p.psi_reference.pargs) in
+      let fv = Set.union fv (VarSet.of_list p.PsiDef.reference.pargs) in
       AsyncSmt.smt_assert solver (SmtLib.mk_exists (sorted_vars_of_vars fv) formula)
     in
     let* resp = AsyncSmt.check_sat solver in
@@ -481,11 +481,12 @@ let check_image_unsat ~p ctex : (Stats.verif_method * SmtLib.solver_response) t 
 
 (**
   [check_ctex_in_image ~p ctex] checks whether the recursion elimination's variables values in the
-  model of [ctex] are in the image of (p.psi_reference o p.psi_repr).
+  model of [ctex] are in the image of (p.PsiDef.reference o p.PsiDef.repr).
 *)
-let check_ctex_in_image ?(ignore_unknown = false) ~(p : psi_def) (ctex : ctex) : ctex =
+let check_ctex_in_image ?(ignore_unknown = false) ~(p : PsiDef.t) (ctex : ctex) : ctex =
   Log.verbose_msg
-    Fmt.(str "Checking whether ctex is in the image of %s..." p.psi_reference.pvar.vname);
+    Fmt.(
+      str "Checking whether ctex is in the image of %s..." p.PsiDef.reference.pvar.vname);
   let vmethod, resp =
     if Analysis.is_bounded ctex.ctex_eqn.eterm
     then Stats.Induction, SmtLib.Sat
@@ -559,7 +560,7 @@ let mk_model_sat_asserts ctex f_o_r instantiate =
   satisfy the predicate [tinv]. In general, if the reponse is not unsat, the solver either
   stalls or returns unknown.
 *)
-let check_tinv_unsat ~(p : psi_def) (tinv : PMRS.t) (ctex : ctex)
+let check_tinv_unsat ~(p : PsiDef.t) (tinv : PMRS.t) (ctex : ctex)
     : (Stats.verif_method * SmtLib.solver_response) t * int Lwt.u
   =
   let build_task (cvc4_instance, task_start) =
@@ -568,20 +569,20 @@ let check_tinv_unsat ~(p : psi_def) (tinv : PMRS.t) (ctex : ctex)
     let fv =
       Set.union
         (Analysis.free_variables ctex.ctex_eqn.eterm)
-        (VarSet.of_list p.psi_reference.pargs)
+        (VarSet.of_list p.PsiDef.reference.pargs)
     in
     let pmrs_decls =
       smt_of_pmrs tinv
-      @ smt_of_pmrs p.psi_reference
-      @ if p.psi_repr_is_identity then [] else smt_of_pmrs p.psi_repr
+      @ smt_of_pmrs p.PsiDef.reference
+      @ if p.PsiDef.repr_is_identity then [] else smt_of_pmrs p.PsiDef.repr
     in
     let f_compose_r t =
       let repr_of_v =
-        if p.psi_repr_is_identity then t else mk_app_v p.psi_repr.pvar [ t ]
+        if p.PsiDef.repr_is_identity then t else mk_app_v p.PsiDef.repr.pvar [ t ]
       in
       mk_app_v
-        p.psi_reference.pvar
-        (List.map ~f:mk_var p.psi_reference.pargs @ [ repr_of_v ])
+        p.PsiDef.reference.pvar
+        (List.map ~f:mk_var p.PsiDef.reference.pargs @ [ repr_of_v ])
     in
     (* Create the formula. *)
     let formula =
@@ -616,7 +617,7 @@ let check_tinv_unsat ~(p : psi_def) (tinv : PMRS.t) (ctex : ctex)
           ~quantifier_free:false
           ~for_induction:true
           ~with_uninterpreted_functions:true
-          ~logic_infos:(AState.psi_def_logics p)
+          ~logic_infos:(AState.PsiDef.logics p)
           []
       in
       Commands.mk_preamble ~induction:true ~logic ()
@@ -635,14 +636,14 @@ let check_tinv_unsat ~(p : psi_def) (tinv : PMRS.t) (ctex : ctex)
     the invariant [tinv] (a PMRS). The function returns a pair of a promise of a solver
     response and a resolver for that promise. The promise is cancellable.
  *)
-let check_tinv_sat ~(p : psi_def) (tinv : PMRS.t) (ctex : ctex)
+let check_tinv_sat ~(p : PsiDef.t) (tinv : PMRS.t) (ctex : ctex)
     : (Stats.verif_method * SmtLib.solver_response) t * int Lwt.u
   =
   let f_compose_r t =
     let repr_of_v =
-      if p.psi_repr_is_identity then t else Reduce.reduce_pmrs p.psi_repr t
+      if p.PsiDef.repr_is_identity then t else Reduce.reduce_pmrs p.PsiDef.repr t
     in
-    Reduce.reduce_term (Reduce.reduce_pmrs p.psi_reference repr_of_v)
+    Reduce.reduce_term (Reduce.reduce_pmrs p.PsiDef.reference repr_of_v)
   in
   let initial_t = ctex.ctex_eqn.eterm in
   let task (solver, starter) =
@@ -696,7 +697,7 @@ let check_tinv_sat ~(p : psi_def) (tinv : PMRS.t) (ctex : ctex)
         solver
         (Commands.mk_preamble
            ~incremental:(String.is_prefix ~prefix:"CVC" solver.s_name)
-           ~logic:(SmtLogic.infer_logic ~logic_infos:(AState.psi_def_logics p) [])
+           ~logic:(SmtLogic.infer_logic ~logic_infos:(AState.PsiDef.logics p) [])
            ())
     in
     let* res =
@@ -711,7 +712,7 @@ let check_tinv_sat ~(p : psi_def) (tinv : PMRS.t) (ctex : ctex)
   AsyncSmt.(cancellable_task (make_solver "z3") task)
 ;;
 
-let satisfies_tinv ~(p : psi_def) (tinv : PMRS.t) (ctex : ctex) : ctex =
+let satisfies_tinv ~(p : PsiDef.t) (tinv : PMRS.t) (ctex : ctex) : ctex =
   let vmethod, resp =
     try
       Lwt_main.run
@@ -739,7 +740,7 @@ let satisfies_tinv ~(p : psi_def) (tinv : PMRS.t) (ctex : ctex) : ctex =
 (** Classify counterexamples into positive or negative counterexamples with respect
     to the Tinv predicate in the problem.
 *)
-let classify_ctexs ~(p : psi_def) (ctexs : ctex list) : ctex list =
+let classify_ctexs ~(p : PsiDef.t) (ctexs : ctex list) : ctex list =
   let classify_with_tinv tinv ctexs =
     (* TODO: DT_LIA for z3, DTLIA for cvc4... Should write a type to represent logics. *)
     let f (ctex : ctex) = satisfies_tinv ~p tinv ctex in
@@ -750,7 +751,7 @@ let classify_ctexs ~(p : psi_def) (ctexs : ctex list) : ctex list =
   (* First pass ignoring unknowns. *)
   (* let ctexs = classify_wrt_ref true ctexs in *)
   let ctexs_c1, ignore_further_unknowns =
-    match p.psi_tinv with
+    match p.tinv with
     | Some tinv ->
       (* If there is some tinv, we may ignore unknowns in further classification steps. *)
       classify_with_tinv tinv ctexs, true

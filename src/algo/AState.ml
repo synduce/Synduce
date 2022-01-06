@@ -9,45 +9,48 @@ open Utils
    definitions and printing functions for displaying solutions.
  *)
 
-(**
-  psi_def is the definition of the problem: the goal is to synthesize the unknowns in target such
+module PsiDef = struct
+  (**
+  PsiDef.t is the definition of the problem: the goal is to synthesize the unknowns in target such
   that target = orig ∘ repr
 *)
-type psi_def =
-  { psi_id : int (** An identifier for the problem. *)
-  ; psi_target : PMRS.t (**
+  type t =
+    { id : int (** An identifier for the problem. *)
+    ; target : PMRS.t (**
   The target recursion skeleton in the problem.
   *)
-  ; psi_reference : PMRS.t (**
+    ; reference : PMRS.t (**
    The reference function in the problem.
   *)
-  ; psi_repr : PMRS.t (**
+    ; repr : PMRS.t (**
     The representation function in the problem.
   *)
-  ; psi_tinv : PMRS.t option
-        (**
+    ; tinv : PMRS.t option
+          (**
   The requires predicate of the target recursion skeleton.
   *)
-  ; psi_repr_is_identity : bool
-        (**
+    ; repr_is_identity : bool (**
   A boolean that is true iff psi_repr is identity.
   *)
-  ; psi_lifting : RType.t list
-        (** The current lifting: the output type of psi_target
+    ; lifting : RType.t list
+          (** The current lifting: the output type of psi_target
   should be !_alpha extended with the tuple of types psi_lifting. *)
-  }
+    }
 
-let psi_def_logics p = [ p.psi_repr.plogic; p.psi_reference.plogic; p.psi_target.plogic ]
+  let logics (p : t) = [ p.repr.plogic; p.reference.plogic; p.target.plogic ]
+  let compare (p1 : t) (p2 : t) = compare p1.id p2.id
+  let equal (p1 : t) (p2 : t) = compare p1 p2 = 0
+  let hash (p : t) = p.id
 
-(* State variables for the algorithm. *)
+  (* State variables for the algorithm. *)
+  let psi_id : int ref = ref 0
 
-let psi_id = ref 0
-
-let new_psi_id () =
-  let id = !psi_id in
-  Int.incr psi_id;
-  id
-;;
+  let new_psi_id () : int =
+    let id = !psi_id in
+    Int.incr psi_id;
+    id
+  ;;
+end
 
 (** The type τ in the paper, input type of the reference function.  *)
 let _tau = ref RType.TInt

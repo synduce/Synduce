@@ -20,7 +20,7 @@ open Syguslib.Sygus
     will be taken as counterexamples during the refinement loop.
     Use the option [--segis] in the executable to use this synthesis algorithm.
 *)
-let rec segis_loop (p : psi_def) (t_set : TermSet.t) : solver_response segis_response =
+let rec segis_loop (p : PsiDef.t) (t_set : TermSet.t) : solver_response segis_response =
   Int.incr refinement_steps;
   if !refinement_steps > !Config.refinement_rounds_warning_limit
      && Config.Optims.some_eager_optim_on ()
@@ -65,7 +65,7 @@ let rec segis_loop (p : psi_def) (t_set : TermSet.t) : solver_response segis_res
     | verif_time, None ->
       Stats.log_major_step_end ~synth_time ~verif_time ~t:tsize ~u:0 true;
       Log.print_ok ();
-      Realizable { soln_rec_scheme = p.psi_target; soln_implems = sol })
+      Realizable { soln_rec_scheme = p.PsiDef.target; soln_implems = sol })
   | RInfeasible, Second ctexs ->
     Stats.log_major_step_end ~synth_time ~verif_time:0. ~t:tsize ~u:0 false;
     Log.info
@@ -86,7 +86,7 @@ let rec segis_loop (p : psi_def) (t_set : TermSet.t) : solver_response segis_res
   | _ -> Failed s_resp
 ;;
 
-let algo_segis (p : psi_def) =
+let algo_segis (p : PsiDef.t) =
   let t_set = TermSet.of_list (Analysis.terms_of_max_depth 1 !AState._theta) in
   refinement_steps := 0;
   segis_loop p t_set
@@ -101,7 +101,7 @@ let algo_segis (p : psi_def) =
     will be taken as counterexamples during the refinement loop: this is a concrete CEGIS algorithm.
     Use the option [--cegis] in the executable to use this synthesis algorithm.
 *)
-let rec cegis_loop (p : psi_def) (t_set : TermSet.t) : solver_response segis_response =
+let rec cegis_loop (p : PsiDef.t) (t_set : TermSet.t) : solver_response segis_response =
   Int.incr refinement_steps;
   if !refinement_steps > !Config.refinement_rounds_warning_limit
   then (
@@ -147,7 +147,7 @@ let rec cegis_loop (p : psi_def) (t_set : TermSet.t) : solver_response segis_res
       cegis_loop p (Set.add t_set eqn.eterm)
     | None ->
       Log.print_ok ();
-      Realizable { soln_rec_scheme = p.psi_target; soln_implems = sol })
+      Realizable { soln_rec_scheme = p.PsiDef.target; soln_implems = sol })
   | RInfeasible, Second ctexs ->
     Log.info
       Fmt.(
@@ -167,7 +167,7 @@ let rec cegis_loop (p : psi_def) (t_set : TermSet.t) : solver_response segis_res
   | _ -> Failed s_resp
 ;;
 
-let algo_cegis (p : psi_def) =
+let algo_cegis (p : PsiDef.t) =
   let t_set =
     TermSet.of_list
       (List.map ~f:Analysis.concretize (Analysis.terms_of_max_depth 1 !AState._theta))

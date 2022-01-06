@@ -12,6 +12,8 @@ type rloc =
   ; rtokens : VarSet.t (** Each location has some tokens. *)
   }
 
+let default_rloc = { rid = -1; rxi = Variable.mk "null"; rtokens = VarSet.empty }
+
 let _pp_rloc (frmt : Formatter.t) (r : rloc) =
   Fmt.(pf frmt "@[[%i:%a]<%a>@]" r.rid Variable.pp r.rxi VarSet.pp r.rtokens)
 ;;
@@ -19,8 +21,8 @@ let _pp_rloc (frmt : Formatter.t) (r : rloc) =
 (* ============================================================================================= *)
 (*                    ANALYSIS FUNCTIONS                                                         *)
 (* ============================================================================================= *)
-let analyze_rec_args_at_loc (p : psi_def) (r : rloc) =
-  match Map.find p.psi_target.prules r.rid with
+let analyze_rec_args_at_loc (p : PsiDef.t) (r : rloc) =
+  match Map.find p.PsiDef.target.prules r.rid with
   | Some (_, lhs_args, _, _) ->
     Set.partition_tf r.rtokens ~f:(fun v ->
         (not (RType.is_base (Variable.vtype_or_new v)))
@@ -31,16 +33,16 @@ let analyze_rec_args_at_loc (p : psi_def) (r : rloc) =
 
 let safe_remove_unknown (r : rloc) p =
   let unknown_in_other_rules =
-    Map.existsi p.psi_target.prules ~f:(fun ~key ~data ->
+    Map.existsi p.PsiDef.target.prules ~f:(fun ~key ~data ->
         let _, _, _, rhs = data in
         (not (key = r.rid)) && Set.mem (Analysis.free_variables rhs) r.rxi)
   in
   if unknown_in_other_rules
-  then p.psi_target.psyntobjs
-  else Set.remove p.psi_target.psyntobjs r.rxi
+  then p.PsiDef.target.psyntobjs
+  else Set.remove p.PsiDef.target.psyntobjs r.rxi
 ;;
 
-let applicable_nonterminals (p : psi_def) (args : TermSet.t) =
+let applicable_nonterminals (p : PsiDef.t) (args : TermSet.t) =
   let f nont =
     let in_typs, _ = RType.fun_typ_unpack (Variable.vtype_or_new nont) in
     let arg_choices =
@@ -55,22 +57,12 @@ let applicable_nonterminals (p : psi_def) (args : TermSet.t) =
     in
     List.map ~f:(fun (argvs, _) -> nont, argvs) arg_choices
   in
-  List.concat_map ~f (Set.elements p.psi_target.pnon_terminals)
+  List.concat_map ~f (Set.elements p.PsiDef.target.pnon_terminals)
 ;;
 
 (* ============================================================================================= *)
 (*                    RECURSION SKELETON EXPANSION FUNCTIONS                                     *)
 (* ============================================================================================= *)
-type extension_point =
-  | Deconstr of psi_def * rloc * variable
-  | Simple of psi_def * rloc * term list
-  | NoExt of psi_def
-
-let get_extension_psi = function
-  | Deconstr (p, _, _) -> p
-  | Simple (p, _, _) -> p
-  | NoExt p -> p
-;;
 
 let extend_function ~from:(f : variable) ~to_:(g : variable) (extra_args : term list) =
   let case _ t =
@@ -106,7 +98,7 @@ let mk_new_rule xi (nt, args, decons_arg, rhs) (constrname, constrargs) =
   new_unknown, new_rewrite_rule
 ;;
 
-let mk_with_constant_args ~(p : psi_def) (r : rloc) (cargs : term list) =
+let with_args ~(p : PsiDef.t) (r : rloc) (cargs : term list) =
   let new_xi =
     let in_t, re_t = RType.fun_typ_unpack (Variable.vtype_or_new r.rxi) in
     (* Input type is extended by adding arguments *)
@@ -114,20 +106,21 @@ let mk_with_constant_args ~(p : psi_def) (r : rloc) (cargs : term list) =
     Variable.mk ~t (Alpha.fresh ~s:r.rxi.vname ())
   in
   let add_arg_and_replace_unknown _t =
-    let nt, lhs, pat, rhs = Map.find_exn p.psi_target.prules r.rid in
+    let nt, lhs, pat, rhs = Map.find_exn p.PsiDef.target.prules r.rid in
     nt, lhs, pat, extend_function ~from:r.rxi ~to_:new_xi cargs rhs
   in
   let new_psi_target =
-    { p.psi_target with
+    { p.PsiDef.target with
       psyntobjs = Set.add (safe_remove_unknown r p) new_xi
-    ; prules = Map.update p.psi_target.prules r.rid ~f:add_arg_and_replace_unknown
+    ; prules = Map.update p.PsiDef.target.prules r.rid ~f:add_arg_and_replace_unknown
     }
   in
-  ( [ { p with psi_id = new_psi_id (); psi_target = new_psi_target } ]
-  , { r with rxi = new_xi } )
+  PsiDef.{ p with id = new_psi_id (); target = new_psi_target }, { r with rxi = new_xi }
 ;;
 
-let with_deconstruction ~(p : psi_def) (r : rloc) (dec : variable) =
+let with_deconstruction ~(p : PsiDef.t) (r : rloc) (dec : variable)
+    : (PsiDef.t * VarSet.t) option
+  =
   let deconstruct_one (nt, lhs_args, _, rhs) v =
     match RType.get_variants (Variable.vtype_or_new v) with
     | _ :: _ as cases ->
@@ -142,10 +135,10 @@ let with_deconstruction ~(p : psi_def) (r : rloc) (dec : variable) =
         | [] -> None
         (* Datatype has a single constructor. *)
         | [ (a, b) ] ->
-          Some (VarSet.singleton a, Map.set p.psi_target.prules ~key:r.rid ~data:b)
+          Some (VarSet.singleton a, Map.set p.PsiDef.target.prules ~key:r.rid ~data:b)
         (* Multiple rules need to be addded to the PMRS. *)
         | (new_unknown, new_rewrite_rule) :: tl ->
-          let map0 = Map.set p.psi_target.prules ~key:r.rid ~data:new_rewrite_rule in
+          let map0 = Map.set p.PsiDef.target.prules ~key:r.rid ~data:new_rewrite_rule in
           (* Map cannot be empty here. *)
           let max_rule_id, _ = Map.max_elt_exn map0 in
           let new_unknowns, new_rules, _ =
@@ -163,28 +156,60 @@ let with_deconstruction ~(p : psi_def) (r : rloc) (dec : variable) =
       | Some (n_xis, nr) ->
         let psyntobjs = safe_remove_unknown r p in
         Some
-          { p with
-            psi_id = new_psi_id ()
-          ; psi_target =
-              { p.psi_target with psyntobjs = Set.union n_xis psyntobjs; prules = nr }
-          }
+          ( PsiDef.
+              { p with
+                id = new_psi_id ()
+              ; target =
+                  { p.PsiDef.target with
+                    psyntobjs = Set.union n_xis psyntobjs
+                  ; prules = nr
+                  }
+              }
+          , n_xis )
       | None -> None)
     | _ -> None
     (* No variants, nothing to be done here. *)
   in
   Option.(
-    bind ~f:(fun rrule -> deconstruct_one rrule dec) (Map.find p.psi_target.prules r.rid))
+    bind
+      ~f:(fun rrule -> deconstruct_one rrule dec)
+      (Map.find p.PsiDef.target.prules r.rid))
 ;;
 
-let without_deconstruction p r (args : term list) = fst (mk_with_constant_args ~p r args)
+(** An edge links to synthesis problems, with a label explaining how the synthesis
+    problem was modified.
+*)
+module ExtensionPoint = struct
+  (** Program transformation kind. *)
+  type kind =
+    | RecDeconstr of variable
+    | CstExt of term list
+    | RecExt of term list
+    | NoExt
 
-let apply_extension : extension_point -> psi_def list = function
-  | Deconstr (p, r, d) -> Option.to_list (with_deconstruction ~p r d)
-  | Simple (p, r, args) -> without_deconstruction p r args
-  | NoExt p -> [ p ]
-;;
+  type t = rloc * kind
 
-let mk_with_rec_args ~(p : psi_def) (r : rloc) : extension_point list =
+  let compare k1 k2 = Poly.compare k1 k2
+  let default : t = default_rloc, NoExt
+  let _loc_of (ept : t) = fst ept
+  let mk_rec_deconst r v = r, RecDeconstr v
+  let mk_cst_ext r args = r, CstExt args
+  let mk_rec_ext r args = r, RecExt args
+
+  let apply ((r, k) : t) (p : PsiDef.t) : (PsiDef.t * VarSet.t) option =
+    match k with
+    | RecDeconstr d -> with_deconstruction ~p r d
+    | RecExt args ->
+      let p', r' = with_args ~p r args in
+      Some (p', VarSet.singleton r'.rxi)
+    | CstExt args ->
+      let p', r' = with_args ~p r args in
+      Some (p', VarSet.singleton r'.rxi)
+    | NoExt -> None
+  ;;
+end
+
+let ext_with_rec_args ~(p : PsiDef.t) (r : rloc) : ExtensionPoint.t list =
   if Set.is_empty r.rtokens
   then []
   else (
@@ -195,52 +220,49 @@ let mk_with_rec_args ~(p : psi_def) (r : rloc) : extension_point list =
         ~f:(fun (f, args) -> mk_app (mk_var f) args)
         (applicable_nonterminals p (TermSet.of_varset args_usable))
     in
-    List.map ~f:(fun x -> Simple (p, r, x)) (subsets arg_choices)
-    @ List.map ~f:(fun x -> Deconstr (p, r, x)) (Set.elements args_require_deconstruction))
+    List.map ~f:(ExtensionPoint.mk_rec_ext r) (subsets arg_choices)
+    @ List.map
+        ~f:(ExtensionPoint.mk_rec_deconst r)
+        (Set.elements args_require_deconstruction))
 ;;
 
-let mk_new_problem ~(p : psi_def) (r : rloc) : extension_point list =
-  (* First extend the unknowns with constant argsr. *)
-  let with_extra_constant_args, updated_objective =
-    let cargs, rargs =
-      let of_base_type, of_rec_type =
-        Set.partition_tf r.rtokens ~f:(fun v -> RType.is_base (Variable.vtype_or_new v))
-      in
-      Set.elements of_base_type, of_rec_type
+let ext_with_constant_args (r : rloc) : ExtensionPoint.t option =
+  let cargs =
+    let of_base_type, _ =
+      Set.partition_tf r.rtokens ~f:(fun v -> RType.is_base (Variable.vtype_or_new v))
     in
-    if List.length cargs > 0
-    then (
-      let new_p, new_r = mk_with_constant_args ~p r (List.map ~f:mk_var cargs) in
-      new_p, { new_r with rtokens = rargs })
-    else [], r
+    Set.elements of_base_type
   in
-  List.map ~f:(fun x -> NoExt x) with_extra_constant_args
-  @
-  match with_extra_constant_args with
-  | _ :: _ ->
-    mk_with_rec_args ~p:(List.last_exn with_extra_constant_args) updated_objective
-  | [] -> mk_with_rec_args ~p r
+  match cargs with
+  | _ :: _ -> Some (ExtensionPoint.mk_cst_ext r (List.map ~f:mk_var cargs))
+  | _ -> None
 ;;
 
-let find_extensions (p : psi_def) =
-  let g = p.psi_target in
+let find_extension_locs ?(mask = VarSet.empty) ?(only = None) (p : PsiDef.t) =
+  let g = p.PsiDef.target in
+  let synt_objs =
+    match only with
+    | Some s -> s
+    | None -> Set.diff g.psyntobjs mask
+  in
   let paramset = VarSet.of_list g.pargs in
   (* Check for each rule.  *)
   let f ((rule_id, rrule) : int * rewrite_rule) =
     let _, lhs_args, lhs_pat, rhs = rrule in
     let rhs_argset = Analysis.free_variables ~include_functions:false rhs in
+    let rhs_funcs = Analysis.free_variables ~include_functions:true rhs in
     let lhs_argset =
       Set.union
         (VarSet.of_list lhs_args)
         (Option.value_map lhs_pat ~default:VarSet.empty ~f:(fun p ->
              Analysis.free_variables (Term.term_of_pattern p)))
     in
-    if not (Set.are_disjoint g.psyntobjs rhs_argset)
+    if not (Set.are_disjoint synt_objs rhs_funcs)
     then (
       let more_args = Set.diff (Set.union paramset lhs_argset) rhs_argset in
       if not (Set.is_empty more_args)
       then (
-        let unknowns = Set.inter p.psi_target.psyntobjs (Analysis.free_variables rhs) in
+        let unknowns = Set.inter synt_objs rhs_funcs in
         List.concat_map
           ~f:(fun rxi ->
             let _, _, _, rhs_rrule = rrule in
@@ -255,43 +277,86 @@ let find_extensions (p : psi_def) =
   List.concat_map ~f (Map.to_alist g.prules)
 ;;
 
-let list_extensions (p : psi_def) =
-  let subspecs = find_extensions p in
-  let new_ps =
-    if List.length subspecs > 0
-    then
-      List.fold_left subspecs ~init:[ NoExt p ] ~f:(fun accum subspec ->
-          Log.verbose
-            Fmt.(
-              fun fmt () ->
-                pf
-                  fmt
-                  "@.༆ Apply %a to:@.%a@."
-                  _pp_rloc
-                  subspec
-                  (list (PMRS.pp ~short:false))
-                  (List.map ~f:(fun p' -> (get_extension_psi p').psi_target) accum));
-          List.concat_map
-            ~f:(fun p' -> mk_new_problem ~p:(get_extension_psi p') subspec)
-            accum)
-    else []
-  in
-  NoExt p :: new_ps
-;;
-
 (* ============================================================================================= *)
 (*                    MAIN ENTRY POINT                                                           *)
 (* ============================================================================================= *)
 
 open Graph
-open Pack
+module PGraph = Imperative.Digraph.ConcreteLabeled (PsiDef) (ExtensionPoint)
 
-let _enumeration_graph = Graph.create ~size:20 ()
-let _problem_versions : (int, psi_def) Hashtbl.t = Hashtbl.create ~size:20 (module Int)
+module EdgeWeights = struct
+  type edge = PGraph.E.t
+  type t = int
 
-let enumerate_p (p : psi_def) =
-  let exts = list_extensions p in
-  let res = List.concat_map ~f:apply_extension exts in
-  Log.info Fmt.(fun fmt () -> pf fmt "%i subproblems." (List.length res));
-  res
+  let weight _ = 1
+  let compare = compare
+  let add = ( + )
+  let zero = 0
+end
+
+module PPath = Path.Dijkstra (PGraph) (EdgeWeights)
+module PBfs = Traverse.Bfs (PGraph)
+
+let root_program : PsiDef.t option = None
+let enumeration_graph = PGraph.create ~size:20 ()
+let problem_versions : (int, PsiDef.t) Hashtbl.t = Hashtbl.create ~size:20 (module Int)
+
+let list_problems () : PsiDef.t list =
+  List.rev
+    (PGraph.fold_vertex (fun new_psi accum -> new_psi :: accum) enumeration_graph [])
 ;;
+
+let clear () =
+  PGraph.clear enumeration_graph;
+  Hashtbl.clear problem_versions
+;;
+
+let _root_path (p : PsiDef.t) =
+  match root_program with
+  | Some rp ->
+    (try Some (fst (PPath.shortest_path enumeration_graph rp p)) with
+    | Caml.Not_found -> None)
+  | None -> None
+;;
+
+let rec expand_vertex ?(mask = VarSet.empty) ?(n = 10) (p : PsiDef.t) =
+  if n < 0
+  then ()
+  else (
+    PGraph.add_vertex enumeration_graph p;
+    List.iter (find_extension_locs ~mask p) ~f:(fun rloc ->
+        (* First try adding constant-time computable args. *)
+        let p', rloc' =
+          match ext_with_constant_args rloc with
+          | Some ept ->
+            (match ExtensionPoint.apply ept p with
+            | Some (pd, new_xis) ->
+              let new_edge = PGraph.E.create p ept pd in
+              PGraph.add_edge_e enumeration_graph new_edge;
+              pd, { rloc with rxi = Set.max_elt_exn new_xis }
+            | None -> p, rloc)
+          | None -> p, rloc
+        in
+        List.iter (ext_with_rec_args ~p:p' rloc') ~f:(fun ept ->
+            match ExtensionPoint.apply ept p' with
+            | Some (new_p, new_xis) ->
+              PGraph.add_edge_e enumeration_graph (PGraph.E.create p' ept new_p);
+              let new_mask =
+                match snd ept with
+                | RecDeconstr _ -> mask
+                | _ -> Set.union mask new_xis
+              in
+              expand_vertex ~mask:new_mask ~n:(n - 1) new_p
+            | _ -> ())))
+;;
+
+let enumerate_p (p : PsiDef.t) =
+  expand_vertex p;
+  list_problems ()
+;;
+
+(* ============================================================================================= *)
+(*                    PROGRAM SEARCH                                                             *)
+(* ============================================================================================= *)
+
+let _program_search (p : PsiDef.t) = expand_vertex p

@@ -45,10 +45,10 @@ let main () =
     Algo.AState.(
       match pb, soln with
       | pb, Realizable soln ->
-        ( pb.psi_id
+        ( pb.PsiDef.id
         , ToolMessages.on_success ~is_ocaml_syntax filename pb (Either.First soln) )
       | pb, Unrealizable ctexs ->
-        ( pb.psi_id
+        ( pb.PsiDef.id
         , ToolMessages.on_success ~is_ocaml_syntax filename pb (Either.Second ctexs) )
       | _, Failed _ ->
         Utils.Log.error_msg "Failed to find a solution or a witness of unrealizability";

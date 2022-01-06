@@ -6,7 +6,7 @@ open Utils
 let find_and_solve_problem
     (psi_comps : (string * string * string) option)
     (pmrs : (string, PMRS.t, Base.String.comparator_witness) Map.t)
-    : (psi_def * Syguslib.Sygus.solver_response segis_response) list
+    : (PsiDef.t * Syguslib.Sygus.solver_response segis_response) list
   =
   (*  Find problem components *)
   let target_fname, spec_fname, repr_fname =
@@ -32,6 +32,7 @@ let find_and_solve_problem
     then [ top_userdef_problem ]
     else PEnum.enumerate_p top_userdef_problem
   in
+  Fmt.(pf stdout "%i potential sketches." (List.length problems));
   let rec f (i, sols, fails) l =
     if List.length sols >= max 1 !Config.Optims.max_solutions
     then sols, fails
@@ -42,7 +43,7 @@ let find_and_solve_problem
         AlgoLog.show_new_rskel i low_problem;
         let maybe_solution = main_algo low_problem in
         (* Print state and save. *)
-        LogJson.save_stats_and_restart low_problem.psi_id;
+        LogJson.save_stats_and_restart low_problem.id;
         (match maybe_solution with
         | Realizable soln -> f (i + 1, (low_problem, Realizable soln) :: sols, fails) tl
         | _ as res -> f (i + 1, sols, (low_problem, res) :: fails) tl)

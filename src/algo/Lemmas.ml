@@ -42,9 +42,10 @@ let placeholder_ctex (det : term_state_detail) : ctex =
  function is the set of scalar variables that would appear in the term after recursion elimination has
  been applied.
 *)
-let recurs_elim_of_term (term : term) ~(p : psi_def) : (term * term) list * variable list =
+let recurs_elim_of_term (term : term) ~(p : PsiDef.t) : (term * term) list * variable list
+  =
   Set.fold
-    ~init:([], p.psi_reference.pargs)
+    ~init:([], p.PsiDef.reference.pargs)
     ~f:(fun (rec_elim, vars) var ->
       match Variable.vtype var with
       | None -> rec_elim, var :: vars
@@ -221,15 +222,15 @@ let skeleton_of_tinv (det : term_state_detail) (tinv_of_t : term) =
   objective (SyGuS command).
   All strategies should be executed in order to find a solution efficiently.
  *)
-let synthfun_of_det ~(p : psi_def) (det : term_state_detail) : (command * string) list =
+let synthfun_of_det ~(p : PsiDef.t) (det : term_state_detail) : (command * string) list =
   let opset =
     List.fold
       ~init:OpSet.empty
       ~f:(fun acc func -> Set.union acc (Analysis.operators_of func.f_body))
-      (PMRS.func_of_pmrs p.psi_reference
-      @ PMRS.func_of_pmrs p.psi_repr
+      (PMRS.func_of_pmrs p.PsiDef.reference
+      @ PMRS.func_of_pmrs p.PsiDef.repr
       @
-      match p.psi_tinv with
+      match p.tinv with
       | None -> []
       | Some pmrs -> PMRS.func_of_pmrs pmrs)
   in
@@ -249,7 +250,7 @@ let synthfun_of_det ~(p : psi_def) (det : term_state_detail) : (command * string
   if !Config.Optims.make_partial_lemma_sketches
   then (
     let skeleton_guess =
-      match p.psi_tinv with
+      match p.tinv with
       | Some tinv -> skeleton_of_tinv det (Reduce.reduce_pmrs tinv det.term)
       | _ -> None
     in
@@ -265,7 +266,7 @@ let term_var_string term : string =
 ;;
 
 let convert_term_rec_to_ctex_rec
-    ~(p : psi_def)
+    ~(p : PsiDef.t)
     (det : term_state_detail)
     (ctex : ctex)
     (name : string)
@@ -323,7 +324,7 @@ let convert_term_rec_to_ctex_rec
     VarSet.find_by_name
       (Set.union
          (Analysis.free_variables det.term)
-         (Set.union (VarSet.of_list p.psi_reference.pargs) ctex.ctex_vars))
+         (Set.union (VarSet.of_list p.PsiDef.reference.pargs) ctex.ctex_vars))
       name
   with
   | None -> f det.recurs_elim
@@ -331,7 +332,7 @@ let convert_term_rec_to_ctex_rec
 ;;
 
 let ctex_model_to_args
-    ~(p : psi_def)
+    ~(p : PsiDef.t)
     (det : term_state_detail)
     (params : (string * sygus_sort) list)
     ctex
@@ -347,7 +348,7 @@ let ctex_model_to_args
                (Set.union
                   (* Don't include functions, we won't get a model for them in CVC5. *)
                   (Analysis.free_variables ~include_functions:false det.term)
-                  (Set.union (VarSet.of_list p.psi_reference.pargs) ctex.ctex_vars))
+                  (Set.union (VarSet.of_list p.PsiDef.reference.pargs) ctex.ctex_vars))
                name
            with
           | None ->
@@ -412,19 +413,23 @@ let handle_lemma_synth_response
 (*                                  Lemma verification functions                                 *)
 (* ============================================================================================= *)
 
-let mk_f_compose_r_orig ~(p : psi_def) (t : term) : term =
-  let repr_of_v = if p.psi_repr_is_identity then t else mk_app_v p.psi_repr.pvar [ t ] in
-  mk_app_v p.psi_reference.pvar (List.map ~f:mk_var p.psi_reference.pargs @ [ repr_of_v ])
-;;
-
-let mk_f_compose_r_main ~(p : psi_def) (t : term) : term =
+let mk_f_compose_r_orig ~(p : PsiDef.t) (t : term) : term =
   let repr_of_v =
-    if p.psi_repr_is_identity then t else mk_app_v p.psi_repr.pmain_symb [ t ]
+    if p.PsiDef.repr_is_identity then t else mk_app_v p.PsiDef.repr.pvar [ t ]
   in
-  mk_app_v p.psi_reference.pmain_symb [ repr_of_v ]
+  mk_app_v
+    p.PsiDef.reference.pvar
+    (List.map ~f:mk_var p.PsiDef.reference.pargs @ [ repr_of_v ])
 ;;
 
-let get_precise_lemma ~(p : psi_def) (ts : term_state) ~(key : term * term option)
+let mk_f_compose_r_main ~(p : PsiDef.t) (t : term) : term =
+  let repr_of_v =
+    if p.PsiDef.repr_is_identity then t else mk_app_v p.PsiDef.repr.pmain_symb [ t ]
+  in
+  mk_app_v p.PsiDef.reference.pmain_symb [ repr_of_v ]
+;;
+
+let get_precise_lemma ~(p : PsiDef.t) (ts : term_state) ~(key : term * term option)
     : term option
   =
   let term_detail_to_lemma det =
@@ -445,7 +450,7 @@ let get_precise_lemma ~(p : psi_def) (ts : term_state) ~(key : term * term optio
   | Some det -> term_detail_to_lemma det
 ;;
 
-let get_lemma ~(p : psi_def) (ts : term_state) ~(key : term) : term option =
+let get_lemma ~(p : PsiDef.t) (ts : term_state) ~(key : term) : term option =
   let term_detail_to_lemma det =
     let subst =
       List.concat_map
@@ -470,7 +475,7 @@ let get_lemma ~(p : psi_def) (ts : term_state) ~(key : term) : term option =
     | _ as conds -> mk_assoc Binop.And conds)
 ;;
 
-let smt_of_recurs_elim_eqns (elim : (term * term) list) ~(p : psi_def) : S.smtTerm =
+let smt_of_recurs_elim_eqns (elim : (term * term) list) ~(p : PsiDef.t) : S.smtTerm =
   let lst =
     List.map
       ~f:(fun (t1, t2) ->
@@ -480,16 +485,16 @@ let smt_of_recurs_elim_eqns (elim : (term * term) list) ~(p : psi_def) : S.smtTe
   if equal (List.length lst) 0 then S.mk_true else S.mk_assoc_and lst
 ;;
 
-let smt_of_aux_ensures ~(p : psi_def) : S.smtTerm list =
+let smt_of_aux_ensures ~(p : PsiDef.t) : S.smtTerm list =
   let mk_sort maybe_rtype =
     match maybe_rtype with
     | None -> S.mk_int_sort
     | Some rtype -> sort_of_rtype rtype
   in
   let pmrss : PMRS.t list =
-    [ p.psi_reference; p.psi_target; p.psi_reference ]
+    [ p.PsiDef.reference; p.PsiDef.target; p.PsiDef.reference ]
     @
-    match p.psi_tinv with
+    match p.tinv with
     | None -> []
     | Some tinv -> [ tinv ]
   in
@@ -526,8 +531,8 @@ let smt_of_aux_ensures ~(p : psi_def) : S.smtTerm list =
     vars
 ;;
 
-let smt_of_tinv_app ~(p : psi_def) (det : term_state_detail) =
-  match p.psi_tinv with
+let smt_of_tinv_app ~(p : PsiDef.t) (det : term_state_detail) =
+  match p.tinv with
   | None -> failwith "No TInv has been specified. Cannot make smt of tinv app."
   | Some pmrs -> S.mk_simple_app pmrs.pvar.vname [ smt_of_term det.term ]
 ;;
@@ -538,7 +543,7 @@ let smt_of_lemma_app (det : term_state_detail) =
     (List.map ~f:(fun var -> S.mk_var var.vname) det.scalar_vars)
 ;;
 
-let smt_of_lemma_validity ~(p : psi_def) (det : term_state_detail) =
+let smt_of_lemma_validity ~(p : PsiDef.t) (det : term_state_detail) =
   let mk_sort maybe_rtype =
     match maybe_rtype with
     | None -> S.mk_int_sort
@@ -548,7 +553,7 @@ let smt_of_lemma_validity ~(p : psi_def) (det : term_state_detail) =
     List.map
       ~f:(fun var -> S.SSimple var.vname, mk_sort (Variable.vtype var))
       (Set.elements (Analysis.free_variables det.term)
-      @ p.psi_reference.pargs
+      @ p.PsiDef.reference.pargs
       @ List.concat_map
           ~f:(fun (_, b) -> Set.elements (Analysis.free_variables b))
           det.recurs_elim)
@@ -567,7 +572,7 @@ let smt_of_lemma_validity ~(p : psi_def) (det : term_state_detail) =
   ]
 ;;
 
-let set_up_lemma_solver solver ~(p : psi_def) (det : term_state_detail) =
+let set_up_lemma_solver solver ~(p : PsiDef.t) (det : term_state_detail) =
   let preamble =
     Commands.mk_preamble
       ~logic:
@@ -575,7 +580,7 @@ let set_up_lemma_solver solver ~(p : psi_def) (det : term_state_detail) =
            ~quantifier_free:false
            ~with_uninterpreted_functions:true
            ~for_induction:true
-           ~logic_infos:(AState.psi_def_logics p)
+           ~logic_infos:(AState.PsiDef.logics p)
            [])
       ~incremental:false
       ~induction:true
@@ -592,12 +597,12 @@ let set_up_lemma_solver solver ~(p : psi_def) (det : term_state_detail) =
           let%lwt _ = AsyncSmt.exec_command solver x in
           return ())
         ((* Start by defining tinv. *)
-         Option.(map ~f:smt_of_pmrs p.psi_tinv |> value ~default:[])
+         Option.(map ~f:smt_of_pmrs p.tinv |> value ~default:[])
         (* PMRS definitions.*)
         (* Reference function. *)
-        @ smt_of_pmrs p.psi_reference
+        @ smt_of_pmrs p.PsiDef.reference
         (* Representation function. *)
-        @ (if p.psi_repr_is_identity then [] else smt_of_pmrs p.psi_repr)
+        @ (if p.PsiDef.repr_is_identity then [] else smt_of_pmrs p.PsiDef.repr)
         (* Assert invariants on functions *)
         @ List.map ~f:S.mk_assert (smt_of_aux_ensures ~p)
         (* Declare lemmas. *)
@@ -631,7 +636,7 @@ let smt_of_disallow_ctex_values (det : term_state_detail) : S.smtTerm =
     (List.map ~f:(fun ctex -> S.mk_not (S.mk_assoc_and (of_one_ctex ctex))) ctexs)
 ;;
 
-let set_up_to_get_model solver ~(p : psi_def) (det : term_state_detail) =
+let set_up_to_get_model solver ~(p : PsiDef.t) (det : term_state_detail) =
   (* Step 1. Declare vars for term, and assert that term satisfies tinv. *)
   let%lwt () =
     AsyncSmt.exec_all solver (Commands.decls_of_vars (Analysis.free_variables det.term))
@@ -683,10 +688,10 @@ let mk_model_sat_asserts det f_o_r instantiate =
   List.map ~f det.scalar_vars
 ;;
 
-let verify_lemma_bounded ~(p : psi_def) (det : term_state_detail)
+let verify_lemma_bounded ~(p : PsiDef.t) (det : term_state_detail)
     : (Utils.Stats.verif_method * S.solver_response) Lwt.t * int Lwt.u
   =
-  let logic = SmtLogic.infer_logic ~logic_infos:(AState.psi_def_logics p) [] in
+  let logic = SmtLogic.infer_logic ~logic_infos:(AState.PsiDef.logics p) [] in
   let task (solver, starter) =
     let%lwt _ = starter in
     let%lwt () =
@@ -708,9 +713,9 @@ let verify_lemma_bounded ~(p : psi_def) (det : term_state_detail)
         let%lwt _ = accum in
         let f_compose_r t =
           let repr_of_v =
-            if p.psi_repr_is_identity then t else Reduce.reduce_pmrs p.psi_repr t
+            if p.PsiDef.repr_is_identity then t else Reduce.reduce_pmrs p.PsiDef.repr t
           in
-          Reduce.reduce_term (Reduce.reduce_pmrs p.psi_reference repr_of_v)
+          Reduce.reduce_term (Reduce.reduce_pmrs p.PsiDef.reference repr_of_v)
         in
         let subs =
           List.map
@@ -747,7 +752,7 @@ let verify_lemma_bounded ~(p : psi_def) (det : term_state_detail)
         in
         (* Assert that TInv is true for this concrete term t *)
         let%lwt _ =
-          match p.psi_tinv with
+          match p.tinv with
           | None -> return ()
           | Some tinv ->
             let tinv_t = Reduce.reduce_pmrs tinv t in
@@ -818,7 +823,7 @@ let verify_lemma_bounded ~(p : psi_def) (det : term_state_detail)
   AsyncSmt.(cancellable_task (make_solver "cvc") task)
 ;;
 
-let verify_lemma_unbounded ~(p : psi_def) (det : term_state_detail)
+let verify_lemma_unbounded ~(p : PsiDef.t) (det : term_state_detail)
     : (Utils.Stats.verif_method * S.solver_response) Lwt.t * int Lwt.u
   =
   let build_task (cvc4_instance, task_start) =
@@ -852,7 +857,7 @@ let verify_lemma_unbounded ~(p : psi_def) (det : term_state_detail)
   another call to a SMT solver. The induction solver attempts to prove that the solution
   is correct while the smt solver attempt to find a counterexample.
 *)
-let verify_lemma_candidate ~(p : psi_def) (det : term_state_detail)
+let verify_lemma_candidate ~(p : PsiDef.t) (det : term_state_detail)
     : Utils.Stats.verif_method * SyncSmt.solver_response
   =
   match det.lemma_candidate with
@@ -909,7 +914,7 @@ let parse_positive_example_solver_model response (det : term_state_detail) =
 
 (** The Interactive module contains function used in interactive mode. *)
 module Interactive = struct
-  let make_term_state_detail ~(p : psi_def) (term : term) : term_state_detail =
+  let make_term_state_detail ~(p : PsiDef.t) (term : term) : term_state_detail =
     let recurs_elim, scalar_vars = recurs_elim_of_term ~p term in
     let input_args_t = List.map ~f:Variable.vtype_or_new scalar_vars in
     let lemma_f =
@@ -944,7 +949,7 @@ module Interactive = struct
   ;;
 
   let set_term_lemma
-      ~(p : psi_def)
+      ~(p : PsiDef.t)
       (ts : term_state)
       ~(key : term * term option)
       ~(lemma : term)
@@ -959,8 +964,8 @@ module Interactive = struct
     | Some det -> Map.add_exn ts ~key ~data:{ det with lemmas = [ lemma ] }
   ;;
 
-  let add_lemmas ~(p : psi_def) (lstate : refinement_loop_state) : refinement_loop_state =
-    let env_in_p = VarSet.of_list p.psi_reference.pargs in
+  let add_lemmas ~(p : PsiDef.t) (lstate : refinement_loop_state) : refinement_loop_state =
+    let env_in_p = VarSet.of_list p.PsiDef.reference.pargs in
     let f existing_lemmas t =
       let vars = Set.union (Analysis.free_variables t) env_in_p in
       let env = VarSet.to_env vars in
@@ -970,9 +975,9 @@ module Interactive = struct
           Fmt.pf
             frmt
             "Environment:@;@[functions %s, %s and %s@]@;and @[%a@]."
-            p.psi_reference.pvar.vname
-            p.psi_target.pvar.vname
-            p.psi_repr.pvar.vname
+            p.PsiDef.reference.pvar.vname
+            p.PsiDef.target.pvar.vname
+            p.PsiDef.repr.pvar.vname
             VarSet.pp
             vars);
       match Stdio.In_channel.input_line Stdio.stdin with
@@ -1097,7 +1102,7 @@ module Interactive = struct
   ;;
 end
 
-let synthesize_new_lemma ~(p : psi_def) (det : term_state_detail) : term option =
+let synthesize_new_lemma ~(p : PsiDef.t) (det : term_state_detail) : term option =
   let with_synth_obj i synth_obj logic =
     AlgoLog.announce_new_lemma_synthesis i det;
     let neg_constraints = List.map ~f:(constraint_of_neg_ctex det) det.negative_ctexs in
@@ -1134,7 +1139,7 @@ let synthesize_new_lemma ~(p : psi_def) (det : term_state_detail) : term option 
 (*                                  Main entry points                                            *)
 (* ============================================================================================= *)
 
-let rec lemma_refinement_loop ~(p : psi_def) (det : term_state_detail)
+let rec lemma_refinement_loop ~(p : PsiDef.t) (det : term_state_detail)
     : term_state_detail option
   =
   match synthesize_new_lemma ~p det with
@@ -1211,7 +1216,7 @@ let ctexs_for_ensures_synt ctex =
 ;;
 
 let refine_ensures_predicates
-    ~(p : psi_def)
+    ~(p : PsiDef.t)
     ~(neg_ctexs : ctex list)
     ~(pos_ctexs : ctex list)
     (lstate : refinement_loop_state)
@@ -1225,13 +1230,13 @@ let refine_ensures_predicates
   match maybe_pred with
   | None -> lstate.term_state, `CoarseningFailure
   | Some ensures ->
-    (match Specifications.get_ensures p.psi_reference.pvar with
+    (match Specifications.get_ensures p.PsiDef.reference.pvar with
     | None ->
-      AlgoLog.show_new_ensures_predicate p.psi_reference.pvar ensures;
-      Specifications.set_ensures p.psi_reference.pvar ensures
+      AlgoLog.show_new_ensures_predicate p.PsiDef.reference.pvar ensures;
+      Specifications.set_ensures p.PsiDef.reference.pvar ensures
     | Some old_ensures ->
       let var : variable =
-        Variable.mk ~t:(Some p.psi_reference.poutput_typ) (Alpha.fresh ())
+        Variable.mk ~t:(Some p.PsiDef.reference.poutput_typ) (Alpha.fresh ())
       in
       let new_pred =
         mk_fun
@@ -1241,12 +1246,12 @@ let refine_ensures_predicates
              (mk_app old_ensures [ mk_var var ])
              (mk_app ensures [ mk_var var ]))
       in
-      AlgoLog.show_new_ensures_predicate p.psi_reference.pvar new_pred;
-      Specifications.set_ensures p.psi_reference.pvar new_pred);
+      AlgoLog.show_new_ensures_predicate p.PsiDef.reference.pvar new_pred;
+      Specifications.set_ensures p.PsiDef.reference.pvar new_pred);
     lstate.term_state, `CoarseningOk
 ;;
 
-let synthesize_lemmas ~(p : psi_def) synt_failure_info (lstate : refinement_loop_state)
+let synthesize_lemmas ~(p : PsiDef.t) synt_failure_info (lstate : refinement_loop_state)
     : ( (refinement_loop_state, unrealizability_ctex list) Either.t, solver_response )
     Result.t
   =

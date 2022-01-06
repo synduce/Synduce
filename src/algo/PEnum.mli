@@ -1,2 +1,3 @@
+val clear : unit -> unit
 (** This functions enumerate possible extensions of an input problem. *)
-val enumerate_p : AState.psi_def -> AState.psi_def list
+val enumerate_p : AState.PsiDef.t -> AState.PsiDef.t list

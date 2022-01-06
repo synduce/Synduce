@@ -10,24 +10,24 @@ let no_synth () =
   Caml.exit 0
 ;;
 
-let sync_args p : psi_def =
+let sync_args p : PsiDef.t =
   let subs =
-    match List.zip p.psi_reference.pargs p.psi_target.pargs with
+    match List.zip p.PsiDef.reference.pargs p.PsiDef.target.pargs with
     | Unequal_lengths ->
       failwith
         "Reference and target recursion scheme must have the same number of parameters."
     | Ok var_subs -> List.map ~f:(fun (v1, v2) -> mk_var v2, mk_var v1) var_subs
   in
   let target' =
-    PMRS.subst_rule_rhs ~p:{ p.psi_target with pargs = p.psi_reference.pargs } subs
+    PMRS.subst_rule_rhs ~p:{ p.PsiDef.target with pargs = p.PsiDef.reference.pargs } subs
   in
-  { p with psi_target = target' }
+  { p with target = target' }
 ;;
 
 let find_problem_components
     ((target_fname, spec_fname, repr_fname) : string * string * string)
     (pmrs_map : (string, PMRS.t, String.comparator_witness) Map.t)
-    : psi_def
+    : PsiDef.t
   =
   (* Representation function. *)
   let repr, theta_to_tau =
@@ -125,21 +125,22 @@ let find_problem_components
   in
   let problem =
     sync_args
-      { psi_id = AState.new_psi_id ()
-      ; psi_target = target_f
-      ; psi_reference = reference_f
-      ; psi_repr = repr_pmrs
-      ; psi_tinv = tinv_pmrs
-      ; psi_repr_is_identity = Reduce.is_identity repr_pmrs
-      ; psi_lifting = []
-      }
+      PsiDef.
+        { id = AState.PsiDef.new_psi_id ()
+        ; target = target_f
+        ; reference = reference_f
+        ; repr = repr_pmrs
+        ; tinv = tinv_pmrs
+        ; repr_is_identity = Reduce.is_identity repr_pmrs
+        ; lifting = []
+        }
   in
   (* Print summary information about the problem, before solving.*)
   AlgoLog.show_summary (spec_fname, repr_fname, target_fname) target_f;
   (* Print reference function. *)
-  AlgoLog.show_pmrs problem.psi_reference;
+  AlgoLog.show_pmrs problem.PsiDef.reference;
   (* Print target recursion skeleton. *)
-  AlgoLog.show_pmrs problem.psi_target;
+  AlgoLog.show_pmrs problem.PsiDef.target;
   (* Print representation function. *)
   Log.info
     Fmt.(
@@ -157,7 +158,7 @@ let find_problem_components
             body);
   Log.verbose Specifications.dump_all;
   (* Print the condition on the reference function's input, if there is one. *)
-  (match problem.psi_tinv with
+  (match problem.tinv with
   | Some tinv -> AlgoLog.show_pmrs tinv
   | None -> ());
   (* Set global information. *)
@@ -169,8 +170,8 @@ let find_problem_components
   problem
 ;;
 
-let update_context (p : psi_def) =
-  let target = PMRS.infer_pmrs_types p.psi_target in
+let update_context (p : PsiDef.t) =
+  let target = PMRS.infer_pmrs_types p.PsiDef.target in
   PMRS.update target;
   AState.refinement_steps := 0
 ;;

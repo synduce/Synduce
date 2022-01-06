@@ -1,8 +1,9 @@
 open Base
 open Lang
+open AState
 
 val compute_preconds
-  :  p:AState.psi_def
+  :  p:PsiDef.t
   -> term_state:AState.term_state
   -> (Term.term -> Term.term)
   -> Term.term
@@ -12,7 +13,7 @@ val filter_elims : (Term.term * 'a) list -> Term.term -> (Term.term * 'a) list
 
 val make
   :  ?force_replace_off:bool
-  -> p:AState.psi_def
+  -> p:PsiDef.t
   -> term_state:AState.term_state
   -> lifting:AState.lifting
   -> Term.TermSet.t
@@ -34,13 +35,13 @@ val pp_partial_soln
   -> unit
 
 val solve
-  :  p:AState.psi_def
+  :  p:PsiDef.t
   -> AState.equation list
   -> Syguslib.Sygus.solver_response
      * (partial_soln, AState.unrealizability_ctex list) Either.t
 
 val update_assumptions
-  :  p:AState.psi_def
+  :  p:PsiDef.t
   -> AState.refinement_loop_state
   -> partial_soln
   -> Term.TermSet.t

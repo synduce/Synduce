@@ -5,7 +5,7 @@ open Lang.Term
 open Syguslib.Sygus
 open Utils
 
-let rec refinement_loop ?(major = true) (p : psi_def) (lstate_in : refinement_loop_state)
+let rec refinement_loop ?(major = true) (p : PsiDef.t) (lstate_in : refinement_loop_state)
     : solver_response segis_response
   =
   let tsize, usize = Set.length lstate_in.t_set, Set.length lstate_in.u_set in
@@ -80,7 +80,9 @@ let rec refinement_loop ?(major = true) (p : psi_def) (lstate_in : refinement_lo
          AState.solved_eqn_system := Some eqns;
          Log.print_ok ();
          Realizable
-           { soln_rec_scheme = p.psi_target; soln_implems = Analysis.rename_nicely sol }
+           { soln_rec_scheme = p.PsiDef.target
+           ; soln_implems = Analysis.rename_nicely sol
+           }
      with
     | Failure s ->
       Log.error_msg Fmt.(str "Failure: %s" s);
@@ -121,7 +123,7 @@ let rec refinement_loop ?(major = true) (p : psi_def) (lstate_in : refinement_lo
     | _ -> Failed RFail)
 ;;
 
-let se2gis (p : psi_def) =
+let se2gis (p : PsiDef.t) =
   (* Initialize sets with the most general terms. *)
   let t_set, u_set =
     if !Config.Optims.simple_init
@@ -130,7 +132,7 @@ let se2gis (p : psi_def) =
       let s = TermSet.of_list (Analysis.expand_once x0) in
       Set.partition_tf ~f:(Expand.is_mr_all p) s)
     else (
-      let init_set = MGT.most_general_terms p.psi_target in
+      let init_set = MGT.most_general_terms p.PsiDef.target in
       Set.fold init_set ~init:(TermSet.empty, TermSet.empty) ~f:(fun (t, u) mgt ->
           let t', u' = Expand.to_maximally_reducible p mgt in
           Set.union t t', Set.union u u'))
@@ -157,7 +159,7 @@ let se2gis (p : psi_def) =
 (*                                                 MAIN ENTRY POINTS                             *)
 (* ============================================================================================= *)
 
-let solve_problem (synthesis_problem : psi_def) : solver_response segis_response =
+let solve_problem (synthesis_problem : PsiDef.t) : solver_response segis_response =
   (* Solve the problem using portofolio of techniques. *)
   se2gis synthesis_problem
 ;;
@@ -165,7 +167,7 @@ let solve_problem (synthesis_problem : psi_def) : solver_response segis_response
 let find_and_solve_problem
     (psi_comps : (string * string * string) option)
     (pmrs : (string, PMRS.t, Base.String.comparator_witness) Map.t)
-    : (psi_def * Syguslib.Sygus.solver_response segis_response) list
+    : (PsiDef.t * Syguslib.Sygus.solver_response segis_response) list
   =
   (*  Find problem components *)
   let target_fname, spec_fname, repr_fname =
