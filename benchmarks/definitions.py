@@ -2,7 +2,7 @@
 import sys
 
 # Timeout for all experiments.
-timeout_value = 360
+timeout_value = 3
 timestamp_definition = "%d-%m-%y-%H:%M:%S"
 experimental_setup = "a machine with an AMD® Ryzen 7 3700x 8-core processor and 32GB Ram running Ubuntu 20.04"
 experimental_setup_2 = "a laptop with an Intel Core i7-8750H 6-core processor and 32GB Ram running Ubuntu 21.04"
@@ -16,7 +16,7 @@ kw_steps = "#st"
 kw_tlast = "Tlast"
 kw_ver = "ver.%"
 kw_toolname = "Synduce"
-kw_tool_main_algo = "S-CEGIS+PB"
+kw_tool_main_algo = "S-CEGIS${\\bf +PB}$"
 kw_tool_main_algo_v2 = "SE²GIS"
 kw_baseline = "Baseline"
 kw_segis = "Symbolic CEGIS"

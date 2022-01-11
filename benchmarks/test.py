@@ -51,6 +51,7 @@ def run_n(progress, bench_id, realizable, command, algo,
           optim, filename, extra_opt, errors, num_runs, csv_output):
 
     total_elapsed = 0.0
+    total_last_step_elapsed = 0.0
     verif_elapsed = 0.0
     max_e = 0
     min_e = timeout_value
@@ -78,6 +79,7 @@ def run_n(progress, bench_id, realizable, command, algo,
             ((realizable and not info.is_unrealizable) or
                 (not realizable and info.is_unrealizable))):
             total_elapsed += info.elapsed
+            total_last_step_elapsed += info.last_elapsed
             verif_elapsed += info.verif_elapsed
             max_e = max(info.elapsed, max_e)
             min_e = min(info.elapsed, min_e)
@@ -90,6 +92,7 @@ def run_n(progress, bench_id, realizable, command, algo,
             break
 
     elapsed = total_elapsed / num_runs
+    last_step_elapsed = total_last_step_elapsed / num_runs
     verif_elapsed = verif_elapsed / num_runs
     delta = 1000 * max(abs(max_e - elapsed), abs(min_e-elapsed))
     sp = " "
@@ -120,13 +123,14 @@ def run_n(progress, bench_id, realizable, command, algo,
 
         msg = f"{progress : >11s} ✅ {info.algo: <6s} : {bench_name : <33s} ×{num_runs} runs, {str(timing): <30s} {induction_info} | R: {refinement_rounds} {sp : <20s} "
         print(msg)
-        csvline = f"{elapsed: 4.3f},{delta : .0f},{refinement_rounds},{c_by_induction},{p_by_induction},{verif_elapsed}"
+        csvline = f"{elapsed: 4.3f}, {last_step_elapsed: 4.3f}, {delta : .0f},{refinement_rounds},{c_by_induction},{p_by_induction},{verif_elapsed : 4.3f}"
     else:
+        errors += [bench_id]
         print(f"{progress: >11s} ❌ {bench_id : <90s}")
         if info is not None:
-            csvline = f"N/A,N/A,f{info.major_step_count},N/A,N/A,N/A"
+            csvline = f"N/A{info.last_elapsed: 4.3f},N/A,f{info.major_step_count},N/A,N/A,{info.verif_elapsed : 4.3f}"
         else:
-            csvline = f"N/A,N/A,N/A,N/A,N/A,N/A"
+            csvline = f"N/A,N/A,N/A,N/A,N/A,N/A,N/A"
 
     sys.stdout.flush()
 
