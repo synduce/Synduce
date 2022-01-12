@@ -138,6 +138,29 @@ def parse_line_v2(info):
     return (se2gis_result, segis_result, cegis_result)
 
 
+def repair(info):
+    def look_and_insert(i):
+        if info[i].startswith("N/A") and info[i].strip() != "N/A":
+            splits = info[i].split(" ")
+            if len(splits) > 1:
+                last_step_time = splits[1].strip()
+                info[i] = "N/A"
+                info.insert(i+1, last_step_time)
+                return True
+            else:
+                return False
+        return False
+
+    if(len(info)) != 22 or len(info) != 25:
+        if look_and_insert(10):
+            look_and_insert(18)
+        else:
+            look_and_insert(17)
+        print(info)
+
+    return info
+
+
 def make_table_2(input_file, output_file):
     print("============== SUMMARY - T2 ================")
     print("Summary of relative improvement of Synduce over baselines SEGIS and CEGIS.")
@@ -187,7 +210,7 @@ def make_table_2(input_file, output_file):
             info = line.split(",")
             if len(info) >= 15:
                 benchmark = info[0].split(".")[0]
-
+                info = repair(info)
                 # Line of length 22 for older results
                 if len(info) == 22:
                     se2gis_result, segis_result, cegis_result = parse_line_v1(
