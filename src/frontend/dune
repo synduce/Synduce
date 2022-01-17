@@ -27,7 +27,17 @@
 (library
  (name frontend)
  (public_name Synduce.Lib.Frontend)
- (libraries str lang sexplib utils fmt menhirLib stdio compiler-libs)
+ (libraries
+  str
+  lang
+  sexplib
+  utils
+  fmt
+  menhirLib
+  stdio
+  compiler-libs
+  goblint-cil
+  goblint-cil.zrapp)
  (preprocess
   (pps ppx_optcomp)))
 

@@ -25,17 +25,22 @@ let main () =
   Lib.Utils.Stats.glob_start ();
   (* Parse input file. *)
   let is_ocaml_syntax = Caml.Filename.check_suffix !filename ".ml" in
-  let prog, psi_comps =
-    if is_ocaml_syntax then parse_ocaml !filename else parse_pmrs !filename
-  in
-  (* Populate types.  *)
-  let _ = seek_types prog in
-  (* Translate the Caml or PRMS file into pmrs representation. *)
-  let all_pmrs =
-    try translate prog with
-    | e ->
-      if !Config.show_vars then Term.Variable.print_summary stdout ();
-      raise e
+  let is_c_syntax = Caml.Filename.check_suffix !filename ".c" in
+  let psi_comps, all_pmrs =
+    if is_c_syntax
+    then functionalize_c !filename
+    else (
+      let prog, psi_comps =
+        if is_ocaml_syntax then parse_ocaml !filename else parse_pmrs !filename
+      in
+      (* Populate types.  *)
+      let _ = seek_types prog in
+      (* Translate the Caml or PRMS file into pmrs representation. *)
+      ( psi_comps
+      , try translate prog with
+        | e ->
+          if !Config.show_vars then Term.Variable.print_summary stdout ();
+          raise e ))
   in
   if !parse_only then Caml.exit 1;
   (* Solve the problem proper. *)
