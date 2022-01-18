@@ -7,7 +7,10 @@ int mysum(int *a, int n)
 
   for (i = 1; i < n + 10; i++)
   {
-    sum += a[i];
+    if (a[i] > 0)
+    {
+      sum += a[i];
+    }
     amax = max(a[i], amax);
   }
   return sum;
