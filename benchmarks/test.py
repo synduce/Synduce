@@ -128,7 +128,7 @@ def run_n(progress, bench_id, realizable, command, algo,
         errors += [bench_id]
         print(f"{progress: >11s} ❌ {bench_id : <90s}")
         if info is not None:
-            csvline = f"N/A, {info.last_elapsed: 4.3f},N/A,f{info.major_step_count},N/A,N/A,{info.verif_elapsed : 4.3f}"
+            csvline = f"N/A,{info.last_elapsed: 4.3f},N/A,f{info.major_step_count},N/A,N/A,{info.verif_elapsed : 4.3f}"
         else:
             csvline = f"N/A,N/A,N/A,N/A,N/A,N/A,N/A"
 

@@ -79,86 +79,19 @@ def save_scatter_plot_table2(scatter_file, se2gis_series, segis_series, timeouts
 
 # "TABLE 2" with three different algorithms
 
+
 def parse_line_v1(info):
-    se2gis_result = {
-        "time": info[2],
-        "delta": info[3],
-        "rounds": info[4],
-        "N": info[5],
-        "B": info[6],
-        "verif": info[7],
-    }
-    segis_result = {
-        "time": info[9],
-        "delta": info[10],
-        "rounds": info[11],
-        "N": info[12],
-        "B": info[13],
-        "verif": info[14],
-    }
-    cegis_result = {
-        "time": info[16],
-        "delta": info[17],
-        "rounds": info[18],
-        "N": info[19],
-        "B": info[20],
-        "verif": info[21],
-    }
+    se2gis_result = parse_alg(info, 0)
+    segis_result = parse_alg(info, 7)
+    cegis_result = parse_alg(info, 14)
     return (se2gis_result, segis_result, cegis_result)
 
 
 def parse_line_v2(info):
-    se2gis_result = {
-        "time": info[2],
-        "last_elapsed": info[3],
-        "delta": info[4],
-        "rounds": info[5],
-        "N": info[6],
-        "B": info[7],
-        "verif": info[8],
-    }
-    segis_result = {
-        "time": info[10],
-        "last_elapsed": info[11],
-        "delta": info[12],
-        "rounds": info[13],
-        "N": info[14],
-        "B": info[15],
-        "verif": info[16],
-    }
-    cegis_result = {
-        "time": info[18],
-        "last_elapsed": info[19],
-        "delta": info[20],
-        "rounds": info[21],
-        "N": info[22],
-        "B": info[23],
-        "verif": info[24],
-    }
+    se2gis_result = parse_alg_v2(info, 0)
+    segis_result = parse_alg_v2(info, 8)
+    cegis_result = parse_alg_v2(info, 16)
     return (se2gis_result, segis_result, cegis_result)
-
-
-def repair(info):
-    def look_and_insert(i):
-        if info[i].startswith("N/A") and info[i].strip() != "N/A":
-            splits = info[i].split(" ")
-            if len(splits) > 1:
-                last_step_time = splits[1].strip()
-                info[i] = "N/A"
-                info.insert(i+1, last_step_time)
-                return True
-            else:
-                return False
-        return False
-
-    if(len(info)) != 22 or len(info) != 25:
-        if look_and_insert(10):
-            look_and_insert(18)
-        else:
-            look_and_insert(17)
-        print(info)
-
-    return info
 
 
 def make_table_2(input_file, output_file):

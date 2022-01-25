@@ -90,3 +90,48 @@ def with_exp_data(info, data, data2, data3, realizable=True):
     else:
         res = f"{info[1]} & { by_induction } & {time1} & {rounds} & {time2}  & {rounds2} \\\\ \n"
     return res
+
+
+def parse_alg(info, i):
+    return {
+        "time": info[i+2],
+        "delta": info[i+3],
+        "rounds": info[i+4],
+        "N": info[i+5],
+        "B": info[i+6],
+        "verif": info[i+7],
+    }
+
+
+def parse_alg_v2(info, i):
+    return {
+        "time": info[i + 2],
+        "last_elapsed": info[i+3],
+        "delta": info[i+4],
+        "rounds": info[i+5],
+        "N": info[i+6],
+        "B": info[i+7],
+        "verif": info[i+8],
+    }
+
+
+def repair(info):
+    def look_and_insert(i):
+        if info[i].startswith("N/A") and info[i].strip() != "N/A":
+            splits = info[i].split(" ")
+            if len(splits) > 1:
+                last_step_time = splits[1].strip()
+                info[i] = "N/A"
+                info.insert(i+1, last_step_time)
+                return True
+            else:
+                return False
+        return False
+
+    if(len(info)) != 22 or len(info) != 25:
+        if look_and_insert(10):
+            look_and_insert(18)
+        else:
+            look_and_insert(17)
+
+    return info
