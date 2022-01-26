@@ -279,6 +279,7 @@ let options print_usage parse_only =
   ; '\000', "no-assumptions", set make_partial_correctness_assumption false, None
   ; '\000', "no-gropt", set optimize_grammars 0, None
   ; '\000', "no-splitting", set split_solve_on false, None
+  ; '\000', "no-rew", set use_rewrite_solver false, None
   ; '\000', "no-lifting", set attempt_lifting false, None
   ; '\000', "no-simplify", set simplify_eqns false, None
   ; '\000', "no-syndef", set use_syntactic_definitions false, None

@@ -87,6 +87,13 @@ if __name__ == "__main__":
     # TABLE 2
     if table_no == 2:
         filenames = make_table_2(input_file, output_file)
+        if args.copy:
+            LOCAL_COPY = os.getenv('FMSD22_LOCAL_COPY')
+            if LOCAL_COPY is not None:
+                shutil.copyfile(filenames['cactus'], os.path.join(
+                    LOCAL_COPY, "figures/cactus_t3.pdf"))
+                shutil.copyfile(filenames['barchart'], os.path.join(
+                    LOCAL_COPY, "figures/barchart_t3.pdf"))
 
         if args.copy:
             LOCAL_COPY = os.getenv('FMSD22_LOCAL_COPY')

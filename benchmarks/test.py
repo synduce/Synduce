@@ -382,16 +382,16 @@ if __name__ == "__main__":
     elif table_no == 3:
 
         algos = [
-            ["se2gis", "--no-gropt"],
-            ["segis", "--segis --no-gropt"],
+            ["se2gis", ""],
+            ["segis", "--segis"],
         ]
 
         optims = [
             ["all", ""],
-            ["ini", "-c --no-gropt"],
-            ["st", "-st --no-gropt"],
-            ["d", "--no-syndef --no-gropt"],
-            ["off", "-st --no-syndef --no-gropt"]
+            ["ini", "-c"],
+            ["split", "-st"],  # equation system splitting optimizations
+            ["syn", "--no-syndef --no-gropt --no-rew"],  # syntactic optimizations
+            ["off", "-st --no-syndef --no-gropt --no-rew"]
         ]
 
     # Table 4 / Test
