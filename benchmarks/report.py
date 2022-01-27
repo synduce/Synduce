@@ -84,17 +84,9 @@ if __name__ == "__main__":
                 shutil.copyfile(filenames['scatter_no_timeouts'], os.path.join(
                     LOCAL_COPY, "figures/no_timeouts_scatter_t2.pdf"))
 
-    # TABLE 2
+    # SET 2
     if table_no == 2:
         filenames = make_table_2(input_file, output_file)
-        if args.copy:
-            LOCAL_COPY = os.getenv('FMSD22_LOCAL_COPY')
-            if LOCAL_COPY is not None:
-                shutil.copyfile(filenames['cactus'], os.path.join(
-                    LOCAL_COPY, "figures/cactus_t3.pdf"))
-                shutil.copyfile(filenames['barchart'], os.path.join(
-                    LOCAL_COPY, "figures/barchart_t3.pdf"))
-
         if args.copy:
             LOCAL_COPY = os.getenv('FMSD22_LOCAL_COPY')
             if LOCAL_COPY is not None:
@@ -104,8 +96,18 @@ if __name__ == "__main__":
                     LOCAL_COPY, "figures/scatter_t2.pdf"))
                 shutil.copyfile(filenames['scatter_no_timeouts'], os.path.join(
                     LOCAL_COPY, "figures/no_timeouts_scatter_t2.pdf"))
+    # SET 3
     if table_no == 3:
         filenames = make_table_3(input_file, output_file)
+        if args.copy:
+            LOCAL_COPY = os.getenv('FMSD22_LOCAL_COPY')
+            if LOCAL_COPY is not None:
+                shutil.copyfile(filenames['cactus'], os.path.join(
+                    LOCAL_COPY, "figures/cactus_t3.pdf"))
+                shutil.copyfile(filenames['barchart'], os.path.join(
+                    LOCAL_COPY, "figures/barchart_t3.pdf"))
+                shutil.copyfile(filenames['verif'], os.path.join(
+                    LOCAL_COPY, "figures/verif_t3.pdf"))
 
     # TABLE 5
     if table_no == 5 or table_no == 0 and input_file:

@@ -19,6 +19,8 @@ algo_linestyle = {
 
 time_threshold = 2.0
 
+non_algo_keyw = ['benchmarks', 'verif_ratios']
+
 
 def parse_line(info) -> dict:
     algos = {}
@@ -39,17 +41,18 @@ def parse_line(info) -> dict:
 
 
 def cactus_plot_table3(cactus_file, series):
-    fig, ax = plt.subplots(figsize=(8, 6))
+    plot_fontsize = 11
+    fig, ax = plt.subplots(figsize=(8, 3))
 
     for algo in series:
-        if algo != 'benchmarks':
+        if algo not in non_algo_keyw:
             for opt in series[algo]:
-                if algo == 'segis' and opt == 'init':
+                if opt == 'init':
                     pass
                 else:
                     k = sorted([x for x in series[algo]
                                [opt] if x < timeout_value])
-                    s_label = f"{algo:8s} -{opt}"
+                    s_label = f"{algo:8s} -{opt:8s} ({len(k)})"
                     linewidth = 1.0
                     ax.plot(k, label=s_label,
                             linestyle=algo_linestyle[algo],
@@ -75,7 +78,6 @@ def normalize(serie):
 
 
 def barchart_plot_table3(barchart_file, series):
-
     fig, ax = plt.subplots(figsize=(8, 4))
     indices = avg_significant(series)
     benchmarks = [series['benchmarks'][i][:8] for i in indices]
@@ -101,6 +103,20 @@ def barchart_plot_table3(barchart_file, series):
     fig.savefig(barchart_file, bbox_inches='tight')
 
 
+def verifchart_plot_table3(verifchart_file, series):
+    fig, ax = plt.subplots(figsize=(6, 4))
+    points = sorted(series['verif_ratios'], key=lambda x: x[0])
+    veriftimes = [x[1] for x in points]
+    runtimes = [x[0] for x in points]
+    x = [i+1 for i, _ in enumerate(points)]
+    ax.plot(x, veriftimes, color='red', label='Verification time')
+    ax.plot(x, runtimes, color='blue', label='Total synthesis time')
+    ax.set_xlabel("Benchmarks", fontsize=plot_fontsize)
+    ax.set_ylabel("Time", fontsize=plot_fontsize)
+    ax.legend(fontsize=plot_fontsize)
+    fig.savefig(verifchart_file, bbox_inches='tight')
+
+
 def make_table_3(input_file, output_file):
     print("============== SUMMARY - T3 ================")
     print("Summary ablation study on set of benchmarks.")
@@ -112,6 +128,7 @@ def make_table_3(input_file, output_file):
 
     series = {}
     series['benchmarks'] = []
+    series['verif_ratios'] = []
     series['segis+PB'] = {}
     series['segis'] = {}
     series['segis+PB']['all'] = []
@@ -157,6 +174,7 @@ def make_table_3(input_file, output_file):
                 for algo in algos:
                     for optchoice in algos[algo]:
                         runtime = algos[algo][optchoice]['time'] if algos[algo][optchoice] else timeout_value
+                        veriftime = algos[algo][optchoice]['verif'] if algos[algo][optchoice] else timeout_value
                         series[algo][optchoice].append(floti(runtime))
                         if floti(runtime) < fastest_time:
                             fastest_time = floti(runtime)
@@ -170,6 +188,9 @@ def make_table_3(input_file, output_file):
                             if floti(runtime) < fastest_segis_pb:
                                 fastest_segis_pb = floti(runtime)
                                 fastest_segis_pb_opt = optchoice
+                            if optchoice == 'all':
+                                series['verif_ratios'] += [
+                                    (floti(runtime), floti(veriftime))]
 
                 fast_count['overall'][benchmark] = (
                     fastest_algo, fastest_option)
@@ -185,12 +206,15 @@ def make_table_3(input_file, output_file):
     barchart_file = input_name + "_barchart.pdf"
     barchart_plot_table3(barchart_file, series)
 
+    verifchart_file = input_name + "_verif.pdf"
+    verifchart_plot_table3(verifchart_file, series)
+
     num_benchmarks = len(table)
     print(
         f"Number of benchmarks: {num_benchmarks}")
     print("Solved benchmark per option:")
     for a in series:
-        if a != 'benchmarks':
+        if a not in non_algo_keyw:
             for opt in series[a]:
                 num_solved = len(
                     [x for x in series[a][opt] if x < timeout_value])
@@ -199,8 +223,10 @@ def make_table_3(input_file, output_file):
 
     print(f"Cactus plot:\n{cactus_file}")
     print(f"Bar chart plot:\n{barchart_file}")
+    print(f"Verif times plot:\n{verifchart_file}")
 
     return {
         "cactus": cactus_file,
         "barchart": barchart_file,
+        "verif": verifchart_file
     }

@@ -388,11 +388,11 @@ if __name__ == "__main__":
 
         optims = [
             ["all", ""],
-            ["ini", "-c"],
+            #["ini", "-c"],
             # equation system splitting optimizations
             ["split", "-t --no-splitting"],
             ["syn", "--no-syndef --no-gropt --no-rew"],  # syntactic optimizations
-            ["off", "-st --no-syndef --no-gropt --no-rew --no-splitting"]
+            ["off", "-t --no-syndef --no-gropt --no-rew --no-splitting"]
         ]
 
     # Table 4 / Test

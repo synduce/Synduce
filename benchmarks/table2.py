@@ -200,6 +200,7 @@ def make_table_2(input_file, output_file):
     # Plot one quantile plot
     cactus_plot_table2(cactus_file, se2gis_series,
                        segis_series, cegis_series)
+
     # Output a tex table for  realizable benchmarks
     # make_tex_table(exp_setup, table2, tex_table)
     # Output a tex table for unrealizable benchmarks
