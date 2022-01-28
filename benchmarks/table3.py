@@ -34,7 +34,7 @@ time_threshold = 2.0
 
 non_algo_keyw = ['benchmarks', 'verif_ratios']
 
-t3_caption = f"Comparison of the {kw_tool_main_algo} and {kw_segis} algorithms on the benhcmarks for the FMSD22 journal paper."
+t3_caption = f"Comparison of the {kw_tool_main_algo} and {kw_segis} algorithms on the benhcmarks for the FMSD22 journal paper.\n"
 
 
 def parse_line(info) -> dict:
