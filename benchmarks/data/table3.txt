@@ -1,0 +1,13 @@
+Comparison of the S-CEGIS${\bf +PB}$ and Symbolic CEGIS algorithms on the benhcmarks for the FMSD22 journal paper.=== Summary ===
+Number of benchmarks: 86
+Solved benchmark per option:
+S-CEGIS${\bf +PB}$ with all   solves 86  (100.0 %).
+S-CEGIS${\bf +PB}$ with split solves 65  (75.6 %).
+S-CEGIS${\bf +PB}$ with syntx solves 78  (90.7 %).
+S-CEGIS${\bf +PB}$ with off   solves 54  (62.8 %).
+S-CEGIS    with all   solves 64  (74.4 %).
+S-CEGIS    with split solves 63  (73.3 %).
+S-CEGIS    with syntx solves 58  (67.4 %).
+S-CEGIS    with off   solves 53  (61.6 %).
+=== Table ===
+Coming soon

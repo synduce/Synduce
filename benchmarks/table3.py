@@ -34,6 +34,8 @@ time_threshold = 2.0
 
 non_algo_keyw = ['benchmarks', 'verif_ratios']
 
+t3_caption = f"Comparison of the {kw_tool_main_algo} and {kw_segis} algorithms on the benhcmarks for the FMSD22 journal paper."
+
 
 def parse_line(info) -> dict:
     algos = {}
@@ -128,6 +130,26 @@ def verifchart_plot_table3(verifchart_file, series):
     fig.savefig(verifchart_file, bbox_inches='tight')
 
 
+def make_text_table(table, series):
+    with open("benchmarks/data/table3.txt", "w") as out:
+        out.write(t3_caption)
+        out.write("=== Summary ===\n")
+        num_benchmarks = len(table)
+        out.write(
+            f"Number of benchmarks: {num_benchmarks}\n")
+        out.write("Solved benchmark per option:\n")
+        for a in series:
+            if a not in non_algo_keyw:
+                for opt in series[a]:
+                    num_solved = len(
+                        [x for x in series[a][opt] if x < timeout_value])
+                    if num_solved > 0:
+                        out.write(
+                            f"{algo_name[a] :10s} with {option_name[opt] :5s} solves {num_solved}  ({100.0 * (1.0 * num_solved / (1.0 * num_benchmarks)) :3.1f} %).\n")
+        out.write("=== Table ===\n")
+        out.write("Coming soon")
+
+
 def make_table_3(input_file, output_file):
     print("============== SUMMARY - T3 ================")
     print("Summary ablation study on set of benchmarks.")
@@ -210,6 +232,8 @@ def make_table_3(input_file, output_file):
 
                 print("%54s, fastest with %s, %s" %
                       (benchmark, fastest_algo, fastest_option))
+
+    make_text_table(table, series)
 
     cactus_file = input_name + "_cactus.pdf"
     cactus_plot_table3(cactus_file, series)
