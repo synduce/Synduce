@@ -115,6 +115,39 @@ def parse_alg_v2(info, i):
     }
 
 
+def parse_block(info, i):
+    fields = [
+        ("time", True),
+        ("last_elapsed", True),
+        ("delta", True),
+        ("rounds", False),
+        ("N", False),
+        ("B", False),
+        ("verif", True)]
+
+    try:
+        block = {}
+        m = info[i].split(":")
+        if len(m) != 2:
+            return None
+        algo = m[0]  # name of the algorithm
+        option = m[1]  # name of the option (ablation study)
+        j = 1  # Number of cells read
+        while j <= 7:
+            if len(info) > i + j:
+                if fields[j-1][1]:
+                    block[fields[j-1][0]] = floti(info[i + j])
+                else:
+                    block[fields[j-1][0]] = info[i + j]
+            else:
+                return j, algo, option, block
+            j += 1
+        return j, algo, option, block
+
+    except:
+        return 0, None, None, None
+
+
 def repair(info):
     def look_and_insert(i):
         if info[i].startswith("N/A") and info[i].strip() != "N/A":

@@ -7,14 +7,27 @@ option_color = {
     'all': 'blue',
     'init': 'cyan',
     'split': 'green',
-    'syntx': 'orange',
+    'syn': 'orange',
     'off': 'red'
 
 }
 
 algo_linestyle = {
-    'segis+PB': 'solid',
+    'se2gis': 'solid',
     'segis': 'dotted',
+}
+
+algo_name = {
+    'se2gis': kw_tool_main_algo,
+    'segis': kw_segis_short
+}
+
+option_name = {
+    'all': 'all',
+    'init': 'init',
+    'split': 'split',
+    'syn': 'syntx',
+    'off': 'off'
 }
 
 time_threshold = 2.0
@@ -24,20 +37,16 @@ non_algo_keyw = ['benchmarks', 'verif_ratios']
 
 def parse_line(info) -> dict:
     algos = {}
-    algos['segis+PB'] = {}
+    algos['se2gis'] = {}
     algos['segis'] = {}
-    algos['segis+PB']['all'] = parse_alg_v2(info, 0)
-    algos['segis+PB']['init'] = parse_alg_v2(info, 8)
-    algos['segis+PB']['split'] = parse_alg_v2(info, 16)
-    algos['segis+PB']['syntx'] = parse_alg_v2(info, 24)
-    algos['segis+PB']['off'] = parse_alg_v2(info, 32)
-    algos['segis']['all'] = parse_alg_v2(info, 40)
-    algos['segis']['init'] = parse_alg_v2(info, 48)
-    algos['segis']['split'] = parse_alg_v2(info, 56)
-    algos['segis']['syntx'] = parse_alg_v2(info, 64)
-    algos['segis']['off'] = parse_alg_v2(info, 72)
-
-    return algos
+    i = 1
+    while True:
+        num_read, algo, option, block = parse_block(info, i)
+        if block is None:
+            return algos
+        else:
+            i += num_read
+            algos[algo][option] = block
 
 
 def cactus_plot_table3(cactus_file, series):
@@ -52,7 +61,7 @@ def cactus_plot_table3(cactus_file, series):
                 else:
                     k = sorted([x for x in series[algo]
                                [opt] if x < timeout_value])
-                    s_label = f"{algo:8s} -{opt:8s} ({len(k)})"
+                    s_label = f"{algo_name[algo]:8s} -{option_name[opt]:8s} ({len(k)})"
                     linewidth = 1.0
                     ax.plot(k, label=s_label,
                             linestyle=algo_linestyle[algo],
@@ -66,9 +75,9 @@ def cactus_plot_table3(cactus_file, series):
 def avg_significant(series):
     indices = []
     for i, x in enumerate(series['benchmarks']):
-        n = series['segis+PB']['all'][i] + series['segis+PB']['off'][i]
+        n = series['se2gis']['all'][i] + series['se2gis']['off'][i]
 
-        if n > time_threshold and series['segis+PB']['all'][i] < timeout_value:
+        if n > time_threshold and series['se2gis']['all'][i] < timeout_value:
             indices += [(i, n)]
     return [x[0] for x in sorted(indices, key=(lambda x: x[1]))]
 
@@ -83,17 +92,19 @@ def barchart_plot_table3(barchart_file, series):
     benchmarks = [series['benchmarks'][i][:8] for i in indices]
     x = np.arange(len(benchmarks))  # the label locations
     width = 0.1
-    s1 = normalize([series['segis+PB']['all'][i] for i in indices])
-    s2 = normalize([series['segis+PB']['off'][i] for i in indices])
+    s1 = normalize([series['se2gis']['all'][i] for i in indices])
+    s2 = normalize([series['se2gis']['off'][i] for i in indices])
     s3 = normalize([series['segis']['all'][i] for i in indices])
     s4 = normalize([series['segis']['off'][i] for i in indices])
 
-    r1 = ax.bar(x - 1.5*width, s1, width, label='segis+PB', color='blue')
+    r1 = ax.bar(x - 1.5*width, s1, width,
+                label=algo_name['se2gis'], color='blue')
     r2 = ax.bar(x - 0.5*width, s2, width,
-                label='segis+PB -off', color='cyan')
-    r3 = ax.bar(x + 0.5*width, s3, width, label='segis', color='red')
+                label=f"{ algo_name['se2gis'] } -off", color='cyan')
+    r3 = ax.bar(x + 0.5*width, s3, width,
+                label=algo_name['segis'], color='red')
     r4 = ax.bar(x + 1.5*width, s4, width,
-                label='segis -off', color='orange')
+                label=f"{algo_name['segis']} -off", color='orange')
 
     ax.set_ylabel('Time')
     ax.set_xticks(x)
@@ -129,22 +140,22 @@ def make_table_3(input_file, output_file):
     series = {}
     series['benchmarks'] = []
     series['verif_ratios'] = []
-    series['segis+PB'] = {}
+    series['se2gis'] = {}
     series['segis'] = {}
-    series['segis+PB']['all'] = []
-    series['segis+PB']['init'] = []
-    series['segis+PB']['split'] = []
-    series['segis+PB']['syntx'] = []
-    series['segis+PB']['off'] = []
+    series['se2gis']['all'] = []
+    series['se2gis']['init'] = []
+    series['se2gis']['split'] = []
+    series['se2gis']['syn'] = []
+    series['se2gis']['off'] = []
     series['segis']['all'] = []
     series['segis']['init'] = []
     series['segis']['split'] = []
-    series['segis']['syntx'] = []
+    series['segis']['syn'] = []
     series['segis']['off'] = []
 
     fast_count = {}
     fast_count['overall'] = {}
-    fast_count['segis+PB'] = {}
+    fast_count['se2gis'] = {}
     fast_count['segis'] = {}
 
     with open(input_file, 'r') as csv:
@@ -195,7 +206,7 @@ def make_table_3(input_file, output_file):
                 fast_count['overall'][benchmark] = (
                     fastest_algo, fastest_option)
                 fast_count['segis'][benchmark] = fastest_segis_opt
-                fast_count['segis+PB'][benchmark] = fastest_segis_pb_opt
+                fast_count['se2gis'][benchmark] = fastest_segis_pb_opt
 
                 print("%54s, fastest with %s, %s" %
                       (benchmark, fastest_algo, fastest_option))
