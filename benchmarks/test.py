@@ -143,6 +143,8 @@ def run_benchmarks(input_files, algos, optims, num_runs=1, csv_output=None, exit
     errors = []
     start = time.time()
     prev_bench_cat = "x"
+    if csv_output:
+        csv_output.write(f"TIMEOUT:{timeout_value}\n")
     for filename_with_opt in input_files:
         filename = filename_with_opt[0]
         category = os.path.dirname(filename)

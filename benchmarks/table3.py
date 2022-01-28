@@ -51,7 +51,7 @@ def parse_line(info) -> dict:
             algos[algo][option] = block
 
 
-def cactus_plot_table3(cactus_file, series):
+def cactus_plot_table3(cactus_file, series, exp_params):
     plot_fontsize = 11
     fig, ax = plt.subplots(figsize=(8, 3))
 
@@ -62,7 +62,7 @@ def cactus_plot_table3(cactus_file, series):
                     pass
                 else:
                     k = sorted([x for x in series[algo]
-                               [opt] if x < timeout_value])
+                               [opt] if x < exp_params["timeout"]])
                     s_label = f"{algo_name[algo]:8s} -{option_name[opt]:8s} ({len(k)})"
                     linewidth = 1.0
                     ax.plot(k, label=s_label,
@@ -74,30 +74,30 @@ def cactus_plot_table3(cactus_file, series):
     fig.savefig(cactus_file, bbox_inches='tight')
 
 
-def avg_significant(series):
+def avg_significant(series, exp_params):
     indices = []
     for i, x in enumerate(series['benchmarks']):
         n = series['se2gis']['all'][i] + series['se2gis']['off'][i]
-
-        if n > time_threshold and series['se2gis']['all'][i] < timeout_value:
+        if n > time_threshold and series['se2gis']['all'][i] < exp_params["timeout"]:
             indices += [(i, n)]
     return [x[0] for x in sorted(indices, key=(lambda x: x[1]))]
 
 
-def normalize(serie):
-    return [x if x < timeout_value else 0 for x in serie]
+def normalize(serie, exp_params):
+    local_timeout_value = exp_params["timeout"]
+    return [x if x < local_timeout_value else 0 for x in serie]
 
 
-def barchart_plot_table3(barchart_file, series):
+def barchart_plot_table3(barchart_file, series, exp_params):
     fig, ax = plt.subplots(figsize=(8, 4))
-    indices = avg_significant(series)
+    indices = avg_significant(series, exp_params)
     benchmarks = [series['benchmarks'][i][:8] for i in indices]
     x = np.arange(len(benchmarks))  # the label locations
     width = 0.1
-    s1 = normalize([series['se2gis']['all'][i] for i in indices])
-    s2 = normalize([series['se2gis']['off'][i] for i in indices])
-    s3 = normalize([series['segis']['all'][i] for i in indices])
-    s4 = normalize([series['segis']['off'][i] for i in indices])
+    s1 = normalize([series['se2gis']['all'][i] for i in indices], exp_params)
+    s2 = normalize([series['se2gis']['off'][i] for i in indices], exp_params)
+    s3 = normalize([series['segis']['all'][i] for i in indices], exp_params)
+    s4 = normalize([series['segis']['off'][i] for i in indices], exp_params)
 
     r1 = ax.bar(x - 1.5*width, s1, width,
                 label=algo_name['se2gis'], color='blue')
@@ -116,7 +116,7 @@ def barchart_plot_table3(barchart_file, series):
     fig.savefig(barchart_file, bbox_inches='tight')
 
 
-def verifchart_plot_table3(verifchart_file, series):
+def verifchart_plot_table3(verifchart_file, series, exp_params):
     fig, ax = plt.subplots(figsize=(6, 4))
     points = sorted(series['verif_ratios'], key=lambda x: x[0])
     veriftimes = [x[1] for x in points]
@@ -130,7 +130,7 @@ def verifchart_plot_table3(verifchart_file, series):
     fig.savefig(verifchart_file, bbox_inches='tight')
 
 
-def make_text_table(table, series):
+def make_text_table(table, series, exp_params):
     with open("benchmarks/data/table3.txt", "w") as out:
         out.write(t3_caption)
         out.write("=== Summary ===\n")
@@ -142,10 +142,10 @@ def make_text_table(table, series):
             if a not in non_algo_keyw:
                 for opt in series[a]:
                     num_solved = len(
-                        [x for x in series[a][opt] if x < timeout_value])
+                        [x for x in series[a][opt] if x < exp_params["timeout"]])
                     if num_solved > 0:
                         out.write(
-                            f"{algo_name[a] :10s} with {option_name[opt] :5s} solves {num_solved}  ({100.0 * (1.0 * num_solved / (1.0 * num_benchmarks)) :3.1f} %).\n")
+                            f"{algo_name[a] :10s} with {option_name[opt] :5s} solves {num_solved:4d}  ({100.0 * (1.0 * num_solved / (1.0 * num_benchmarks)) :3.1f} %).\n")
         out.write("=== Table ===\n")
         out.write("Coming soon")
 
@@ -180,10 +180,16 @@ def make_table_3(input_file, output_file):
     fast_count['se2gis'] = {}
     fast_count['segis'] = {}
 
+    exp_params = {
+        "timeout": timeout_value}
+
     with open(input_file, 'r') as csv:
         for line in csv.readlines():
             if line.startswith("SETUP:"):
                 exp_setup = line[5:]
+                continue
+            if line.startswith("TIMEOUT:"):
+                exp_params["timeout"] = int(line.split(":")[1].strip())
                 continue
             info = [b.strip() for b in line.split(",")]
             if len(info) >= 15:
@@ -195,8 +201,7 @@ def make_table_3(input_file, output_file):
                     print(f"Error in benchmark {benchmark}")
                     algos = None
                 table[benchmark] = algos
-
-                fastest_time = timeout_value
+                fastest_time = exp_params["timeout"]
                 fastest_algo = 'none'
                 fastest_option = 'all'
                 fastest_segis = 0
@@ -206,24 +211,29 @@ def make_table_3(input_file, output_file):
                 series['benchmarks'] += [benchmark]
                 for algo in algos:
                     for optchoice in algos[algo]:
-                        runtime = algos[algo][optchoice]['time'] if algos[algo][optchoice] else timeout_value
-                        veriftime = algos[algo][optchoice]['verif'] if algos[algo][optchoice] else timeout_value
-                        series[algo][optchoice].append(floti(runtime))
-                        if floti(runtime) < fastest_time:
-                            fastest_time = floti(runtime)
+                        runtime = algos[algo][optchoice]['time'] if algos[algo][optchoice] else exp_params["timeout"]
+                        veriftime = algos[algo][optchoice]['verif'] if algos[algo][optchoice] else exp_params["timeout"]
+
+                        rt = floti(runtime, timeout=exp_params["timeout"])
+
+                        series[algo][optchoice].append(rt)
+
+                        if rt < fastest_time:
+                            fastest_time = rt
                             fastest_algo = algo
                             fastest_option = optchoice
+
                         if algo == 'segis':
-                            if floti(runtime) < fastest_segis:
-                                fastest_segis = floti(runtime)
+                            if rt < fastest_segis:
+                                fastest_segis = rt
                                 fastest_segis_opt = optchoice
                         else:
-                            if floti(runtime) < fastest_segis_pb:
-                                fastest_segis_pb = floti(runtime)
+                            if rt < fastest_segis_pb:
+                                fastest_segis_pb = rt
                                 fastest_segis_pb_opt = optchoice
                             if optchoice == 'all':
                                 series['verif_ratios'] += [
-                                    (floti(runtime), floti(veriftime))]
+                                    (rt, floti(veriftime, timeout=exp_params["timeout"]))]
 
                 fast_count['overall'][benchmark] = (
                     fastest_algo, fastest_option)
@@ -233,16 +243,16 @@ def make_table_3(input_file, output_file):
                 print("%54s, fastest with %s, %s" %
                       (benchmark, fastest_algo, fastest_option))
 
-    make_text_table(table, series)
+    make_text_table(table, series, exp_params)
 
     cactus_file = input_name + "_cactus.pdf"
-    cactus_plot_table3(cactus_file, series)
+    cactus_plot_table3(cactus_file, series, exp_params)
 
     barchart_file = input_name + "_barchart.pdf"
-    barchart_plot_table3(barchart_file, series)
+    barchart_plot_table3(barchart_file, series, exp_params)
 
     verifchart_file = input_name + "_verif.pdf"
-    verifchart_plot_table3(verifchart_file, series)
+    verifchart_plot_table3(verifchart_file, series, exp_params)
 
     num_benchmarks = len(table)
     print(
@@ -252,9 +262,9 @@ def make_table_3(input_file, output_file):
         if a not in non_algo_keyw:
             for opt in series[a]:
                 num_solved = len(
-                    [x for x in series[a][opt] if x < timeout_value])
+                    [x for x in series[a][opt] if x < exp_params["timeout"]])
                 print(
-                    f"{a :10s} with {opt :5s} solves {num_solved}  ({100.0 * (1.0 * num_solved / (1.0 * num_benchmarks)) :3.1f} %).")
+                    f"{a :10s} with {opt :5s} solves {num_solved:4d}  ({100.0 * (1.0 * num_solved / (1.0 * num_benchmarks)) :3.1f} %).")
 
     print(f"Cactus plot:\n{cactus_file}")
     print(f"Bar chart plot:\n{barchart_file}")

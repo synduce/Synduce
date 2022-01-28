@@ -124,6 +124,8 @@ def make_table_2(input_file, output_file):
     scatter_no_timeouts_file = input_name + "_no_timeouts_scatter.pdf"
     tex_table = input_name + "_table.tex"
 
+    exp_timeout = timeout_value
+
     unrealizable_benchmarks = 0
 
     table2 = {}
@@ -139,6 +141,9 @@ def make_table_2(input_file, output_file):
         for line in csv.readlines():
             if line.startswith("SETUP:"):
                 exp_setup = line[5:]
+                continue
+            if line.startswith("TIMEOUT:"):
+                exp_timeout = int(line[8:])
                 continue
             info = line.split(",")
             if len(info) >= 15:
