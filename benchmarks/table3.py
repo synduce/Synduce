@@ -3,6 +3,10 @@ from definitions import *
 import matplotlib.pyplot as plt
 import numpy as np
 
+show_options = ['all', 'split', 'syn', 'off']
+show_algos = ['se2gis', 'segis']
+
+
 option_color = {
     'all': 'blue',
     'init': 'cyan',
@@ -34,7 +38,9 @@ time_threshold = 2.0
 
 non_algo_keyw = ['benchmarks', 'verif_ratios']
 
-t3_caption = f"Comparison of the {kw_tool_main_algo} and {kw_segis} algorithms on the benhcmarks for the FMSD22 journal paper.\n"
+
+def t3_caption(timeout_value):
+    return f"Comparison of the {kw_tool_main_algo} and {kw_segis} algorithms on the benchmarks for the FMSD22 journal paper.\n"
 
 
 def parse_line(info) -> dict:
@@ -131,8 +137,23 @@ def verifchart_plot_table3(verifchart_file, series, exp_params):
 
 
 def make_text_table(table, series, exp_params):
+    def table_line(out, bench_name, algos):
+        timings = ""
+        for algo in algos:
+            for option in show_options:
+                time = floti(algos[algo][option]['time'])
+                if time == exp_params["timeout"]:
+                    time_str = "-"
+                else:
+                    time_str = f"{time:3.2f}"
+                timings += f"{time_str:7s}"
+        out.write(f"{bench_name:35s}{timings}\n")
+
+    def sep(out):
+        out.write(f"{dash:-<90s}\n")
+
     with open("benchmarks/data/table3.txt", "w") as out:
-        out.write(t3_caption)
+        out.write(t3_caption(exp_params["timeout"]))
         out.write("=== Summary ===\n")
         num_benchmarks = len(table)
         out.write(
@@ -144,10 +165,32 @@ def make_text_table(table, series, exp_params):
                     num_solved = len(
                         [x for x in series[a][opt] if x < exp_params["timeout"]])
                     if num_solved > 0:
+                        compl = 100.0 * (1.0 * num_solved /
+                                         (1.0 * num_benchmarks))
+                        compl_str = f"{compl:3.1f}"
                         out.write(
-                            f"{algo_name[a] :10s} with {option_name[opt] :5s} solves {num_solved:4d}  ({100.0 * (1.0 * num_solved / (1.0 * num_benchmarks)) :3.1f} %).\n")
+                            f"{algo_name[a] :10s} with {option_name[opt] :5s} solves {num_solved:4d}  ({compl_str:5s} %).\n")
         out.write("=== Table ===\n")
-        out.write("Coming soon")
+        # === Write the algorihms header
+        headers = ""
+        empty_header = ""
+        for algo in show_algos:
+            headers += f"{algo_name[algo]:7s}"
+            for option in show_options[1:]:
+                headers += f"{empty_header:7s}"
+        # === Write the options header
+        out.write(f"{empty_header:35s}{headers}\n")
+        sep(out)
+        headers = ""
+        benchmark_header = "Benchmark Name"
+        for algo in show_algos:
+            for option in show_options:
+                headers += f"{option_name[option]:7s}"
+        out.write(f"{benchmark_header:35s}{headers}\n")
+        sep(out)
+        # === Write the benchmark running times for each option
+        for bench in table:
+            table_line(out, bench, table[bench])
 
 
 def make_table_3(input_file, output_file):
@@ -263,8 +306,11 @@ def make_table_3(input_file, output_file):
             for opt in series[a]:
                 num_solved = len(
                     [x for x in series[a][opt] if x < exp_params["timeout"]])
+                completion = 100.0 * \
+                    (1.0 * num_solved / (1.0 * num_benchmarks))
+                complm = f"{completion:3.1f}"
                 print(
-                    f"{a :10s} with {opt :5s} solves {num_solved:4d}  ({100.0 * (1.0 * num_solved / (1.0 * num_benchmarks)) :3.1f} %).")
+                    f"{a :10s} with {opt :5s} solves {num_solved:4d}  ({complm:5s} %) {compl_bar(completion)}.")
 
     print(f"Cactus plot:\n{cactus_file}")
     print(f"Bar chart plot:\n{barchart_file}")

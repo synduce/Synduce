@@ -1,3 +1,4 @@
+from math import floor
 from definitions import *
 
 
@@ -41,6 +42,17 @@ def roundcount(s):
     else:
         s = s[:-1]
     return str(len(s))
+
+
+def compl_bar(percentage, width=20):
+    threshold = percentage * width / 100.0
+    s = "["
+    for i in range(width):
+        if i < threshold:
+            s += "="
+        else:
+            s += " "
+    return s + "]"
 
 
 def empty_exp_data(info, realizable=True):
