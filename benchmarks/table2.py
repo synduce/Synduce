@@ -3,6 +3,41 @@ from definitions import *
 import matplotlib.pyplot as plt
 
 
+show_algos = ['se2gis', 'segis', 'cegis']
+
+option_color = {
+    'all': 'blue',
+    'init': 'cyan',
+    'split': 'green',
+    'syn': 'orange',
+    'off': 'red'
+
+}
+
+algo_linestyle = {
+    'se2gis': 'solid',
+    'segis': 'dotted',
+}
+
+algo_name = {
+    'se2gis': kw_tool_main_algo,
+    'segis': kw_segis_short,
+    'cegis': kw_cegis_short,
+}
+
+option_name = {
+    'all': 'all',
+    'init': 'init',
+    'split': 'split',
+    'syn': 'syntx',
+    'off': 'off'
+}
+
+
+def t2_caption(timeout_value):
+    return f"Comparison of the {kw_tool_main_algo},{kw_segis} and {kw_cegis} algorithms on the benchmarks for the FMSD22 journal paper.\n"
+
+
 def cactus_plot_table2(cactus_file, se2gis_series, segis_series, cegis_series):
     fig, ax = plt.subplots(figsize=(6, 4))
     s1 = [x for x in sorted(
@@ -77,6 +112,49 @@ def save_scatter_plot_table2(scatter_file, se2gis_series, segis_series, timeouts
         fig.savefig(scatter_file, bbox_inches='tight')
 
 
+def make_text_table(table2, exp_params, series, timeouts):
+    def table_line(out, bench_name, algos):
+        timings = ""
+        for algo in algos:
+            time = floti(algos[algo]['time'])
+            if time == exp_params["timeout"]:
+                time_str = "-"
+            else:
+                time_str = f"{time:3.2f}"
+            timings += f"{time_str:10s}"
+        out.write(f"{bench_name:35s}{timings}\n")
+
+    def sep(out):
+        out.write(f"{dash:-<90s}\n")
+
+    with open("benchmarks/data/table_baselines_comparison.txt", "w") as out:
+        out.write(t2_caption(exp_params["timeout"]))
+        out.write("=== Summary ===\n")
+        out.write(
+            f"Number of benchmarks: {len(series['segis'])}\n")
+        out.write(
+            f"{kw_segis_short} solves {len([x for x in series['segis'] if x < timeout_value])}\n")
+        out.write(
+            f"{kw_cegis_short} solves {len([x for x in series['cegis'] if x < timeout_value])}\n")
+        out.write(
+            f"{kw_tool_main_algo} solves {len([x for x in series['se2gis'] if x < timeout_value])}\n")
+        out.write(
+            f"{timeouts['cegis']} timeouts for {kw_cegis_short}, {timeouts['segis']} timeouts for {kw_segis_short}, {timeouts['se2gis']} timeouts for {kw_tool_main_algo}.\n")
+        out.write(
+            f"{kw_tool_main_algo} is faster on {timeouts['speedups']} benchmarks.\n")
+        num_benchmarks = len(table2)
+        out.write("=== Table ===\n")
+        # === Write the algorihms header
+        headers = ""
+        empty_header = ""
+        for algo in show_algos:
+            headers += f"{algo_name[algo]:10s}"
+        out.write(f"{empty_header:35s}{headers}\n")
+        sep(out)
+        # === Write the benchmark running times for each option
+        for bench in table2:
+            table_line(out, bench, table2[bench])
+
 # "TABLE 2" with three different algorithms
 
 
@@ -124,7 +202,8 @@ def make_table_2(input_file, output_file):
     scatter_no_timeouts_file = input_name + "_no_timeouts_scatter.pdf"
     tex_table = input_name + "_table.tex"
 
-    exp_timeout = timeout_value
+    exp_params = {}
+    exp_params['timeout'] = timeout_value
 
     unrealizable_benchmarks = 0
 
@@ -140,26 +219,30 @@ def make_table_2(input_file, output_file):
     with open(input_file, 'r') as csv:
         for line in csv.readlines():
             if line.startswith("SETUP:"):
-                exp_setup = line[5:]
+                exp_params['setup'] = line[5:]
                 continue
             if line.startswith("TIMEOUT:"):
-                exp_timeout = int(line[8:])
+                exp_params['timeout'] = int(line[8:])
                 continue
             info = line.split(",")
             if len(info) >= 15:
                 benchmark = info[0].split(".")[0]
                 info = repair(info)
+                table2[benchmark] = {}
+
                 # Line of length 22 for older results
                 if len(info) == 22:
                     se2gis_result, segis_result, cegis_result = parse_line_v1(
                         info)
-                    table2[benchmark] = (
-                        se2gis_result, segis_result, cegis_result)
+                    table2[benchmark]['se2gis'] = se2gis_result
+                    table2[benchmark]['segis'] = segis_result
+                    table2[benchmark]['cegis'] = cegis_result
                 elif len(info) == 25:
                     se2gis_result, segis_result, cegis_result = parse_line_v2(
                         info)
-                    table2[benchmark] = (
-                        se2gis_result, segis_result, cegis_result)
+                    table2[benchmark]['se2gis'] = se2gis_result
+                    table2[benchmark]['segis'] = segis_result
+                    table2[benchmark]['cegis'] = cegis_result
 
                 if len(info) > 15:
                     a = se2gis_result['time']
@@ -210,6 +293,11 @@ def make_table_2(input_file, output_file):
     # make_tex_table(exp_setup, table2, tex_table)
     # Output a tex table for unrealizable benchmarks
     # make_tex_unrealizables_table(exp_setup, table2, tex_table2)
+    series = {'cegis': cegis_series,
+              'segis': segis_series, 'se2gis': se2gis_series}
+    timeouts = {'cegis': cegis_timeouts,
+                'segis': segis_timeouts, 'se2gis': se2gis_timeouts, 'speedups': speedups}
+    make_text_table(table2, exp_params, series, timeouts)
 
     print(
         f"Number of benchmarks: {len(segis_series)}")

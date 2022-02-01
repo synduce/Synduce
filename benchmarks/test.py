@@ -147,8 +147,6 @@ def run_benchmarks(input_files, algos, optims, num_runs=1, csv_output=None, exit
     if csv_output:
         # Write the current timeout value in the csv file
         csv_output.write(f"TIMEOUT:{timeout_value}\n")
-        # Write the system configuration in the csv file
-        uname = sys.platform.system()
 
     for filename_with_opt in input_files:
         filename = filename_with_opt[0]
