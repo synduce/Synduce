@@ -204,6 +204,7 @@ module Expression = struct
     | ETrue
     | EFalse
     | EInt of int
+    | EChar of char
     | EVar of int
     | EBox of boxkind
     | ETup of t list
@@ -234,6 +235,7 @@ module Expression = struct
       | ETrue -> pf f "#t"
       | EFalse -> pf f "#f"
       | EInt i -> pf f "%i" i
+      | EChar c -> pf f "%c" c
       | EVar i -> pp_ivar f i
       | EBox kind ->
         (match kind with
@@ -279,6 +281,7 @@ module Expression = struct
   let mk_e_true = ETrue
   let mk_e_false = EFalse
   let mk_e_int i = EInt i
+  let mk_e_char i = EChar i
   let mk_e_bool b = if b then mk_e_true else mk_e_false
   let mk_e_var id = EVar id
   let mk_e_tup tl = ETup tl
@@ -331,7 +334,7 @@ module Expression = struct
       | Some c -> c
       | None ->
         (match e with
-        | ETrue | EFalse | EInt _ | EVar _ | EBox _ -> init
+        | ETrue | EFalse | EChar _ | EInt _ | EVar _ | EBox _ -> init
         | EIte (a, b, c) -> join (aux a) (join (aux b) (aux c))
         | ESel (t, _) -> aux t
         | EOp (_, tl) | EData (_, tl) | ETup tl ->
@@ -346,7 +349,7 @@ module Expression = struct
       | Some c -> c
       | None ->
         (match e with
-        | ETrue | EFalse | EInt _ | EVar _ | EBox _ -> e
+        | ETrue | EFalse | EChar _ | EInt _ | EVar _ | EBox _ -> e
         | EIte (a, b, c) -> mk_e_ite (aux a) (aux b) (aux c)
         | EOp (op, tl) -> mk_e_assoc op (List.map ~f:aux tl)
         | ESel (t, i) -> mk_e_sel (aux t) i
@@ -435,6 +438,7 @@ module Expression = struct
         Constant.(
           (match c with
           | CInt i -> mk_e_int i
+          | CChar c -> mk_e_char c
           | CTrue -> mk_e_true
           | CFalse -> mk_e_false))
       | TVar v ->
@@ -482,6 +486,7 @@ module Expression = struct
       | ETrue -> Some (Terms.bool true)
       | EFalse -> Some (Terms.bool false)
       | EInt i -> Some (Terms.int i)
+      | EChar c -> Some (Terms.char c)
       | EVar i ->
         let%map v = get_var i in
         mk_var v
@@ -846,6 +851,7 @@ module Skeleton = struct
 
   let rec of_expression : Expression.t -> t option = function
     | EInt _ -> Some (SType RType.TInt)
+    | EChar _ -> Some (SType RType.TChar)
     | EFalse | ETrue -> Some (SType RType.TBool)
     | EVar v ->
       Option.(Expression.get_var v >>= Variable.vtype >>= fun t -> Some (SType t))

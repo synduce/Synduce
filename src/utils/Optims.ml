@@ -19,6 +19,13 @@ let detupling_on = ref true
 let use_syntactic_definitions = ref true
 
 (**
+  Rewrite sovler: find solutions by rewriting expressions and isolate possible
+  solutions for the functions.
+  Turn off with --no-rew
+ *)
+let use_rewrite_solver = ref true
+
+(**
   Partial correctenss asumptions: don't throw away partial solutions
   Turn off with --no-assumptions
  *)

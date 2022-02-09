@@ -51,6 +51,7 @@ def run_one(progress, bench_id, command, algo, optim, filename, extra_opt, expec
 def run_n(progress, bench_id, command, filename, realizable=True, expect_many=False, algo="se2gis",
           optim="", extra_opt="", errors=[], num_runs=1, csv_output=None):
     total_elapsed = 0.0
+    total_last_step_elapsed = 0.0
     verif_elapsed = 0.0
     max_e = 0
     min_e = timeout_value
@@ -73,7 +74,10 @@ def run_n(progress, bench_id, command, filename, realizable=True, expect_many=Fa
             info = MultiDataObj({})
             info.is_successful = False
 
-        if info.is_successful and ((realizable and not info.is_unrealizable) or (not realizable and info.is_unrealizable)):
+        if (info is not None and
+            info.is_successful and
+            ((realizable and not info.is_unrealizable) or
+                (not realizable and info.is_unrealizable))):
             total_elapsed += info.elapsed
             verif_elapsed += info.verif_elapsed
             max_e = max(info.elapsed, max_e)
@@ -92,7 +96,7 @@ def run_n(progress, bench_id, command, filename, realizable=True, expect_many=Fa
     sp = " "
     csvline = "?,?,?,?,?,?"
 
-    if info.is_successful and ((realizable and not info.is_unrealizable) or (not realizable and info.is_unrealizable)):
+    if info is not None and info.is_successful and ((realizable and not info.is_unrealizable) or (not realizable and info.is_unrealizable)):
         delta_str = f"{delta : .0f}ms"
         if (float(delta) / (1000.0 * elapsed)) > 0.05:
             delta_str = f"{delta_str} !"
@@ -125,10 +129,14 @@ def run_n(progress, bench_id, command, filename, realizable=True, expect_many=Fa
 
         msg = f"{progress : >11s} ✅ {current_algo: <6s} : {bench_name : <33s} ×{num_runs} runs, {str(timing): <30s} {induction_info} | R: {refinement_rounds} {sp : <20s} "
         print(msg)
-        csvline = f"{elapsed: 4.3f},{delta : .0f},{refinement_rounds},{c_by_induction},{p_by_induction},{verif_elapsed}"
+        csvline = f"{elapsed: 4.3f}, N/A, {delta : .0f},{refinement_rounds},{c_by_induction},{p_by_induction},{verif_elapsed : 4.3f}"
     else:
+        errors += [bench_id]
         print(f"{progress: >11s} ❌ {bench_id : <90s}")
-        csvline = f"N/A,N/A,f{info.major_step_count},N/A,N/A,N/A"
+        if info is not None:
+            csvline = f"N/A,N/A,N/A,f{info.major_step_count},N/A,N/A,{info.verif_elapsed : 4.3f}"
+        else:
+            csvline = f"N/A,N/A,N/A,N/A,N/A,N/A,N/A"
 
     sys.stdout.flush()
 
@@ -380,8 +388,8 @@ if __name__ == "__main__":
     if table_no == 1:
 
         algos = [
-            ["se2gis", "--no-gropt"],
-            ["segis", "--segis --no-gropt"]
+            ["se2gis", ""],
+            ["segis", "--segis"]
         ]
         optims = [["all", ""]]
 
@@ -389,9 +397,9 @@ if __name__ == "__main__":
     elif table_no == 2:
 
         algos = [
-            ["se2gis", "--no-gropt"],
-            ["segis", "--segis --no-gropt"],
-            ["cegis", "--cegis --no-gropt"]
+            ["se2gis", ""],
+            ["segis", "--segis"],
+            ["cegis", "--cegis"]
         ]
         optims = [["all", ""]]
 
@@ -399,16 +407,17 @@ if __name__ == "__main__":
     elif table_no == 3:
 
         algos = [
-            ["se2gis", "--no-gropt"],
-            ["segis", "--segis --no-gropt"],
+            ["se2gis", ""],
+            ["segis", "--segis"],
         ]
 
         optims = [
             ["all", ""],
-            ["ini", "-c --no-gropt"],
-            ["st", "-st --no-gropt"],
-            ["d", "--no-syndef --no-gropt"],
-            ["off", "-st --no-syndef --no-gropt"]
+            #["ini", "-c"],
+            # equation system splitting optimizations
+            ["split", "-t --no-splitting"],
+            ["syn", "--no-syndef --no-gropt --no-rew"],  # syntactic optimizations
+            ["off", "-t --no-syndef --no-gropt --no-rew --no-splitting"]
         ]
 
     # Table 4 / Test
@@ -442,9 +451,9 @@ if __name__ == "__main__":
 
     else:
         if table_no == 2:
-            input_files = reduced_benchmark_set_table2
+            input_files = base_benchmark_set
         elif table_no == 3:
-            input_files = reduced_benchmark_set_table3
+            input_files = base_benchmark_set
         elif table_no == 4:
             input_files = constraint_benchmarks
         elif table_no == 5:

@@ -245,6 +245,7 @@ let smtPattern_of_pattern (p : pattern) =
 let term_of_const (c : Constant.t) : smtTerm =
   match c with
   | Constant.CInt i -> SmtTSpecConst (SCNumeral i)
+  | Constant.CChar c -> SmtTSpecConst (SCString (String.of_char c))
   | Constant.CTrue -> mk_true
   | Constant.CFalse -> mk_false
 ;;

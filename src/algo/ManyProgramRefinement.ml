@@ -32,7 +32,6 @@ let find_and_solve_problem
     then [ top_userdef_problem ]
     else PEnum.enumerate_p top_userdef_problem
   in
-  Fmt.(pf stdout "%i potential sketches." (List.length problems));
   let rec f (i, sols, fails) l =
     if List.length sols >= max 1 !Config.Optims.max_solutions
     then sols, fails

@@ -2,10 +2,11 @@
 import sys
 
 # Timeout for all experiments.
-timeout_value = 400
+timeout_value = 360
 timestamp_definition = "%d-%m-%y-%H:%M:%S"
 experimental_setup = "a machine with an AMD® Ryzen 7 3700x 8-core processor and 32GB Ram running Ubuntu 20.04"
 experimental_setup_2 = "a laptop with an Intel Core i7-8750H 6-core processor and 32GB Ram running Ubuntu 21.04"
+experimental_setup_3 = "a machine with an Intel(R) Xeon(R) CPU E5-2620 16-core processor @ 2.10GHz and 32GB Ram running Ubuntu 21.04"
 sp = " "
 dash = "-"
 kw_class = "... Class"
@@ -15,11 +16,17 @@ kw_steps = "#st"
 kw_tlast = "Tlast"
 kw_ver = "ver.%"
 kw_toolname = "Synduce"
+kw_tool_main_algo = "S-CEGIS${\\bf +PB}$"
+kw_tool_main_algo_v2 = "SE²GIS"
 kw_baseline = "Baseline"
 kw_segis = "Symbolic CEGIS"
+kw_segis_short = "S-CEGIS"
 kw_cegis = "Concrete CEGIS"
+kw_cegis_short = "C-CEGIS"
+kw_segis_uc = "Symbolic CEGIS with UC"
+kw_segis_uc_short = "SEGIS+UC"
 kw_path = "Path"
-plot_fontsize = 11
+plot_fontsize = 13
 
 if sys.platform.startswith('linux'):
     timeout = ("timeout %i" %
