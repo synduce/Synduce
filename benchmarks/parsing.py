@@ -65,6 +65,31 @@ def all_proved_by_induction(data: dict):
     return cex_classif_flag, lemma_proof_flag
 
 
+def get_last_step_elapsed(data: dict):
+    last_step_time = 0.0
+    progress_data = data.get("progress")
+    if progress_data:
+        for step in progress_data.values():
+            start_time = step.get("start_info").get("start_time")
+            if start_time:
+                last_step_time = float(start_time)
+
+    else:
+        refinement_steps = data.get("refinement-steps")
+        if refinement_steps:
+            for step in refinement_steps.values():
+                start_time = step.get("start_info").get("start_time")
+                if start_time:
+                    last_step_time = float(start_time)
+
+    return last_step_time
+
+
+def get_verif_elapsed(data: dict):
+    verif_elapsed = data.get("verif_elapsed")
+    return verif_elapsed
+
+
 class DataObj:
     def __init__(self, data):
         self.data = data
@@ -72,7 +97,8 @@ class DataObj:
         self.minor_step_count = get_minor_step_count(data)
         self.major_step_count = get_major_step_count(data)
         self.elapsed = data.get("total_elapsed")
-        self.verif_elapsed = data.get("verif_elapsed")
+        self.last_elapsed = get_last_step_elapsed(data)
+        self.verif_elapsed = get_verif_elapsed(data)
         self.is_successful = is_successful(data)
         self.is_unrealizable = is_unrealizable(data)
         cex_classif_flag, lemma_proof_flag = all_proved_by_induction(data)

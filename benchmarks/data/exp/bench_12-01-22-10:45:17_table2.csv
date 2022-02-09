@@ -1,0 +1,112 @@
+% Machine:
+% Architecture:                    x86_64
+% CPU op-mode(s):                  32-bit, 64-bit
+% Byte Order:                      Little Endian
+% Address sizes:                   43 bits physical, 48 bits virtual
+% CPU(s):                          16
+% On-line CPU(s) list:             0-15
+% Thread(s) per core:              2
+% Core(s) per socket:              8
+% Socket(s):                       1
+% NUMA node(s):                    1
+% Vendor ID:                       AuthenticAMD
+% CPU family:                      23
+% Model:                           113
+% Model name:                      AMD Ryzen 7 3700X 8-Core Processor
+% Stepping:                        0
+% Frequency boost:                 enabled
+% CPU MHz:                         2800.000
+% CPU max MHz:                     4672.0698
+% CPU min MHz:                     2200.0000
+% BogoMIPS:                        7585.96
+% Virtualization:                  AMD-V
+% L1d cache:                       256 KiB
+% L1i cache:                       256 KiB
+% L2 cache:                        4 MiB
+% L3 cache:                        32 MiB
+combine/mts.pmrs,se2gis:all, 0.064,  0.011,  0,++✓,✓,✓, 0.023,segis:all,N/A,  0.028,N/A,f3,N/A,N/A, 0.018,cegis:all,N/A,  62.243,N/A,f8,N/A,N/A, 0.066
+combine/mts_and_mps.pmrs,se2gis:all, 0.444,  0.191,  0,+++✓,✓,✓, 0.067,segis:all,N/A,  0.034,N/A,f3,N/A,N/A, 0.019,cegis:all,N/A,  240.350,N/A,f8,N/A,N/A, 0.069
+combine/mss_with_sum.ml,se2gis:all, 0.654,  0.030,  0,++✓,✓,✓, 0.061,segis:all,N/A,  0.053,N/A,f3,N/A,N/A, 0.021,cegis:all,N/A,  30.196,N/A,f7,N/A,N/A, 0.058
+compressed_list/sum.ml,se2gis:all, 0.170,  0.142,  0,+++✓,✓,✓, 0.021,segis:all,N/A,  0.378,N/A,f5,N/A,N/A, 0.040,cegis:all, 1.225,  1.184,  0,+++++++++++++++++++++✓,✓,✓, 0.342
+expressions/norm_arith.ml,se2gis:all, 0.007,  0.000,  0,+✓,✓,✓, 0.007,segis:all, 0.028,  0.014,  0,++✓,✓,✓, 0.023,cegis:all, 0.108,  0.067,  0,++++✓,✓,✓, 0.040
+expressions/max_subexpr_sum.ml,se2gis:all, 0.009,  0.002,  0,+✓,✓,✓, 0.007,segis:all,N/A,  0.079,N/A,f4,N/A,N/A, 0.044,cegis:all,N/A,  0.898,N/A,f6,N/A,N/A, 0.099
+indexed_list/search.ml,se2gis:all, 0.037,  0.009,  0,++✓,✓,✓, 0.017,segis:all, 0.133,  0.025,  0,+++✓,✓,✓, 0.028,cegis:all, 0.053,  0.025,  0,+++✓,✓,✓, 0.029
+indexed_list/position_polynomial.ml,se2gis:all, 0.062,  0.035,  0,+++✓,✓,✓, 0.022,segis:all, 0.500,  0.481,  0,++++✓,✓,✓, 0.038,cegis:all,N/A,  2.929,N/A,f7,N/A,N/A, 0.056
+indexed_list/sum_elts_lt_pos.ml,se2gis:all, 0.740,  0.009,  0,++✓,✓,✓, 0.018,segis:all, 0.297,  0.025,  0,+++✓,✓,✓, 0.028,cegis:all, 1.123,  0.397,  0,+++++✓,✓,✓, 0.048
+misc/count_between.ml,se2gis:all, 0.737,  0.001,  0,+✓,✓,✓, 0.010,segis:all, 1.334,  0.019,  0,++✓,✓,✓, 0.060,cegis:all, 5.450,  2.426,  0,++++✓,✓,✓, 0.080
+misc/composed_unkwns.ml,se2gis:all, 0.079,  0.001,  0,+✓,✓,✓, 0.067,segis:all, 0.336,  0.061,  0,+++✓,✓,✓, 0.213,cegis:all, 0.364,  0.128,  0,++++✓,✓,✓, 0.228
+misc/simple_nnf.ml,se2gis:all, 0.010,  0.001,  0,+✓,✓,✓, 0.009,segis:all, 15.422,  1.126,  0,+++✓,✓,✓, 15.407,cegis:all, 19.111,  4.965,  0,+++++++++✓,✓,✓, 18.540
+misc/unknowns_are_ids.ml,se2gis:all, 0.072,  0.001,  0,+✓,✓,✓, 0.065,segis:all, 0.213,  0.001,  0,+✓,✓,✓, 0.204,cegis:all, 0.283,  0.026,  0,++✓,✓,✓, 0.247
+list/alist_sum.ml,se2gis:all, 0.074,  0.001,  0,+✓,✓,✓, 0.053,segis:all, 5.702,  0.049,  0,+++✓,✓,✓, 5.667,cegis:all, 280.361,  49.277,  0,+++++✓,✓,✓, 8.882
+list/atoi.ml,se2gis:all, 0.173,  0.001,  0,+✓,✓,✓, 0.128,segis:all,N/A,  0.168,N/A,f5,N/A,N/A, 0.067,cegis:all,N/A,  29.782,N/A,f8,N/A,N/A, 0.120
+list/bal.ml,se2gis:all, 5.602,  2.226,  0,++✓,✓,✓, 0.812,segis:all,N/A,  2.750,N/A,f6,N/A,N/A, 0.099,cegis:all,N/A,  3.616,N/A,f28,N/A,N/A, 0.647
+list/block_ones_extremas.ml,se2gis:all, 1.673,  0.386,  0,++✓,✓,✓, 0.736,segis:all, 6.170,  1.196,  0,++++++✓,✓,✓, 4.493,cegis:all,N/A,  51.149,N/A,f24,N/A,N/A, 47.066
+list/hamming.pmrs,se2gis:all, 0.156,  0.002,  0,+✓,✓,✓, 0.112,segis:all, 0.468,  0.123,  0,++++✓,✓,✓, 0.388,cegis:all, 20.156,  9.608,  0,++++✓,✓,✓, 1.478
+list/last.pmrs,se2gis:all, 0.017,  0.001,  0,+✓,✓,✓, 0.012,segis:all, 0.035,  0.018,  0,++✓,✓,✓, 0.022,cegis:all, 0.127,  0.088,  0,++++✓,✓,✓, 0.038
+list/lenhom.pmrs,se2gis:all, 0.088,  0.002,  0,+✓,✓,✓, 0.068,segis:all, 0.269,  0.075,  0,++++✓,✓,✓, 0.225,cegis:all, 22.197,  20.501,  0,++++✓,✓,✓, 0.255
+list/line_of_sight.ml,se2gis:all, 0.384,  0.012,  0,++✓,✓,✓, 0.063,segis:all, 111.135,  62.334,  0,++++✓,✓,✓, 0.135,cegis:all,N/A,  355.274,N/A,f14,N/A,N/A, 0.150
+list/maxcount.pmrs,se2gis:all, 0.107,  0.001,  0,+✓,✓,✓, 0.099,segis:all,N/A,  0.040,N/A,f3,N/A,N/A, 0.020,cegis:all,N/A,  344.993,N/A,f9,N/A,N/A, 0.092
+list/max_block_ones.ml,se2gis:all, 10.919,  3.229,  0,+++✓,✓,✓, 3.971,segis:all,N/A,  8.633,N/A,f8,N/A,N/A, 0.566,cegis:all,N/A,  101.148,N/A,f20,N/A,N/A, 97.066
+list/maxhom.pmrs,se2gis:all, 0.151,  0.001,  0,+✓,✓,✓, 0.143,segis:all, 0.106,  0.018,  0,++✓,✓,✓, 0.093,cegis:all, 0.772,  0.077,  0,++++✓,✓,✓, 0.129
+list/mincount.pmrs,se2gis:all, 0.107,  0.001,  0,+✓,✓,✓, 0.099,segis:all,N/A,  0.041,N/A,f3,N/A,N/A, 0.022,cegis:all,N/A,  143.880,N/A,f24,N/A,N/A, 0.289
+list/minhom.pmrs,se2gis:all, 0.032,  0.001,  0,+✓,✓,✓, 0.026,segis:all, 0.088,  0.020,  0,++✓,✓,✓, 0.073,cegis:all, 0.554,  0.470,  0,+++++++++++++++++++++✓,✓,✓, 0.302
+list/mpshom.pmrs,se2gis:all, 0.294,  0.001,  0,+✓,✓,✓, 0.253,segis:all, 4.362,  0.207,  0,+++++✓,✓,✓, 4.042,cegis:all,N/A,  8.822,N/A,f7,N/A,N/A, 0.103
+list/mtshom.pmrs,se2gis:all, 0.413,  0.052,  0,++✓,✓,✓, 0.287,segis:all, 5.608,  0.207,  0,+++++✓,✓,✓, 4.458,cegis:all,N/A,  264.789,N/A,f10,N/A,N/A, 0.151
+list/mts_and_mps_hom.pmrs,se2gis:all, 0.920,  0.132,  0,++✓,✓,✓, 0.631,segis:all, 15.871,  2.749,  0,++++++✓,✓,✓, 9.067,cegis:all,N/A,  182.148,N/A,f11,N/A,N/A, 0.188
+list/msshom.pmrs,se2gis:all, 11.130,  2.929,  0,+++✓,✓,✓, 3.233,segis:all,N/A,  191.611,N/A,f8,N/A,N/A, 0.575,cegis:all,N/A,  1.395,N/A,f9,N/A,N/A, 0.177
+list/prodhom.pmrs,se2gis:all, 0.097,  0.002,  0,+✓,✓,✓, 0.077,segis:all, 0.272,  0.079,  0,++++✓,✓,✓, 0.245,cegis:all,N/A,  59.059,N/A,f8,N/A,N/A, 0.153
+list/polyhom.pmrs,se2gis:all, 0.174,  0.002,  0,+✓,✓,✓, 0.133,segis:all, 0.819,  0.229,  0,+++++✓,✓,✓, 0.644,cegis:all, 264.352,  18.814,  0,++++++✓,✓,✓, 0.673
+list/search.pmrs,se2gis:all, 0.101,  0.002,  0,+✓,✓,✓, 0.080,segis:all,N/A,  0.040,N/A,f3,N/A,N/A, 0.033,cegis:all,N/A,  0.023,N/A,f2,N/A,N/A, 0.017
+list/slsp.ml,se2gis:all, 0.251,  0.001,  0,+✓,✓,✓, 0.041,segis:all, 0.438,  0.020,  0,++✓,✓,✓, 0.129,cegis:all,N/A,  205.093,N/A,f11,N/A,N/A, 0.100
+list/sndmax.ml,se2gis:all, 0.789,  0.002,  0,+✓,✓,✓, 0.604,segis:all, 4.609,  0.020,  0,++✓,✓,✓, 4.425,cegis:all,N/A,  177.500,N/A,f26,N/A,N/A, 0.247
+list/sndmin.ml,se2gis:all, 1.071,  0.002,  0,+✓,✓,✓, 0.883,segis:all, 4.730,  0.021,  0,++✓,✓,✓, 4.538,cegis:all,N/A,  18.026,N/A,f26,N/A,N/A, 0.240
+list/sumgt.ml,se2gis:all, 0.096,  0.002,  0,+✓,✓,✓, 0.075,segis:all, 0.802,  0.480,  0,+++++✓,✓,✓, 0.369,cegis:all, 3.102,  1.818,  0,+++++✓,✓,✓, 0.588
+list/sumhom.pmrs,se2gis:all, 0.095,  0.002,  0,+✓,✓,✓, 0.075,segis:all, 0.250,  0.040,  0,+++✓,✓,✓, 0.224,cegis:all, 0.418,  0.186,  0,+++++✓,✓,✓, 0.290
+list/sumodds.pmrs,se2gis:all, 0.106,  0.002,  0,+✓,✓,✓, 0.085,segis:all, 1.684,  0.042,  0,+++✓,✓,✓, 1.521,cegis:all,N/A,  1.029,N/A,f21,N/A,N/A, 0.397
+list/sumevens.pmrs,se2gis:all, 0.145,  0.002,  0,+✓,✓,✓, 0.087,segis:all, 1.704,  0.064,  0,+++✓,✓,✓, 1.545,cegis:all,N/A,  1.119,N/A,f21,N/A,N/A, 0.385
+list/zero_after_one.ml,se2gis:all, 0.686,  0.110,  0,++✓,✓,✓, 0.369,segis:all, 2.407,  0.651,  0,+++++++✓,✓,✓, 1.682,cegis:all, 3.091,  1.093,  0,++++++++++✓,✓,✓, 1.954
+list/zeros_ones.ml,se2gis:all, 0.496,  0.014,  0,++✓,✓,✓, 0.043,segis:all, 7.718,  1.359,  0,++++✓,✓,✓, 0.126,cegis:all, 1.125,  0.946,  0,++++++++++✓,✓,✓, 0.127
+list/issorted.pmrs,se2gis:all, 3.219,  0.011,  0,++✓,✓,✓, 0.034,segis:all, 3.224,  0.143,  0,++++✓,✓,✓, 0.055,cegis:all, 6.681,  0.186,  0,+++++++✓,✓,✓, 0.086
+list_to_tree/search.pmrs,se2gis:all, 3.057,  0.012,  0,++✓,✓,✓, 0.043,segis:all, 24.278,  0.437,  0,++++✓,✓,✓, 0.046,cegis:all, 16.214,  0.056,  0,++++✓,✓,✓, 0.047
+list_to_tree/search_v2.pmrs,se2gis:all, 3.023,  0.012,  0,++✓,✓,✓, 0.096,segis:all, 20.949,  1.154,  0,++++✓,✓,✓, 0.072,cegis:all, 10.782,  0.462,  0,++++✓,✓,✓, 0.046
+list_to_tree/search_v3.pmrs,se2gis:all, 4.210,  0.012,  0,++✓,✓,✓, 0.043,segis:all, 17.064,  0.694,  0,++++✓,✓,✓, 0.044,cegis:all, 7.713,  0.461,  0,++++✓,✓,✓, 0.044
+list_to_tree/mls.pmrs,se2gis:all, 15.411,  0.073,  0,+++✓,✓,✓, 0.392,segis:all,N/A,  0.792,N/A,f4,N/A,N/A, 0.030,cegis:all,N/A,  36.820,N/A,f7,N/A,N/A, 0.070
+nested_lists/mtss.ml,se2gis:all, 0.029,  0.001,  0,+✓,✓,✓, 0.025,segis:all, 0.808,  0.062,  0,++++✓,✓,✓, 0.056,cegis:all,N/A,  159.798,N/A,f9,N/A,N/A, 0.079
+nested_lists/pyramid_intervals.ml,se2gis:all, 49.212,  0.049,  0,+++✓,✓,✓, 0.035,segis:all,N/A,  74.948,N/A,f6,N/A,N/A, 0.117,cegis:all,N/A,  346.223,N/A,f56,N/A,N/A, 1.015
+numbers/int_nat_toint.ml,se2gis:all, 0.082,  0.039,  0,+++✓,✓,✓, 0.039,segis:all, 0.157,  0.075,  0,+++++✓,✓,✓, 0.047,cegis:all, 0.159,  0.074,  0,+++++✓,✓,✓, 0.047
+numbers/int_nat_twosum.ml,se2gis:all, 5.701,  5.169,  0,++++++✓,✓,✓, 0.118,segis:all, 11.206,  4.341,  0,++++++++✓,✓,✓, 0.084,cegis:all, 10.001,  4.468,  0,++++++++✓,✓,✓, 0.086
+ptree/maxheads.pmrs,se2gis:all, 1.188,  0.015,  0,++✓,✓,✓, 1.169,segis:all, 0.059,  0.034,  0,+++✓,✓,✓, 0.034,cegis:all, 13.169,  5.012,  0,+++++++✓,✓,✓, 0.109
+ptree/maxlast.pmrs,se2gis:all, 0.892,  0.014,  0,++✓,✓,✓, 0.876,segis:all, 0.056,  0.033,  0,+++✓,✓,✓, 0.032,cegis:all, 8.685,  4.749,  0,+++++++✓,✓,✓, 0.090
+ptree/maxsum.pmrs,se2gis:all, 0.044,  0.015,  0,++✓,✓,✓, 0.018,segis:all, 0.075,  0.033,  0,+++✓,✓,✓, 0.036,cegis:all,N/A,  16.630,N/A,f6,N/A,N/A, 0.074
+ptree/mul.pmrs,se2gis:all, 0.094,  0.036,  0,+++✓,✓,✓, 0.024,segis:all, 0.041,  0.019,  0,++✓,✓,✓, 0.019,cegis:all,N/A,  74.421,N/A,f10,N/A,N/A, 0.104
+ptree/sum.pmrs,se2gis:all, 0.073,  0.031,  0,+++✓,✓,✓, 0.024,segis:all, 0.040,  0.020,  0,++✓,✓,✓, 0.019,cegis:all, 0.077,  0.019,  0,++✓,✓,✓, 0.019
+sort_list/min.ml,se2gis:all, 0.018,  0.001,  0,+✓,✓,✓, 0.017,segis:all, 0.025,  0.015,  0,++✓,✓,✓, 0.020,cegis:all, 0.099,  0.056,  0,++++✓,✓,✓, 0.041
+sort_list/max.ml,se2gis:all, 0.025,  0.001,  0,+✓,✓,✓, 0.024,segis:all, 0.026,  0.015,  0,++✓,✓,✓, 0.021,cegis:all, 0.097,  0.054,  0,++++✓,✓,✓, 0.041
+sort_list/sumgtz.ml,se2gis:all, 2.775,  0.001,  0,+✓,✓,✓, 0.422,segis:all, 2.378,  0.015,  0,++✓,✓,✓, 0.041,cegis:all, 309.455,  221.964,  0,++++++++++++✓,✓,✓, 0.169
+tailopt/mts.pmrs,se2gis:all, 0.065,  0.011,  0,++✓,✓,✓, 0.024,segis:all, 36.704,  0.029,  0,+++✓,✓,✓, 0.030,cegis:all,N/A,  73.893,N/A,f8,N/A,N/A, 0.069
+tailopt/mps.pmrs,se2gis:all, 0.070,  0.012,  0,++✓,✓,✓, 0.029,segis:all, 0.784,  0.030,  0,+++✓,✓,✓, 0.033,cegis:all,N/A,  1.448,N/A,f7,N/A,N/A, 0.061
+tailopt/sum.pmrs,se2gis:all, 0.015,  0.008,  0,++✓,✓,✓, 0.014,segis:all, 0.042,  0.024,  0,+++✓,✓,✓, 0.028,cegis:all, 0.083,  0.053,  0,++++✓,✓,✓, 0.038
+terms/height.ml,se2gis:all, 0.015,  0.005,  0,+✓,✓,✓, 0.009,segis:all,N/A,  0.003,N/A,f1,N/A,N/A, 0.000,cegis:all,N/A,  0.003,N/A,f1,N/A,N/A, 0.000
+tree/maxPathWeight.pmrs,se2gis:all, 1.570,  0.035,  0,++✓,✓,✓, 1.529,segis:all, 0.271,  0.166,  0,++++✓,✓,✓, 0.084,cegis:all, 42.206,  6.667,  0,++++++✓,✓,✓, 0.091
+tree/maxtree.pmrs,se2gis:all, 0.378,  0.001,  0,+✓,✓,✓, 0.377,segis:all, 0.442,  0.015,  0,++✓,✓,✓, 0.436,cegis:all,N/A,  118.208,N/A,f8,N/A,N/A, 0.072
+tree/maxtree2.pmrs,se2gis:all, 0.276,  0.013,  0,++✓,✓,✓, 0.270,segis:all, 0.301,  0.015,  0,++✓,✓,✓, 0.295,cegis:all,N/A,  152.864,N/A,f8,N/A,N/A, 0.070
+tree/min.pmrs,se2gis:all, 0.269,  0.014,  0,++✓,✓,✓, 0.262,segis:all, 0.294,  0.015,  0,++✓,✓,✓, 0.288,cegis:all, 1.067,  0.450,  0,+++++++++++++++++++++++✓,✓,✓, 0.580
+tree/minmax.pmrs,se2gis:all, 0.780,  0.017,  0,++✓,✓,✓, 0.734,segis:all, 5.020,  0.032,  0,+++✓,✓,✓, 0.633,cegis:all, 77.191,  70.401,  0,+++++++++++++++++++++++++++++++✓,✓,✓, 0.951
+tree/mips.pmrs,se2gis:all, 1.296,  0.016,  0,++✓,✓,✓, 1.248,segis:all, 213.275,  1.158,  0,++++✓,✓,✓, 0.141,cegis:all,N/A,  0.314,N/A,f7,N/A,N/A, 0.090
+tree/mits.pmrs,se2gis:all, 1.269,  0.019,  0,++✓,✓,✓, 1.218,segis:all, 326.861,  0.806,  0,++++✓,✓,✓, 0.101,cegis:all,N/A,  3.223,N/A,f7,N/A,N/A, 0.059
+tree/mpps.pmrs,se2gis:all, 143.272,  92.590,  0,++++✓,✓,✓, 1.833,segis:all,N/A,  50.742,N/A,f6,N/A,N/A, 0.105,cegis:all,N/A,  180.154,N/A,f9,N/A,N/A, 0.169
+tree/poly.pmrs,se2gis:all, 8.445,  0.018,  0,++✓,✓,✓, 1.109,segis:all,N/A,  0.428,N/A,f4,N/A,N/A, 0.029,cegis:all,N/A,  44.659,N/A,f6,N/A,N/A, 0.051
+tree/poly2.ml,se2gis:all, 10.407,  0.014,  0,++✓,✓,✓, 1.057,segis:all,N/A,  0.391,N/A,f4,N/A,N/A, 0.029,cegis:all,N/A,  2.777,N/A,f6,N/A,N/A, 0.050
+tree/sorted.pmrs,se2gis:all, 0.008,  0.001,  0,+✓,✓,✓, 0.007,segis:all, 42.527,  1.944,  0,++++✓,✓,✓, 0.056,cegis:all, 7.686,  1.786,  0,+++++++++++✓,✓,✓, 0.154
+tree/sorted_2.ml,se2gis:all, 0.906,  0.001,  0,+✓,✓,✓, 0.904,segis:all, 0.037,  0.016,  0,++✓,✓,✓, 0.030,cegis:all, 83.228,  39.615,  0,++++++✓,✓,✓, 0.106
+tree/sumtree.pmrs,se2gis:all, 0.058,  0.009,  0,++✓,✓,✓, 0.037,segis:all, 0.059,  0.034,  0,+++✓,✓,✓, 0.034,cegis:all, 0.065,  0.044,  0,++++✓,✓,✓, 0.042
+treepaths/height.pmrs,se2gis:all, 0.014,  0.001,  0,+✓,✓,✓, 0.007,segis:all, 1.304,  0.454,  0,+++++✓,✓,✓, 0.090,cegis:all, 1.837,  0.555,  0,+++++✓,✓,✓, 0.101
+treepaths/leftmostodd.pmrs,se2gis:all, 0.009,  0.001,  0,+✓,✓,✓, 0.007,segis:all,N/A,  0.245,N/A,f4,N/A,N/A, 0.211,cegis:all,N/A,  7.819,N/A,f37,N/A,N/A, 2.656
+treepaths/maxPathWeight.pmrs,se2gis:all, 0.026,  0.004,  0,+✓,✓,✓, 0.016,segis:all, 0.091,  0.015,  0,++✓,✓,✓, 0.085,cegis:all, 0.203,  0.116,  0,++++++✓,✓,✓, 0.129
+treepaths/maxPathWeight2.pmrs,se2gis:all, 0.008,  0.001,  0,+✓,✓,✓, 0.007,segis:all, 0.115,  0.035,  0,+++✓,✓,✓, 0.096,cegis:all, 1.935,  0.406,  0,+++++++++++✓,✓,✓, 0.216
+treepaths/mips.pmrs,se2gis:all, 19.015,  7.898,  0,++✓,✓,✓, 18.018,segis:all,N/A,  71.022,N/A,f7,N/A,N/A, 0.082,cegis:all,N/A,  1.395,N/A,f16,N/A,N/A, 0.162
+treepaths/sum.pmrs,se2gis:all, 0.009,  0.001,  0,+✓,✓,✓, 0.007,segis:all, 0.071,  0.027,  0,+++✓,✓,✓, 0.053,cegis:all, 0.095,  0.055,  0,++++✓,✓,✓, 0.063
+unimodal_lists/sum.ml,se2gis:all, 0.536,  0.002,  0,+✓,✓,✓, 0.510,segis:all, 1.460,  0.084,  0,++++✓,✓,✓, 1.402,cegis:all, 10.681,  0.504,  0,+++++++++✓,✓,✓, 1.543
+unimodal_lists/search_no_optim.ml,se2gis:all, 0.503,  0.002,  0,+✓,✓,✓, 0.383,segis:all, 2.375,  0.086,  0,++++✓,✓,✓, 2.180,cegis:all, 3.443,  0.129,  0,++++✓,✓,✓, 2.171
+zippers/list_sum.ml,se2gis:all, 0.089,  0.043,  0,+++✓,✓,✓, 0.021,segis:all, 0.115,  0.081,  0,++++✓,✓,✓, 0.038,cegis:all, 0.207,  0.160,  0,+++++✓,✓,✓, 0.075
+zippers/list_sum_basic.ml,se2gis:all, 0.035,  0.009,  0,++✓,✓,✓, 0.015,segis:all, 0.054,  0.025,  0,+++✓,✓,✓, 0.028,cegis:all, 0.084,  0.054,  0,++++✓,✓,✓, 0.038

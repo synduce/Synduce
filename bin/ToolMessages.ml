@@ -111,13 +111,12 @@ let on_success
   (* If no info required, output timing information. *)
   if (not !Config.info) && !Config.timings
   then (
-    Fmt.(
-      pf stdout "%i,%.4f,%.4f@." !Algo.AState.refinement_steps !Stats.verif_time elapsed);
+    Fmt.(pf stdout "%i,%.4f,%.4f@." !Algo.AState.refinement_steps verif_time elapsed);
     Fmt.(pf stdout "success@."));
   if !Config.json_out
   then (
     let json =
-      prep_final_json ~is_ocaml_syntax source_filename pb result elapsed !Stats.verif_time
+      prep_final_json ~is_ocaml_syntax source_filename pb result elapsed verif_time
     in
     if !Config.json_progressive
     then (
@@ -146,6 +145,7 @@ let print_usage () =
     \  Optimizations off/on:\n\
     \    -s --no-splitting              Do not split systems into subsystems.\n\
     \       --no-syndef                 Do not use syntactic definitions.\n\
+    \       --no-rew                    Do not use rewrite solver.\n\
     \    -t --no-detupling              Turn off detupling.\n\
     \    -c --simple-init               Initialize T naively.\n\
     \    -l --lemma-sketch              Sketch lemmas in synthesis.\n\

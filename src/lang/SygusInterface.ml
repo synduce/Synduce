@@ -9,8 +9,7 @@ open Utils
 (* Instantiate solver functor in interface. *)
 
 module SygusSolver =
-  Syguslib.Solvers.SygusSolver
-    (* Statistics collection config. *)
+  Syguslib.Solvers.SygusSolver (* Statistics collection config. *)
     (Stats)
     (* Logging config. *)
     (struct
@@ -121,6 +120,7 @@ let sygus_term_of_const (c : Constant.t) : sygus_term =
   match c with
   | Constant.CInt i ->
     if i >= 0 then SyLit (LitNum i) else SyApp (IdSimple "-", [ SyLit (LitNum (-i)) ])
+  | Constant.CChar c -> SyLit (LitString (String.of_char c))
   | Constant.CTrue -> SyLit (LitBool true)
   | Constant.CFalse -> SyLit (LitBool false)
 ;;
