@@ -821,7 +821,7 @@ let verify_lemma_bounded ~(p : PsiDef.t) (det : term_state_detail)
     let* () = AsyncSmt.close_solver solver in
     return (Utils.Stats.BoundedChecking, res)
   in
-  AsyncSmt.(cancellable_task (make_solver "cvc") task)
+  AsyncSmt.(cancellable_task (make_solver "z3") task)
 ;;
 
 let verify_lemma_unbounded ~(p : PsiDef.t) (det : term_state_detail)
