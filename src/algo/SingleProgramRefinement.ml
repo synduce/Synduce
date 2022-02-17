@@ -5,9 +5,15 @@ open Lang.Term
 open Syguslib.Sygus
 open Utils
 
-let rec refinement_loop ?(major = true) (p : PsiDef.t) (lstate_in : refinement_loop_state)
+let rec refinement_loop
+    ?(major = true)
+    (ctx : Context.t)
+    (p : PsiDef.t)
+    (lstate_in : refinement_loop_state)
     : solver_response segis_response
   =
+  (* Check there is no termination order. *)
+  Context.check ctx;
   let tsize, usize = Set.length lstate_in.t_set, Set.length lstate_in.u_set in
   if major
   then (
@@ -30,6 +36,8 @@ let rec refinement_loop ?(major = true) (p : PsiDef.t) (lstate_in : refinement_l
   let eqns, lifting =
     Equations.make ~p ~term_state:lstate.term_state ~lifting:lstate.lifting lstate.t_set
   in
+  (* Check there is no termination order. *)
+  Context.check ctx;
   (* The solve the set of constraints with the assumption equations. *)
   let synth_time, (s_resp, solution) =
     Stats.timed (fun () -> Equations.solve ~p (eqns @ lstate.assumptions))
@@ -56,7 +64,7 @@ let rec refinement_loop ?(major = true) (p : PsiDef.t) (lstate_in : refinement_l
            else lstate
          in
          (* Continue looping with the new sets. *)
-         refinement_loop ~major:true p { lstate with t_set; u_set; lifting }
+         refinement_loop ~major:true ctx p { lstate with t_set; u_set; lifting }
        | `Incorrect_assumptions ->
          if !Config.Optims.use_syntactic_definitions
             || !Config.Optims.make_partial_correctness_assumption
@@ -71,7 +79,7 @@ let rec refinement_loop ?(major = true) (p : PsiDef.t) (lstate_in : refinement_l
              ~u:usize
              false;
            Config.Optims.turn_off_eager_optims ();
-           refinement_loop ~major p lstate_in)
+           refinement_loop ~major ctx p lstate_in)
          else Failed RFail
        | `Correct ->
          (* This case happens when verification succeeded.
@@ -97,7 +105,7 @@ let rec refinement_loop ?(major = true) (p : PsiDef.t) (lstate_in : refinement_l
      with
     | lsynt_time, Ok (First new_lstate) ->
       Stats.log_minor_step ~synth_time ~auxtime:lsynt_time false;
-      refinement_loop ~major:false p new_lstate
+      refinement_loop ~major:false ctx p new_lstate
     | lsynt_time, Ok (Second ctexs)
       when !Config.Optims.attempt_lifting
            && Lifting.lifting_count p < !Config.Optims.max_lifting_attempts ->
@@ -106,7 +114,7 @@ let rec refinement_loop ?(major = true) (p : PsiDef.t) (lstate_in : refinement_l
       | Ok (p', lstate') ->
         Lifting.msg_lifting ();
         Stats.log_minor_step ~synth_time ~auxtime:lsynt_time true;
-        refinement_loop ~major:false p' lstate'
+        refinement_loop ~major:false ctx p' lstate'
       | Error r' ->
         (* Infeasible is not a failure! *)
         (match r' with
@@ -123,7 +131,7 @@ let rec refinement_loop ?(major = true) (p : PsiDef.t) (lstate_in : refinement_l
     | _ -> Failed RFail)
 ;;
 
-let se2gis (p : PsiDef.t) =
+let se2gis (ctx : Context.t) (p : PsiDef.t) =
   (* Initialize sets with the most general terms. *)
   let t_set, u_set =
     if !Config.Optims.simple_init
@@ -146,6 +154,7 @@ let se2gis (p : PsiDef.t) =
   else (
     refinement_steps := 0;
     refinement_loop
+      ctx
       p
       { t_set
       ; u_set
@@ -161,7 +170,10 @@ let se2gis (p : PsiDef.t) =
 
 let solve_problem (synthesis_problem : PsiDef.t) : solver_response segis_response =
   (* Solve the problem using portofolio of techniques. *)
-  se2gis synthesis_problem
+  try se2gis (Context.mk ()) synthesis_problem with
+  | Context.Escape ->
+    Utils.Log.debug_msg "se2gis run was terminated early.";
+    Failed RFail
 ;;
 
 let find_and_solve_problem
@@ -185,7 +197,7 @@ let find_and_solve_problem
     then Baselines.algo_segis
     else if !Config.Optims.use_cegis (* Concrete CEGIS. *)
     then Baselines.algo_cegis (* Default algorithm: best combination of techniques. *)
-    else se2gis
+    else solve_problem
   in
   [ top_userdef_problem, main_algo top_userdef_problem ]
 ;;

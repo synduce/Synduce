@@ -1,6 +1,6 @@
 (library
  (name algo)
  (public_name Synduce.Lib.Algo)
- (libraries base fmt utils lang lwt ocamlgraph)
+ (libraries base fmt utils lang lwt ocamlgraph domainslib)
  (preprocess
   (pps ppx_let lwt_ppx)))

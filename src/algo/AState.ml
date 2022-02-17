@@ -3,11 +3,45 @@ open Lang
 open Lang.Term
 open Syguslib.Sygus
 open Utils
+open Domainslib
 
 (**
   AState: This module contains state variables for the synthesis algorithms, as well as type
    definitions and printing functions for displaying solutions.
  *)
+
+module Context = struct
+  exception Escape
+
+  type t =
+    { mutable c_alive : bool
+    ; mutable c_pid : int
+    ; mutable c_subctx : t array
+    ; c_chan : int Chan.t
+    }
+
+  let mk () =
+    { c_alive = true; c_pid = -1; c_subctx = [||]; c_chan = Chan.make_bounded 10 }
+  ;;
+
+  let send_termination (ctx : t) = Chan.send ctx.c_chan (-1)
+
+  let subkill (ctx : t) : unit =
+    Array.iter ~f:(fun subctx -> Unix.kill subctx.c_pid Caml.Sys.sigkill) ctx.c_subctx;
+    if ctx.c_pid > 0 then Unix.kill ctx.c_pid Caml.Sys.sigkill
+  ;;
+
+  let check (ctx : t) =
+    match Chan.recv_poll ctx.c_chan with
+    | Some i ->
+      if i < 0
+      then (
+        subkill ctx;
+        raise Escape)
+      else ()
+    | None -> ()
+  ;;
+end
 
 module PsiDef = struct
   (**
