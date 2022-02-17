@@ -1008,7 +1008,10 @@ module Preprocess = struct
           if Set.is_empty (Set.inter (Analysis.free_variables rhs_c) unknowns)
           then (
             match eqn.elhs.tkind with
-            | TIte (lhs_c, lhs_bt, lhs_bf) when Terms.equal rhs_c lhs_c ->
+            | TIte (lhs_c, lhs_bt, lhs_bf)
+              when Terms.equal
+                     (Rewriter.simplify_term rhs_c)
+                     (Rewriter.simplify_term lhs_c) ->
               split_if
                 { eqn with
                   eprecond = and_opt eqn.eprecond rhs_c

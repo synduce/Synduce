@@ -66,16 +66,29 @@ let test_0 () =
   assert_eequals Op.(min x y) Op.(min y x);
   assert_eequals Op.(max v (max w z)) Op.(max (max v z) w);
   assert_eequals Op.(max (max x (int 0) + y) (int 0)) Op.(max (max (x + y) y) (int 0));
+  assert_eequals Op.(~?(a > b) a b) Op.(max a b);
+  assert_eequals Op.(~?(a < b) a b) Op.(min a b);
+  assert_eequals Op.(~?(a <= b) a b) Op.(min a b);
+  assert_eequals Op.(~?(a >= b) a b) Op.(max a b);
+  assert_eequals Op.(~?(b < a) a b) Op.(max a b);
+  assert_eequals Op.(~?(b > a) a b) Op.(min a b);
   (* If-then-else *)
   assert_eequals
     Op.(~?(x > int 1) (x + ~?(y > int 0) y (int 0)) (~?(y > int 0) y (int 0)))
     Op.(~?(x > int 1) x (int 0) + ~?(y > int 0) y (int 0));
+  assert_eequals Op.(~?a x y > x) Op.((not a) && y > x);
+  assert_eequals Op.(~?a x y > y) Op.(a && x > y);
   (* And, or *)
   assert_eequals Op.(x && ETrue) x;
   assert_eequals Op.(x && y && EFalse) EFalse;
   assert_eequals Op.(x || ETrue || y) ETrue;
   assert_eequals Op.(x || EFalse) x;
-  assert_eequals Op.(x || EFalse || y) Op.(x || y)
+  assert_eequals Op.(x || EFalse || y) Op.(x || y);
+  (* Implies *)
+  assert_eequals Op.(x && x => y) Op.(x && y);
+  assert_eequals Op.((x && y) && x => y) Op.(x && y);
+  assert_eequals Op.(x && (not x) => y) x;
+  assert_eequals Op.(x && z && (not x) => y) Op.(x && z)
 ;;
 
 let test_1 () =

@@ -74,7 +74,7 @@ let projection_eqns (lhs : term) (rhs : term) =
 ;;
 
 (** [invar invariants lhs_e rhs_e] filters the terms in `invariants` that have no free variable
-  in common with  [lhs_e] or [rhs_e] and return the conjuction of all these invariants.
+  in common with  [lhs_e] or [rhs_e] and return the conjunction of all these invariants.
   *)
 let invar invariants lhs_e rhs_e =
   let f inv_expr =

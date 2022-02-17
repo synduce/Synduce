@@ -156,7 +156,7 @@ let concrete_int_op (op : Operator.t) =
     | Binary Plus -> Some ( + )
     | Binary Times -> Some ( * )
     | Binary Minus -> Some ( - )
-    | Binary Div -> Some ( * )
+    | Binary Div -> Some ( / )
     | _ -> None)
 ;;
 
@@ -313,6 +313,7 @@ module Expression = struct
     let ( < ) = mk_e_bin Binop.Lt
     let ( >= ) = mk_e_bin Binop.Ge
     let ( <= ) = mk_e_bin Binop.Le
+    let ( => ) = mk_e_bin Binop.Implies
     let max = mk_e_bin Binop.Max
     let min = mk_e_bin Binop.Min
     let not e1 = mk_e_un Unop.Not e1
@@ -539,6 +540,29 @@ module Expression = struct
     f e
   ;;
 
+  let has_impl a tl =
+    List.exists
+      ~f:(function
+        | EOp (Binary Implies, [ EOp (Unary Not, [ a' ]); _ ]) -> equal a' a
+        | EOp (Binary Implies, [ a'; _ ]) -> equal a' a
+        | _ -> false)
+      tl
+  ;;
+
+  (* Replace (a => b) in tl by b given that a is true. *)
+  let simplify_implies a tl =
+    EOp
+      ( Binary And
+      , a
+        :: List.map
+             ~f:(function
+               | EOp (Binary Implies, [ EOp (Unary Not, [ a' ]); _ ]) when equal a' a ->
+                 mk_e_true
+               | EOp (Binary Implies, [ a'; b ]) when equal a' a -> b
+               | e -> e)
+             tl )
+  ;;
+
   (** Evaluation *)
   let simplify (e : t) : t =
     (* Integer evaluation. *)
@@ -618,7 +642,7 @@ module Expression = struct
         | args ->
           (match op with
           | Binary Plus -> Some (mk_e_assoc op (ieval Binop.Plus ( + ) args))
-          | Binary Times -> Some (mk_e_assoc op (ieval Binop.Times ( + ) args))
+          | Binary Times -> Some (mk_e_assoc op (ieval Binop.Times ( * ) args))
           | Binary Max -> Some (mk_e_assoc op (ieval Binop.Max max args))
           | Binary Min -> Some (mk_e_assoc op (ieval Binop.Min min args))
           | Binary And -> Some (mk_e_assoc op (beval Binop.And ( && ) args))
@@ -640,8 +664,11 @@ module Expression = struct
           , EOp (Binary Implies, [ a; b ]) :: EOp (Binary Implies, [ a'; b' ]) :: tl )
         when equal a a' ->
         Some (mk_e_assoc (Binary And) (mk_e_bin Implies a (mk_e_bin And b b') :: tl))
+      | EOp (Binary And, a :: EOp (Binary Implies, [ a'; b ]) :: tl) when equal a a' ->
+        Some (mk_e_assoc (Binary And) (a :: b :: tl))
       | EOp (Binary And, EOp (Binary Implies, [ a; b ]) :: tl) ->
-        if List.mem tl b ~equal then Some (EOp (Binary And, a :: tl)) else None
+        if List.mem tl a ~equal then Some (EOp (Binary And, b :: tl)) else None
+      | EOp (Binary And, a :: tl) when has_impl a tl -> Some (simplify_implies a tl)
       (* Simple or Rules *)
       | EOp (Binary Or, EFalse :: rest) ->
         (match rest with
@@ -731,14 +758,14 @@ module Expression = struct
       | EOp (Binary Ge, [ EInt a; EInt b ]) -> Some (mk_e_bool (a >= b))
       (* (a ? x : y) > y -> a && x > y *)
       | EOp (Binary Gt, [ EIte (a, x, y); y' ]) when equal y y' -> Some Op.(a && x > y)
-      (* (a ? x : y) > x -> !a && x > y *)
+      (* (a ? x : y) > x -> !a && y > x *)
       | EOp (Binary Gt, [ EIte (a, x, y); x' ]) when equal x x' ->
-        Some Op.((not a) || x > y)
+        Some Op.((not a) && y > x)
       (* (a ? x : y) < y -> a && x < y *)
-      | EOp (Binary Lt, [ EIte (a, x, y); y' ]) when equal y y' -> Some Op.(a && x < y)
-      (* (a ? x : y) < x -> !a && x < y *)
+      | EOp (Binary Lt, [ EIte (a, x, y); y' ]) when equal y y' -> Some Op.(a && y > x)
+      (* (a ? x : y) < x -> !a && y > x *)
       | EOp (Binary Lt, [ EIte (a, x, y); x' ]) when equal x x' ->
-        Some Op.((not a) || x < y)
+        Some Op.((not a) && y > x)
       | _ -> None
     in
     rewrite_until_stable (fun x -> x |> transform tr_prew |> transform tr_peval) e
