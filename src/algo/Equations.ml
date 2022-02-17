@@ -5,7 +5,6 @@ open Lang
 open Lang.Term
 open Projection
 open Syguslib
-open Sygus
 open SygusInterface
 open Utils
 open Lwt.Syntax
@@ -705,13 +704,16 @@ module Solve = struct
       let success_resp =
         let f (fname, args, body) =
           ( fname
-          , List.map ~f:(fun v -> v.vname, sort_of_rtype (Variable.vtype_or_new v)) args
+          , List.map
+              ~f:(fun v ->
+                Sygus.mk_sorted_var v.vname (sort_of_rtype (Variable.vtype_or_new v)))
+              args
           , sort_of_rtype body.ttyp
           , sygus_of_term body )
         in
         List.map ~f partial_soln
       in
-      let answer = RSuccess success_resp, Either.First (psoln @ partial_soln) in
+      let answer = Sygus.RSuccess success_resp, Either.First (psoln @ partial_soln) in
       Lwt.task () |> fun (_, r) -> Lwt.return answer, r
       (* Second case: we only got hints or the base grammar. *)
     | Either.Second synth_objs ->
@@ -727,10 +729,10 @@ module Solve = struct
           |> constrain (constraints_of_eqns eqns))
       in
       (* Handling the solver response. *)
-      let handle_response (resp : solver_response) =
+      let handle_response (resp : Sygus.solver_response) =
         let parse_synth_fun (fname, fargs, _, fbody) =
           let args =
-            let f (varname, sort) = Variable.mk ~t:(rtype_of_sort sort) varname in
+            let f (_, varname, sort) = Variable.mk ~t:(rtype_of_sort sort) varname in
             List.map ~f fargs
           in
           let local_vars = VarSet.of_list args in
@@ -763,7 +765,7 @@ module Solve = struct
               | None -> RFail, Either.Second [])
             t
         , r ))
-      else Lwt.task () |> fun (_, r) -> Lwt.return (RFail, Either.Second []), r
+      else Lwt.task () |> fun (_, r) -> Lwt.return (Sygus.RFail, Either.Second []), r
   ;;
 
   let check_unrealizable
@@ -782,20 +784,20 @@ module Solve = struct
              (* It not infeasible, sleep for timeout duration, unless counter is 0 *)
              let* () = Lwt_unix.sleep !Config.Optims.wait_parallel_tlimit in
              Int.decr task_counter;
-             Lwt.return (RFail, Either.Second [])
+             Lwt.return (Sygus.RFail, Either.Second [])
            | _ ->
              if !Config.generate_benchmarks
              then ignore (core_solve ~gen_only:true unknowns eqns);
              if !Config.check_unrealizable_smt_unsatisfiable
              then Counterexamples.smt_unsatisfiability_check unknowns eqns;
-             Lwt.return (RInfeasible, Either.Second ctexs)
+             Lwt.return (Sygus.RInfeasible, Either.Second ctexs)
          in
          r, task)
     else None
   ;;
 
   let solve_eqns (unknowns : VarSet.t) (eqns : equation list)
-      : solver_response * (partial_soln, unrealizability_ctex list) Either.t
+      : Sygus.solver_response * (partial_soln, unrealizability_ctex list) Either.t
     =
     let opt_cst =
       Set.exists unknowns ~f:(fun v -> RType.is_base (Variable.vtype_or_new v))
@@ -900,14 +902,14 @@ module Solve = struct
     let comb_l l =
       List.fold
         l
-        ~init:(RSuccess [], Either.First partial_soln)
+        ~init:(Sygus.RSuccess [], Either.First partial_soln)
         ~f:(fun (_, prev_sol) r -> combine prev_sol r)
     in
     List.fold_until
       (List.stable_sort
          ~compare:(fun (vs1, _) (vs2, _) -> compare (Set.length vs1) (Set.length vs2))
          (List.rev split_eqn_systems))
-      ~init:(RSuccess [], Either.first partial_soln)
+      ~init:(Sygus.RSuccess [], Either.first partial_soln)
       ~finish:identity
       ~f:(fun (_, prev_soln) subsystem ->
         match comb_l (solve_eqn_aux subsystem) with
@@ -955,8 +957,8 @@ module Preprocess = struct
     { pre_unknowns : VarSet.t
     ; pre_equations : equation list
     ; pre_postprocessing :
-        solver_response * (partial_soln, unrealizability_ctex list) Either.t
-        -> solver_response * (partial_soln, unrealizability_ctex list) Either.t
+        Sygus.solver_response * (partial_soln, unrealizability_ctex list) Either.t
+        -> Sygus.solver_response * (partial_soln, unrealizability_ctex list) Either.t
     }
 
   (** An empty preprocessing action. *)
@@ -1074,7 +1076,7 @@ end
   function and body of a function) or a list of unrealizability counterexamples.
 *)
 let solve ~(p : PsiDef.t) (eqns : equation list)
-    : solver_response * (partial_soln, unrealizability_ctex list) Either.t
+    : Sygus.solver_response * (partial_soln, unrealizability_ctex list) Either.t
   =
   let unknowns = p.PsiDef.target.psyntobjs in
   let preprocessing_actions =

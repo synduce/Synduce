@@ -7,7 +7,6 @@ open Utils
 open Smtlib
 open SmtInterface
 open Syguslib
-open Sygus
 open SygusInterface
 module Solvers = SyncSmt
 module S = Smtlib.SmtLib
@@ -181,7 +180,7 @@ let set_up_to_get_ensures_model solver ~(p : PsiDef.t) (ensures : term) =
 ;;
 
 let handle_ensures_synth_response
-    ((task, resolver) : solver_response option Lwt.t * int Lwt.u)
+    ((task, resolver) : Sygus.solver_response option Lwt.t * int Lwt.u)
     (var : variable)
   =
   let parse_synth_fun (fname, _fargs, _, fbody) =
@@ -203,7 +202,7 @@ let handle_ensures_synth_response
 
 let make_ensures_name (id : int) = "ensures_" ^ Int.to_string id
 
-let synthfun_ensures ~(p : PsiDef.t) (id : int) : command * variable * string =
+let synthfun_ensures ~(p : PsiDef.t) (id : int) : Sygus.command * variable * string =
   let var = Variable.mk ~t:(Some p.PsiDef.reference.poutput_typ) (Alpha.fresh ()) in
   let opset =
     List.fold

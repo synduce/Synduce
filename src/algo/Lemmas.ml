@@ -7,7 +7,6 @@ open Lang.Term
 open Lwt.Syntax
 open Rewriter
 open Syguslib
-open Sygus
 open SygusInterface
 open Utils
 open Smtlib
@@ -222,7 +221,9 @@ let skeleton_of_tinv (det : term_state_detail) (tinv_of_t : term) =
   objective (SyGuS command).
   All strategies should be executed in order to find a solution efficiently.
  *)
-let synthfun_of_det ~(p : PsiDef.t) (det : term_state_detail) : (command * string) list =
+let synthfun_of_det ~(p : PsiDef.t) (det : term_state_detail)
+    : (Sygus.command * string) list
+  =
   let opset =
     List.fold
       ~init:OpSet.empty
@@ -334,9 +335,9 @@ let convert_term_rec_to_ctex_rec
 let ctex_model_to_args
     ~(p : PsiDef.t)
     (det : term_state_detail)
-    (params : (string * sygus_sort) list)
+    (params : (string * Sygus.sygus_sort) list)
     ctex
-    : sygus_term list
+    : Sygus.sygus_term list
   =
   List.map params ~f:(fun (param_name, _) ->
       match
@@ -367,12 +368,12 @@ let ctex_model_to_args
 
 let constraint_of_neg_ctex (det : term_state_detail) ctex =
   let neg_constraint = mk_un Not (mk_app (mk_var det.lemma) (Map.data ctex.ctex_model)) in
-  CConstraint (sygus_of_term neg_constraint)
+  Sygus.mk_c_constraint (sygus_of_term neg_constraint)
 ;;
 
 let constraint_of_pos_ctex (det : term_state_detail) ctex =
   let pos_constraint = mk_app (mk_var det.lemma) (Map.data ctex.ctex_model) in
-  CConstraint (sygus_of_term pos_constraint)
+  Sygus.mk_c_constraint (sygus_of_term pos_constraint)
 ;;
 
 let log_soln s vs t =
@@ -388,7 +389,7 @@ let log_soln s vs t =
 
 let handle_lemma_synth_response
     (det : term_state_detail)
-    ((task, resolver) : solver_response option Lwt.t * int Lwt.u)
+    ((task, resolver) : Sygus.solver_response option Lwt.t * int Lwt.u)
     : term list option
   =
   let parse_synth_fun (_, _, _, fbody) =
@@ -1109,8 +1110,12 @@ let synthesize_new_lemma ~(p : PsiDef.t) (det : term_state_detail) : term option
     let pos_constraints = List.map ~f:(constraint_of_pos_ctex det) det.positive_ctexs in
     let extra_defs = Semantic.[ max_definition; min_definition ] in
     let commands =
-      CSetLogic logic
-      :: (extra_defs @ [ synth_obj ] @ neg_constraints @ pos_constraints @ [ CCheckSynth ])
+      Sygus.mk_c_set_logic logic
+      :: (extra_defs
+         @ [ synth_obj ]
+         @ neg_constraints
+         @ pos_constraints
+         @ [ Sygus.mk_c_check_synth () ])
     in
     match
       handle_lemma_synth_response det (SygusInterface.SygusSolver.solve_commands commands)
@@ -1252,8 +1257,8 @@ let refine_ensures_predicates
 ;;
 
 let synthesize_lemmas ~(p : PsiDef.t) synt_failure_info (lstate : refinement_loop_state)
-    : ( (refinement_loop_state, unrealizability_ctex list) Either.t, solver_response )
-    Result.t
+    : ( (refinement_loop_state, unrealizability_ctex list) Either.t, Sygus.solver_response
+    ) Result.t
   =
   let _interactive_synthesis () =
     !Config.interactive_lemmas_loop
@@ -1345,7 +1350,7 @@ let synthesize_lemmas ~(p : PsiDef.t) synt_failure_info (lstate : refinement_loo
   | `Unrealizable -> Ok (Either.Second unr_ctexs)
   | `CoarseningFailure ->
     (match synt_failure_info with
-    | RFail, _ ->
+    | Sygus.RFail, _ ->
       Log.error_msg "SyGuS solver failed to find a solution.";
       Error RFail
     | RInfeasible, _ ->

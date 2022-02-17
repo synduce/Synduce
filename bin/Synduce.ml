@@ -19,7 +19,7 @@ let main () =
   Config.problem_name := Caml.Filename.basename (Caml.Filename.chop_extension !filename);
   set_style_renderer stdout `Ansi_tty;
   Caml.Format.set_margin 100;
-  (match !SygusInterface.SygusSolver.default_solver with
+  (match !SygusInterface.SygusSolver.CoreSolver.default_solver with
   | CVC -> ToolMessages.cvc_message ()
   | EUSolver -> failwith "EUSolver unsupported."
   | DryadSynth -> Syguslib.Sygus.use_v1 := true);

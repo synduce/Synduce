@@ -3,17 +3,19 @@ open Term
 open Syguslib
 
 module SygusSolver : sig
-  type t =
-    | CVC
-    | DryadSynth
-    | EUSolver
+  module CoreSolver : sig
+    type t =
+      | CVC
+      | DryadSynth
+      | EUSolver
+
+    val default_solver : t ref
+  end
 
   val solve_commands
-    :  ?solver_kind:t
+    :  ?solver_kind:CoreSolver.t
     -> Sygus.program
     -> Sygus.solver_response option Lwt.t * int Lwt.u
-
-  val default_solver : t ref
 end
 
 (**
