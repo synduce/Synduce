@@ -14,20 +14,42 @@ module Context = struct
   exception Escape
 
   type t =
-    { mutable c_alive : bool
+    { c_name : string
+    ; mutable c_alive : bool
     ; mutable c_pid : int
     ; mutable c_subctx : t array
     ; c_chan : int Chan.t
+    ; c_pool : Task.pool
     }
 
-  let mk () =
-    { c_alive = true; c_pid = -1; c_subctx = [||]; c_chan = Chan.make_bounded 10 }
+  let mk name =
+    { c_name = name
+    ; c_alive = true
+    ; c_pid = -1
+    ; c_subctx = [||]
+    ; c_chan = Chan.make_bounded 10
+    ; c_pool = Task.setup_pool ~name ~num_additional_domains:!Config.Optims.num_threads ()
+    }
+  ;;
+
+  let subctx ?(pid = None) (ctx : t) (name : string) : t =
+    let new_ctx =
+      { c_name = name
+      ; c_alive = true
+      ; c_pid = Option.value ~default:ctx.c_pid pid
+      ; c_subctx = [||]
+      ; c_chan = Chan.make_bounded 10
+      ; c_pool = ctx.c_pool
+      }
+    in
+    ctx.c_subctx <- Array.append ctx.c_subctx [| new_ctx |];
+    new_ctx
   ;;
 
   let send_termination (ctx : t) = Chan.send ctx.c_chan (-1)
 
-  let subkill (ctx : t) : unit =
-    Array.iter ~f:(fun subctx -> Unix.kill subctx.c_pid Caml.Sys.sigkill) ctx.c_subctx;
+  let rec subkill (ctx : t) : unit =
+    Array.iter ~f:subkill ctx.c_subctx;
     if ctx.c_pid > 0 then Unix.kill ctx.c_pid Caml.Sys.sigkill
   ;;
 

@@ -90,7 +90,6 @@ type smtTerm =
   | SmtTAnnot of smtTerm * smtAttribute list
 
 and match_case = smtPattern * smtTerm
-
 and var_binding = smtSymbol * smtTerm
 
 type smtSortDec = smtSymbol * numeral

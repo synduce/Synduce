@@ -1,2 +1,7 @@
-val algo_segis : AState.PsiDef.t -> Syguslib.Sygus.solver_response AState.segis_response
-val algo_cegis : AState.PsiDef.t -> Syguslib.Sygus.solver_response AState.segis_response
+open AState
+
+(** The symbolic SEGIS algorithm.  *)
+val algo_segis : Context.t -> PsiDef.t -> Syguslib.Sygus.solver_response segis_response
+
+(** The concrete CEGIS algorithm. *)
+val algo_cegis : Context.t -> PsiDef.t -> Syguslib.Sygus.solver_response segis_response

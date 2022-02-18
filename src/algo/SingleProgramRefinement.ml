@@ -40,7 +40,7 @@ let rec refinement_loop
   Context.check ctx;
   (* The solve the set of constraints with the assumption equations. *)
   let synth_time, (s_resp, solution) =
-    Stats.timed (fun () -> Equations.solve ~p (eqns @ lstate.assumptions))
+    Stats.timed (fun () -> Equations.solve ctx ~p (eqns @ lstate.assumptions))
   in
   match s_resp, solution with
   | RSuccess _, First sol ->
@@ -168,15 +168,18 @@ let se2gis (ctx : Context.t) (p : PsiDef.t) =
 (*                                                 MAIN ENTRY POINTS                             *)
 (* ============================================================================================= *)
 
-let solve_problem (synthesis_problem : PsiDef.t) : solver_response segis_response =
+let solve_problem (ctx : Context.t) (synthesis_problem : PsiDef.t)
+    : solver_response segis_response
+  =
   (* Solve the problem using portofolio of techniques. *)
-  try se2gis (Context.mk ()) synthesis_problem with
+  try se2gis ctx synthesis_problem with
   | Context.Escape ->
     Utils.Log.debug_msg "se2gis run was terminated early.";
     Failed RFail
 ;;
 
 let find_and_solve_problem
+    (ctx : Context.t)
     (psi_comps : (string * string * string) option)
     (pmrs : (string, PMRS.t, Base.String.comparator_witness) Map.t)
     : (PsiDef.t * Syguslib.Sygus.solver_response segis_response) list
@@ -199,5 +202,5 @@ let find_and_solve_problem
     then Baselines.algo_cegis (* Default algorithm: best combination of techniques. *)
     else solve_problem
   in
-  [ top_userdef_problem, main_algo top_userdef_problem ]
+  [ top_userdef_problem, main_algo ctx top_userdef_problem ]
 ;;

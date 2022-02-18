@@ -20,7 +20,9 @@ open Syguslib.Sygus
     will be taken as counterexamples during the refinement loop.
     Use the option [--segis] in the executable to use this synthesis algorithm.
 *)
-let rec segis_loop (p : PsiDef.t) (t_set : TermSet.t) : solver_response segis_response =
+let rec segis_loop (ctx : Context.t) (p : PsiDef.t) (t_set : TermSet.t)
+    : solver_response segis_response
+  =
   Int.incr refinement_steps;
   if !refinement_steps > !Config.refinement_rounds_warning_limit
      && Config.Optims.some_eager_optim_on ()
@@ -47,7 +49,9 @@ let rec segis_loop (p : PsiDef.t) (t_set : TermSet.t) : solver_response segis_re
       ~lifting:Lifting.empty_lifting
       t_set
   in
-  let synth_time, (s_resp, solution) = Stats.timed (fun () -> Equations.solve ~p eqns) in
+  let synth_time, (s_resp, solution) =
+    Stats.timed (fun () -> Equations.solve ctx ~p eqns)
+  in
   match s_resp, solution with
   | RSuccess _, First sol ->
     (match Stats.timed (fun () -> Verify.bounded_check ~p sol) with
@@ -61,7 +65,7 @@ let rec segis_loop (p : PsiDef.t) (t_set : TermSet.t) : solver_response segis_re
               "@[<hov 2><SEGIS> Counterexample term:@;@[<hov 2>%a@]"
               pp_term
               eqn.eterm));
-      segis_loop p (Set.add t_set eqn.eterm)
+      segis_loop ctx p (Set.add t_set eqn.eterm)
     | verif_time, None ->
       Stats.log_major_step_end ~synth_time ~verif_time ~t:tsize ~u:0 true;
       Log.print_ok ();
@@ -86,10 +90,10 @@ let rec segis_loop (p : PsiDef.t) (t_set : TermSet.t) : solver_response segis_re
   | _ -> Failed s_resp
 ;;
 
-let algo_segis (p : PsiDef.t) =
+let algo_segis (ctx : Context.t) (p : PsiDef.t) =
   let t_set = TermSet.of_list (Analysis.terms_of_max_depth 1 !AState._theta) in
   refinement_steps := 0;
-  segis_loop p t_set
+  segis_loop (Context.subctx ctx "segis") p t_set
 ;;
 
 (* ============================================================================================= *)
@@ -101,7 +105,9 @@ let algo_segis (p : PsiDef.t) =
     will be taken as counterexamples during the refinement loop: this is a concrete CEGIS algorithm.
     Use the option [--cegis] in the executable to use this synthesis algorithm.
 *)
-let rec cegis_loop (p : PsiDef.t) (t_set : TermSet.t) : solver_response segis_response =
+let rec cegis_loop (ctx : Context.t) (p : PsiDef.t) (t_set : TermSet.t)
+    : solver_response segis_response
+  =
   Int.incr refinement_steps;
   if !refinement_steps > !Config.refinement_rounds_warning_limit
   then (
@@ -124,7 +130,9 @@ let rec cegis_loop (p : PsiDef.t) (t_set : TermSet.t) : solver_response segis_re
       ~lifting:Lifting.empty_lifting
       t_set
   in
-  let synth_time, (s_resp, solution) = Stats.timed (fun () -> Equations.solve ~p eqns) in
+  let synth_time, (s_resp, solution) =
+    Stats.timed (fun () -> Equations.solve ctx ~p eqns)
+  in
   match s_resp, solution with
   | RSuccess _, First sol ->
     (match
@@ -140,7 +148,7 @@ let rec cegis_loop (p : PsiDef.t) (t_set : TermSet.t) : solver_response segis_re
               "@[<hov 2><CEGIS> Counterexample term:@;@[<hov 2>%a@]"
               pp_term
               eqn.eterm));
-      cegis_loop p (Set.add t_set eqn.eterm)
+      cegis_loop ctx p (Set.add t_set eqn.eterm)
     | verif_time, None ->
       Stats.log_major_step_end ~synth_time ~verif_time ~t:tsize ~u:0 true;
       Log.print_ok ();
@@ -165,11 +173,11 @@ let rec cegis_loop (p : PsiDef.t) (t_set : TermSet.t) : solver_response segis_re
   | _ -> Failed s_resp
 ;;
 
-let algo_cegis (p : PsiDef.t) =
+let algo_cegis (ctx : Context.t) (p : PsiDef.t) =
   let t_set =
     TermSet.of_list
       (List.map ~f:Analysis.concretize (Analysis.terms_of_max_depth 1 !AState._theta))
   in
   refinement_steps := 0;
-  cegis_loop p t_set
+  cegis_loop (Context.subctx ctx "cegis") p t_set
 ;;

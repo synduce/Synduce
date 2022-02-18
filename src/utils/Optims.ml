@@ -201,3 +201,17 @@ let turn_off_eager_optims () =
   turn_off use_syntactic_definitions;
   turn_off make_partial_correctness_assumption
 ;;
+
+(* ============================================================================================= *)
+(*                                                    MULTITHREADING                             *)
+(* ============================================================================================= *)
+
+let num_threads = ref 4
+
+let set_num_threads (s : string) =
+  try
+    let i = Int.of_string s in
+    if i > 0 && i <= 32 then num_threads := i
+  with
+  | _ -> ()
+;;

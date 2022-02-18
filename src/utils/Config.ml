@@ -240,6 +240,7 @@ open Optims
 
 let options print_usage parse_only =
   [ 'b', "bmc", None, Some set_check_depth
+  ; 'B', "bounded-lemma-check", set bounded_lemma_check true, None
   ; 'c', "simple-init", set simple_init true, None
   ; 'C', "check-smt-unrealizable", set check_unrealizable_smt_unsatisfiable true, None
   ; 'u', "no-check-unrealizable", set check_unrealizable false, None
@@ -256,8 +257,8 @@ let options print_usage parse_only =
   ; 'm', "style-math", set math_display true, None
   ; 'n', "verification", None, Some set_num_expansions_check
   ; 'N', "no-sat-as-unsat", set no_bounded_sat_as_unsat true, None
-  ; 'B', "bounded-lemma-check", set bounded_lemma_check true, None
   ; 'o', "output", None, Some set_output_folder
+  ; 'p', "num-threads", None, Some set_num_threads
   ; 's', "max-solutions", None, Some set_max_solutions
   ; 't', "no-detupling", set detupling_on false, None
   ; 'v', "verbose", set verbose true, None

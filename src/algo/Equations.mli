@@ -35,7 +35,8 @@ val pp_partial_soln
   -> unit
 
 val solve
-  :  p:PsiDef.t
+  :  Context.t
+  -> p:PsiDef.t
   -> AState.equation list
   -> Syguslib.Sygus.solver_response
      * (partial_soln, AState.unrealizability_ctex list) Either.t

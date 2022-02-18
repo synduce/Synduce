@@ -35,7 +35,7 @@ let solve_file ?(print_info = false) (filename : string)
   in
   Parsers.seek_types prog;
   let all_pmrs = Parsers.translate prog in
-  let outputs = Single.find_and_solve_problem psi_comps all_pmrs in
+  let outputs = Single.find_and_solve_problem (Context.mk "main") psi_comps all_pmrs in
   List.map outputs ~f:(fun (problem, result) ->
       let pd = problem_descr_of_psi_def problem in
       match result with

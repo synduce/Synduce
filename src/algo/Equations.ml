@@ -638,10 +638,12 @@ module Solve = struct
   let core_solve
       ?(predict_constants = None)
       ?(use_bools = true)
+      ~(ctx : Context.t)
       ~(gen_only : bool)
       (unknowns : VarSet.t)
       (eqns : equation list)
     =
+    let _ = ctx in
     let psoln, unknowns, eqns =
       match predict_constants with
       | Some x ->
@@ -769,6 +771,7 @@ module Solve = struct
   ;;
 
   let check_unrealizable
+      ~(ctx : Context.t)
       (task_counter : int ref)
       (unknowns : VarSet.t)
       (eqns : equation_system)
@@ -787,7 +790,7 @@ module Solve = struct
              Lwt.return (Sygus.RFail, Either.Second [])
            | _ ->
              if !Config.generate_benchmarks
-             then ignore (core_solve ~gen_only:true unknowns eqns);
+             then ignore (core_solve ~ctx ~gen_only:true unknowns eqns);
              if !Config.check_unrealizable_smt_unsatisfiable
              then Counterexamples.smt_unsatisfiability_check unknowns eqns;
              Lwt.return (Sygus.RInfeasible, Either.Second ctexs)
@@ -796,7 +799,7 @@ module Solve = struct
     else None
   ;;
 
-  let solve_eqns (unknowns : VarSet.t) (eqns : equation list)
+  let solve_eqns (ctx : Context.t) (unknowns : VarSet.t) (eqns : equation list)
       : Sygus.solver_response * (partial_soln, unrealizability_ctex list) Either.t
     =
     let opt_cst =
@@ -818,10 +821,10 @@ module Solve = struct
       List.concat_map
         ~f:Option.to_list
         [ (* Task 1 : checking unrealizability, if the option is set. *)
-          check_unrealizable task_counter unknowns eqns
+          check_unrealizable ~ctx task_counter unknowns eqns
         ; (* Task 2 : solving system of equations, default strategy. *)
           Some
-            (let t, r = core_solve ~gen_only:false unknowns eqns in
+            (let t, r = core_solve ~ctx ~gen_only:false unknowns eqns in
              (* Wait on failure, if the unrealizability check has not terminated
                 we would end up with a synthesis failure but no counterexamples
                 to decide what to do!
@@ -831,11 +834,16 @@ module Solve = struct
               If answer is Fail, must stall.
           *)
           on_opt opt_cst (fun () ->
-              core_solve ~predict_constants:(Some false) ~gen_only:false unknowns eqns)
+              core_solve
+                ~ctx
+                ~predict_constants:(Some false)
+                ~gen_only:false
+                unknowns
+                eqns)
         ; on_opt opt_cst (fun () ->
-              core_solve ~predict_constants:(Some true) ~gen_only:false unknowns eqns)
+              core_solve ~ctx ~predict_constants:(Some true) ~gen_only:false unknowns eqns)
         ; on_opt true (fun () ->
-              core_solve ~use_bools:false ~gen_only:false unknowns eqns)
+              core_solve ~ctx ~use_bools:false ~gen_only:false unknowns eqns)
         ]
     in
     Log.debug_msg
@@ -850,19 +858,24 @@ module Solve = struct
             lwt_tasks))
   ;;
 
-  let solve_eqns_proxy (unknowns : VarSet.t) (eqns : equation list) =
+  let solve_eqns_proxy (ctx : Context.t) (unknowns : VarSet.t) (eqns : equation list) =
     if !Config.Optims.use_syntactic_definitions
     then (
       let partial_soln, new_unknowns, new_eqns =
         solve_syntactic_definitions unknowns eqns
       in
       if Set.length new_unknowns > 0
-      then combine (Either.First partial_soln) (solve_eqns new_unknowns new_eqns)
+      then combine (Either.First partial_soln) (solve_eqns ctx new_unknowns new_eqns)
       else RSuccess [], Either.First partial_soln)
-    else solve_eqns unknowns eqns
+    else solve_eqns ctx unknowns eqns
   ;;
 
-  let split_solve partial_soln (unknowns : VarSet.t) (eqns : equation list) =
+  let split_solve
+      (ctx : Context.t)
+      (partial_soln : partial_soln)
+      (unknowns : VarSet.t)
+      (eqns : equation list)
+    =
     (* If an unknown depends only on itself, it can be split from the rest *)
     let split_eqn_systems =
       let f (l, u, e) xi =
@@ -897,7 +910,7 @@ module Solve = struct
       sl @ [ u, e ]
     in
     let solve_eqn_aux (unknowns, equations) =
-      if Set.length unknowns > 0 then [ solve_eqns_proxy unknowns equations ] else []
+      if Set.length unknowns > 0 then [ solve_eqns_proxy ctx unknowns equations ] else []
     in
     let comb_l l =
       List.fold
@@ -919,7 +932,8 @@ module Solve = struct
           Stop (combine prev_soln (resp, Either.Second counterexamples)))
   ;;
 
-  let solve_stratified (unknowns : VarSet.t) (eqns : equation list) =
+  let solve_stratified (ctx : Context.t) (unknowns : VarSet.t) (eqns : equation list) =
+    Context.check ctx;
     let psol, u, e =
       if !Config.Optims.use_syntactic_definitions
       then (
@@ -931,11 +945,12 @@ module Solve = struct
         c_soln @ partial_soln', new_unknowns, new_eqns)
       else [], unknowns, eqns
     in
+    Context.check ctx;
     if !Config.Optims.split_solve_on
-    then split_solve psol u e
+    then split_solve ctx psol u e
     else
       Either.(
-        match solve_eqns u e with
+        match solve_eqns ctx u e with
         | resp, First soln -> resp, First (psol @ soln)
         | resp, Second ctexs -> resp, Second ctexs)
   ;;
@@ -1078,7 +1093,7 @@ end
   solution as a list of implementations for the unknowns (a triple of unknown name, arguments of a
   function and body of a function) or a list of unrealizability counterexamples.
 *)
-let solve ~(p : PsiDef.t) (eqns : equation list)
+let solve (ctx : Context.t) ~(p : PsiDef.t) (eqns : equation list)
     : Sygus.solver_response * (partial_soln, unrealizability_ctex list) Either.t
   =
   let unknowns = p.PsiDef.target.psyntobjs in
@@ -1096,14 +1111,16 @@ let solve ~(p : PsiDef.t) (eqns : equation list)
         preprocessing_actions
         ~init:(unknowns, eqns, [])
         ~f:(fun (u, e, post_acts) pre_act ->
+          Context.check ctx;
           let ppact = pre_act u e in
           Preprocess.(
             ppact.pre_unknowns, ppact.pre_equations, ppact.pre_postprocessing :: post_acts))
     in
+    Context.check ctx;
     (* Apply the postprocessing after solving. *)
     List.fold
       postprocessing_actions
-      ~init:(Solve.solve_stratified unknowns' eqns')
+      ~init:(Solve.solve_stratified ctx unknowns' eqns')
       ~f:(fun partial_solution post_act -> post_act partial_solution)
   in
   Either.(

@@ -22,8 +22,6 @@ module AsyncSmt : sig
   val solver_verbose_response_summary : solver -> Sexplib0.Sexp.t -> unit
   val solver_verbose_pp_last_resp_count : solver -> unit
   val already_declared : solver -> SmtLib.smtSymbol -> bool
-  val solver_read : solver -> response
-  val solver_write : solver -> SmtLib.command -> unit Lwt.t
   val solver_declare : solver -> SmtLib.smtSymbol -> unit
   val open_log : unit -> unit
   val log : ?solver:solver option -> SmtLib.command -> unit
@@ -57,23 +55,20 @@ module SyncSmt : sig
   type online_solver = Solvers.Synchronous(SmtLog)(Stats).online_solver =
     { s_name : string
     ; s_pid : int
-    ; s_inputc : Stdio.Out_channel.t
-    ; s_outputc : Stdio.In_channel.t
+    ; s_inputc : out_channel
+    ; s_outputc : in_channel
+    ; mutable s_online : bool
     ; mutable s_scope_level : int
     ; s_declared : (string, int) Base.Hashtbl.t
     ; s_log_file : string
-    ; s_log_outc : Stdio.Out_channel.t
+    ; s_log_outc : out_channel
     }
 
   val open_log : unit -> unit
   val log : ?solver:online_solver option -> SmtLib.command -> unit
-  val solver_write : online_solver -> SmtLib.command -> unit
-  val solver_read : online_solver -> solver_response
   val already_declared : online_solver -> SmtLib.smtSymbol -> bool
   val solver_declare : online_solver -> SmtLib.smtSymbol -> unit
   val exec_command : online_solver -> SmtLib.command -> solver_response
-  val online_solvers : (int * online_solver) list ref
-  val handle_sigchild : int -> unit
   val close_solver : online_solver -> unit
   val call_solver : online_solver -> SmtLib.command list -> solver_response
 

@@ -66,15 +66,21 @@ module Synchronous (Log : Logger) (Stats : Statistics) = struct
     | _ -> false
   ;;
 
+  (** Type information about a solver.  *)
   type online_solver =
-    { s_name : string
-    ; s_pid : int
-    ; s_inputc : OC.t
-    ; s_outputc : IC.t
+    { s_name : string (** The name of the solver. *)
+    ; s_pid : int (** The process id of the solver.  *)
+    ; s_inputc : OC.t (** The input of the solver (an output channel for the user).  *)
+    ; s_outputc : IC.t (** The output of the sovler (an input channel for the user).  *)
+    ; mutable s_online : bool (** Whether the solver is online.  *)
     ; mutable s_scope_level : int
+          (** The scope level the solver is curently in. The scope level
+     changes when push and pop operations are used.  *)
     ; s_declared : (string, int) Hashtbl.t
+          (** The table of symbols declared in the solver at each scope level.  *)
     ; s_log_file : string
-    ; s_log_outc : OC.t
+          (** The file that hols the log of the SMT commands issued to the solver.  *)
+    ; s_log_outc : OC.t (** The output channel for logging from the solver. *)
     }
 
   (* Logging utilities. *)
@@ -94,24 +100,62 @@ module Synchronous (Log : Logger) (Stats : Statistics) = struct
         | None -> Log.(error (fun fmt () -> Fmt.pf fmt "Failed to open log file."))))
   ;;
 
-  let solver_write (solver : online_solver) (c : command) : unit =
-    write_command solver.s_inputc c;
-    OC.output_char solver.s_inputc '\n';
-    OC.flush solver.s_inputc
+  let close_solver solver =
+    Stats.log_proc_quit solver.s_pid;
+    let elapsed = Stats.get_elapsed solver.s_pid in
+    Log.debug
+      Fmt.(
+        fun fmt () ->
+          pf
+            fmt
+            "Closing %s (spent %.3fs), log can be found in %a"
+            solver.s_name
+            elapsed
+            (styled (`Fg `Blue) pp_link)
+            solver.s_log_file);
+    solver.s_online <- false;
+    (try OC.output_string solver.s_inputc (Sexp.to_string (sexp_of_command mk_exit)) with
+    | _ -> ());
+    try
+      IC.close solver.s_outputc;
+      OC.close solver.s_log_outc
+    with
+    | _ -> ()
+  ;;
+
+  let solver_write (solver : online_solver) (c : command) : bool =
+    if solver.s_online
+    then (
+      try
+        write_command solver.s_inputc c;
+        OC.output_char solver.s_inputc '\n';
+        OC.flush solver.s_inputc;
+        true
+      with
+      | Sys_error s ->
+        Log.error
+          Fmt.(fun fmt () -> pf fmt "Cannot write to solve (%s). Ignoring command." s);
+        (* Tag the solver as offline  *)
+        close_solver solver;
+        false)
+    else false
   ;;
 
   let solver_read (solver : online_solver) : solver_response =
-    let l =
-      try Ok (Sexp.input_sexp solver.s_outputc) with
-      | End_of_file -> Error (Sexp.List [ Atom "solver_read"; Atom "end of file" ])
-      | Sys_error _ ->
-        Error (Sexp.List [ Atom "solver_read"; Atom "Couldn't read solver answer." ])
-    in
-    match Result.map ~f:(fun l -> parse_response [ l ]) l with
-    | Ok r -> r
-    | Error sexps ->
-      Log.error (fun fmt () -> Sexp.pp fmt (List [ Atom "error"; sexps ]));
-      SExps [ Atom "error"; sexps ]
+    if solver.s_online
+    then (
+      let l =
+        try Ok (Sexp.input_sexp solver.s_outputc) with
+        | End_of_file -> Error (Sexp.List [ Atom "solver_read"; Atom "end of file" ])
+        | Sys_error _ ->
+          Error (Sexp.List [ Atom "solver_read"; Atom "Couldn't read solver answer." ])
+      in
+      match Result.map ~f:(fun l -> parse_response [ l ]) l with
+      | Ok r -> r
+      | Error sexps ->
+        Log.error (fun fmt () -> Sexp.pp fmt (List [ Atom "error"; sexps ]));
+        SExps [ Atom "error"; sexps ])
+    else SExps [ Atom "error"; Atom "solver_offline" ]
   ;;
 
   let already_declared (solver : online_solver) (s : smtSymbol) : bool =
@@ -165,11 +209,16 @@ module Synchronous (Log : Logger) (Stats : Statistics) = struct
         true
       | _ -> true
     in
-    if do_exec
+    if not solver.s_online
+    then Error (Fmt.str "Solver is offline")
+    else if do_exec
     then (
       if Log.log_queries then log ~solver:(Some solver) c;
-      solver_write solver c;
-      solver_read solver)
+      if solver_write solver c
+      then solver_read solver
+      else
+        SExps
+          [ Atom "error"; List [ Atom "exec_command"; Atom "Could not talk to solver" ] ])
     else Error (Fmt.str "Variable already declared")
   ;;
 
@@ -179,20 +228,20 @@ module Synchronous (Log : Logger) (Stats : Statistics) = struct
 
   let handle_sigchild (_ : int) : unit =
     if List.length !online_solvers = 0
-    then ignore @@ Unix.wait (`Group (Pid.of_int (-1)))
+    then ignore @@ Caml.Unix.wait ()
     else (
       let pid =
-        let pid, msg = Unix.wait (`Group (Pid.of_int (-1))) in
-        let pid = Pid.to_int pid in
+        let pid, msg = Caml.Unix.wait () in
         if Log.verbose
-        then Log.error (fun fmt () -> Fmt.pf fmt "Solver (pid %d) exited!" pid);
+        then Log.debug (fun fmt () -> Fmt.pf fmt "Solver (pid %d) exited!" pid);
         (match msg with
-        | Ok _ -> ()
-        | Error (`Exit_non_zero i) ->
-          if Log.verbose then Log.error Fmt.(fun fmt () -> pf fmt "Non-zero error = %i" i)
-        | Error (`Signal sign) ->
-          if Log.verbose
-          then Log.error Fmt.(fun fmt () -> pf fmt "Signal : %s" (Signal.to_string sign)));
+        | Caml.Unix.WEXITED i ->
+          if not (i = 0)
+          then Log.error Fmt.(fun fmt () -> pf fmt "%i returned non-zero error: %i" pid i)
+        | Caml.Unix.WSIGNALED s ->
+          Log.error Fmt.(fun fmt () -> pf fmt "%i signalled with: %i" pid s)
+        | Caml.Unix.WSTOPPED s ->
+          Log.error Fmt.(fun fmt () -> pf fmt "%i stopped with code: %i" pid s));
         pid
       in
       match List.Assoc.find !online_solvers ~equal:( = ) pid with
@@ -203,12 +252,11 @@ module Synchronous (Log : Logger) (Stats : Statistics) = struct
             Fmt.(
               fun fmt () ->
                 pf fmt "Solver %s log is in: %a" solver.s_name pp_link solver.s_log_file);
-        IC.close solver.s_outputc;
-        OC.close solver.s_inputc
+        close_solver solver
       | None -> ())
   ;;
 
-  (* let () = Caml.Sys.set_signal Caml.Sys.sigchld (Caml.Sys.Signal_handle handle_sigchild) *)
+  let () = Caml.Sys.set_signal Caml.Sys.sigchld (Caml.Sys.Signal_handle handle_sigchild)
 
   let make_solver ~(name : string) (path : string) (options : string list) : online_solver
     =
@@ -231,6 +279,7 @@ module Synchronous (Log : Logger) (Stats : Statistics) = struct
       ; s_pid = Pid.to_int pinfo.pid
       ; s_inputc = out_chan
       ; s_outputc = in_chan
+      ; s_online = true
       ; s_declared = Hashtbl.create (module String)
       ; s_scope_level = 0
       ; s_log_file = log_file
@@ -258,24 +307,6 @@ module Synchronous (Log : Logger) (Stats : Statistics) = struct
     with
     | Sys_error s ->
       failwith ("couldn't talk to solver, double-check path. Sys_error " ^ s)
-  ;;
-
-  let close_solver solver =
-    Stats.log_proc_quit solver.s_pid;
-    let elapsed = Stats.get_elapsed solver.s_pid in
-    Log.debug
-      Fmt.(
-        fun fmt () ->
-          pf
-            fmt
-            "Closing %s (spent %.3fs), log can be found in %a"
-            solver.s_name
-            elapsed
-            (styled (`Fg `Blue) pp_link)
-            solver.s_log_file);
-    OC.output_string solver.s_inputc (Sexp.to_string (sexp_of_command mk_exit));
-    IC.close solver.s_outputc;
-    OC.close solver.s_log_outc
   ;;
 
   (** Returns empty response if commands is empty, otherwise, executes the LAST command in the
