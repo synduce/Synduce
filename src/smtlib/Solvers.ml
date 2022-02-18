@@ -237,11 +237,11 @@ module Synchronous (Log : Logger) (Stats : Statistics) = struct
         (match msg with
         | Caml.Unix.WEXITED i ->
           if not (i = 0)
-          then Log.error Fmt.(fun fmt () -> pf fmt "%i returned non-zero error: %i" pid i)
+          then Log.debug Fmt.(fun fmt () -> pf fmt "%i returned non-zero error: %i" pid i)
         | Caml.Unix.WSIGNALED s ->
-          Log.error Fmt.(fun fmt () -> pf fmt "%i signalled with: %i" pid s)
+          Log.debug Fmt.(fun fmt () -> pf fmt "%i signalled with: %i" pid s)
         | Caml.Unix.WSTOPPED s ->
-          Log.error Fmt.(fun fmt () -> pf fmt "%i stopped with code: %i" pid s));
+          Log.debug Fmt.(fun fmt () -> pf fmt "%i stopped with code: %i" pid s));
         pid
       in
       match List.Assoc.find !online_solvers ~equal:( = ) pid with
@@ -252,7 +252,10 @@ module Synchronous (Log : Logger) (Stats : Statistics) = struct
             Fmt.(
               fun fmt () ->
                 pf fmt "Solver %s log is in: %a" solver.s_name pp_link solver.s_log_file);
-        close_solver solver
+        OC.close_no_err solver.s_inputc;
+        solver.s_online <- false;
+        (try IC.close solver.s_outputc with
+        | _ -> ())
       | None -> ())
   ;;
 

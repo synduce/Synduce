@@ -46,10 +46,21 @@ module Context = struct
     new_ctx
   ;;
 
+  let remove_sub (ctx : t) ~(sub : t) =
+    ctx.c_subctx
+      <- Array.filter ctx.c_subctx ~f:(fun sub' ->
+             not (String.equal sub'.c_name sub.c_name))
+  ;;
+
   let send_termination (ctx : t) = Chan.send ctx.c_chan (-1)
 
   let rec subkill (ctx : t) : unit =
-    Array.iter ~f:subkill ctx.c_subctx;
+    Array.iter
+      ~f:(fun sub ->
+        send_termination sub;
+        subkill sub;
+        remove_sub ctx ~sub)
+      ctx.c_subctx;
     if ctx.c_pid > 0 then Unix.kill ctx.c_pid Caml.Sys.sigkill
   ;;
 
