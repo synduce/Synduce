@@ -47,6 +47,15 @@ fi
 sep "Updating package lists"
 eval "$PKG_UPDATE"
 
+sep "Installing bc ..."
+BC_VERSION=$(bc --version)
+if [[ -z BC_VERSION ]]
+then
+    eval "$PKG_INSTALL bc"
+else
+    msg_success "bc $BC_VERSION is already installed."
+fi
+
 sep "Installing python3 ..."
 PYTHON3_VERSION=$(python3 --version)
 if [[ -z PYTHON3_VERSION ]]
