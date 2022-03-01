@@ -41,8 +41,6 @@ def run_one(progress, bench_id, command, algo, optim, filename, extra_opt):
 
         if process.poll() is not None or info.is_successful:
             break
-        print(
-            f"{progress : >11s}.. benchmarks/{filename} {extra_opt} {algo[1]} {optim[1]} 🏃 at step {info.major_step_count}:{info.minor_step_count}", end="\r")
 
     return last_info
 
