@@ -1,6 +1,6 @@
-#!/bin/sh
+#!/bin/bash
+source .venv/bin/activate
 # This benchmarks runs the full set of experiments with a 400s timeout.
-
 # Create the directory where we'll write the results
 mkdir -p full-results
 export RESULTS_LOCAL_COPY=$PWD/full-results/
