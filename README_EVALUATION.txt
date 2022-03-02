@@ -101,3 +101,53 @@ for the functions g0, g1, g2, g3).
 
 
 ## Reproducing the experimental results of Section 8
+
+The reviewer can reproduce the experimental results presented in Section 8 by executing
+the scripts `1-short-timeout.sh` and `2-full-experiments.sh` in the root directory.
+The first script is a shorter evaluation process (1-2 hours) while the second script
+should only be run by a reviewer that wants to obtain results as close to the ones presented
+in the paper, modulo the variations due to the experimental setup.
+
+1) The script `1-short-timeout.sh` reproduces only partially the results presented in the paper,
+but runs in a shorter amount of time (1-2 hours).
+
+Running:
+
+$ ./1-short-timeout.sh
+
+launches a series of tests. For each benchmark in the set of 140 benchmarks, the scripts
+runs the tool with the SE2GIS (default) algorithm and the SEGIS+UC algorithm, with a timeout
+of 60s. The expected output during this phase should be two lines for each benchmark.
+
+Once all the tests have been executed, the script will generate the figures that correspond
+to the experimental data in the `short-results` folder:
+- fig3or10.pdf corresponds to Figures 3 and 10 of the paper,
+- fig4or9.df corresponds to Figures 4 and 9 of the paper,
+- fig11.pdf corresponds to Figure 11 of the paper (in the Appendix).
+- table1.tex corresponds to Table 1 of the paper (and table2.tex to Table2).
+
+The main difference in the evaluation process of this script compared to the one used to
+generate the results presented in the paper is that:
+- only SE2GIS and SEGIS+UC algorithms are run. The SEGIS algorithm runs in similar time to
+SEGIS+UC on realizable benchmarks, and fails on unrealizable benchmarks. The experimental
+information gained from running this algorithm compared to SEGIS+UC is not significant.
+Therefore, we removed the tests in this evaluation setting.
+- A timeout of 60s is used instead of 400s.
+- Each benchmark is only evaluated once for each algorithm, instead of 10 times in the paper.
+
+2) The script `2-full-results.sh` follows a similar evaluation approach as the previous one,
+but runs all algorithms with a 400s timeouts. Running this script can take between 6 to 12
+hours.
+
+Running:
+
+$./2-full-results.sh
+
+launches a series of tests and then a script to generate the figures corresponding to
+the experimental data.
+The figures are written to the `full-results` folder.
+As opposed to the previous script, both SEGIS and SEGIS+UC are run on each benchmark
+and the timeout is increased to 400s.
+The only difference between this evaluation process and the one used to produce the
+results presented in the paper is that each benchmark is run only once for each
+synthesis algorithm instead of 10 times.

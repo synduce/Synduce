@@ -427,7 +427,7 @@ def create_figures(input_file, output_file):
         f"SEGIS+UC solves {len([x for x in segis_series if x < timeout_value])}")
     print(
         f"SE2GIS solves {len([x for x in se2gis_series if x < timeout_value])}")
-    print(f"{segis_timeouts} timeouts for SEGIS, {se2gis_timeouts} timeouts for SE2GIS.")
+    print(f"{segis_timeouts} timeouts for SEGIS+UC, {se2gis_timeouts} timeouts for SE2GIS.")
     print(f"SE2GIS is faster on {speedups} benchmarks.")
     print(f"Tex table    : { tex_table1}  ")
     print(f"Quantile plot: {quantile_file}")
