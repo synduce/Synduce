@@ -3,7 +3,7 @@
 
 # Create the directory where we'll write the results
 mkdir -p full-results
-export RESULTS_LOCAL_COPY=$HOME/Synduce/full-results/
+export RESULTS_LOCAL_COPY=$PWD/full-results/
 
 # Write the timeout value in the python file
 echo "timeout_value = 400" >> benchmarks/timeout_v.py

@@ -8,7 +8,7 @@
 # Running the scripts generating the experimental results...
 # Create the directory where we'll write the results.
 mkdir -p paper-results
-export RESULTS_LOCAL_COPY=$HOME/Synduce/paper-results/
+export RESULTS_LOCAL_COPY=$PWD/paper-results/
 # Set the timeout value that was used for the results reported in the paper.
 echo "timeout_value = 400" >> benchmarks/timeout_v.py
 # Generate the figures and tables from the csv containing the results.

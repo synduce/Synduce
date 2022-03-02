@@ -281,7 +281,7 @@ def save_scatter_plot(scatter_file, segis_series, se2gis_series,
         fig.savefig(scatter_file, bbox_inches='tight')
 
 
-def make_table_5(input_file, output_file):
+def create_figures(input_file, output_file):
     print("============== SUMMARY ================")
     print("Summary of relative improvement of Synduce over baseline.")
     print("improvement = baseline synt. time / Synduce synt. time")
@@ -305,8 +305,8 @@ def make_table_5(input_file, output_file):
     quantile_unrealizable_file = input_name + "_unrealizable_quantile.pdf"
     scatter_file = input_name + "_scatter.pdf"
     scatter_no_timeouts_file = input_name + "_no_timeouts_scatter.pdf"
-    tex_table = input_name + "_table.tex"
-    tex_table2 = input_name + "_table_unrealizable.tex"
+    tex_table1 = input_name + "_table1.tex"
+    tex_table2 = input_name + "_table2.tex"
 
     unrealizable_benchmarks = 0
 
@@ -415,7 +415,7 @@ def make_table_5(input_file, output_file):
     quantile_plot2(quantile_unrealizable_file,
                    segis_unrealizable_series, se2gis_unrealizable_series)
     # Output a tex table for  realizable benchmarks
-    make_tex_table(exp_setup, table, tex_table)
+    make_tex_table(exp_setup, table, tex_table1)
     # Output a tex table for unrealizable benchmarks
     make_tex_unrealizables_table(exp_setup, table, tex_table2)
 
@@ -429,7 +429,7 @@ def make_table_5(input_file, output_file):
         f"SE2GIS solves {len([x for x in se2gis_series if x < timeout_value])}")
     print(f"{segis_timeouts} timeouts for SEGIS, {se2gis_timeouts} timeouts for SE2GIS.")
     print(f"SE2GIS is faster on {speedups} benchmarks.")
-    print(f"Tex table    : { tex_table}  ")
+    print(f"Tex table    : { tex_table1}  ")
     print(f"Quantile plot: {quantile_file}")
     print(
         f"Quantile unrealizable benchmarks plot: {quantile_unrealizable_file}")
@@ -440,7 +440,7 @@ def make_table_5(input_file, output_file):
         "quantile_unrealizable": quantile_unrealizable_file,
         "scatter": scatter_file,
         "scatter_no_timeouts": scatter_no_timeouts_file,
-        "table1": tex_table,
+        "table1": tex_table1,
         "table2": tex_table2
     }
 
@@ -495,7 +495,7 @@ if __name__ == "__main__":
         input_file = select_last_known_experimental_data()
         print(f"Input file selected: {input_file}")
 
-    filenames = make_table_5(input_file, output_file)
+    filenames = create_figures(input_file, output_file)
 
     if args.copy:
         LOCAL_COPY = os.getenv('RESULTS_LOCAL_COPY')
