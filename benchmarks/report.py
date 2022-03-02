@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# -*- coding: UTF-8 -*-
 import sys
 import os
 from datetime import datetime
@@ -6,6 +7,7 @@ import argparse
 from definitions import *
 import matplotlib.pyplot as plt
 import shutil
+from timeout_v import timeout_value
 
 
 def caption(exp_setup):
@@ -438,12 +440,12 @@ def make_table_5(input_file, output_file):
         "quantile_unrealizable": quantile_unrealizable_file,
         "scatter": scatter_file,
         "scatter_no_timeouts": scatter_no_timeouts_file,
-        "table": tex_table,
+        "table1": tex_table,
         "table2": tex_table2
     }
 
 
-def select_last_known_experimental_data(table_no):
+def select_last_known_experimental_data():
     candidates = []
     for root, dirs, files in os.walk("benchmarks/data/exp"):
         for file in files:
@@ -452,8 +454,8 @@ def select_last_known_experimental_data(table_no):
                 try:
                     date_generated = datetime.strptime(
                         comps[1].strip(), timestamp_definition)
-                    file_table_no = comps[2].split(".")[0][-1]
-                    if table_no == int(file_table_no):
+                    file_table = comps[2].split(".")[0]
+                    if file_table.endswith("table"):
                         candidates.append((date_generated, file))
                 except ValueError as e:
                     pass
@@ -472,13 +474,11 @@ if __name__ == "__main__":
     aparser.add_argument(
         "-o", "--output", help="The output text file for the table.", type=str, default="benchmarks/table.txt")
     aparser.add_argument(
-        "-t", "--table", help="Table number that the script must generate.", type=int, choices=[0, 1, 2, 3, 4, 5], default=0)
-    aparser.add_argument(
-        "-c", "--csv", help="The output csv file for results.", type=str, default="benchmarks/constraints_results.csv")
+        "-c", "--csv", help="The output csv file for results.", type=str, default="benchmarks/data/exp/results.csv")
     aparser.add_argument(
         "-e", "--explain", help="Explain where the benchmarks are stored.", action="store_true")
     aparser.add_argument(
-        "-y", "--copy", help="Copy figures to $SYND_LOCAL_COPY/figures and $SYND_LOCAL_COPY/tables.", action="store_true"
+        "-y", "--copy", help="Copy figures and tables $RESULTS_LOCAL_COPY", action="store_true"
     )
 
     args = aparser.parse_args()
@@ -489,32 +489,24 @@ if __name__ == "__main__":
 
     input_file = args.input
     output_file = args.csv
-    table_no = args.table
     tex_out = args.output
 
-    if (table_no is None) or table_no < 0 or table_no > 5:
-        print("Please provide a table number between 0 and 5.")
-        exit()
-
     if not input_file:
-        input_file = select_last_known_experimental_data(table_no)
+        input_file = select_last_known_experimental_data()
         print(f"Input file selected: {input_file}")
 
-    if table_no == 5 or table_no == 0 and input_file:
-        filenames = make_table_5(input_file, output_file)
+    filenames = make_table_5(input_file, output_file)
 
-        if args.copy:
-            LOCAL_COPY = os.getenv('SYND_LOCAL_COPY')
-            if LOCAL_COPY is not None:
-                shutil.copyfile(filenames['table'], os.path.join(
-                    LOCAL_COPY, "tables/table.tex"))
-                shutil.copyfile(filenames['table2'], os.path.join(
-                    LOCAL_COPY, "tables/table_unrealizable.tex"))
-                shutil.copyfile(filenames['quantile'], os.path.join(
-                    LOCAL_COPY, "figures/quantile.pdf"))
-                shutil.copyfile(filenames['quantile_unrealizable'], os.path.join(
-                    LOCAL_COPY, "figures/quantile_unrealizable.pdf"))
-                shutil.copyfile(filenames['scatter'], os.path.join(
-                    LOCAL_COPY, "figures/scatter.pdf"))
-                shutil.copyfile(filenames['scatter_no_timeouts'], os.path.join(
-                    LOCAL_COPY, "figures/no_timeouts_scatter.pdf"))
+    if args.copy:
+        LOCAL_COPY = os.getenv('RESULTS_LOCAL_COPY')
+        if LOCAL_COPY is not None:
+            shutil.copyfile(filenames['table1'], os.path.join(
+                LOCAL_COPY, "table1.tex"))
+            shutil.copyfile(filenames['table2'], os.path.join(
+                LOCAL_COPY, "table2.tex"))
+            shutil.copyfile(filenames['quantile'], os.path.join(
+                LOCAL_COPY, "fig3or10.pdf"))
+            shutil.copyfile(filenames['quantile_unrealizable'], os.path.join(
+                LOCAL_COPY, "fig11.pdf"))
+            shutil.copyfile(filenames['scatter_no_timeouts'], os.path.join(
+                LOCAL_COPY, "fig4or9.pdf"))

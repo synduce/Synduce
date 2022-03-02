@@ -1,8 +1,8 @@
 
 import sys
+from timeout_v import timeout_value
 
 # Timeout for all experiments.
-timeout_value = 400
 timestamp_definition = "%d-%m-%y-%H:%M:%S"
 experimental_setup = "a machine with an AMD® Ryzen 7 3700x 8-core processor and 32GB Ram running Ubuntu 20.04"
 experimental_setup_2 = "a laptop with an Intel Core i7-8750H 6-core processor and 32GB Ram running Ubuntu 21.04"
@@ -316,31 +316,6 @@ constraint_benchmarks = [
     ["constraints/unimodal_list/max_logn.ml", "-B"],
 ]
 
-lifting_benchmarks = [
-    # Indexed list
-    ["indexed_list/position_polynomial_no_index.ml", ""],
-    ["indexed_list/search_no_index.ml", ""],
-    ["indexed_list/sum_elts_lt_pos_no_len.ml", "--no-assumptions"],
-    # Automatic parallelization
-    ["list/atoi_no_fac.ml", "--no-gropt"],
-    ["list/is_sorted_no_last.ml", ""],
-    ["list/largest_diff_sorted_list_nohead.ml", ""],
-    ["list/mps_no_sum.ml", ""],
-    ["list/poly_no_fac.ml", ""],
-    ["list/zero_after_one_no.ml", ""],
-    # Tail optimizations
-    ["tailopt/mps_no_sum.ml", ""],
-    # Combining traversals
-    ["combine/mts_and_mps_nosum.ml", ""],
-    # Sorting list makes things easier
-    ["sort_list/sndmax.ml", ""],
-    ["sort_list/sndmin.ml", ""],
-    # Switching tree traversals
-    ["tree/gradient.ml", ""],
-    ["tree/mits_nosum.ml", ""],
-    # Unimodal lists (might also be due to representation)
-    ["unimodal_lists/prod_needs_aux.ml", ""]
-]
 
 unrealizable_benchmarks = [
     ["unrealizable/approximately_pareto.ml", "", False],
@@ -391,7 +366,7 @@ unrealizable_benchmarks = [
     ["unimodal_lists/prod_needs_aux.ml",  "--no-lifting", False],
 ]
 
-benchmark_set = constraint_benchmarks + base_benchmark_set + lifting_benchmarks
+benchmark_set = constraint_benchmarks + base_benchmark_set
 
 # Extra extra benchmarks (takes extra time..)
 extra_benchmarks = [
@@ -404,10 +379,9 @@ extra_benchmarks = [
 def summarize():
     num_constraint = len(constraint_benchmarks)
     num_base = len(base_benchmark_set)
-    num_lifting = len(lifting_benchmarks)
     num_extrs = len(extra_benchmarks)
     num_unr = len(unrealizable_benchmarks)
-    total = num_constraint + num_base + num_lifting + num_extrs
+    total = num_constraint + num_base + num_extrs + num_unr
     print("%i benchmarks in total:" % total)
     print("\t• %i basic benchmarks (run with --base)." % num_base)
     print("\t\tincluding %i in kick-the-tires set (run with --kick-the-tires or -b small)." %
@@ -415,9 +389,8 @@ def summarize():
     print("\t• %i benchmarks with requires constraints (run with -b constraint)." %
           num_constraint)
     print("\t• %i unrealizable benchmarks (run with -b unr)." % num_unr)
-    print("\t• %i benchmarks with lifting (run with -b lifting)." % num_lifting)
     print("\t• %i extras benchmarks." % num_extrs)
-    print("\t🎉 that means %i benchmarks in T5, %i in T6." % (num_unr + num_constraint,  (num_unr + num_constraint + num_lifting))
+    print("\t🎉 that means %i benchmarks in T5, %i in T6." % (num_unr + num_constraint,  (num_unr + num_constraint))
           )
 
 

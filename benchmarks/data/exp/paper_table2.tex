@@ -1,0 +1,62 @@
+% ====================================
+% This table has been automatically produced by the tool on 2021-11-19 18:43:31.623591.
+% ====================================
+	{\small
+		\begin{longtable}[h]{|c|c|c|c||c|c|}
+			\hline
+			\multirow{2}{*}{Benchmark} &                 \multirow{2}{*}{I?} &                 \multicolumn{2}{c||}{\setwogis} &                 \multicolumn{2}{c|}{SEGIS+UC}\\ 
+			\cline{3-6}
+			 & & time & steps & time & \#'r' \\ 
+			\hline
+value-pos mult. & y & {\bf 0.028} & $\bullet\bullet$ & -  & 3 \\ 
+search index & y & {\bf 0.030} & $\bullet\bullet$ & -  & 3 \\ 
+sum smaller pos. & y & {\bf 0.034} & $\bullet\bullet$ & -  & 3 \\ 
+			\hline
+atoi & y & {\bf 0.028} & $\bullet$ & -  & 21 \\ 
+is sorted & y & {\bf 0.071} & $\bullet\bullet$ & -  & 4 \\ 
+largest diff & y & {\bf 0.022} & $\bullet$ &  0.023  & 2 \\ 
+mps & y & {\bf 0.057} & $\bullet$ &  0.108  & 4 \\ 
+poly & y & {\bf 0.057} & $\bullet$ &  0.100  & 4 \\ 
+0 after 1 & y & {\bf 0.039} & $\bullet$ &  0.122  & 4 \\ 
+			\hline
+mps (no sum) & y & {\bf 0.032} & $\bullet\bullet$ & -  & 3 \\ 
+			\hline
+gradient & y & {\bf 0.012} & $\bullet$ &  0.024  & 2 \\ 
+mits & y & {\bf 0.064} & $\bullet\bullet$ & -  & 3 \\ 
+			\hline
+product & y & {\bf 0.691} & $\bullet$ & -  & 21 \\ 
+			\hline
+Mts+mps (no sum) & y & {\bf 0.096} & $\bullet\bullet$ & -  & 3 \\ 
+			\hline
+Partial order sorted & y &  0.082 & $\bullet\bullet$ & {\bf 0.047}  & 3 \\ 
+sum  & y &  0.028 & $\bullet$ & {\bf 0.023}  & 2 \\ 
+two-sum & y & {\bf 0.068} & $\bullet\bullet$ & -  & 98 \\ 
+minmax & y & {\bf 0.065} & $\bullet\bullet\bullet\bullet$ & -  & 21 \\ 
+most freq. no invariant & y & {\bf 0.523} & $\bullet\bullet\bullet\bullet$ & -  & 6 \\ 
+count between (swap calls) & n &  2.850 & $\bullet\circ\circ$ & {\bf 0.038}  & 2 \\ 
+count between (try 1 intro) & n &  0.848 & $\bullet\circ\circ\circ$ & {\bf 0.037}  & 2 \\ 
+count between (try 2 intro) & n &  81.731 & $\bullet\circ\circ\circ$ & {\bf 0.057}  & 2 \\ 
+count between (try 3 intro) & n &  82.391 & $\bullet\circ\circ\circ$ & {\bf 0.058}  & 2 \\ 
+count between v2 & n &  2.404 & $\bullet\circ\circ$ & {\bf 0.128}  & 2 \\ 
+contains & y & {\bf 0.035} & $\bullet$ &  0.055  & 3 \\ 
+contains (v2) & y & {\bf 0.027} & $\bullet$ &  0.028  & 2 \\ 
+parity & y & {\bf 0.033} & $\bullet$ &  0.036  & 2 \\ 
+largest even positive & y &  0.104 & $\bullet\circ$ & {\bf 0.028}  & 2 \\ 
+minmax (v2) & y & {\bf 0.052} & $\bullet\bullet\bullet$ &  0.658  & 21 \\ 
+swapping, missing call & y & {\bf 7.772} & $\bullet\bullet\bullet$ & -  & 7 \\ 
+forced unknown nesting & n & - & $f$ & -  & 21 \\ 
+pareto approx. & y & {\bf 0.023} & $\bullet$ &  0.041  & 2 \\ 
+partial sum & n &  22.955 & $\bullet\circ\circ\circ\circ\circ$ & {\bf 0.056}  & 2 \\ 
+common elt. & y &  0.030 & $\bullet$ & {\bf 0.026}  & 2 \\ 
+interval intersection & y & {\bf 0.070} & $\bullet\bullet$ & -  & 3 \\ 
+max bottom strip & n & {\bf 8.709} & $\bullet\bullet\bullet\circ\circ$ & -  & 2 \\ 
+max b. strip, bad sorting & n & {\bf 0.297} & $\bullet\circ\circ$ &  3.480  & 4 \\ 
+min max mts & y & {\bf 3.344} & $\bullet\bullet\circ\circ$ & -  & 5 \\ 
+min max mixed & y & {\bf 0.668} & $\bullet\bullet\bullet\bullet\circ$ & -  & 7 \\ 
+pyramid sort & y &  0.058 & $\bullet\bullet$ & {\bf 0.051}  & 2 \\ 
+largest peak & y & {\bf 89.021} & $\bullet\circ\circ\circ$ &  339.655  & 4 \\ 
+height memoizing max & y &  0.064 & $\bullet$ & {\bf 0.029}  & 2 \\ 
+			\hline
+	\caption{Experimental Results for Unrealizable Benchmarks. All synthesis times are in seconds. The best time is highlighted in bold font.  A '-' indicates timeout ($>$ 400s). The ``I'' column indicates whether intermediate lemmas were proven by induction. Steps is a sequence of '$\bullet$' (refinement) and '$\circ$' (coarsening). Experiments are run on a laptop with an Intel Core i7-8750H 6-core processor and 32GB Ram running Ubuntu 21.04.}\label{table:unrealizable-experiments}
+		\end{longtable}
+	}

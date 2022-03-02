@@ -1,0 +1,120 @@
+% ====================================
+% This table has been automatically produced by the tool on 2021-11-19 18:43:31.623002.
+% ====================================
+	{\small
+		\begin{longtable}[h]{|c|c|c|c|c||c|c||c|c|}
+			\hline
+			 \multirow{2}{*}{Class} &                \multirow{2}{*}{Benchmark} &                 \multirow{2}{*}{I?} &                 \multicolumn{2}{c||}{\setwogis} &                 \multicolumn{2}{c|}{SEGIS+UC} &                 \multicolumn{2}{c|}{SEGIS}\\ 
+			\cline{4-9}
+			 &   & & time & steps & time & \#'r' & time & \#'r' \\ 
+			\hline
+ & mps & y & {\bf 0.896} & $\bullet\circ\circ$ &  3.731  & 5 &  3.880 & 5 \\ 
+ & mts & y & {\bf 0.652} & $\bullet\circ\bullet$ &  5.511  & 5 &  5.363 & 5 \\ 
+Inferring & mss & y & {\bf 21.274} & $\bullet\circ\circ\circ\circ\circ\circ\circ\circ\bullet\bullet$ & -  & 8 & - & 8 \\ 
+Postconditions & max top strip & y &  1.072 & $\bullet\bullet\circ\circ$ &  1.066  & 4 & {\bf 1.060} & 4 \\ 
+ & max top strip (no hint) & y & {\bf 6.636} & $\bullet\bullet\bullet\circ\circ$ &  19.272  & 4 &  19.148 & 4 \\ 
+ & max bottom strip & y & {\bf 0.267} & $\bullet\bullet\circ$ &  2.557  & 5 &  2.536 & 5 \\ 
+ & max bottom strip (no hint) & y & {\bf 3.594} & $\bullet\bullet\bullet\circ$ &  19.859  & 4 &  19.782 & 4 \\ 
+ & max segment strip & y & {\bf 4.866} & $\bullet\bullet\circ\circ\circ\circ$ & -  & 5 & - & 5 \\ 
+ & max seg. strip (no hint) & y & {\bf 17.260} & $\bullet\bullet\bullet\circ\circ\circ\circ$ & -  & 3 & - & 3 \\ 
+ & min-max nested & y & {\bf 0.115} & $\bullet\bullet\bullet$ &  0.651  & 7 &  0.593 & 7 \\ 
+ & balanced parens & n & - & $f$ & -  & 41 & - & 41 \\ 
+			\hline
+All & mps & y & {\bf 0.583} & $\bullet\circ\circ$ &  1.266  & 4 &  1.187 & 4 \\ 
+Elements & second min & n &  1.136 & $\bullet\circ$ &  0.835  & 1 & {\bf 0.827} & 1 \\ 
+Positive & second max & y & {\bf 0.705} & $\bullet\bullet$ &  85.573  & 6 &  85.405 & 6 \\ 
+			\hline
+               & count mems (v2)  & n &  0.595 & $\bullet\circ$ & {\bf 0.081}  & 4 &  0.097 & 4 \\ 
+  Association  & count mems & y &  0.061 & $\bullet\circ$ &  0.060  & 3 & {\bf 0.054} & 3 \\ 
+   List        & sum for matching keys & y &  0.060 & $\bullet\circ$ &  0.058  & 3 & {\bf 0.055} & 3 \\ 
+               & most frequent (alist) & y &  8.867 & $\bullet\bullet\bullet\bullet$ &  2.003  & 5 & {\bf 1.992} & 5 \\ 
+               & most frequent (unique keys) & y &  8.766 & $\bullet\bullet\bullet\bullet$ &  2.121  & 5 & {\bf 2.082} & 5 \\ 
+			\hline
+ Balanced  & node count & y & {\bf 0.318} & $\bullet\circ$ &  285.497  & 4 &  284.740 & 4 \\ 
+  Tree     & height & y &  0.181 & $\bullet\circ$ & {\bf 0.052}  & 3 &  0.058 & 3 \\ 
+           & height (v2) & n &  0.262 & $\bullet\circ$ & {\bf 0.059}  & 3 &  0.061 & 3 \\ 
+			\hline
+  & check bounds inclusion & n & {\bf 0.229} & $\bullet\circ\circ$ & -  & 2 & - & 2 \\ 
+  & single-pass inclusion & n & {\bf 0.097} & $\bullet\circ$ &  0.132  & 2 &  0.127 & 2 \\ 
+  & integer contains & y & {\bf 0.172} & $\bullet\circ$ &  0.184  & 2 &  0.181 & 2 \\ 
+  & no subtree sum gt.2 & n &  6.490 & $\bullet\circ\circ\circ\circ\circ\circ\circ\circ$ &  0.169  & 2 & {\bf 0.157} & 2 \\ 
+  & boolean contains & n &  1.730 & $\bullet\circ$ &  0.106  & 2 & {\bf 0.104} & 2 \\ 
+       & count elts. < & y &  0.216 & $\bullet\circ$ &  0.195  & 2 & {\bf 0.182} & 2 \\ 
+ Binary  & int contains w. const case & y &  0.581 & $\bullet\circ\circ$ &  0.109  & 1 & {\bf 0.105} & 1 \\ 
+ Search  & contains rev. & y & {\bf 0.998} & $\bullet\circ\circ$ &  68.594  & 2 &  68.278 & 2 \\ 
+ Tree  & count between & y & {\bf 0.837} & $\bullet\circ\circ$ &  137.506  & 2 &  135.589 & 2 \\ 
+  & int. contains (list) & y &  0.117 & $\bullet\circ$ &  0.105  & 2 & {\bf 0.101} & 2 \\ 
+  & max elt. (list) & n &  4.094 & $\bullet\circ$ &  0.124  & 2 & {\bf 0.122} & 2 \\ 
+  & minmax (2 traversals) & y &  4.404 & $\bullet\bullet\bullet$ &  0.715  & 4 & {\bf 0.707} & 4 \\ 
+  & minmax (1 traversal) & y & {\bf 0.023} & $\bullet$ &  0.030  & 2 &  0.030 & 2 \\ 
+  & most frequent & y & {\bf 6.891} & $\bullet\bullet\bullet\bullet\bullet\bullet$ & -  & 54 & - & 54 \\ 
+  & sum if key larger & n &  1.958 & $\bullet\circ$ &  0.164  & 2 & {\bf 0.156} & 2 \\ 
+  & sum between & y & {\bf 0.684} & $\bullet\circ\circ$ & -  & 2 & - & 2 \\ 
+			\hline
+ Constant  & index of elt.  & y & {\bf 1.303} & $\bullet\circ$ &  1.947  & 2 &  1.958 & 2 \\ 
+  List     & contains elt   & y & {\bf 1.632} & $\bullet\circ$ &  2.278  & 2 &  2.284 & 2 \\ 
+			\hline
+ Empty & contains & y & {\bf 2.801} & $\bullet\circ$ & -  & 3 & - & 3 \\ 
+ Subtree & sum & y & {\bf 0.093} & $\bullet\circ$ & -  & 21 & - & 21 \\ 
+			\hline
+Elements & parity of 1st & y & {\bf 0.178} & $\bullet\circ\circ$ & -  & 101 & - & 101 \\ 
+ are even & parity of last & y & {\bf 0.070} & $\bullet\circ$ & -  & 101 & - & 101 \\ 
+ numbers   & first odd elt. & y &  0.270 & $\bullet\circ\circ$ &  0.041  & 2 & {\bf 0.036} & 2 \\ 
+     & parity of sum  & y & {\bf 0.019} & $\bullet$ &  0.038  & 2 &  0.034 & 2 \\ 
+			\hline
+  Tree of Even  & parity of max  & y &  6.679 & $\bullet$ &  0.092  & 2 & {\bf 0.085} & 2 \\ 
+  Numbers   & parity of sum & y &  3.254 & $\bullet\circ\circ\circ\circ$ & {\bf 0.051}  & 2 &  0.055 & 2 \\ 
+			\hline
+        & has constant & y & {\bf 0.005} & $\bullet$ & -  & 214 & - & 214 \\ 
+        & count elts lt & n & {\bf 1.787} & $\bullet\circ\circ$ & -  & 66 & - & 66 \\ 
+ Memoizing   & contains & n &  2.627 & $\bullet\circ\circ\circ$ &  0.172  & 2 & {\bf 0.169} & 2 \\ 
+ Information  & sum elts gt. key & n &  12.309 & $\bullet\circ\circ\circ$ &  0.193  & 2 & {\bf 0.178} & 2 \\ 
+        & minmax & n & {\bf 1.021} & $\bullet\circ\circ\circ\circ$ & -  & 76 & - & 76 \\ 
+        & sum lt. pos & y & {\bf 0.189} & $\bullet\bullet$ & -  & 90 & - & 90 \\ 
+        & sum lt. pos (v2) & y & {\bf 0.005} & $\bullet$ & -  & 51 & - & 51 \\ 
+        & size & n & {\bf 10.864} & $\bullet\circ\circ$ & -  & 79 & - & 79 \\ 
+			\hline
+  & obfuscated length & y & {\bf 0.112} & $\bullet\bullet\bullet\bullet$ &  75.070  & 4 &  75.506 & 4 \\ 
+  & obfuscated length (v2) & y & {\bf 0.227} & $\bullet$ &  0.231  & 2 &  0.236 & 2 \\ 
+			\hline
+ Symmetric   & sum & y &  0.267 & $\bullet\circ$ &  0.040  & 2 & {\bf 0.040} & 2 \\ 
+    Tree     & height & y & {\bf 0.265} & $\bullet\circ$ & -  & 7 & - & 7 \\ 
+             & min & y &  1.207 & $\bullet\circ$ & {\bf 0.041}  & 2 &  0.042 & 2 \\ 
+			\hline
+         & min  & y &  0.072 & $\bullet\circ$ &  0.015  & 1 & {\bf 0.013} & 1 \\ 
+ Sorted  & max  & y &  0.070 & $\bullet\circ$ &  0.014  & 1 & {\bf 0.014} & 1 \\ 
+ List    & count elt. smaller  & y &  0.066 & $\bullet\circ$ &  0.034  & 2 & {\bf 0.032} & 2 \\ 
+         & index of elt  & y & {\bf 1.095} & $\bullet\circ$ &  1.904  & 2 &  1.827 & 2 \\ 
+         & intersection-empty  & y & {\bf 0.069} & $\bullet$ &  0.180  & 4 &  0.135 & 4 \\ 
+    & exists duplicates & y & {\bf 0.051} & $\bullet$ & -  & 113 & - & 113 \\ 
+    & exists duplicates (v2) & y & {\bf 0.143} & $\bullet$ &  0.310  & 5 &  0.252 & 5 \\ 
+         & largest diff  & y & {\bf 0.051} & $\bullet\bullet$ &  1.302  & 3 &  1.325 & 3 \\ 
+         & smallest diff  & y & {\bf 0.020} & $\bullet$ &  0.032  & 2 &  0.034 & 2 \\ 
+          & interval intersection  & y & {\bf 190.005} & $\bullet\bullet$ & -  & 3 & - & 3 \\ 
+         & largest diff (pos elts)  & y & {\bf 0.012} & $\bullet$ &  0.033  & 2 &  0.035 & 2 \\ 
+         & largest even & y &  0.079 & $\bullet\circ$ &  0.018  & 1 & {\bf 0.018} & 1 \\ 
+         & largest even positive & y &  0.106 & $\bullet\circ$ & {\bf 0.020}  & 1 &  0.024 & 1 \\ 
+         & largest even positive (v2) & y & {\bf 0.158} & $\bullet\circ$ & -  & 2 & - & 2 \\ 
+         & parallel min & n &  0.503 & $\bullet\circ$ &  0.031  & 1 & {\bf 0.028} & 1 \\ 
+         & parallel max & n &  0.937 & $\bullet\circ$ & {\bf 0.026}  & 1 &  0.027 & 1 \\ 
+         & par. max of point sum & y & {\bf 0.026} & $\bullet$ &  0.041  & 1 &  0.039 & 1 \\ 
+         & parallel max (v2) & n &  0.496 & $\bullet\circ$ & {\bf 0.029}  & 1 &  0.030 & 1 \\ 
+         & mss & y & {\bf 8.530} & $\bullet\bullet$ & -  & 3 & - & 3 \\ 
+         & sum of longest positive suffix & n &  0.536 & $\bullet\circ\circ$ &  0.326  & 2 & {\bf 0.316} & 2 \\ 
+         & sum if all positive & n & - & $\bullet\circ\circ\bullet\circ\circ\bullet\circ\circ\circ$ &  0.456  & 4 & {\bf 0.428} & 4 \\ 
+         & pyramid range & y & {\bf 0.058} & $\bullet\bullet$ & -  & 5 & - & 5 \\ 
+         & second smallest & n &  153.148 & $\bullet\circ\circ\circ$ &  0.129  & 2 & {\bf 0.124} & 2 \\ 
+         & second largest & n & {\bf 7.857} & $\bullet\circ\bullet\circ\circ\circ$ & -  & 8 & - & 8 \\ 
+         & second smallest (v2) & n & {\bf 3.592} & $\bullet\circ\circ\circ\bullet\circ\circ\circ$ & -  & 8 & - & 8 \\ 
+         & second smallest, len2 base case & y &  0.867 & $\bullet\circ\circ$ & {\bf 0.028}  & 2 &  0.033 & 2 \\ 
+			\hline
+ Sorted and  & count smaller 0 & n &  1.664 & $\bullet\circ\circ$ &  0.047  & 2 & {\bf 0.044} & 2 \\ 
+ Indexed      & count smaller x & n &  1.821 & $\bullet\circ\circ$ &  0.057  & 2 & {\bf 0.055} & 2 \\ 
+			\hline
+Unimodal   & max & n &  1.290 & $\bullet\circ\circ$ &  0.216  & 2 & {\bf 0.214} & 2 \\ 
+List  & max (v2) & y & {\bf 5.299} & $\bullet\circ\circ\circ$ &  21.125  & 2 &  21.065 & 2 \\ 
+     & max with pos & n &  77.533 & $\bullet\circ\circ\circ$ & {\bf 19.548}  & 5 &  19.700 & 5 \\ 
+			\hline
+	\caption{Experimental Results for Realizable Benchmarks.  Benchmarks are grouped by categories introduced in Section \ref{sec:evaluation}. All times are in seconds. The best time is highlighted in bold font.  A '-' indicates timeout ($>$ 400s). The ``I'' column indicates whether intermediate lemmas were proven by induction. Steps is a sequence of '$\bullet$' (refinement) and '$\circ$' (coarsening). Experiments are run on a laptop with an Intel Core i7-8750H 6-core processor and 32GB Ram running Ubuntu 21.04.}\label{table:experiments}
+		\end{longtable}
+	}

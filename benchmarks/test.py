@@ -9,6 +9,7 @@ import json
 # Local helper modules
 from definitions import *
 from parsing import DataObj
+from timeout_v import timeout_value
 
 
 def run_one(progress, bench_id, command, algo, optim, filename, extra_opt):
@@ -197,40 +198,44 @@ if __name__ == "__main__":
     root = os.getcwd()
     exec_path = os.path.join(root, "_build/default/bin/Synduce.exe")
 
-    table_info = "Tables: #1 is for CAV21 paper Table 1,\
-    # 2 is for CAV21 paper Table 2,\
-    # 3 is for CAV21 paper Table 3,\
-    # 4 is for testing benchmarks with constraints, with p-boudning and symbolic CEGIS,\
-    # 5 is for testing benchmarks with constraints, with p-bounding and Symbolic-CEGIS."
+    test_set_info = "Test sets:\
+        0 : run a reduced test test (should take about 1h).\
+        1 : run the full test test."
 
     sys.stdout.flush()
     aparser = argparse.ArgumentParser()
-    aparser.add_argument(
-        "--cvc5", help="Force use of CVC5 (useful if you can't install CVC4 on Mac M1)", action="store_true")
+
     aparser.add_argument(
         "--generate-benchmarks", help="Generate SyGuS benchmarks.", action="store_true")
+
     aparser.add_argument(
         "--generate-solutions", help="Generate solutions in extras/solution.", action="store_true")
-    aparser.add_argument(
-        "--kick-the-tires", help="Run a subset of benchmarks.", action="store_true")
+
     aparser.add_argument(
         "-o", "--output", help="Dump Synduce output in -i mode to file (appending to file).", type=str, default=-1)
+
     aparser.add_argument(
         "-b", "--benchmarks", help="Run a set of benchmarks.", type=str,
-        choices=["all", "constraint", "lifting", "base", "unr", "small"], nargs="+", default=None)
+        choices=["all", "constraint", "base", "unr", "small"], nargs="+", default=None)
+
     aparser.add_argument(
         "-c", "--compare", help="Compare with segis or cegis", type=str,
         choices=["segis", "cegis", "segis0"], default=None, nargs="+")
+
     aparser.add_argument(
-        "--single", help="Run the lifting benchmark in benchmarks/[FILE]", type=str, default=None)
+        "--single", help="Run the benchmark in benchmarks/[FILE]", type=str, default=None)
+
     aparser.add_argument(
         "-n", "--num-runs", help="Run each benchmark NUM times.", type=int, default=1
     )
+
     aparser.add_argument(
         "-x", "--unrealizable", help="Benchmark is unrealizable.", default=True, action="store_false"
     )
+
     aparser.add_argument(
-        "-t", "--table", help=table_info, type=int, default=-1)
+        "-t", "--test-set", help=test_set_info, type=int, default=-1)
+
     aparser.add_argument(
         "--summary", help="Give a summary of benchmarks.", action="store_true")
 
@@ -258,32 +263,26 @@ if __name__ == "__main__":
     timeout_value = args.timeout
 
     # Benchmark set selection
-    run_lifting_benchmarks = False
     run_constraint_benchmarks = False
     run_base_benchmarks = False
     run_unrealizable = False
-    run_kick_the_tires_only = False
+    run_small_set_only = False
 
     if args.benchmarks is not None:
         if "constraint" in args.benchmarks:
             run_constraint_benchmarks = True
-        if "lifting" in args.benchmarks:
-            run_lifting_benchmarks = True
         if "base" in args.benchmarks:
             run_base_benchmarks = True
         if "small" in args.benchmarks:
-            run_kick_the_tires_only = True
+            run_small_set_only = True
         if "unr" in args.benchmarks:
             run_unrealizable = True
         if "all" in args.benchmarks:  # e.g. benchmarks = "all"
-            run_lifting_benchmarks = True
             run_constraint_benchmarks = True
             run_base_benchmarks = True
 
     # Background solver selection : cvc4 by default.
     cvc = "--cvc4"
-    if args.cvc5:
-        cvc = "--cvc5"
 
     other_alg = []
     print(args.compare)
@@ -310,7 +309,7 @@ if __name__ == "__main__":
 
     bench_set = []
     # Running specific sets if we're supposed to.
-    if run_kick_the_tires_only:
+    if run_small_set_only:
         algos = [["se2gis", cvc]] + other_alg
         optims = [["all", ""]]
         run_benchmarks(kick_the_tires_set, algos,
@@ -318,12 +317,8 @@ if __name__ == "__main__":
         exit(0)
 
     # If we were supposed to run a specific set of benchmarks, we're done
-    if run_base_benchmarks or run_constraint_benchmarks or run_lifting_benchmarks or run_unrealizable:
+    if run_base_benchmarks or run_constraint_benchmarks or run_unrealizable:
         algos = [["se2gis", cvc]] + other_alg
-
-        if run_lifting_benchmarks:
-            optims = [["all", ""]]
-            bench_set += lifting_benchmarks
 
         if run_constraint_benchmarks:
             optims = [["all", ""]]
@@ -339,89 +334,38 @@ if __name__ == "__main__":
 
         run_benchmarks(bench_set, algos,
                        optims, csv_output=csv_output, num_runs=runs)
-        exit()
+        exit(0)
 
     # === === TABLES and CAV runs === ===
 
     # Algorithm set selection by table number.
-    table_no = args.table
-    print(f"Running Table {table_no} Benchmarks.")
+    test_set = args.test_set
+    if test_set == 0:
+        print(f"Running reduced set of benchmarks.")
+    else:
+        print(f"Running full set of benchmarks.")
 
-    # Table 1 / CAV 21 paper : compare Synduce and Baseline
-    if table_no == 1:
+    # Select
 
-        algos = [
-            ["se2gis", "--no-gropt"],
-            ["segis", "--segis --no-gropt"]
-        ]
+    # Benchmark set selection depending on test set
+    if test_set == 0:
+        algos = [["se2gis", "--cvc4"],
+                 ["segis", "--segis --cvc4"]]
         optims = [["all", ""]]
-
-    # Table 2 / CAV 21 paper : compare Synduce, Baseline and Concrete CEGIS
-    elif table_no == 2:
-
-        algos = [
-            ["se2gis", "--no-gropt"],
-            ["segis", "--segis --no-gropt"],
-            ["cegis", "--cegis --no-gropt"]
-        ]
-        optims = [["all", ""]]
-
-    # Table 3 / CAV21 paper : compare Synduce, Baseline with optimizations on/off
-    elif table_no == 3:
-
-        algos = [
-            ["se2gis", "--no-gropt"],
-            ["segis", "--segis --no-gropt"],
-        ]
-
-        optims = [
-            ["all", ""],
-            ["ini", "-c --no-gropt"],
-            ["st", "-st --no-gropt"],
-            ["d", "--no-syndef --no-gropt"],
-            ["off", "-st --no-syndef --no-gropt"]
-        ]
-
-    # Table 4 / Test
-    elif table_no == 4:
-        algos = [["se2gis", "--cvc4"], ["segis", "--segis --cvc4"]]
-        optims = [["all", ""]]
-
-    # Table 5 / Test with cvc4 against baseline comparison
-    elif table_no == 5:
+    else:
         algos = [["se2gis", "--cvc4"],
                  ["segis", "--segis --cvc4"],
                  ["segis0", "--segis --cvc4 -u"]]
         optims = [["all", ""]]
 
-    # No table - just run the base algorithm.
-    else:
-        algos = [["se2gis", "--cvc4"], ["segis", "--segis --cvc4"]]
-        optims = [["all", ""]]
+    input_files = constraint_benchmarks + unrealizable_benchmarks
 
     # If no csv output has been provided, generate a timestamped output file
     if not csv_output:
         timestr = time.strftime(timestamp_definition)
-        filename = f"benchmarks/data/exp/bench_{timestr}_table{table_no}.csv"
+        filename = f"benchmarks/data/exp/bench_{timestr}_table.csv"
         print(f"No output file given, I will be writing in {filename}")
         csv_output = open(filename, 'a+', encoding='utf-8')
-
-    # Benchmark set selection.
-    input_files = []
-    if args.kick_the_tires:
-        input_files = kick_the_tires_set
-
-    else:
-        if table_no == 2:
-            input_files = reduced_benchmark_set_table2
-        elif table_no == 3:
-            input_files = reduced_benchmark_set_table3
-        elif table_no == 4:
-            input_files = constraint_benchmarks
-        elif table_no == 5:
-            input_files = constraint_benchmarks + unrealizable_benchmarks
-        else:
-            input_files = kick_the_tires_set
 
     run_benchmarks(input_files, algos, optims, csv_output=csv_output,
                    exit_err=True, num_runs=runs)
