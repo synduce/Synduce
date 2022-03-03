@@ -11,11 +11,11 @@ from timeout_v import timeout_value
 
 
 def caption(exp_setup):
-    return "Experimental Results for Realizable Benchmarks.  Benchmarks are grouped by categories introduced in Section \\ref{sec:evaluation}. All times are in seconds. The best time is highlighted in bold font.  A '-' indicates timeout ($>$ 400s). The ``I'' column indicates whether intermediate lemmas were proven by induction. Steps is a sequence of '$\\bullet$' (refinement) and '$\\circ$' (coarsening). Experiments are run on %s." % exp_setup
+    return "Experimental Results for Realizable Benchmarks.  Benchmarks are grouped by categories introduced in Section 8. All times are in seconds. The best time is highlighted in bold font.  A '-' indicates timeout ($>$ 400s). The ``I'' column indicates whether intermediate lemmas were proven by induction. Steps is a sequence of '$\\bullet$' (refinement) and '$\\circ$' (coarsening)."
 
 
 def caption_unrealizable(exp_setup):
-    return "Experimental Results for Unrealizable Benchmarks. All synthesis times are in seconds. The best time is highlighted in bold font.  A '-' indicates timeout ($>$ 400s). The ``I'' column indicates whether intermediate lemmas were proven by induction. Steps is a sequence of '$\\bullet$' (refinement) and '$\\circ$' (coarsening). Experiments are run on %s." % exp_setup
+    return "Experimental Results for Unrealizable Benchmarks. All synthesis times are in seconds. The best time is highlighted in bold font.  A '-' indicates timeout ($>$ 400s). The ``I'' column indicates whether intermediate lemmas were proven by induction. Steps is a sequence of '$\\bullet$' (refinement) and '$\\circ$' (coarsening)."
 
 
 def timefix(x):
@@ -103,6 +103,13 @@ def with_exp_data(info, data, data2, data3, realizable=True):
 
 def make_tex_table(exp_setup, data, output_file_name):
     tex = open(output_file_name, 'w+')
+    tex.write(
+        "\\documentclass{article}\n\
+        \\usepackage[text={8in,10in}]{geometry}\n\
+        \\usepackage{longtable}\n\
+        \\usepackage{multirow}\n\
+        \\def\\setwogis{SE2GIS}\n")
+    tex.write("\\begin{document}\n")
     tex.write("%s ====================================\n" % '%')
     tex.write(
         "%s This table has been automatically produced by the tool on %s.\n" %
@@ -122,7 +129,7 @@ def make_tex_table(exp_setup, data, output_file_name):
     tex.write("\t\t\t\\cline{4-9}\n")
     tex.write(
         "\t\t\t &   & & time & steps & time & \\#'r' & time & \\#'r' \\\\ \n")
-    speedups = []
+
     for benchmark_class, benchmarks in show_benchmarks.items():
         tex.write("\t\t\t\\hline\n")
         for benchmark, benchmark_info in benchmarks.items():
@@ -139,14 +146,22 @@ def make_tex_table(exp_setup, data, output_file_name):
                                             experimental_data[0], experimental_data[1], None))
 
     tex.write("\t\t\t\\hline\n")
-    tex.write("\t\caption{%s}\label{table:experiments}\n" % caption(exp_setup))
+    tex.write("\t\caption{%s}\n" % caption(exp_setup))
     tex.write("\t\t\end{longtable}\n")
     tex.write("\t}\n")
+    tex.write("\\end{document}\n")
     tex.close()
 
 
 def make_tex_unrealizables_table(exp_setup, data, output_file_name):
     tex = open(output_file_name, 'w+')
+    tex.write(
+        "\\documentclass{article}\n\
+        \\usepackage[text={8in,10in}]{geometry}\n\
+        \\usepackage{longtable}\n\
+        \\usepackage{multirow}\n\
+        \\def\\setwogis{SE2GIS}\n")
+    tex.write("\\begin{document}\n")
     tex.write("%s ====================================\n" % '%')
     tex.write(
         "%s This table has been automatically produced by the tool on %s.\n" %
@@ -178,9 +193,10 @@ def make_tex_unrealizables_table(exp_setup, data, output_file_name):
 
     tex.write("\t\t\t\\hline\n")
     tex.write(
-        "\t\caption{%s}\label{table:unrealizable-experiments}\n" % caption_unrealizable(exp_setup))
+        "\t\caption{%s}\n" % caption_unrealizable(exp_setup))
     tex.write("\t\t\end{longtable}\n")
     tex.write("\t}\n")
+    tex.write("\\end{document}\n")
     tex.close()
 
 

@@ -14,3 +14,8 @@ export RESULTS_LOCAL_COPY=$PWD/paper-results/
 echo "timeout_value = 400" >> benchmarks/timeout_v.py
 # Generate the figures and tables from the csv containing the results.
 ./benchmarks/report.py -i benchmarks/data/exp/paper_results.csv -y
+# Compile the pdf tables
+pdflatex paper-results/table1.tex
+mv table1.pdf paper-results
+pdflatex paper-results/table2.tex
+mv table2.pdf paper-results
