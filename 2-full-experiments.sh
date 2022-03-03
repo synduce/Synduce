@@ -7,7 +7,7 @@ mkdir -p $TARGET_DIR
 export RESULTS_LOCAL_COPY=$PWD/$TARGET_DIR
 
 # Write the timeout value in the python file
-echo "timeout_value = 400" >> benchmarks/timeout_v.py
+echo "timeout_value = 400" > benchmarks/timeout_v.py
 
 # Generate the data ... this can take a long time
 ./benchmarks/test.py -t 1

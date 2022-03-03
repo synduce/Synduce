@@ -7,7 +7,7 @@ TARGET_DIR=paper-results
 mkdir -p $TARGET_DIR
 export RESULTS_LOCAL_COPY=$PWD/$TARGET_DIR
 # Set the timeout value that was used for the results reported in the paper.
-echo "timeout_value = 400" >> benchmarks/timeout_v.py
+echo "timeout_value = 400" > benchmarks/timeout_v.py
 # Generate the figures and tables from the csv containing the results.
 ./benchmarks/report.py -i benchmarks/data/exp/paper_results.csv -y
 # Compile the pdf tables

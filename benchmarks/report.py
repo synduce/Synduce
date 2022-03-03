@@ -323,7 +323,7 @@ def create_figures(input_file, output_file):
     tex_table1 = input_name + "_table1.tex"
     tex_table2 = input_name + "_table2.tex"
 
-    unrealizable_benchmarks = 0
+    num_unrealizable_benchmarks = len(unrealizable_benchmarks)
 
     table = {}
 
@@ -395,7 +395,6 @@ def create_figures(input_file, output_file):
                     segis_timeouts += 1
 
                 if unrealizable(info[4]):
-                    unrealizable_benchmarks += 1
                     se2gis_unrealizable_series.append(floti(a))
                     segis_unrealizable_series.append(floti(b))
                     if segis0_data:
@@ -449,7 +448,7 @@ def create_figures(input_file, output_file):
     make_tex_unrealizables_table(exp_setup, table, tex_table2)
 
     print(
-        f"Number of benchmarks: {len(segis_series)} ({unrealizable_benchmarks} unrealizable cases)")
+        f"Number of benchmarks: {len(segis_series)} ({num_unrealizable_benchmarks} unrealizable cases)")
     print(f"Timeout value: {timeout_value} s")
     print(f"._______________________________________.")
     print(f"|              SE2GIS  SEGIS+UC  SEGIS  |")

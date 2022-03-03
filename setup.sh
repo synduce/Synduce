@@ -205,17 +205,20 @@ case $RUNTESTS in
     echo "Skipping tests."
 esac
 sep "Installing python dependencies for reporting results."
-echo "Would you like to install python dependencies to run result reporting scripts [y/N] ?"
+echo "Would you like to install latex and python dependencies to run result reporting scripts [y/N] ?"
 echo "This will delete .venv if it exists."
 read INSTALL_DEPS
 case $INSTALL_DEPS in
     'y')
+    echo "Installing virtual python environment..."
     $PKG_INSTALL virtualenv
     rm -rf .venv
     virtualenv -p 3 .venv
     source .venv/bin/activate
     pip install matplotlib
     echo "Don't forget to \"source .venv/bin/activate\" to run the python scripts."
+    echo "Installing basic latex tools..."
+    $PKG_INSTALL texlive
     ;;
     *)
     echo "Skipping optional dependencies installation."

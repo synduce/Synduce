@@ -1,4 +1,5 @@
 #!/bin/sh
+echo "timeout_value = 400" > benchmarks/timeout_v.py
 rm -rf paper-results
 rm -rf full-results
 rm -rf short-results
