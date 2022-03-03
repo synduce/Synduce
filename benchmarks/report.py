@@ -107,7 +107,6 @@ def make_tex_table(exp_setup, data, output_file_name):
         "\\documentclass{article}\n\
         \\usepackage[text={8in,10in}]{geometry}\n\
         \\usepackage{longtable}\n\
-        \\usepackage{multirow}\n\
         \\def\\setwogis{SE2GIS}\n")
     tex.write("\\begin{document}\n")
     tex.write("%s ====================================\n" % '%')
@@ -120,9 +119,9 @@ def make_tex_table(exp_setup, data, output_file_name):
     tex.write("\t\t\\begin{longtable}[h]{|c|c|c|c|c||c|c||c|c|}\n")
     tex.write("\t\t\t\\hline\n")
     tex.write(
-        "\t\t\t \multirow{2}{*}{Class} &\
-                \multirow{2}{*}{Benchmark} & \
-                \multirow{2}{*}{I?} & \
+        "\t\t\t Class &\
+                Benchmark & \
+                I? & \
                 \multicolumn{2}{c||}{\setwogis} & \
                 \multicolumn{2}{c|}{SEGIS+UC} & \
                 \multicolumn{2}{c|}{SEGIS}\\\\ \n")
@@ -159,7 +158,6 @@ def make_tex_unrealizables_table(exp_setup, data, output_file_name):
         "\\documentclass{article}\n\
         \\usepackage[text={8in,10in}]{geometry}\n\
         \\usepackage{longtable}\n\
-        \\usepackage{multirow}\n\
         \\def\\setwogis{SE2GIS}\n")
     tex.write("\\begin{document}\n")
     tex.write("%s ====================================\n" % '%')
@@ -172,8 +170,8 @@ def make_tex_unrealizables_table(exp_setup, data, output_file_name):
     tex.write("\t\t\\begin{longtable}[h]{|c|c|c|c||c|c|}\n")
     tex.write("\t\t\t\\hline\n")
     tex.write(
-        "\t\t\t\multirow{2}{*}{Benchmark} & \
-                \multirow{2}{*}{I?} & \
+        "\t\t\tBenchmark & \
+                I? & \
                 \multicolumn{2}{c||}{\setwogis} & \
                 \multicolumn{2}{c|}{SEGIS+UC}\\\\ \n")
     tex.write("\t\t\t\\cline{3-6}\n")
