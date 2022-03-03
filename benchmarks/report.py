@@ -308,6 +308,7 @@ def create_figures(input_file, output_file):
     #     0            1            2      3       4    5  6    7         8            9     10     11     12 13 14
 
     segis_timeouts = 0
+    segis0_timeouts = 0
     se2gis_timeouts = 0
     speedups = 0
     print("%54s, %7s,  %5s : %5s" %
@@ -372,6 +373,8 @@ def create_figures(input_file, output_file):
                         "verif": info[21],
                     }
                     c = segis0_result['time']
+                    if floti(c) == timeout_value:
+                        segis0_timeouts += 1
 
                 if segis0_data:
                     table[benchmark] = (
@@ -421,9 +424,21 @@ def create_figures(input_file, output_file):
     save_scatter_plot(scatter_no_timeouts_file, segis_series, se2gis_series,
                       segis_unrealizable_series, se2gis_unrealizable_series)
 
+    solved_segis_r = len([x for x in segis_series if x < timeout_value])
+    solved_segis_u = len(
+        [x for x in segis_unrealizable_series if x < timeout_value])
     segis_series = segis_series + segis_unrealizable_series
+
+    solved_se2gis_r = len([x for x in se2gis_series if x < timeout_value])
+    solved_se2gis_u = len(
+        [x for x in se2gis_unrealizable_series if x < timeout_value])
     se2gis_series = se2gis_series + se2gis_unrealizable_series
+
+    solved_segis0_r = len([x for x in segis0_series if x < timeout_value])
+    solved_segis0_u = len(
+        [x for x in segis0_unrealizable_series if x < timeout_value])
     segis0_series = segis0_series + segis0_unrealizable_series
+
     # Plot two quantile plots
     quantile_plot(quantile_file, segis_series, se2gis_series, segis0_series)
     quantile_plot2(quantile_unrealizable_file,
@@ -435,20 +450,17 @@ def create_figures(input_file, output_file):
 
     print(
         f"Number of benchmarks: {len(segis_series)} ({unrealizable_benchmarks} unrealizable cases)")
+    print(f"Timeout value: {timeout_value} s")
+    print(f"._______________________________________.")
+    print(f"|              SE2GIS  SEGIS+UC  SEGIS  |")
     print(
-        f"SEGIS solves {len([x for x in segis0_series if x < timeout_value])}")
+        f"| Realizable   {solved_se2gis_r:6d}  {solved_segis_r:8d}  {solved_segis0_r:5d}  |")
     print(
-        f"SEGIS+UC solves {len([x for x in segis_series if x < timeout_value])}")
+        f"| Unrealizable {solved_se2gis_u:6d}  {solved_segis_u:8d}  {solved_segis0_u:5d}  |")
     print(
-        f"SE2GIS solves {len([x for x in se2gis_series if x < timeout_value])}")
-    print(f"{segis_timeouts} timeouts for SEGIS+UC, {se2gis_timeouts} timeouts for SE2GIS.")
-    print(f"SE2GIS is faster on {speedups} benchmarks.")
-    print(f"Tex table    : { tex_table1}  ")
-    print(f"Quantile plot: {quantile_file}")
-    print(
-        f"Quantile unrealizable benchmarks plot: {quantile_unrealizable_file}")
-    print(f"Scatter plot : {scatter_file}")
-    print(f"Scatter plot (omitting timeouts) : {scatter_no_timeouts_file}")
+        f"|   Total      {solved_se2gis_u + solved_se2gis_r:6d}  {solved_segis_u + solved_segis_r:8d}  {solved_segis0_u + solved_segis0_r:5d}  |")
+    print(f"|_______________________________________|")
+    print("")
     return {
         "quantile": quantile_file,
         "quantile_unrealizable": quantile_unrealizable_file,

@@ -14,7 +14,14 @@ echo "timeout_value = 60" >> benchmarks/timeout_v.py
 # Generate the graphs and tables
 ./benchmarks/report.py -y
 # Compile the pdf tables
-pdflatex $TARGET_DIR/table1.tex
+# Table 1
+pdflatex $TARGET_DIR/table1.tex > /dev/null
+pdflatex $TARGET_DIR/table1.tex > /dev/null
 mv table1.pdf $TARGET_DIR
-pdflatex $TARGET_DIR/table2.tex
+rm table1*
+# Table 2
+pdflatex $TARGET_DIR/table2.tex > /dev/null
+pdflatex $TARGET_DIR/table2.tex > /dev/null
 mv table2.pdf $TARGET_DIR
+rm table2*
+echo "See tables and figures in $TARGET_DIR/"

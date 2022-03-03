@@ -44,7 +44,6 @@ type sygus_term =
   | SyLet of binding list * sygus_term
 
 and sorted_var = symbol * sygus_sort
-
 and binding = symbol * sygus_term
 
 type feature =
@@ -70,11 +69,8 @@ type command =
   | CSetOption of symbol * literal
 
 and sygus_sort_decl = symbol * int
-
 and dt_cons_dec = symbol * sorted_var list
-
 and grammar_def = (sorted_var * grouped_rule_list) list
-
 and grouped_rule_list = sygus_gsterm list
 
 and sygus_gsterm =
@@ -582,7 +578,7 @@ let reponse_of_sexps (s : Sexp.t list) : solver_response =
     | [ Atom "fail" ] -> Some RFail
     | [ Atom "infeasible" ] -> Some RInfeasible
     | [ Atom "unknown" ] -> Some RUnknown
-    | [ Atom "sat" ] -> Some RInfeasible
+    | [ Atom "sat" ] -> Some RUnknown
     | _ -> None
   in
   let one_command cmd =
