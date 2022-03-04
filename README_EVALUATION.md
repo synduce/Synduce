@@ -21,6 +21,8 @@ The tool used in this artifact is available publicly [on
 Github](https://github.com/synduce/Synduce). The specific version used here can be accessed at
 https://github.com/synduce/Synduce/releases/tag/pldi22.
 
+The artifact is available publicly [on Zenodo](https://zenodo.org/record/6329754).
+
 At any point during the evaluation process, the reviewer can run `./clean.sh` to remove the
 experimental data generated during the evaluation process.
 
