@@ -1,16 +1,18 @@
 # Getting Started
 
+## Packaging the artifact
+
 The software artifact is packaged as an Open Virtual Appliance (.ova) file
 [https://en.wikipedia.org/wiki/Open_Virtualization_Format] with Xubuntu 21.04.
 The virtual machine has been set up to use 4 cores and 8gb of RAM. We recommend
-that the reviewers use a machine with a least 4 cpu cores.
+that the reviewers use a machine with **at least 4 CPU cores**.
 
 The credentials are:
 > username: pldi22-reviewer
 >
 > password: pldi22ae
 
-The synthesis tool can be found in the virtual appliance `/home/pldi22-reviewer/Synduce`. All the
+The synthesis tool can be found in the virtual appliance in `/home/pldi22-reviewer/Synduce`. All the
 commands given in this README are meant to be run from that directory. Note that the tool is named
 Sebis in the paper for anonymity reasons, and the artifact builds upon and extends the tool Synduce.
 In this artifact, we use the name Synduce for the tool.
@@ -23,23 +25,22 @@ At any point during the evaluation process, the reviewer can run `./clean.sh` to
 experimental data generated during the evaluation process.
 
 ## Running the tool on simple benchmarks
+
 To get started, open a terminal and change directory to the root folder of the tool
-`/home/pldi22-reviewer/Synduce`.
-The tool has already been compiled, but the README.md in the tool directory contains
-general instructions on how to build the tool and run it.
-We have prepared a script for the reviewers to use to check that the installation is
-working as expected.
+`/home/pldi22-reviewer/Synduce`. The tool has already been compiled, but the README.md in the tool
+directory contains general instructions on how to build the tool and run it. We have prepared a
+script for the reviewers to use to check that the installation is working as expected.
 Running the following command:
 ```
 $./0-kick-the-tires.sh
 ```
 Runs the tool on a small set of 24 benchmarks. All benchmarks should pass. All
-benchmarks have a solution, except the last one.
+benchmarks have a solution, except the last one, which is unrealizable and should be
+marked with a cross.
 The last line of the output should look like:
 ```
  All 24 benchmarks passed in 3.9 s.
 ```
-The last benchmark is unrealizable, and it is expected to fail in that configuration.
 The running time on the reviewer's machine may vary, but it should be within 10s.
 The reviewer cam also run the tool on individual benchmarks, for example:
 ```
@@ -47,6 +48,11 @@ $ ./Synduce benchmarks/constraints/bst/count_lt.ml
 ```
 Should print a solution in less than a second.
 
+Running
+```
+./0-list-benchmarks.sh
+```
+Prints the list of benchmarks and their location within the `benchmarks` folder.
 
 
 ## Generating the figures from the experimental data
@@ -82,9 +88,9 @@ benchmarks. The 44 on line 1143 should read 45.
 
 This section contains step-by-step instructions to reproduce the results presented
 in the paper. More precisely, we provide instructions to reproduce:
-- the sequence of calls to the tool described in Section 2, leading the programmer to find a
-  solution for the problem of optimizing the count-between function on binary search trees.
-- the experimental results that are presented in Section 8 in Figures 3 and 4. These results are
+- The sequence of calls to the tool described in Section 2, leading the programmer to find a
+  solution for the problem of optimizing the `countbtw` function on binary search trees.
+- The experimental results that are presented in Section 8 in Figures 3 and 4. These results are
   repeated in Appendix C.2 and C.3 in table form (Table 1 and 2).
 
 
@@ -101,10 +107,8 @@ and 1 realizable one. At each step, the reviewer can check that:
 
 
 1) The first example (`benchmarks/count_between_example/1.ml`) is the first instantiation of the
-problem presented in Section 2. The reference function and the target recursion skeleton are
-the ones given on page 3 of the paper.
-This problem is unrealizable, there is no solution to the
-sketch.
+problem presented in Section 2. The reference function and the target recursion skeleton are the
+ones given on page 3 of the paper. This problem is unrealizable, there is no solution to the sketch.
 Running the tool on that benchmark:
 `./Synduce benchmarks/count_between_example/1.ml`
 The tool should give a hint as to why it is unrealizable.
@@ -137,7 +141,7 @@ more useful information in about 4min (the tool has to discover many invariants)
 5) In the fifth example, the programmer added `(g r)` as an argument to `g3`. The problem is realizable.
 Running `./Synduce benchmarks/count_between_example/5.ml` produces a solution in less than a second
 (the solution should include a definition for the functions `g0`, `g1`, `g2`, `g3`). The solution should
-be functionally equivalent to the one given in the paper.
+be functionally equivalent to the one given in the paper on the second column of page 3.
 
 
 
@@ -157,7 +161,8 @@ From these experiments, we expect the reviewer to verify our claims that:
 ### Short Experimental Setup
 
 The script `1-short-experiments.sh` reproduces only partially the results presented in the paper,
-but runs in a shorter amount of time (1-2 hours).
+but should be sufficient to support the claims made in the paper. The reviewer should expect
+the script to complete in 1-2 hours.
 
 Running:
 ```
@@ -165,7 +170,9 @@ Running:
 ```
 launches a series of tests. For each benchmark in the set of 140 benchmarks, the scripts
 runs the tool with the SE2GIS (default) algorithm and the SEGIS+UC algorithm, with a timeout
-of 60s. The expected output during this phase should be two lines for each benchmark.
+of 60s. The expected output during the testing phase should be two lines for each benchmark. A check
+mark indicates the benchmark ran successfully, a cross mark indicates the benchmark has failed
+(due to timing out).
 
 Once all the tests have been executed, the script will generate the figures that correspond
 to the experimental data in the `short-results` folder:
@@ -203,7 +210,7 @@ numbers will be 0.
 
 ### Full Experimental Setup
 The script `2-full-experiments.sh` follows a similar evaluation approach as the previous one,
-but runs all algorithms with a 400s timeout. Running this script can take between 6 to 12
+but runs all algorithms with a 400s timeout. Running this script can take between 6 and 12
 hours depending on your machine.
 Running:
 ```
@@ -222,4 +229,6 @@ synthesis algorithm, instead of 10 times in the paper.
 
 The tool directory contains a `README.md` file with instructions on how to build the tool,
 documentation and more information on how to write input problems for Synduce.
+The artifact has been set up from a newly built VM running Ubuntu 21.04 by executing
+the `setup.sh` script.
 The documentation of the source code is in `docs/index.html`.
