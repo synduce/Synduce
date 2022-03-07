@@ -36,6 +36,10 @@ def roundfix(s):
     return s
 
 
+def synt_lemma(s):
+    return s.count(".") > 0
+
+
 def unrealizable(s):
     return s.endswith("∅")
 
@@ -307,10 +311,13 @@ def create_figures(input_file, output_file):
     # benchmark, se2gis_algo_name, time, delta, rounds, N, B, verif, segis_algo_name, time, delta, rounds, N, B ,verif
     #     0            1            2      3       4    5  6    7         8            9     10     11     12 13 14
 
+    # Various counts
     segis_timeouts = 0
     segis0_timeouts = 0
     se2gis_timeouts = 0
     speedups = 0
+    num_lemmas = 0  # number of benchmarks that require lemmas to be synthesized
+
     print("%54s, %7s,  %5s : %5s" %
           ("Benchmark", "SE2GIS", " SEGIS", "Speedup"))
 
@@ -350,6 +357,10 @@ def create_figures(input_file, output_file):
                     "B": info[6],
                     "verif": info[7],
                 }
+
+                if synt_lemma(se2gis_result["rounds"]):
+                    num_lemmas += 1
+
                 segis_result = {
                     "time": info[9],
                     "delta": info[10],
@@ -408,12 +419,17 @@ def create_figures(input_file, output_file):
                 warning_b = c == "N/A" and floti(
                     b) < timeout_value and not unrealizable(info[4])
 
-                if warning_b:
-                    print("%54s, %7s, %7s, %7s: %5s !!!" %
-                          (benchmark, a, b, c, speedup(a, b)))
+                if synt_lemma(se2gis_result["rounds"]):
+                    req_lemma = "𝐗"
                 else:
-                    print("%54s, %7s, %7s, %7s: %5s" %
-                          (benchmark, a, b, c, speedup(a, b)))
+                    req_lemma = " "
+
+                if warning_b:
+                    print("%54s [%s], %7s, %7s, %7s: %5s !!!" %
+                          (benchmark, req_lemma, a, b, c, speedup(a, b)))
+                else:
+                    print("%54s [%s], %7s, %7s, %7s: %5s" %
+                          (benchmark, req_lemma, a, b, c, speedup(a, b)))
 
     # Plot a scatter plot with a diagonal line
     save_scatter_plot(scatter_file, segis_series, se2gis_series,
@@ -460,6 +476,7 @@ def create_figures(input_file, output_file):
         f"|   Total      {solved_se2gis_u + solved_se2gis_r:6d}  {solved_segis_u + solved_segis_r:8d}  {solved_segis0_u + solved_segis0_r:5d}  |")
     print(f"|_______________________________________|")
     print("")
+    print(f"Number of benchmarks that require lemmas: {num_lemmas}")
     return {
         "quantile": quantile_file,
         "quantile_unrealizable": quantile_unrealizable_file,
