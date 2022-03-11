@@ -198,6 +198,15 @@ let log_major_step_end
   | None -> Stack.push refinement_log [ kw, json ]
 ;;
 
+type unrealizability_method =
+  | USmtProof
+  | UFunctional
+
+let str_of_unrealizability_method = function
+  | USmtProof -> "smp"
+  | UFunctional -> "fnu"
+;;
+
 type verif_method =
   | BoundedChecking
   | Induction
@@ -217,6 +226,14 @@ let update_counterexample_classification_method (v : verif_method) =
   (* Method cannot change back to induction if we used boundedchecking at some point. *)
   | Some BoundedChecking -> ()
 ;;
+
+let unrealizability_proof : unrealizability_method list ref = ref []
+
+let add_unrealizability_method (up : unrealizability_method) =
+  unrealizability_proof := !unrealizability_proof @ [ up ]
+;;
+
+(* Lemmas synthesized  *)
 
 let last_lemma_synthesized : (string * string) option ref = ref None
 
@@ -240,6 +257,19 @@ let log_minor_step ~(synth_time : float) ~(auxtime : float) (lifted : bool) : un
        ; "aux_time", `Float auxtime
        ; "lifted", `Bool lifted
        ]
+      @ (match !unrealizability_proof with
+        | [] -> []
+        | _ :: _ ->
+          let r =
+            [ ( "unrealizability_methods"
+              , `List
+                  (List.map
+                     ~f:(fun t -> `String (str_of_unrealizability_method t))
+                     !unrealizability_proof) )
+            ]
+          in
+          unrealizability_proof := [];
+          r)
       @ (match !counterexample_classification_method with
         | Some vmethod ->
           [ "cex_classification_with", `String (verif_method_to_str vmethod) ]

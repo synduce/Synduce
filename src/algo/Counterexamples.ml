@@ -60,6 +60,7 @@ let smt_unsatisfiability_check (unknowns : VarSet.t) (eqns : equation list) : un
   let resp = SyncSmt.check_sat z3 in
   (match resp with
   | Unsat ->
+    Utils.Stats.(add_unrealizability_method USmtProof);
     Log.debug
       Fmt.(
         fun fmt () ->

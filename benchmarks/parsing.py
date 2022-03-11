@@ -66,6 +66,18 @@ def all_proved_by_induction(data: dict):
     return cex_classif_flag, lemma_proof_flag
 
 
+def check_missing_unrealizable(data):
+    refinement_steps = data.get("refinement-steps")
+    b = False
+    if refinement_steps:
+        for step in refinement_steps.values():
+            for failure in step["failures"].values():
+                um = failure.get('unrealizability_methods')
+                if um:
+                    # CHeck whether unrealizability with smt-proof worked
+                    b = b or (not ('smp' in um))
+
+
 class DataObj:
     def __init__(self, data):
         self.data = data
@@ -79,6 +91,7 @@ class DataObj:
         cex_classif_flag, lemma_proof_flag = all_proved_by_induction(data)
         self.proved_by_induction = lemma_proof_flag
         self.classified_by_induction = cex_classif_flag
+        self.missing_unrealizable_smt_checks = check_missing_unrealizable(data)
 
     def get_refinement_summary(self, set_sizes=False) -> str:
         rsteps = self.data.get("refinement-steps")

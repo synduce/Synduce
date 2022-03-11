@@ -783,6 +783,7 @@ module Solve = struct
              Int.decr task_counter;
              Lwt.return (RFail, Either.Second [])
            | _ ->
+             Utils.Stats.(add_unrealizability_method UFunctional);
              if !Config.generate_benchmarks
              then ignore (core_solve ~gen_only:true unknowns eqns);
              if !Config.check_unrealizable_smt_unsatisfiable

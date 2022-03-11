@@ -91,7 +91,10 @@ def run_n(progress, bench_id, realizable, command, algo,
     sp = " "
     csvline = "?,?,?,?,?,?"
 
-    if info.is_successful and ((realizable and not info.is_unrealizable) or (not realizable and info.is_unrealizable)):
+    if info.is_successful and (
+        (realizable and not info.is_unrealizable)
+            or (not realizable and info.is_unrealizable)):
+
         delta_str = f"{delta : .0f}ms"
         if (float(delta) / (1000.0 * elapsed)) > 0.05:
             delta_str = f"{delta_str} !"
@@ -114,12 +117,26 @@ def run_n(progress, bench_id, realizable, command, algo,
         else:
             induction_info = "        "
 
-        msg = f"{progress : >11s} ✅ {info.algo: <6s} : {bench_name : <33s} ×{num_runs} runs, {str(timing): <30s} {induction_info} | R: {refinement_rounds} {sp : <20s} "
+        # If -C is present, we're checking that the smt solver answers "unrealizable" when expected.
+        if "-C" in command:
+            extra_uc_inf = ",T" if not info.missing_unrealizable_smt_checks else ",F"
+        else:
+            extra_uc_inf = ""
+
+        msg = f"{progress : >11s} ✅ {info.algo: <6s} : {bench_name : <33s} ×{num_runs} runs, {str(timing): <30s} {induction_info}{extra_uc_inf} | R: {refinement_rounds} {sp : <20s} "
         print(msg)
-        csvline = f"{elapsed: 4.3f},{delta : .0f},{refinement_rounds},{c_by_induction},{p_by_induction},{verif_elapsed}"
+        csvline = f"{elapsed: 4.3f},{delta : .0f},{refinement_rounds},{c_by_induction},{p_by_induction},{verif_elapsed}{extra_uc_inf}"
+
     else:
         print(f"{progress: >11s} ❌ {bench_id : <90s}")
-        csvline = f"N/A,N/A,f{info.major_step_count},N/A,N/A,N/A"
+
+        # If -C is present, we're checking that the smt solver answers "unrealizable" when expected.
+        if "-C" in command:
+            extra_uc_inf = ",N/A"
+        else:
+            extra_uc_inf = ""
+
+        csvline = f"N/A,N/A,f{info.major_step_count},N/A,N/A,N/A{extra_uc_inf}"
 
     sys.stdout.flush()
 
@@ -342,21 +359,24 @@ if __name__ == "__main__":
     test_set = args.test_set
     if test_set == 0:
         print(f"Running reduced set of benchmarks.")
-    else:
-        print(f"Running full set of benchmarks.")
-
-    # Select
-
-    # Benchmark set selection depending on test set
-    if test_set == 0:
         algos = [["se2gis", "--cvc4"],
                  ["segis", "--segis --cvc4"]]
         optims = [["all", ""]]
-    else:
+
+    elif test_set == 1:
+        print(f"Running full set of benchmarks.")
         algos = [["se2gis", "--cvc4"],
                  ["segis", "--segis --cvc4"],
                  ["segis0", "--segis --cvc4 -u"]]
         optims = [["all", ""]]
+
+    elif test_set == 2:
+        print(f"Testing unrealizability checks.")
+        algos = [["se2gis", "--cvc4 -C"],
+                 ["segis", "--segis --cvc4 -C"]]
+        optims = [["all", ""]]
+    else:
+        exit(0)
 
     input_files = constraint_benchmarks + unrealizable_benchmarks
 
