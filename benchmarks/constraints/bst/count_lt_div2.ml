@@ -1,4 +1,4 @@
-(** @synduce -NB -n 30 *)
+(** @synduce -NB -n 30 --no-lifting *)
 
 type 'a tree =
   | Leaf of 'a
@@ -23,8 +23,8 @@ let repr x = x
 
 let spec x t =
   let rec f = function
-    | Leaf a -> if a < x then 1 else 0
-    | Node (a, l, r) -> if a < x then 1 + f l + f r else f l + f r
+    | Leaf a -> if a < x && a mod 2 = 0 then 1 else 0
+    | Node (a, l, r) -> if a < x && a mod 2 = 0 then 1 + f l + f r else f l + f r
   in
   f t
 ;;
@@ -32,7 +32,7 @@ let spec x t =
 let target y t =
   let rec g = function
     | Leaf a -> [%synt xi_0] y a
-    | Node (a, l, r) -> if a < y then [%synt xi_1] (g l) (g r) else [%synt xi_2] (g l)
+    | Node (a, l, r) -> if a < y then [%synt xi_1] a y (g l) (g r) else [%synt xi_2] (g l)
   in
   g t
   [@@requires is_bst]
