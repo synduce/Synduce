@@ -5,6 +5,7 @@ open Lang.Rewriter
 open Syguslib.Sygus
 open Lang.SygusInterface
 open Utils
+module E = Syguslib.Expressions
 
 type grammar_parameters =
   { g_opset : OpSet.t

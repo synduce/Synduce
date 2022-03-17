@@ -5,6 +5,7 @@ open Syguslib
 open Sygus
 open Term
 open Utils
+module E = Syguslib.Expressions
 
 (* Instantiate solver functor in interface. *)
 
