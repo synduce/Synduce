@@ -89,12 +89,12 @@ module Variable : sig
   val get_name : int -> string option
 
   (** Forget the global type of the variable. *)
-  val clear_type : t -> unit
+  val clear_type : Context.t -> t -> unit
 
   (** Return the type of a variable, or create a new type and return it if the variable doesn't have
       a type. That new type becomes the type of the variable.
     *)
-  val vtype_or_new : t -> RType.t
+  val vtype_or_new : Context.t -> t -> RType.t
 
   (** Apply a type substitution to all the knownn variables. *)
   val update_var_types : (RType.t * RType.t) list -> unit
@@ -106,6 +106,7 @@ module Variable : sig
   val mk
     :  ?attrs:(Attributes.elt, Attributes.Elt.comparator_witness) Base.Set.t
     -> ?t:RType.t option
+    -> Context.t
     -> string
     -> t
 
@@ -132,11 +133,11 @@ module Variable : sig
   (** [same_name v1 v2] eturns true if [v1] and [v2] have the same name. *)
   val same_name : t -> t -> bool
 
-  val pp : Format.formatter -> t -> unit
+  val pp : Context.t -> Format.formatter -> t -> unit
   val pp_id : Format.formatter -> t -> unit
-  val pp_typed : Format.formatter -> t -> unit
-  val free : t -> unit
-  val print_summary : Format.formatter -> unit -> unit
+  val pp_typed : Context.t -> Format.formatter -> t -> unit
+  val free : Alpha.t -> t -> unit
+  val print_summary : Format.formatter -> Alpha.t -> unit
 end
 
 module VarSet : sig
@@ -190,7 +191,7 @@ module VarSet : sig
   val names : t -> string list
 
   (** Filter a set with a type. *)
-  val filter_by_type : t -> RType.t -> t
+  val filter_by_type : Context.t -> t -> RType.t -> t
 
   (** Create a record type from a set of variables (an association list where keys are the variable
       names and data is the variable type). *)
@@ -202,7 +203,7 @@ module VarSet : sig
   (** Given a set of variables, return a list of pairs such that for each element [v] in the set,
     there is a pair [v,v'] in the list where [v'] is a fresh variable (with a name similar to [v])
    *)
-  val prime : t -> (elt * elt) list
+  val prime : Context.t -> t -> (elt * elt) list
 
   (** Change the names of the variables in the set by adding a string prefix. The variables are
       still equal to the input variable, in the sense that they have the same id, but different
@@ -214,11 +215,11 @@ module VarSet : sig
   val iset : t -> int list -> t
 
   (** Pretty-print a set just by printing variable names.  *)
-  val pp_var_names : Format.formatter -> (elt, 'a) Base.Set.t -> unit
+  val pp_var_names : Context.t -> Format.formatter -> (elt, 'a) Base.Set.t -> unit
 
   (** Pretty print a set by printing variable names with their type. Seee [pp_var_names] for
     alternative.  *)
-  val pp : Format.formatter -> (elt, 'a) Base.Set.t -> unit
+  val pp : Context.t -> Format.formatter -> (elt, 'a) Base.Set.t -> unit
 
   (** Print the variable set in a non-human readable format.  *)
   val dump : Format.formatter -> (elt, 'a) Base.Set.t -> unit
