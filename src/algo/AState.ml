@@ -10,7 +10,7 @@ open Domainslib
    definitions and printing functions for displaying solutions.
  *)
 
-module Context = struct
+module ThreadContext = struct
   exception Escape
 
   type t =
@@ -267,48 +267,48 @@ type 'a segis_response =
 (*          Pretty printing functions.                                                           *)
 (* ============================================================================================= *)
 
-let pp_equation (f : Formatter.t) (eqn : equation) =
+let pp_equation ~(ctx : Context.t) (f : Formatter.t) (eqn : equation) =
   match eqn.eprecond with
   | Some inv ->
     Fmt.(
       pf
         f
         "@[<hov 2>E(%a)<%a> := @;@[<hov 2>%a %a@;@[%a@;%a@;%a@]@]@]"
-        (styled `Italic pp_term)
+        (styled `Italic (pp_term ctx))
         eqn.eterm
-        pp_subs
+        (pp_subs ctx)
         eqn.eelim
-        pp_term
+        (pp_term ctx)
         inv
         (styled (`Fg `Red) string)
         "=>"
-        pp_term
+        (pp_term ctx)
         eqn.elhs
         (styled (`Fg `Red) string)
         "="
-        pp_term
+        (pp_term ctx)
         eqn.erhs)
   | None ->
     Fmt.(
       pf
         f
         "@[<hov 2>E(%a)<%a> := @;@[<hov 2>%a %a %a@]@]"
-        (styled `Italic pp_term)
+        (styled `Italic (pp_term ctx))
         eqn.eterm
-        pp_subs
+        (pp_subs ctx)
         eqn.eelim
-        pp_term
+        (pp_term ctx)
         eqn.elhs
         (styled (`Fg `Red) string)
         "="
-        pp_term
+        (pp_term ctx)
         eqn.erhs)
 ;;
 
-let pp_ctex (f : Formatter.t) (ctex : ctex) : unit =
+let pp_ctex ~(ctx : Context.t) (f : Formatter.t) (ctex : ctex) : unit =
   let pp_model frmt model =
     (* Print as comma-separated list of variable -> term *)
-    Fmt.(list ~sep:comma (pair ~sep:Utils.rightarrow Variable.pp pp_term))
+    Fmt.(list ~sep:comma (pair ~sep:Utils.rightarrow (Variable.pp ctx) (pp_term ctx)))
       frmt
       (Map.to_alist model)
   in
@@ -317,37 +317,41 @@ let pp_ctex (f : Formatter.t) (ctex : ctex) : unit =
     "@[M = [%a]@]@;@[for %a@]@;@[with elim. %a@]"
     pp_model
     ctex.ctex_model
-    pp_term
+    (pp_term ctx)
     ctex.ctex_eqn.eterm
-    pp_subs
+    (pp_subs ctx)
     ctex.ctex_eqn.eelim
 ;;
 
-let pp_implems (frmt : Formatter.t) (implems : (symbol * variable list * term) list) =
+let pp_implems
+    ~(ctx : Context.t)
+    (frmt : Formatter.t)
+    (implems : (symbol * variable list * term) list)
+  =
   let pp_single_or_tup frmt l =
     match l with
     | [] -> ()
-    | [ (_, v) ] -> pp_term frmt v
+    | [ (_, v) ] -> (pp_term ctx) frmt v
     | _ :: _ ->
       Fmt.(
         pf
           frmt
           "(%a)"
-          (list ~sep:(fun _f () -> pf _f ", ") pp_term)
+          (list ~sep:(fun _f () -> pf _f ", ") (pp_term ctx))
           (List.map ~f:second l))
   in
   let pp_implem frmt (s, args, t) =
     let f v =
-      match Variable.vtype_or_new v with
+      match Variable.vtype_or_new ctx v with
       | TTup tl ->
         let f i typ =
-          let v' = Variable.mk ~t:(Some typ) (Alpha.fresh ~s:v.vname ()) in
-          mk_sel (mk_var v) i, mk_var v'
+          let v' = Variable.mk ctx ~t:(Some typ) (Alpha.fresh ctx.names ~s:v.vname) in
+          mk_sel ctx (mk_var ctx v) i, mk_var ctx v'
         in
         let subs1 = List.mapi ~f tl in
         let _, vars = List.unzip subs1 in
-        (mk_var v, mk_tup vars) :: subs1, subs1
-      | _ -> [], [ mk_var v, mk_var v ]
+        (mk_var ctx v, mk_tup ctx vars) :: subs1, subs1
+      | _ -> [], [ mk_var ctx v, mk_var ctx v ]
     in
     let subs, args = List.unzip (List.map ~f args) in
     let t' = substitution (List.concat subs) t in
@@ -363,19 +367,26 @@ let pp_implems (frmt : Formatter.t) (implems : (symbol * variable list * term) l
         args
         (styled (`Fg `Red) string)
         "="
-        pp_term
+        (pp_term ctx)
         t')
   in
   Fmt.((list ~sep:(fun _f () -> pf _f "@.@.") pp_implem) frmt implems)
 ;;
 
-let pp_soln ?(use_ocaml_syntax = false) (frmt : Formatter.t) (solution : soln) =
+let pp_soln
+    ?(use_ocaml_syntax = false)
+    ~(ctx : Context.t)
+    (frmt : Formatter.t)
+    (solution : soln)
+  =
   Fmt.(
     pf
       frmt
       "@.%a@.@.@[%a@]@."
-      pp_implems
+      (pp_implems ~ctx)
       solution.soln_implems
-      (if use_ocaml_syntax then PMRS.pp_ocaml ~short:false else PMRS.pp ~short:false)
+      (if use_ocaml_syntax
+      then PMRS.pp_ocaml ~ctx ~short:false
+      else PMRS.pp ~ctx ~short:false)
       solution.soln_rec_scheme)
 ;;

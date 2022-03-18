@@ -44,43 +44,65 @@ type t =
   ; plogic : SmtLogic.logic_info
   }
 
-(** Register a PMRS that should be accesible globally. *)
-val register_global : t -> unit
+(** Context for:
+    - all PMRS in the file, indexed by the function variable id.
+    - all the nonterminals, indexed by the function variable id.
+*)
+module Functions : sig
+  type ctx =
+    { globals : (int, t) Hashtbl.t
+    ; nonterminals : (int, int) Hashtbl.t
+    }
 
-(** Find a globally registered PMRS.  *)
-val find_global : int -> t option
+  (** Create an empty context, with an empty table of functions. *)
+  val create : unit -> ctx
 
-(** Find a PMRS by name. The name of a PMRS is the name of its pvar.  *)
-val find_by_name : string -> variable option
+  (** Clear the function tables. *)
+  val clear : ctx -> unit
 
-(** Register a nonterminal that points back to a PMRS. *)
-val register_nonterminal : int -> t -> unit
+  (** Copy a function context (copies the tables)*)
+  val copy : ctx -> ctx
 
-(** Find the PMRS corresponding to a nonterminal. *)
-val find_nonterminal : int -> t option
+  (** Add a global function to the table of functions [globals] inside the context. *)
+  val register_global : ctx -> t -> unit
 
-(** Find a non-terminal (represented by a variable) from its name. *)
-val find_nonterminal_by_name : string -> variable option
+  (** Search for a PMRS with the given id in the global table of functions. *)
+  val find_global : ctx -> int -> t option
 
-(** Update tables with a new PMRS definition.*)
-val update : t -> unit
+  (** Find a PMRS by name. The name of a PMRS is the name of its pvar.  *)
+  val find_by_name : ctx -> string -> variable option
 
-(** Reinitialize tables of PMRS and nonterminals. *)
-val reinit : unit -> unit
+  (** Register a non-terminal symbol within a PRMS *)
+  val register_nonterminal : ctx -> int -> t -> unit
+
+  (** Find a non-terminal symbol in the current context (returns the PMRS that defines it) *)
+  val find_nonterminal : ctx -> int -> t option
+
+  (** Find a non-terminal (represented by a variable) from its name. *)
+  val find_nonterminal_by_name : ctx -> string -> variable option
+
+  (** [update ctx p] registers the PMRS [p] and all its non-terminals inside the context [ctx].*)
+  val update : ctx -> t -> unit
+end
 
 (** Update the order of a PMRS.  *)
 val update_order : t -> t
 
 (** Set the logic info field of a PMRS.  *)
-val set_logic_info_of_pmrs : t -> t
+val set_logic_info_of_pmrs : ctx:Context.t -> t -> t
 
 (** {-1 Utility functions, transformation, conversion to functions.} *)
 
 (** Translate a recursive function to a PMRS (currently only work for identity).  *)
-val func_to_pmrs : Variables.variable -> Term.fpattern list -> Term.term -> t
+val func_to_pmrs
+  :  ctx:Context.t
+  -> Variables.variable
+  -> Term.fpattern list
+  -> Term.term
+  -> t
 
 (** Translate a PMRS to a set of (mutually) recursive functions. *)
-val func_of_pmrs : t -> function_descr list
+val func_of_pmrs : ctx:Context.t -> t -> function_descr list
 
 (**
   inverted_rule_lookup searches for rules whose rhs match (func args), and return
@@ -89,6 +111,7 @@ val func_of_pmrs : t -> function_descr list
 *)
 val inverted_rule_lookup
   :  ?boundvars:(Variables.variable, Term.Variable.comparator_witness) Base.Set.t
+  -> ctx:Context.t
   -> ( 'a
      , Variables.variable * Variables.variable list * Term.pattern option * Term.term
      , 'b )
@@ -100,31 +123,31 @@ val inverted_rule_lookup
 (**
   Apply a substitution to all the right hand side of the PMRS rules.
 *)
-val subst_rule_rhs : p:t -> (Term.term * Term.term) list -> t
+val subst_rule_rhs : ctx:Context.t -> p:t -> (Term.term * Term.term) list -> t
 
 (**
   Given an input PMRS, returns a list of PMRS that this PMRS depends on.
   *)
-val depends : t -> t list
+val depends : glob:Functions.ctx -> ctx:Context.t -> t -> t list
 
 (**
   Generate the term that corresponds to the left hand side of a rewrite rule in
   a PMRS.
 *)
-val lhs : variable * variable list * pattern option * term -> term
+val lhs : ctx:Context.t -> variable * variable list * pattern option * term -> term
 
 (**
   Updates and returns the output type of a PMRS.
 *)
-val update_output_type : t -> t
+val update_output_type : ctx:Context.t -> t -> t
 
 (**{-1 PMRS and Types }*)
 
 (** Clear the type information inside a PMRS.  *)
-val clear_pmrs_types : t -> t
+val clear_pmrs_types : ctx:Context.t -> t -> t
 
 (** Infer the types inside a PMRS. *)
-val infer_pmrs_types : t -> t
+val infer_pmrs_types : ctx:Context.t -> t -> t
 
 val unify_two_with_vartype_update
   :  RType.t * RType.t
@@ -137,10 +160,10 @@ val extract_rec_input_typ : t -> RType.t
 (**{-1 Pretty printing functions.}*)
 
 (** Pretty print a rewrite rule, as in a PMRS. *)
-val pp_rewrite_rule : Formatter.t -> rewrite_rule -> unit
+val pp_rewrite_rule : ctx:Context.t -> Formatter.t -> rewrite_rule -> unit
 
 (** Pretty print a PMRS. *)
-val pp : Formatter.t -> ?short:bool -> t -> unit
+val pp : ctx:Context.t -> Formatter.t -> ?short:bool -> t -> unit
 
 (** Pretty print a PMRS using Ocaml syntax (as a set of recursive functions). *)
-val pp_ocaml : Formatter.t -> ?short:bool -> t -> unit
+val pp_ocaml : ctx:Context.t -> Formatter.t -> ?short:bool -> t -> unit

@@ -6,4 +6,4 @@ open Term
 *)
 val simplify : term -> term
 
-val in_model : ?no_simplify:bool -> term VarMap.t -> term -> term
+val in_model : ?no_simplify:bool -> ctx:Context.t -> term VarMap.t -> term -> term

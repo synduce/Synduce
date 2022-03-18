@@ -46,21 +46,21 @@ let show_steps tsize usize =
     (str "Start refinement loop with %i terms in T, %i terms in U." tsize usize)
 ;;
 
-let show_counterexamples lstate t_set =
+let show_counterexamples ~(ctx : Context.t) lstate t_set =
   Log.debug (fun frmt () ->
       pf
         frmt
         "@[<hov 2>Counterexample terms:@;@[<hov 2>%a@]"
-        (list ~sep:comma Term.pp_term)
+        (list ~sep:comma (Term.pp_term ctx))
         (Set.elements (Set.diff t_set lstate.t_set)))
 ;;
 
-let show_summary (spec_fname, repr_fname, target_fname) target_f =
+let show_summary ~(ctx : Context.t) (spec_fname, repr_fname, target_fname) target_f =
   Log.info (fun fmt () ->
       pf
         fmt
         " Ψ (%a) := ∀ x : %a. (%a o %a)(x) = %a(x)"
-        (list ~sep:comma Term.Variable.pp)
+        (list ~sep:comma (Term.Variable.pp ctx))
         (Set.elements target_f.PMRS.psyntobjs)
         (styled (`Fg `Yellow) (list ~sep:sp RType.pp))
         target_f.pinput_typ
@@ -72,11 +72,12 @@ let show_summary (spec_fname, repr_fname, target_fname) target_f =
         target_fname)
 ;;
 
-let show_pmrs pmrs =
-  Log.info (fun fmt () -> pf fmt "%a" (box (PMRS.pp ~short:(not !Config.verbose))) pmrs)
+let show_pmrs ~(ctx : Context.t) pmrs =
+  Log.info (fun fmt () ->
+      pf fmt "%a" (box (PMRS.pp ~ctx ~short:(not !Config.verbose))) pmrs)
 ;;
 
-let show_new_rskel i p =
+let show_new_rskel ~(ctx : Context.t) i p =
   if !Config.Optims.max_solutions > 0
   then (
     Log.sep ~i:(Some i) ();
@@ -84,7 +85,7 @@ let show_new_rskel i p =
         pf
           fmt
           "💁 Attempting to find solution to skeleton:@;<1 10>%a"
-          (box (PMRS.pp ~short:false))
+          (box (PMRS.pp ~ctx ~short:false))
           p.PsiDef.target))
 ;;
 
@@ -100,10 +101,15 @@ let msg_too_many_opts () =
 (*                           Messages from the Counterexamples                                   *)
 (* ============================================================================================= *)
 
-let pp_unrealizability_ctex (frmt : Formatter.t) (uc : unrealizability_ctex) : unit =
+let pp_unrealizability_ctex
+    ~(ctx : Context.t)
+    (frmt : Formatter.t)
+    (uc : unrealizability_ctex)
+    : unit
+  =
   let pp_model frmt model =
     (* Print as comma-separated list of variable -> term *)
-    Fmt.(list ~sep:comma (pair ~sep:Utils.rightarrow Variable.pp pp_term))
+    Fmt.(list ~sep:comma (pair ~sep:Utils.rightarrow (Variable.pp ctx) (pp_term ctx)))
       frmt
       (Map.to_alist model)
   in
@@ -119,7 +125,7 @@ let pp_unrealizability_ctex (frmt : Formatter.t) (uc : unrealizability_ctex) : u
       uc.cj.ctex_model)
 ;;
 
-let show_unrealizability_witnesses unknowns eqns ctexs =
+let show_unrealizability_witnesses ~(ctx : Context.t) unknowns eqns ctexs =
   Log.verbose (fun f () ->
       match ctexs with
       | [] ->
@@ -127,7 +133,7 @@ let show_unrealizability_witnesses unknowns eqns ctexs =
           pf
             f
             "(%a) no counterexample to realizability found."
-            VarSet.pp_var_names
+            (VarSet.pp_var_names ctx)
             unknowns)
       | _ :: _ ->
         Fmt.(
@@ -138,11 +144,11 @@ let show_unrealizability_witnesses unknowns eqns ctexs =
              @[<v>%a@]@]@;\
              @[<hov 2>❔ Counterexample models:@;\
              @[<v>%a@]@]@]"
-            VarSet.pp_var_names
+            (VarSet.pp_var_names ctx)
             unknowns
-            (list ~sep:sp (box (pair ~sep:colon int (box pp_equation))))
+            (list ~sep:sp (box (pair ~sep:colon int (box (pp_equation ~ctx)))))
             (List.mapi ~f:(fun i eqn -> i, eqn) eqns)
-            (list ~sep:sep_and pp_unrealizability_ctex)
+            (list ~sep:sep_and (pp_unrealizability_ctex ~ctx))
             ctexs))
 ;;
 
@@ -159,27 +165,31 @@ let spurious_violates_requires i =
   Log.info (fun fmt () -> pf fmt "%i counterexamples violate requires." i)
 ;;
 
-let print_infeasible_message t_set =
+let print_infeasible_message ~ctx t_set =
   Log.info (fun frmt () ->
       pf
         frmt
         "@[<hov 2>This problem has no solution. Counterexample set:@;%a@]"
-        (list ~sep:sp Term.pp_term)
+        (list ~sep:sp (Term.pp_term ctx))
         (Set.elements t_set))
 ;;
 
-let announce_new_term_state ctex =
+let announce_new_term_state ~(ctx : Context.t) ctex =
   Log.debug (fun fmt () ->
       pf
         fmt
         "Creating new term state for term@;%a@;under condition %a@;"
-        pp_term
+        (pp_term ctx)
         ctex.ctex_eqn.eterm
-        (option pp_term)
+        (option (pp_term ctx))
         ctex.ctex_eqn.esplitter)
 ;;
 
-let announce_new_lemma_synthesis (thread_no : int) (det : term_state_detail) =
+let announce_new_lemma_synthesis
+    ~(ctx : Context.t)
+    (thread_no : int)
+    (det : term_state_detail)
+  =
   Log.debug (fun f () ->
       match det.current_preconds with
       | None ->
@@ -187,9 +197,9 @@ let announce_new_lemma_synthesis (thread_no : int) (det : term_state_detail) =
           f
           "[%i] Synthesizing a new lemma candidate for term@;@[%a[%a]@]."
           thread_no
-          pp_term
+          (pp_term ctx)
           det.term
-          pp_subs
+          (pp_subs ctx)
           det.recurs_elim
       | Some pre ->
         pf
@@ -199,11 +209,11 @@ let announce_new_lemma_synthesis (thread_no : int) (det : term_state_detail) =
            with precondition@;\
            @[%a@]"
           thread_no
-          pp_term
+          (pp_term ctx)
           det.term
-          pp_subs
+          (pp_subs ctx)
           det.recurs_elim
-          pp_term
+          (pp_term ctx)
           pre)
 ;;
 
@@ -216,6 +226,7 @@ let lemma_not_proved_correct (m : Stats.verif_method) =
 ;;
 
 let lemma_proved_correct
+    ~(ctx : Context.t)
     (proof_method : Stats.verif_method)
     (det : term_state_detail)
     (lemma_term : term)
@@ -229,13 +240,13 @@ let lemma_proved_correct
   let lemma_str =
     str
       "(%a)[%a]->%s(%s)= %a"
-      pp_term
+      (pp_term ctx)
       det.term
-      (list ~sep:comma (Fmt.pair ~sep:rightarrow pp_term pp_term))
+      (list ~sep:comma (Fmt.pair ~sep:rightarrow (pp_term ctx) (pp_term ctx)))
       det.recurs_elim
       det.lemma.vname
       (String.concat ~sep:", " (List.map ~f:(fun v -> v.vname) det.scalar_vars))
-      (box pp_term)
+      (box (pp_term ctx))
       lemma_term
   in
   Stats.set_lemma_synthesized
@@ -246,47 +257,49 @@ let lemma_proved_correct
       pf
         frmt
         "Lemma for term %a:@;\"%s %s =@;@[%a@]\"."
-        pp_term
+        (pp_term ctx)
         det.term
         det.lemma.vname
         (String.concat ~sep:" " (List.map ~f:(fun v -> v.vname) det.scalar_vars))
-        (box pp_term)
+        (box (pp_term ctx))
         lemma_term)
 ;;
 
 (* Messages from ImagePredicates *)
 
-let violates_ensures p ctexs =
+let violates_ensures ~(ctx : Context.t) p ctexs =
   List.iter ctexs ~f:(fun ctex ->
       List.iter ctex.ctex_eqn.eelim ~f:(fun (_, elimv) ->
-          let tval = Eval.in_model ctex.ctex_model elimv in
+          let tval = Eval.in_model ~ctx ctex.ctex_model elimv in
           Log.verbose (fun fmt () ->
               pf
                 fmt
                 "%a should not be in the image of %s"
-                pp_term
+                (pp_term ctx)
                 tval
                 p.PsiDef.reference.pvar.vname)))
 ;;
 
-let positives_ensures p positives =
+let positives_ensures ~(ctx : Context.t) p positives =
   Log.verbose (fun fmt () ->
       pf
         fmt
         "@[These examples are in the image of %s:@;%a@]"
         p.PsiDef.reference.pvar.vname
-        (list ~sep:comma pp_term)
+        (list ~sep:comma (pp_term ctx))
         positives)
 ;;
 
-let show_new_ensures_predicate (f : variable) (ensures : term) =
+let show_new_ensures_predicate ~(ctx : Context.t) (f : variable) (ensures : term) =
   let ensures = Reduce.reduce_term ensures in
-  Stats.set_lemma_synthesized "ensures_lemma" (String.strip (str "%a" pp_term ensures));
+  Stats.set_lemma_synthesized
+    "ensures_lemma"
+    (String.strip (str "%a" (pp_term ctx) ensures));
   Log.info
     Fmt.(
       fun fmt () ->
         let input_t =
-          let in_t_l, _ = RType.fun_typ_unpack (Variable.vtype_or_new f) in
+          let in_t_l, _ = RType.fun_typ_unpack (Variable.vtype_or_new ctx f) in
           match in_t_l with
           | [ a ] -> a
           | _ -> RType.TTup in_t_l
@@ -298,7 +311,7 @@ let show_new_ensures_predicate (f : variable) (ensures : term) =
           input_t
           (styled (`Fg `Blue) string)
           f.vname
-          (box pp_term)
+          (box (pp_term ctx))
           ensures)
 ;;
 
@@ -307,6 +320,7 @@ let show_new_ensures_predicate (f : variable) (ensures : term) =
 (* ============================================================================================= *)
 
 let image_ctex_class
+    ~(ctx : Context.t)
     (p : PsiDef.t)
     (ctex : ctex)
     (resp : Smtlib.SmtLib.solver_response)
@@ -324,7 +338,7 @@ let image_ctex_class
             (styled (`Fg `Red) string)
             "SPURIOUS"
             p.PsiDef.reference.pvar.vname
-            (box pp_ctex)
+            (box (pp_ctex ~ctx))
             ctex)
       else if SmtInterface.SyncSmt.is_sat resp
       then
@@ -336,7 +350,7 @@ let image_ctex_class
             (styled (`Fg `Green) string)
             "VALID"
             p.PsiDef.reference.pvar.vname
-            (box pp_ctex)
+            (box (pp_ctex ~ctx))
             ctex)
       else
         Fmt.(
@@ -347,7 +361,7 @@ let image_ctex_class
             (styled (`Fg `White) (styled (`Bg `Red) string))
             "UNKNOWN"
             p.PsiDef.reference.pvar.vname
-            (box pp_ctex)
+            (box (pp_ctex ~ctx))
             ctex))
 ;;
 
