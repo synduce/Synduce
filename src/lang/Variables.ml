@@ -1,50 +1,5 @@
 open Base
-
-(**
-   Variables have unique integer ids but two variables can have the same name.
-   Additional information can be added via variable attributes.
-   For example, a variable can be a Terminal or a NonTerminal in the context of a
-   pattern matching recursion scheme.
-*)
-module Attributes = struct
-  module Elt = struct
-    module T = struct
-      type t =
-        | Anonymous
-        | Builtin
-        | Terminal
-        | NonTerminal of int
-      [@@deriving sexp]
-
-      let equal (a : t) (b : t) = Poly.equal a b
-      let compare (a : t) (b : t) = Poly.compare a b
-      let hash = Hashtbl.hash
-    end
-
-    include T
-    include Comparator.Make (T)
-
-    let is_non_terminal a =
-      match a with
-      | NonTerminal _ -> true
-      | _ -> false
-    ;;
-  end
-
-  module AS = Set.M (Elt)
-  include AS
-
-  type elt = Elt.t
-
-  let singleton = Set.singleton (module Elt)
-  let empty = Set.empty (module Elt)
-end
-
-type variable =
-  { vname : string
-  ; vid : int
-  ; vattrs : Attributes.t
-  }
+open TermTypes
 
 (* Module of variables *)
 module Variable = struct
@@ -65,23 +20,19 @@ module Variable = struct
   include T
   include Comparator.Make (T)
 
-  let types_tbl : (int, RType.t) Hashtbl.t = Hashtbl.create (module Int)
-  let names_tbl : (int, string) Hashtbl.t = Hashtbl.create (module Int)
+  let _print_info = ref false
 
-  let clear () =
-    Hashtbl.clear types_tbl;
-    Hashtbl.clear names_tbl
+  let vtype_assign (ctx : Context.t) (v : t) (t : RType.t) =
+    Hashtbl.set ctx.vartypes ~key:v.vid ~data:t
   ;;
 
-  let _print_info = ref false
-  let vtype_assign (v : t) (t : RType.t) = Hashtbl.set types_tbl ~key:v.vid ~data:t
-  let vtype (v : t) = Hashtbl.find types_tbl v.vid
+  let vtype (ctx : Context.t) (v : t) = Hashtbl.find ctx.vartypes v.vid
   let id (v : t) = v.vid
-  let get_name (vid : int) = Hashtbl.find names_tbl vid
+  let get_name (ctx : Context.t) (vid : int) = Hashtbl.find ctx.varnames vid
 
   let clear_type (ctx : Context.t) (v : t) =
     let new_t = RType.get_fresh_tvar ctx.types in
-    vtype_assign v new_t
+    vtype_assign ctx v new_t
   ;;
 
   (* `vtype_or_new v` returns the type of variable v, or assigns a fresh type variable
@@ -90,16 +41,16 @@ module Variable = struct
       produced during type inference.
   *)
   let vtype_or_new (ctx : Context.t) (v : t) =
-    match vtype v with
+    match vtype ctx v with
     | Some x -> x
     | None ->
       let new_t = RType.get_fresh_tvar ctx.types in
-      vtype_assign v new_t;
+      vtype_assign ctx v new_t;
       new_t
   ;;
 
-  let update_var_types (tsubs : (RType.t * RType.t) list) =
-    Hashtbl.map_inplace ~f:(fun t -> RType.sub_all tsubs t) types_tbl
+  let update_var_types (ctx : Context.t) (tsubs : (RType.t * RType.t) list) =
+    Hashtbl.map_inplace ~f:(fun t -> RType.sub_all tsubs t) ctx.vartypes
   ;;
 
   let mk ?(attrs = Attributes.empty) ?(t = None) (ctx : Context.t) (name : string) =
@@ -107,10 +58,10 @@ module Variable = struct
       Alpha.mk_with_id ctx.names (-1) name (fun vid ->
           { vname = name; vid; vattrs = attrs })
     in
-    Hashtbl.set names_tbl ~key:v.vid ~data:v.vname;
+    Hashtbl.set ctx.varnames ~key:v.vid ~data:v.vname;
     (match t with
-    | Some t -> vtype_assign v t
-    | None -> vtype_assign v (RType.get_fresh_tvar ctx.types));
+    | Some t -> vtype_assign ctx v t
+    | None -> vtype_assign ctx v (RType.get_fresh_tvar ctx.types));
     v
   ;;
 
@@ -143,20 +94,21 @@ module Variable = struct
     Fmt.(pf frmt "%s : %a" v.vname RType.pp (vtype_or_new ctx v))
   ;;
 
-  let free (env : Alpha.t) (var : t) =
-    Alpha.forget env var.vid var.vname;
-    Hashtbl.remove types_tbl var.vid
+  let free (ctx : Context.t) (var : t) =
+    Alpha.forget ctx.names var.vid var.vname;
+    Hashtbl.remove ctx.vartypes var.vid
   ;;
 
-  let print_summary (frmt : Formatter.t) (env : Alpha.t) =
+  let print_summary (frmt : Formatter.t) (ctx : Context.t) =
     Utils.Log.(debug (wrap "Variables in tables:"));
     let le =
-      Hashtbl.fold env.ids ~init:0 ~f:(fun ~key:_ ~data l -> max l (String.length data))
+      Hashtbl.fold ctx.names.ids ~init:0 ~f:(fun ~key:_ ~data l ->
+          max l (String.length data))
     in
     Fmt.(pf frmt "\t  ID | %*s : TYPE@." le "NAME");
     Fmt.(pf frmt "\t---------------------------@.");
-    Hashtbl.iteri env.ids ~f:(fun ~key ~data ->
-        match Hashtbl.find types_tbl key with
+    Hashtbl.iteri ctx.names.ids ~f:(fun ~key ~data ->
+        match Hashtbl.find ctx.vartypes key with
         | Some t -> Fmt.(pf frmt "\t%4i | %*s : %a@." key le data RType.pp t)
         | None -> Fmt.(pf frmt "\t%4i | %*s : ??@." key le data))
   ;;
@@ -195,9 +147,9 @@ module VarSet = struct
     Set.filter vs ~f:(fun v -> RType.t_equals (Variable.vtype_or_new ctx v) t)
   ;;
 
-  let record vs =
+  let record ctx vs =
     List.map
-      ~f:(fun elt -> elt.vname, Option.value_exn (Variable.vtype elt))
+      ~f:(fun elt -> elt.vname, Option.value_exn (Variable.vtype ctx elt))
       (elements vs)
   ;;
 
@@ -213,7 +165,7 @@ module VarSet = struct
     Set.fold
       ~f:(fun subs v ->
         let primed_name = Alpha.fresh ~s:(v.vname ^ "_") ctx.names in
-        let primed_var = Variable.mk ctx ~t:(Variable.vtype v) primed_name in
+        let primed_var = Variable.mk ctx ~t:(Variable.vtype ctx v) primed_name in
         (v, primed_var) :: subs)
       ~init:[]
       vs

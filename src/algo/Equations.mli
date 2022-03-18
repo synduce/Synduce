@@ -35,7 +35,7 @@ val pp_partial_soln
   -> unit
 
 val solve
-  :  Context.t
+  :  Term.Context.t
   -> p:PsiDef.t
   -> AState.equation list
   -> Syguslib.Sygus.solver_response

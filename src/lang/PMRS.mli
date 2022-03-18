@@ -94,12 +94,7 @@ val set_logic_info_of_pmrs : ctx:Context.t -> t -> t
 (** {-1 Utility functions, transformation, conversion to functions.} *)
 
 (** Translate a recursive function to a PMRS (currently only work for identity).  *)
-val func_to_pmrs
-  :  ctx:Context.t
-  -> Variables.variable
-  -> Term.fpattern list
-  -> Term.term
-  -> t
+val func_to_pmrs : ctx:Context.t -> Variable.t -> Term.fpattern list -> Term.term -> t
 
 (** Translate a PMRS to a set of (mutually) recursive functions. *)
 val func_of_pmrs : ctx:Context.t -> t -> function_descr list
@@ -110,12 +105,9 @@ val func_of_pmrs : ctx:Context.t -> t -> function_descr list
   substitutions performed.
 *)
 val inverted_rule_lookup
-  :  ?boundvars:(Variables.variable, Term.Variable.comparator_witness) Base.Set.t
+  :  ?boundvars:(Variable.t, Variable.comparator_witness) Base.Set.t
   -> ctx:Context.t
-  -> ( 'a
-     , Variables.variable * Variables.variable list * Term.pattern option * Term.term
-     , 'b )
-     Base.Map.t
+  -> ('a, Variable.t * Variable.t list * Term.pattern option * Term.term, 'b) Base.Map.t
   -> Term.term
   -> Term.term list
   -> ('a, Term.term, 'b) Base.Map.t

@@ -2,10 +2,14 @@ open Lang
 open Base
 open SmtInterface
 
-val mk_recursion_elimination_term : AState.PsiDef.t -> (Term.term * Term.term) option
+val mk_recursion_elimination_term
+  :  ctx:Term.Context.t
+  -> AState.PsiDef.t
+  -> (Term.term * Term.term) option
 
 val subst_recursive_calls
-  :  AState.PsiDef.t
+  :  ctx:Term.Context.t
+  -> AState.PsiDef.t
   -> Term.term list
   -> (Term.term * Term.term) list * Term.TermSet.t
 
@@ -27,6 +31,7 @@ val nonreduced_terms_all
 val replace_rhs_of_main
   :  ?verbose:bool
   -> ?for_mr:bool
+  -> ctx:Term.Context.t
   -> AState.PsiDef.t
   -> PMRS.t
   -> Term.term
@@ -34,7 +39,7 @@ val replace_rhs_of_main
 
 (** Applies `replace_rhs_of_main` with all main functions in the problem definition (psi_def)
 *)
-val replace_rhs_of_mains : AState.PsiDef.t -> Term.term -> Term.term
+val replace_rhs_of_mains : ctx:Term.Context.t -> AState.PsiDef.t -> Term.term -> Term.term
 
 (**
 Simple term expansion procedure. [simple t] expands the term [t] into two sets of terms, the first
@@ -44,18 +49,27 @@ should keep track of the unbounded terms as well and recursively expand them as 
 val simple
   :  ?verbose:bool
   -> ?max_height:int
+  -> ctx:Term.Context.t
   -> Term.term
   -> (Term.term, Term.Terms.comparator_witness) Set.t
      * (Term.term, Term.Terms.comparator_witness) Set.t
 
 (** Heuristic to bound terms. Unbounded symbols will be bound using some arbitrary expansion. *)
-val make_bounded : Term.term -> Term.term
+val make_bounded : ctx:Term.Context.t -> Term.term -> Term.term
 
-val is_mr : AState.PsiDef.t -> PMRS.t -> Term.term -> Term.VarSet.t -> bool
-val is_mr_all : AState.PsiDef.t -> Term.term -> bool
+val is_mr
+  :  ctx:Term.Context.t
+  -> AState.PsiDef.t
+  -> PMRS.t
+  -> Term.term
+  -> Term.VarSet.t
+  -> bool
+
+val is_mr_all : ctx:Term.Context.t -> AState.PsiDef.t -> Term.term -> bool
 
 val to_maximally_reducible
-  :  AState.PsiDef.t
+  :  ctx:Term.Context.t
+  -> AState.PsiDef.t
   -> Term.term
   -> Term.TermSet.t * Term.TermSet.t
 
@@ -85,6 +99,7 @@ val expand_loop
   -> (SyncSmt.solver_response -> Term.term -> SyncSmt.solver_response)
   -> ?r_stop:(SyncSmt.solver_response -> bool)
   -> ?r_complete:SyncSmt.solver_response
+  -> ctx:Term.Context.t
   -> Term.TermSet.t
   -> SyncSmt.solver_response
 
@@ -97,5 +112,6 @@ val lwt_expand_loop
   -> (AsyncSmt.response -> Term.term -> AsyncSmt.response)
   -> ?r_stop:(Smtlib.SmtLib.solver_response -> bool)
   -> ?r_complete:Smtlib.SmtLib.solver_response
+  -> ctx:Term.Context.t
   -> Term.TermSet.t Lwt.t
   -> AsyncSmt.response

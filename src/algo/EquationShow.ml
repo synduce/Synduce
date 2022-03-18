@@ -1,9 +1,10 @@
 open AState
 open Base
-open Lang.Term
+open Lang
+open Term
 open Utils
 
-let show_invariants invariants =
+let show_invariants ~(ctx : Context.t) invariants =
   if Set.length invariants > 0
   then
     Log.verbose
@@ -12,25 +13,25 @@ let show_invariants invariants =
           pf
             frmt
             "Imᵢₙᵥ: @[<hov 2>%a@]"
-            (styled `Italic (list ~sep:comma pp_term))
+            (styled `Italic (list ~sep:comma (pp_term ctx)))
             (Set.elements invariants))
   else Log.verbose_msg "No image invariants."
 ;;
 
-let show_equations tset eqns =
+let show_equations ~(ctx : Context.t) tset eqns =
   Log.verbose (fun f () ->
       let print_less = List.take eqns !Config.pp_eqn_count in
       Fmt.(
         pf f "Equations (%i) @." (Set.length tset);
-        List.iter ~f:(fun eqn -> Fmt.pf f "@[%a@]@." pp_equation eqn) print_less))
+        List.iter ~f:(fun eqn -> Fmt.pf f "@[%a@]@." (pp_equation ~ctx) eqn) print_less))
 ;;
 
-let show_lifting_constraints lifting_eqns =
+let show_lifting_constraints ~(ctx : Context.t) lifting_eqns =
   Log.verbose (fun f () ->
       let print_less = List.take lifting_eqns !Config.pp_eqn_count in
       Fmt.(
         pf f "Lifting constraints (%i) @." (List.length lifting_eqns);
-        List.iter ~f:(fun eqn -> Fmt.pf f "@[%a@]@." pp_equation eqn) print_less))
+        List.iter ~f:(fun eqn -> Fmt.pf f "@[%a@]@." (pp_equation ~ctx) eqn) print_less))
 ;;
 
 let error_msg_comp_not_found s soln =

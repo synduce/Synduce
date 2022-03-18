@@ -71,9 +71,9 @@ module Expression : sig
     | EData of string * t list
     | EOp of Term.Operator.t * t list
 
-  val pp_ivar : ctx:Context.t -> rctx:RContext.t -> Formatter.t -> int -> unit
-  val pp_ivarset : ?ctx:Context.t -> rctx:RContext.t -> Formatter.t -> IS.t -> unit
-  val pp : ?ctx:Context.t -> rctx:RContext.t -> t Fmt.t
+  val pp_ivar : ctx:Term.Context.t -> rctx:RContext.t -> Formatter.t -> int -> unit
+  val pp_ivarset : ?ctx:Term.Context.t -> rctx:RContext.t -> Formatter.t -> IS.t -> unit
+  val pp : ?ctx:Term.Context.t -> rctx:RContext.t -> t Fmt.t
   val mk_e_true : t
   val mk_e_false : t
   val mk_e_int : int -> t
@@ -123,7 +123,7 @@ module Expression : sig
   val free_variables : t -> (int, Base.Int.comparator_witness) Base.Set.t
   val alpha_equal : t -> t -> bool
   val of_term : rctx:RContext.t -> Term.term -> t option
-  val to_term : ctx:Context.t -> rctx:RContext.t -> t -> Term.term option
+  val to_term : ctx:Term.Context.t -> rctx:RContext.t -> t -> Term.term option
   val simplify : t -> t
   val apply : t -> t list -> t
   val normalize : t -> t
@@ -161,4 +161,4 @@ val match_as_subexpr
   -> of_:Expression.t
   -> Expression.t option
 
-val simplify_term : ctx:Context.t -> Term.term -> Term.term
+val simplify_term : ctx:Term.Context.t -> Term.term -> Term.term

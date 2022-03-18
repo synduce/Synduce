@@ -366,6 +366,7 @@ let image_ctex_class
 ;;
 
 let requires_ctex_class
+    ~(ctx : Context.t)
     (tinv : PMRS.t)
     (ctex : ctex)
     (resp : Smtlib.SmtLib.solver_response)
@@ -383,7 +384,7 @@ let requires_ctex_class
             (styled (`Fg `Red) string)
             "SPURIOUS"
             tinv.PMRS.pvar.vname
-            (box pp_ctex)
+            (box (pp_ctex ~ctx))
             ctex)
       else if SmtInterface.SyncSmt.is_sat resp
       then
@@ -395,7 +396,7 @@ let requires_ctex_class
             (styled (`Fg `Green) string)
             "VALID"
             tinv.PMRS.pvar.vname
-            (box pp_ctex)
+            (box (pp_ctex ~ctx))
             ctex)
       else
         Fmt.(
@@ -406,6 +407,6 @@ let requires_ctex_class
             (styled (`Fg `White) (styled (`Bg `Red) string))
             "UNKNOWN"
             tinv.PMRS.pvar.vname
-            (box pp_ctex)
+            (box (pp_ctex ~ctx))
             ctex))
 ;;

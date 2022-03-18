@@ -20,7 +20,11 @@ open Syguslib.Sygus
     will be taken as counterexamples during the refinement loop.
     Use the option [--segis] in the executable to use this synthesis algorithm.
 *)
-let rec segis_loop (ctx : Context.t) (p : PsiDef.t) (t_set : TermSet.t)
+let rec segis_loop
+    ~(ctx : Context.t)
+    ~(t : ThreadContext.t)
+    (p : PsiDef.t)
+    (t_set : TermSet.t)
     : solver_response segis_response
   =
   Int.incr refinement_steps;
@@ -63,9 +67,9 @@ let rec segis_loop (ctx : Context.t) (p : PsiDef.t) (t_set : TermSet.t)
             pf
               frmt
               "@[<hov 2><SEGIS> Counterexample term:@;@[<hov 2>%a@]"
-              pp_term
+              (pp_term ctx)
               eqn.eterm));
-      segis_loop ctx p (Set.add t_set eqn.eterm)
+      segis_loop ~ctx ~t p (Set.add t_set eqn.eterm)
     | verif_time, None ->
       Stats.log_major_step_end ~synth_time ~verif_time ~t:tsize ~u:0 true;
       Log.print_ok ();
@@ -78,7 +82,7 @@ let rec segis_loop (ctx : Context.t) (p : PsiDef.t) (t_set : TermSet.t)
           pf
             frmt
             "@[<hov 2><SEGIS> This problem has no solution. Counterexample set:@;%a@]"
-            (list ~sep:sp pp_term)
+            (list ~sep:sp (pp_term ctx))
             (Set.elements t_set));
     Unrealizable ctexs
   | RFail, _ ->
@@ -90,10 +94,10 @@ let rec segis_loop (ctx : Context.t) (p : PsiDef.t) (t_set : TermSet.t)
   | _ -> Failed s_resp
 ;;
 
-let algo_segis (ctx : Context.t) (p : PsiDef.t) =
-  let t_set = TermSet.of_list (Analysis.terms_of_max_depth 1 !AState._theta) in
+let algo_segis ~(ctx : Context.t) ~(t : ThreadContext.t) (p : PsiDef.t) =
+  let t_set = TermSet.of_list (Analysis.terms_of_max_depth ~ctx 1 !AState._theta) in
   refinement_steps := 0;
-  segis_loop (Context.subctx ctx "segis") p t_set
+  segis_loop ~ctx ~t:(ThreadContext.subctx t "segis") p t_set
 ;;
 
 (* ============================================================================================= *)
@@ -105,7 +109,11 @@ let algo_segis (ctx : Context.t) (p : PsiDef.t) =
     will be taken as counterexamples during the refinement loop: this is a concrete CEGIS algorithm.
     Use the option [--cegis] in the executable to use this synthesis algorithm.
 *)
-let rec cegis_loop (ctx : Context.t) (p : PsiDef.t) (t_set : TermSet.t)
+let rec cegis_loop
+    ~(ctx : Context.t)
+    ~(t : ThreadContext.t)
+    (p : PsiDef.t)
+    (t_set : TermSet.t)
     : solver_response segis_response
   =
   Int.incr refinement_steps;
@@ -146,9 +154,9 @@ let rec cegis_loop (ctx : Context.t) (p : PsiDef.t) (t_set : TermSet.t)
             pf
               frmt
               "@[<hov 2><CEGIS> Counterexample term:@;@[<hov 2>%a@]"
-              pp_term
+              (pp_term ctx)
               eqn.eterm));
-      cegis_loop ctx p (Set.add t_set eqn.eterm)
+      cegis_loop ~ctx ~t p (Set.add t_set eqn.eterm)
     | verif_time, None ->
       Stats.log_major_step_end ~synth_time ~verif_time ~t:tsize ~u:0 true;
       Log.print_ok ();
@@ -161,7 +169,7 @@ let rec cegis_loop (ctx : Context.t) (p : PsiDef.t) (t_set : TermSet.t)
           pf
             frmt
             "@[<hov 2><CEGIS> This problem has no solution. Counterexample set:@;%a@]"
-            (list ~sep:sp pp_term)
+            (list ~sep:sp (pp_term ctx))
             (Set.elements t_set));
     Unrealizable ctexs
   | RFail, _ ->
@@ -173,11 +181,13 @@ let rec cegis_loop (ctx : Context.t) (p : PsiDef.t) (t_set : TermSet.t)
   | _ -> Failed s_resp
 ;;
 
-let algo_cegis (ctx : Context.t) (p : PsiDef.t) =
+let algo_cegis ~(ctx : Context.t) ~(t : ThreadContext.t) (p : PsiDef.t) =
   let t_set =
     TermSet.of_list
-      (List.map ~f:Analysis.concretize (Analysis.terms_of_max_depth 1 !AState._theta))
+      (List.map
+         ~f:(Analysis.concretize ~ctx)
+         (Analysis.terms_of_max_depth ~ctx 1 !AState._theta))
   in
   refinement_steps := 0;
-  cegis_loop (Context.subctx ctx "cegis") p t_set
+  cegis_loop ~ctx ~t:(ThreadContext.subctx t "cegis") p t_set
 ;;

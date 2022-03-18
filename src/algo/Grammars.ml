@@ -264,7 +264,7 @@ let grammar_sort_decomp (sort : sygus_sort) =
   | _ -> None
 ;;
 
-let rec project (v : variable) =
+let rec project ~(ctx : Context.t) (v : variable) =
   let rec aux =
     RType.(
       function
@@ -275,7 +275,7 @@ let rec project (v : variable) =
         List.concat (List.mapi l ~f:(tuple_sel types))
       | _ as t -> [ E.var v.vname, sort_of_rtype t ])
   in
-  aux (Variable.vtype_or_new v)
+  aux (Variable.vtype_or_new ctx v)
 
 and tuple_sel types i projs =
   if !Config.using_cvc4_tuples
@@ -293,11 +293,12 @@ let generate_grammar
     ?(bools = false)
     ?(special_const_prod = true)
     ?(short_predicate = false)
+    ~(ctx : Context.t)
     (opset : OpSet.t)
     (args : variable list)
     (ret_sort : RType.t)
   =
-  let locals_of_scalar_type = List.concat (List.map ~f:project args) in
+  let locals_of_scalar_type = List.concat (List.map ~f:(project ~ctx) args) in
   let params =
     { g_opset = opset
     ; g_fixed_constants = false

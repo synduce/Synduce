@@ -91,16 +91,16 @@ let string_of_smtSymbol (s : smtSymbol) : string =
   | SQuoted s -> "'" ^ s
 ;;
 
-let rec rtype_of_smtSort (s : smtSort) : RType.t option =
+let rec rtype_of_smtSort ~(ctx : Context.t) (s : smtSort) : RType.t option =
   match s with
   | SmtSort (Id sname) ->
-    let%bind x = RType.get_type (string_of_smtSymbol sname) in
+    let%bind x = RType.get_type ctx.types (string_of_smtSymbol sname) in
     (match x with
     | RType.TParam (_, maint) -> Some maint
     | _ -> Some x)
   | Comp (Id sname, sort_params) ->
-    let%bind x = RType.get_type (string_of_smtSymbol sname) in
-    let%bind y = all_or_none (List.map ~f:rtype_of_smtSort sort_params) in
+    let%bind x = RType.get_type ctx.types (string_of_smtSymbol sname) in
+    let%bind y = all_or_none (List.map ~f:(rtype_of_smtSort ~ctx) sort_params) in
     (match x with
     | RType.TParam (params, maint) ->
       (match List.zip params y with
@@ -154,7 +154,9 @@ let decl_of_tup_type (tl : RType.t list) : smtSymbol * command =
           ] ) )
 ;;
 
-let declare_datatype_of_rtype (t0 : RType.t) : (smtSymbol list * command) list =
+let declare_datatype_of_rtype ~(ctx : Context.t) (t0 : RType.t)
+    : (smtSymbol list * command) list
+  =
   let rec aux declared_types t0 =
     let is_decl tname =
       List.exists declared_types ~f:(fun (decl_names, _) ->
@@ -183,7 +185,7 @@ let declare_datatype_of_rtype (t0 : RType.t) : (smtSymbol list * command) list =
             , List.mapi cstr_args ~f:(fun i t ->
                   ( mk_symb Fmt.(str "%s_%i" cstr_name i)
                   , sort_of_rtype (RType.sub_all (snd (List.unzip params)) t) )) ))
-          (RType.get_variants t)
+          (RType.get_variants ctx.types t)
       in
       let smt_constrs : datatype_dec =
         match params with
@@ -204,9 +206,9 @@ let declare_datatype_of_rtype (t0 : RType.t) : (smtSymbol list * command) list =
         if is_decl tname
         then declared_types
         else (
-          let deps = RType.get_datatype_depends t0 in
+          let deps = RType.get_datatype_depends ctx.types t0 in
           let decl_one =
-            match RType.get_type tname with
+            match RType.get_type ctx.types tname with
             | Some orig_t -> declare_orig tname orig_t
             | None -> []
           in
@@ -219,7 +221,7 @@ let declare_datatype_of_rtype (t0 : RType.t) : (smtSymbol list * command) list =
   aux [] t0
 ;;
 
-let smtPattern_of_pattern (p : pattern) =
+let smtPattern_of_pattern ~(ctx : Context.t) (p : pattern) =
   match p with
   | PatAny -> Pat (mk_symb "_")
   | PatConstant c -> Pat (mk_symb (Fmt.str "%a" Constant.pp c))
@@ -228,13 +230,16 @@ let smtPattern_of_pattern (p : pattern) =
     (match pats with
     | [] -> Pat (mk_symb c)
     | _ ->
-      PatComp (mk_symb c, List.map ~f:(fun p -> mk_symb Fmt.(str "%a" pp_pattern p)) pats))
+      PatComp
+        (mk_symb c, List.map ~f:(fun p -> mk_symb Fmt.(str "%a" (pp_pattern ctx) p)) pats))
   | PatTuple pats ->
-    let smt_pats = List.map ~f:(fun p -> mk_symb Fmt.(str "%a" pp_pattern p)) pats in
+    let smt_pats =
+      List.map ~f:(fun p -> mk_symb Fmt.(str "%a" (pp_pattern ctx) p)) pats
+    in
     let tl =
       List.map
         ~f:(fun pat ->
-          let t, _ = infer_type (term_of_pattern pat) in
+          let t, _ = infer_type ctx (term_of_pattern ctx pat) in
           t.ttyp)
         pats
     in
@@ -250,7 +255,7 @@ let term_of_const (c : Constant.t) : smtTerm =
   | Constant.CFalse -> mk_false
 ;;
 
-let rec smt_of_term (t : term) : smtTerm =
+let rec smt_of_term ~(ctx : Context.t) (t : term) : smtTerm =
   let open Result.Let_syntax in
   let rec aux t : (smtTerm, string) Result.t =
     match t.tkind with
@@ -275,14 +280,14 @@ let rec smt_of_term (t : term) : smtTerm =
       let%map args = Result.all (List.map ~f:aux tl) in
       mk_simple_app tuple_constructor args
     | TSel (tup, i) ->
-      (match (fst (infer_type tup)).ttyp with
+      (match (fst (infer_type ctx tup)).ttyp with
       | TTup tl ->
         let proj_fun = Tuples.proj_name_of_types tl i in
         let%map tup' = aux tup in
         mk_simple_app proj_fun [ tup' ]
       | _ as typ ->
         Log.error_msg
-          Fmt.(str "SMT: tuple projection %a is not correctly typed." pp_term t);
+          Fmt.(str "SMT: tuple projection %a is not correctly typed." (pp_term ctx) t);
         Log.error_msg Fmt.(str "It has type %a." RType.pp typ);
         failwith "Wrong tuple type.")
     | TData (cstr, args) ->
@@ -296,7 +301,7 @@ let rec smt_of_term (t : term) : smtTerm =
         mk_simple_app cstr args')
     | TMatch (tm, cases) ->
       let%map tm' = aux tm in
-      SmtTMatch (tm', List.map ~f:smt_of_case cases)
+      SmtTMatch (tm', List.map ~f:(smt_of_case ~ctx) cases)
     | TApp (func, args) ->
       (match func.tkind with
       | TVar v ->
@@ -310,7 +315,7 @@ let rec smt_of_term (t : term) : smtTerm =
           mk_let bindings fbody'
         | Unequal_lengths -> Error "Smt: unexpected malformed term.")
       | _ ->
-        Log.error_msg Fmt.(str "Smt of term %a impossible." pp_term t);
+        Log.error_msg Fmt.(str "Smt of term %a impossible." (pp_term ctx) t);
         Error "Smt: application function can only be variable.")
     | TFun (_, _) -> failwith "Smt: functions in terms not supported."
   and make_bindings pre_bindings =
@@ -325,29 +330,31 @@ let rec smt_of_term (t : term) : smtTerm =
     let make_one_binding bto bdg =
       let tto = fpat_to_term bto in
       (* Try to transform the function into a let-binding, by first creating a tuple. *)
-      match Matching.matches ~pattern:tto (tuplify bdg) with
+      match Matching.matches ~ctx ~pattern:tto (tuplify ctx bdg) with
       | Some varmap -> bindings_of_varmap varmap, []
       | None ->
-        (match Matching.matches ~pattern:tto bdg with
+        (match Matching.matches ~ctx ~pattern:tto bdg with
         | Some varmap -> bindings_of_varmap varmap, []
         | None ->
           (match tto.tkind with
           | TTup tl ->
             (* Replace tuple parts that are bound by a single variable. *)
             let tl_typ = RType.TTup (List.map ~f:type_of tl) in
-            let tup_var = Variable.mk ~t:(Some tl_typ) (Alpha.fresh ~s:"tup" ()) in
+            let tup_var =
+              Variable.mk ctx ~t:(Some tl_typ) (Alpha.fresh ~s:"tup" ctx.names)
+            in
             ( (let%map x = aux bdg in
                [ mk_symb tup_var.vname, x ])
-            , List.mapi ~f:(fun i t -> t, mk_sel (Term.mk_var tup_var) i) tl )
+            , List.mapi ~f:(fun i t -> t, mk_sel ctx (Term.mk_var ctx tup_var) i) tl )
           | _ ->
             ( Error
                 (Fmt.str
                    "%a cannot match %a or %a in smt term conversion."
-                   pp_term
+                   (pp_term ctx)
                    (fpat_to_term bto)
-                   pp_term
-                   (tuplify bdg)
-                   pp_term
+                   (pp_term ctx)
+                   (tuplify ctx bdg)
+                   (pp_term ctx)
                    bdg)
             , [] )))
     in
@@ -362,7 +369,7 @@ let rec smt_of_term (t : term) : smtTerm =
     match aux t with
     | Ok smt_t -> smt_t
     | Error s ->
-      Log.error_msg Fmt.(str "Error when trying to convert %a." pp_term t);
+      Log.error_msg Fmt.(str "Error when trying to convert %a." (pp_term ctx) t);
       Log.error_msg s;
       failwith "Smt term conversion failure."
   with
@@ -370,8 +377,8 @@ let rec smt_of_term (t : term) : smtTerm =
     Log.error_msg "Failure when converting to smt";
     raise e
 
-and smt_of_case ((p, t) : Term.match_case) : match_case =
-  smtPattern_of_pattern p, smt_of_term t
+and smt_of_case ~(ctx : Context.t) ((p, t) : Term.match_case) : match_case =
+  smtPattern_of_pattern ~ctx p, smt_of_term ~ctx t
 ;;
 
 let constant_of_smtConst (l : smtSpecConstant) : Constant.t =
@@ -391,7 +398,12 @@ type id_kind =
   | ITupCstr
   | INotDef
 
-let id_kind_of_s env s =
+let id_kind_of_s
+    ~(ctx : Context.t)
+    ~(functions : PMRS.Functions.ctx)
+    (env : (string, Variable.t, String.comparator_witness) Map.t)
+    (s : string)
+  =
   match Map.find env s with
   | Some v -> IVar v
   | None ->
@@ -401,7 +413,7 @@ let id_kind_of_s env s =
       (match Unop.of_string s with
       | Some unop -> IUnop unop
       | None ->
-        (match RType.type_of_variant s with
+        (match RType.type_of_variant ctx.types s with
         | Some _ -> ICstr s
         | None ->
           (match s with
@@ -409,20 +421,26 @@ let id_kind_of_s env s =
           | "false" -> IBool false
           | _ ->
             (* Last possibility: a global function or a pmrs. *)
-            (match Option.first_some (PMRS.find_by_name s) (Term.find_global s) with
+            (match
+               Option.first_some
+                 (PMRS.Functions.find_by_name functions s)
+                 (Context.find_global ctx s)
+             with
             | Some v -> IVar v
             | _ -> if Tuples.is_constr_name s then ITupCstr else INotDef)))))
 ;;
 
 let rec term_of_smt
+    ~(ctx : Context.t)
+    ~(functions : PMRS.Functions.t)
     (env : (string, variable, String.comparator_witness) Map.t)
     (st : smtTerm)
     : term
   =
   match st with
   | SmtTQualdId (QIas (Id (SSimple s), _)) | SmtTQualdId (QI (Id (SSimple s))) ->
-    (match id_kind_of_s env s with
-    | IVar v -> Term.mk_var v
+    (match id_kind_of_s ~functions env s with
+    | IVar v -> Term.mk_var ctx v
     | IBool true -> mk_const Constant.CTrue
     | IBool false -> mk_const Constant.CFalse
     | ICstr c -> mk_data c []
