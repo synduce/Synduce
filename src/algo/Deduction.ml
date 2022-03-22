@@ -388,11 +388,12 @@ module Solver = struct
         List.for_all equations_to_check ~f:(fun (pre, constr) ->
             SyncSmt.spush solver;
             let fv = Analysis.free_variables ~ctx:ctx.parent constr in
-            SyncSmt.exec_all solver (Commands.decls_of_vars fv);
+            SyncSmt.exec_all solver (Commands.decls_of_vars ~ctx:ctx.parent fv);
             (match pre with
-            | Some precond -> SyncSmt.smt_assert solver (smt_of_term precond)
+            | Some precond ->
+              SyncSmt.smt_assert solver (smt_of_term ~ctx:ctx.parent precond)
             | None -> ());
-            SyncSmt.smt_assert solver (smt_of_term constr);
+            SyncSmt.smt_assert solver (smt_of_term ~ctx:ctx.parent constr);
             match SyncSmt.check_sat solver with
             | Unsat ->
               SyncSmt.spop solver;
@@ -508,6 +509,7 @@ module Solver = struct
     Converts the term equation into a functionalization problem with Expressions.
     *)
   let functional_equation
+      ~(fctx : PMRS.Functions.ctx)
       ~(ctx : Context.t)
       ~(func_side : term list)
       ~(lemma : term option)
@@ -555,7 +557,7 @@ module Solver = struct
           (Fmt.str
              "Term {%a} %a is not a function-free expression, cannot deduce."
              (list ~sep:comma (pp_term ctx))
-             (List.map ~f:Reduce.reduce_term flat_args)
+             (List.map ~f:(Reduce.reduce_term ~ctx ~fctx) flat_args)
              (pp_term ctx)
              res_side);
         [], None, rctx)

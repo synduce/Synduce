@@ -8,7 +8,8 @@ val mk_recursion_elimination_term
   -> (Term.term * Term.term) option
 
 val subst_recursive_calls
-  :  ctx:Term.Context.t
+  :  fctx:PMRS.Functions.ctx
+  -> ctx:Term.Context.t
   -> AState.PsiDef.t
   -> Term.term list
   -> (Term.term * Term.term) list * Term.TermSet.t
@@ -42,7 +43,7 @@ val replace_rhs_of_main
 val replace_rhs_of_mains : ctx:Term.Context.t -> AState.PsiDef.t -> Term.term -> Term.term
 
 (**
-Simple term expansion procedure. [simple t] expands the term [t] into two sets of terms, the first
+Simple term expansion procedure. [simple ~ctx t] expands the term [t] into two sets of terms, the first
 set is a set of *bounded* terms, the second set is a set of unbounded terms. In an algorithm, one
 should keep track of the unbounded terms as well and recursively expand them as necessary.
 *)
@@ -58,17 +59,24 @@ val simple
 val make_bounded : ctx:Term.Context.t -> Term.term -> Term.term
 
 val is_mr
-  :  ctx:Term.Context.t
+  :  fctx:PMRS.Functions.ctx
+  -> ctx:Term.Context.t
   -> AState.PsiDef.t
   -> PMRS.t
   -> Term.term
   -> Term.VarSet.t
   -> bool
 
-val is_mr_all : ctx:Term.Context.t -> AState.PsiDef.t -> Term.term -> bool
+val is_mr_all
+  :  fctx:PMRS.Functions.ctx
+  -> ctx:Term.Context.t
+  -> AState.PsiDef.t
+  -> Term.term
+  -> bool
 
 val to_maximally_reducible
-  :  ctx:Term.Context.t
+  :  fctx:PMRS.Functions.ctx
+  -> ctx:Term.Context.t
   -> AState.PsiDef.t
   -> Term.term
   -> Term.TermSet.t * Term.TermSet.t

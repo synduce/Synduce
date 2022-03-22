@@ -23,7 +23,8 @@ module Solver : sig
        ]
 
   val functional_equation
-    :  ctx:Term.Context.t
+    :  fctx:PMRS.Functions.ctx
+    -> ctx:Term.Context.t
     -> func_side:Term.term list
     -> lemma:Term.term option
     -> Term.term

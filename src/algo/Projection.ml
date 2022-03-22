@@ -99,14 +99,15 @@ let invar ~(ctx : Context.t) invariants lhs_e rhs_e =
 ;;
 
 let proj_and_detuple_eqns
+    ~(fctx : PMRS.Functions.ctx)
     ~(ctx : Context.t)
     (projections : (int, variable list, Int.comparator_witness) Map.t)
     (eqns : equation list)
   =
   let apply_p = apply_projections projections in
   let f eqn =
-    let lhs' = Reduce.reduce_term (apply_p ~ctx eqn.elhs)
-    and rhs' = Reduce.reduce_term (apply_p ~ctx eqn.erhs) in
+    let lhs' = Reduce.reduce_term ~ctx ~fctx (apply_p ~ctx eqn.elhs)
+    and rhs' = Reduce.reduce_term ~ctx ~fctx (apply_p ~ctx eqn.erhs) in
     let eqs = projection_eqns lhs' rhs' in
     List.map ~f:(fun (_l, _r) -> { eqn with elhs = _l; erhs = _r }) eqs
   in

@@ -290,8 +290,13 @@ let positives_ensures ~(ctx : Context.t) p positives =
         positives)
 ;;
 
-let show_new_ensures_predicate ~(ctx : Context.t) (f : variable) (ensures : term) =
-  let ensures = Reduce.reduce_term ensures in
+let show_new_ensures_predicate
+    ~(fctx : PMRS.Functions.ctx)
+    ~(ctx : Context.t)
+    (f : variable)
+    (ensures : term)
+  =
+  let ensures = Reduce.reduce_term ~fctx ~ctx ensures in
   Stats.set_lemma_synthesized
     "ensures_lemma"
     (String.strip (str "%a" (pp_term ctx) ensures));

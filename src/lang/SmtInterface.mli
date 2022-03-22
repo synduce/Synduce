@@ -91,15 +91,20 @@ module SyncSmt : sig
   val make_solver : string -> online_solver
 end
 
-val rtype_of_smtSort : SmtLib.smtSort -> RType.t option
+val rtype_of_smtSort : ctx:Term.Context.t -> SmtLib.smtSort -> RType.t option
 val sort_of_rtype : RType.t -> SmtLib.smtSort
 val dec_parametric : RType.t -> RType.t list -> SmtLib.smtSort
 val decl_of_tup_type : RType.t list -> SmtLib.smtSymbol * SmtLib.command
-val declare_datatype_of_rtype : RType.t -> (SmtLib.smtSymbol list * SmtLib.command) list
-val smtPattern_of_pattern : Term.pattern -> SmtLib.smtPattern
+
+val declare_datatype_of_rtype
+  :  ctx:Term.Context.t
+  -> RType.t
+  -> (SmtLib.smtSymbol list * SmtLib.command) list
+
+val smtPattern_of_pattern : ctx:Term.Context.t -> Term.pattern -> SmtLib.smtPattern
 val term_of_const : Term.Constant.t -> SmtLib.smtTerm
-val smt_of_term : Term.term -> SmtLib.smtTerm
-val smt_of_case : Term.match_case -> SmtLib.match_case
+val smt_of_term : ctx:Term.Context.t -> Term.term -> SmtLib.smtTerm
+val smt_of_case : ctx:Term.Context.t -> Term.match_case -> SmtLib.match_case
 val constant_of_smtConst : SmtLib.smtSpecConstant -> Term.Constant.t
 
 type id_kind =
@@ -112,38 +117,56 @@ type id_kind =
   | INotDef
 
 val term_of_smt
-  :  (string, Term.variable, Base.String.comparator_witness) Base.Map.t
+  :  ctx:Term.Context.t
+  -> functions:PMRS.Functions.ctx
+  -> (string, Term.variable, Base.String.comparator_witness) Base.Map.t
   -> SmtLib.smtTerm
   -> Term.term
 
-val sorted_vars_of_vars : Term.VarSet.t -> SmtLib.smtSortedVar list
+val sorted_vars_of_vars : ctx:Term.Context.t -> Term.VarSet.t -> SmtLib.smtSortedVar list
 
 type term_model = (string, Term.term, Base.String.comparator_witness) Base.Map.t
 
 val model_to_constmap
-  :  SyncSmt.solver_response
+  :  ctx:Term.Context.t
+  -> functions:PMRS.Functions.ctx
+  -> SyncSmt.solver_response
   -> (string, Term.term, Base.String.comparator_witness) Base.Map.t
 
-val model_to_varmap : Term.VarSet.t -> SyncSmt.solver_response -> Term.term Term.VarMap.t
+val model_to_varmap
+  :  ctx:Term.Context.t
+  -> functions:PMRS.Functions.ctx
+  -> Term.VarSet.t
+  -> SyncSmt.solver_response
+  -> Term.term Term.VarMap.t
 
 val request_different_models
-  :  term_model
+  :  ctx:Term.Context.t
+  -> functions:PMRS.Functions.ctx
+  -> term_model
   -> int
   -> Solvers.Synchronous(SmtLog)(Stats).online_solver
   -> (string, Term.term, Base.String.comparator_witness) Base.Map.t list
 
 val request_different_models_async
-  :  term_model Lwt.t
+  :  ctx:Term.Context.t
+  -> functions:PMRS.Functions.ctx
+  -> term_model Lwt.t
   -> int
   -> Solvers.Asyncs(SmtLog)(Stats).solver
   -> (string, Term.term, Base.String.comparator_witness) Base.Map.t list Lwt.t
 
 val smtPattern_of_term : Term.term -> SmtLib.smtPattern option
 val mk_assert : SmtLib.smtTerm -> SmtLib.command
-val smt_of_pmrs : PMRS.t -> SmtLib.command list
+
+val smt_of_pmrs
+  :  ctx:Term.Context.t
+  -> functions:PMRS.Functions.ctx
+  -> PMRS.t
+  -> SmtLib.command list
 
 module Commands : sig
-  val decls_of_vars : Term.VarSet.t -> SmtLib.command list
+  val decls_of_vars : ctx:Term.Context.t -> Term.VarSet.t -> SmtLib.command list
   val decl_of_tuple_type : RType.t -> SmtLib.command list
 
   (**
@@ -171,7 +194,8 @@ module Commands : sig
     -> SmtLib.command list
 
   val mk_def_fun
-    :  string
+    :  ctx:Term.Context.t
+    -> string
     -> (string * RType.t) list
     -> RType.t
     -> Term.term

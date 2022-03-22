@@ -8,7 +8,7 @@ open Utils
 (*                                     MOST GENERAL TERMS                                        *)
 (* ============================================================================================= *)
 
-let mgt (ctx : Context.t) (prog : PMRS.t) : TermSet.t =
+let mgt (fctx : PMRS.Functions.ctx) (ctx : Context.t) (prog : PMRS.t) : TermSet.t =
   let xi = prog.psyntobjs in
   let i = ref 0 in
   let rec aux (mgts, rem_xi) exp_queue =
@@ -17,7 +17,7 @@ let mgt (ctx : Context.t) (prog : PMRS.t) : TermSet.t =
     then None
     else (
       let f (mgts, rem_xi, rem_xs) expansion =
-        let f_xp = Reduce.reduce_pmrs prog expansion in
+        let f_xp = Reduce.reduce_pmrs ~fctx ~ctx prog expansion in
         let fv = Analysis.free_variables ~ctx f_xp in
         let xi_in_xp = Set.inter rem_xi fv in
         if Set.length xi_in_xp > 0
@@ -42,7 +42,9 @@ let mgt (ctx : Context.t) (prog : PMRS.t) : TermSet.t =
 
 (* Start the algorith from a variable. *)
 
-let most_general_terms (ctx : Context.t) (prog : PMRS.t) : TermSet.t =
-  let ts = if Set.is_empty prog.psyntobjs then TermSet.empty else mgt ctx prog in
+let most_general_terms (fctx : PMRS.Functions.ctx) (ctx : Context.t) (prog : PMRS.t)
+    : TermSet.t
+  =
+  let ts = if Set.is_empty prog.psyntobjs then TermSet.empty else mgt fctx ctx prog in
   ts
 ;;

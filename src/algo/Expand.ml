@@ -47,7 +47,11 @@ let mk_recursion_elimination_term ~(ctx : Context.t) (p : PsiDef.t) : (term * te
     | _ -> None)
 ;;
 
-let subst_recursive_calls ~(ctx : Context.t) (p : PsiDef.t) (tl : term list)
+let subst_recursive_calls
+    ~(fctx : PMRS.Functions.ctx)
+    ~(ctx : Context.t)
+    (p : PsiDef.t)
+    (tl : term list)
     : (term * term) list * TermSet.t
   =
   let fsymb = p.PsiDef.reference.pmain_symb
@@ -68,7 +72,10 @@ let subst_recursive_calls ~(ctx : Context.t) (p : PsiDef.t) (tl : term list)
     in
     let invariant =
       Option.map (Specifications.get_ensures p.PsiDef.reference.pvar) ~f:(fun inv ->
-          first (infer_type ctx (Reduce.reduce_term (mk_app inv [ scalar_term_f ]))))
+          first
+            (infer_type
+               ctx
+               (Reduce.reduce_term ~ctx ~fctx (mk_app inv [ scalar_term_f ]))))
     in
     ( substs
       @ [ mk_app (mk_var ctx fsymb) [ mk_var ctx var ], scalar_term_f
@@ -289,7 +296,12 @@ let make_bounded ~(ctx : Context.t) (t0 : term) =
 (* ============================================================================================= *)
 (*                               MAIN ENTRY POINTS: MR_TERMS                                     *)
 (* ============================================================================================= *)
-let expand_max ~(ctx : Context.t) (p : PsiDef.t) (f : PMRS.t) (t0 : term)
+let expand_max
+    ~(fctx : PMRS.Functions.ctx)
+    ~(ctx : Context.t)
+    (p : PsiDef.t)
+    (f : PMRS.t)
+    (t0 : term)
     : (term * term) list * term list
   =
   let nonterminals =
@@ -299,7 +311,7 @@ let expand_max ~(ctx : Context.t) (p : PsiDef.t) (f : PMRS.t) (t0 : term)
       ; p.PsiDef.reference.pnon_terminals
       ]
   in
-  let f_of_t0 = Reduce.reduce_pmrs f t0 in
+  let f_of_t0 = Reduce.reduce_pmrs ~ctx ~fctx f t0 in
   let simpl_f_of_t0 = replace_rhs_of_main ~ctx p f f_of_t0 in
   let nr = nonreduced_terms p nonterminals simpl_f_of_t0 in
   (* Collect all the variables that need to be expanded. *)
@@ -324,7 +336,7 @@ let expand_max ~(ctx : Context.t) (p : PsiDef.t) (f : PMRS.t) (t0 : term)
   in
   let all_ts = List.map substs ~f:(fun s -> substitution s t0) in
   let check_max_exp t =
-    let tr = replace_rhs_of_main ~ctx p f (Reduce.reduce_pmrs f t) in
+    let tr = replace_rhs_of_main ~ctx p f (Reduce.reduce_pmrs ~ctx ~fctx f t) in
     match nonreduced_terms p f.pnon_terminals tr with
     | [] -> First (t, tr)
     | _ -> Second t
@@ -340,20 +352,21 @@ let expand_max ~(ctx : Context.t) (p : PsiDef.t) (f : PMRS.t) (t0 : term)
 ;;
 
 let composed_reduction_sequence
+    ~(fctx : PMRS.Functions.ctx)
     ~(ctx : Context.t)
     (p : PsiDef.t)
     (f : PMRS.t)
     (g : PMRS.t)
     (t0 : term)
   =
-  let _t0 = Reduce.reduce_pmrs g t0 in
-  let _t1 = Reduce.reduce_pmrs f _t0 in
+  let _t0 = Reduce.reduce_pmrs ~ctx ~fctx g t0 in
+  let _t1 = Reduce.reduce_pmrs ~ctx ~fctx f _t0 in
   let _t2 = replace_rhs_of_main ~ctx ~for_mr:true p g _t1 in
   replace_rhs_of_main ~ctx p f _t2
 ;;
 
-let check_max_exp ~(ctx : Context.t) p f g t =
-  let t3 = composed_reduction_sequence ~ctx p f g t in
+let check_max_exp ~(fctx : PMRS.Functions.ctx) ~(ctx : Context.t) p f g t =
+  let t3 = composed_reduction_sequence ~fctx ~ctx p f g t in
   match nonreduced_terms p (Set.union f.pnon_terminals g.pnon_terminals) t3 with
   | [] -> First (t, t3)
   | _ -> Second t
@@ -361,6 +374,7 @@ let check_max_exp ~(ctx : Context.t) p f g t =
 
 let expand_max_main
     ~(ctx : Context.t)
+    ~(fctx : PMRS.Functions.ctx)
     (p : PsiDef.t)
     (f : PMRS.t)
     (g : PMRS.t)
@@ -368,7 +382,7 @@ let expand_max_main
     : (term * term) list * term list
   =
   let non_terminals = Set.union f.pnon_terminals g.pnon_terminals in
-  let t3 = composed_reduction_sequence ~ctx p f g t0 in
+  let t3 = composed_reduction_sequence ~fctx ~ctx p f g t0 in
   let nr = nonreduced_terms p non_terminals t3 in
   (* Collect all the variables that need to be expanded. *)
   let expand_reqs =
@@ -391,16 +405,16 @@ let expand_max_main
     cartesian_nary_product (List.filter ~f:(not <| List.is_empty) expansions)
   in
   let all_ts = List.map substs ~f:(fun s -> substitution s t0) in
-  let mr_terms, rest = List.partition_map all_ts ~f:(check_max_exp ~ctx p f g) in
+  let mr_terms, rest = List.partition_map all_ts ~f:(check_max_exp ~fctx ~ctx p f g) in
   mr_terms, rest
 ;;
 
-let expand_driver ~(ctx : Context.t) p f g t =
-  match expand_max_main ~ctx p f g t with
+let expand_driver ~(fctx : PMRS.Functions.ctx) ~(ctx : Context.t) p f g t =
+  match expand_max_main ~fctx ~ctx p f g t with
   | [], rest ->
     (match rest with
     | hd :: tl ->
-      let expanded_ts, rest' = expand_max_main ~ctx p f g hd in
+      let expanded_ts, rest' = expand_max_main ~fctx ~ctx p f g hd in
       expanded_ts, tl @ rest'
     | [] -> [], [])
   | mr_terms, rest -> mr_terms, rest
@@ -411,19 +425,28 @@ let expand_driver ~(ctx : Context.t) p f g t =
 *)
 let expand_max2
     ~(ctx : Context.t)
+    ~(fctx : PMRS.Functions.ctx)
     (p : PsiDef.t)
     ~refr:(f : PMRS.t)
     ~target:(g : PMRS.t)
     (t0 : term)
     : (term * term) list * term list
   =
-  match check_max_exp ~ctx p f g t0 with
+  match check_max_exp ~fctx ~ctx p f g t0 with
   | First x -> [ x ], []
-  | _ -> expand_driver ~ctx p f g t0
+  | _ -> expand_driver ~fctx ~ctx p f g t0
 ;;
 
-let is_mr ~(ctx : Context.t) (p : PsiDef.t) (f : PMRS.t) (t0 : term) nt : bool =
-  let f_t0 = Reduce.reduce_pmrs f t0 in
+let is_mr
+    ~(fctx : PMRS.Functions.ctx)
+    ~(ctx : Context.t)
+    (p : PsiDef.t)
+    (f : PMRS.t)
+    (t0 : term)
+    nt
+    : bool
+  =
+  let f_t0 = Reduce.reduce_pmrs ~fctx ~ctx f t0 in
   let f_t0 = replace_rhs_of_main ~ctx p f f_t0 in
   let nr = nonreduced_terms p nt f_t0 in
   match nr with
@@ -431,7 +454,7 @@ let is_mr ~(ctx : Context.t) (p : PsiDef.t) (f : PMRS.t) (t0 : term) nt : bool =
   | _ -> false
 ;;
 
-let is_mr_all ~(ctx : Context.t) (p : PsiDef.t) (t0 : term) =
+let is_mr_all ~(fctx : PMRS.Functions.ctx) ~(ctx : Context.t) (p : PsiDef.t) (t0 : term) =
   let nonterminals =
     VarSet.union_list
       [ p.PsiDef.target.pnon_terminals
@@ -439,14 +462,18 @@ let is_mr_all ~(ctx : Context.t) (p : PsiDef.t) (t0 : term) =
       ; p.PsiDef.reference.pnon_terminals
       ]
   in
-  is_mr ~ctx p p.PsiDef.target t0 nonterminals
-  && Either.is_first (check_max_exp ~ctx p p.PsiDef.reference p.PsiDef.repr t0)
+  is_mr ~fctx ~ctx p p.PsiDef.target t0 nonterminals
+  && Either.is_first (check_max_exp ~fctx ~ctx p p.PsiDef.reference p.PsiDef.repr t0)
 ;;
 
 (** `maximal p t0 ` expands the term `t0 ` into T, U such that all terms in T are MR-terms
   for (p.PsiDef.reference (p.PsiDef.repr)) and p.PsiDef.target and T,U is a boundary.
 *)
-let to_maximally_reducible ~(ctx : Context.t) (p : PsiDef.t) (t0 : term)
+let to_maximally_reducible
+    ~(fctx : PMRS.Functions.ctx)
+    ~(ctx : Context.t)
+    (p : PsiDef.t)
+    (t0 : term)
     : TermSet.t * TermSet.t
   =
   let nonterminals =
@@ -459,12 +486,14 @@ let to_maximally_reducible ~(ctx : Context.t) (p : PsiDef.t) (t0 : term)
   let tset0, uset0 =
     let g = p.PsiDef.target in
     (* Expand only if there are non-reduced terms *)
-    if is_mr ~ctx p g t0 nonterminals then [ t0, t0 ], [] else expand_max ~ctx p g t0
+    if is_mr ~fctx ~ctx p g t0 nonterminals
+    then [ t0, t0 ], []
+    else expand_max ~fctx ~ctx p g t0
   in
   (* Expand with orig (f) *)
   let f (tset, uset) (t_theta, _) =
     let new_ts, new_us =
-      expand_max2 ~ctx p ~refr:p.PsiDef.reference ~target:p.PsiDef.repr t_theta
+      expand_max2 ~fctx ~ctx p ~refr:p.PsiDef.reference ~target:p.PsiDef.repr t_theta
     in
     tset @ List.map ~f:first new_ts, uset @ new_us
   in

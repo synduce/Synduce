@@ -106,16 +106,16 @@ type func_resolution =
   | FRNonT of PMRS.t
   | FRUnknown
 
-let resolve_func (ctx : Context.t) (func : term) =
+let resolve_func (fctx : PMRS.Functions.ctx) (ctx : Context.t) (func : term) =
   match func.tkind with
   | TVar x ->
     (match Hashtbl.find ctx.globals x.vname with
     | Some (_, vargs, _, body) -> FRFun (vargs, body)
     | None ->
-      (match PMRS.find_global x.vid with
+      (match PMRS.Functions.find_global fctx x.vid with
       | Some pm -> FRPmrs pm
       | None ->
-        (match PMRS.find_nonterminal x.vid with
+        (match PMRS.Functions.find_nonterminal fctx x.vid with
         | Some pm -> FRNonT pm
         | None -> FRUnknown)))
   | TFun (vargs, body) -> FRFun (vargs, body)
@@ -164,7 +164,12 @@ let rule_lookup (ctx : Context.t) prules (f : variable) (fargs : term list) : te
 (**
   reduce_term reduces a term using only the lambda-calculus
 *)
-let rec reduce_term ?(projecting = false) ?(unboxing = false) (ctx : Context.t) (t : term)
+let rec reduce_term
+    ?(projecting = false)
+    ?(unboxing = false)
+    ~(fctx : PMRS.Functions.ctx)
+    ~(ctx : Context.t)
+    (t : term)
     : term
   =
   let one_step t =
@@ -175,7 +180,7 @@ let rec reduce_term ?(projecting = false) ?(unboxing = false) (ctx : Context.t) 
         | TApp (func, args) ->
           let func' = f func in
           let args' = List.map ~f args in
-          (match resolve_func ctx func' with
+          (match resolve_func fctx ctx func' with
           | FRFun (fpatterns, body) ->
             (match Analysis.subst_args ~ctx fpatterns args' with
             | Ok (remaining_patterns, subst) ->
@@ -186,9 +191,9 @@ let rec reduce_term ?(projecting = false) ?(unboxing = false) (ctx : Context.t) 
             | Error _ -> None)
           | FRPmrs pm ->
             (match args' with
-            | [ tp ] -> Some (f (reduce_pmrs ctx pm tp))
+            | [ tp ] -> Some (f (reduce_pmrs ~fctx ~ctx pm tp))
             | _ -> None (* PMRS are defined only with one argument for now. *))
-          | FRNonT p -> Some (pmrs_until_irreducible ctx p (mk_app func' args'))
+          | FRNonT p -> Some (pmrs_until_irreducible ~ctx p (mk_app func' args'))
           | FRUnknown -> Some (mk_app func' args'))
         | TFun ([], body) -> Some (f body)
         | TIte (c, tt, tf) ->
@@ -233,7 +238,7 @@ let rec reduce_term ?(projecting = false) ?(unboxing = false) (ctx : Context.t) 
   in
   until_irreducible one_step t
 
-and pmrs_until_irreducible (ctx : Context.t) (prog : PMRS.t) (input : term) =
+and pmrs_until_irreducible ~(ctx : Context.t) (prog : PMRS.t) (input : term) =
   let one_step t0 =
     let rstep = ref false in
     let rewrite_rule tm =
@@ -252,9 +257,14 @@ and pmrs_until_irreducible (ctx : Context.t) (prog : PMRS.t) (input : term) =
   in
   until_irreducible one_step input
 
-and reduce_pmrs (ctx : Context.t) (prog : PMRS.t) (input : term) =
+and reduce_pmrs
+    ~(fctx : PMRS.Functions.ctx)
+    ~(ctx : Context.t)
+    (prog : PMRS.t)
+    (input : term)
+  =
   let f_input = mk_app (mk_var ctx prog.pmain_symb) [ input ] in
-  reduce_term ctx (pmrs_until_irreducible ctx prog f_input)
+  reduce_term ~fctx ~ctx (pmrs_until_irreducible ~ctx prog f_input)
 ;;
 
 (* ============================================================================================= *)
@@ -264,13 +274,19 @@ and reduce_pmrs (ctx : Context.t) (prog : PMRS.t) (input : term) =
 (**
   calc_term_step reduces a term using only the lambda-calculus
 *)
-let rec calc_term_step (ctx : Context.t) (rstep : bool ref) (t : term) : term =
+let rec calc_term_step
+    ~(fctx : PMRS.Functions.ctx)
+    ~(ctx : Context.t)
+    (rstep : bool ref)
+    (t : term)
+    : term
+  =
   let case f t =
     match t.tkind with
     | TApp (func, args) ->
       let func' = f func
       and args' = List.map ~f args in
-      (match resolve_func ctx func' with
+      (match resolve_func fctx ctx func' with
       | FRFun (fpatterns, body) ->
         (match Analysis.subst_args ~ctx fpatterns args' with
         | Ok (remaining_patterns, subst) ->
@@ -338,10 +354,10 @@ and pmrs_calc_one_step (ctx : Context.t) (rstep : bool ref) (prog : PMRS.t) (inp
   t0'
 ;;
 
-let calc_term (ctx : Context.t) (t : term) =
+let calc_term ~(fctx : PMRS.Functions.ctx) ~(ctx : Context.t) (t : term) =
   let one_step (t0 : term) : term * bool =
     let rstep = ref false in
-    let t0' = calc_term_step ctx rstep t0 in
+    let t0' = calc_term_step ~fctx ~ctx rstep t0 in
     t0', !rstep
   in
   steps_until_irreducible one_step t
@@ -351,16 +367,17 @@ let calc_term (ctx : Context.t) (t : term) =
 (*                                  DERIVED FROM REDUCTION                                       *)
 (* ============================================================================================= *)
 
-let reduce_rules (ctx : Context.t) (p : PMRS.t) =
+let reduce_rules ~(fctx : PMRS.Functions.ctx) ~(ctx : Context.t) (p : PMRS.t) =
   let reduced_rules =
-    let f (nt, args, pat, body) = nt, args, pat, reduce_term ctx body in
+    let f (nt, args, pat, body) = nt, args, pat, reduce_term ~fctx ~ctx body in
     Map.map ~f p.prules
   in
   { p with prules = reduced_rules }
 ;;
 
 let instantiate_with_solution
-    (ctx : Context.t)
+    ~(fctx : PMRS.Functions.ctx)
+    ~(ctx : Context.t)
     (p : PMRS.t)
     (soln : (string * variable list * term) list)
   =
@@ -378,14 +395,14 @@ let instantiate_with_solution
     List.concat (List.map ~f soln)
   in
   let target_inst = PMRS.subst_rule_rhs ~ctx xi_substs ~p in
-  reduce_rules ctx target_inst
+  reduce_rules ~fctx ~ctx target_inst
 ;;
 
-let is_identity (ctx : Context.t) (p : PMRS.t) =
+let is_identity ~(fctx : PMRS.Functions.ctx) ~(ctx : Context.t) (p : PMRS.t) =
   match p.pinput_typ with
   | [ it ] ->
     let input_symb = Variable.mk ~t:(Some it) ctx "e" in
-    (match reduce_pmrs ctx p (mk_var ctx input_symb) with
+    (match reduce_pmrs ~fctx ~ctx p (mk_var ctx input_symb) with
     | { tkind = TVar x; _ } -> Variable.(x = input_symb)
     | _ -> false)
   | _ -> false

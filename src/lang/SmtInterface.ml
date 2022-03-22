@@ -432,30 +432,30 @@ let id_kind_of_s
 
 let rec term_of_smt
     ~(ctx : Context.t)
-    ~(functions : PMRS.Functions.t)
+    ~(functions : PMRS.Functions.ctx)
     (env : (string, variable, String.comparator_witness) Map.t)
     (st : smtTerm)
     : term
   =
   match st with
   | SmtTQualdId (QIas (Id (SSimple s), _)) | SmtTQualdId (QI (Id (SSimple s))) ->
-    (match id_kind_of_s ~functions env s with
+    (match id_kind_of_s ~ctx ~functions env s with
     | IVar v -> Term.mk_var ctx v
     | IBool true -> mk_const Constant.CTrue
     | IBool false -> mk_const Constant.CFalse
-    | ICstr c -> mk_data c []
+    | ICstr c -> mk_data ctx c []
     | _ -> failwith Fmt.(str "Smt: undefined variable %s" s))
   | SmtTSpecConst l -> mk_const (constant_of_smtConst l)
   | SmtTApp (QIas (Id (SSimple s), _), args) | SmtTApp (QI (Id (SSimple s)), args) ->
-    let args' = List.map ~f:(term_of_smt env) args in
+    let args' = List.map ~f:(term_of_smt ~ctx ~functions env) args in
     (* The line below is a hack! Make a real fix *)
     if String.(equal s "mkTuple_int_int")
-    then mk_tup args'
+    then mk_tup ctx args'
     else (
-      match id_kind_of_s env s with
-      | ICstr c -> mk_data c args'
-      | ITupCstr -> mk_tup args'
-      | IVar v -> mk_app (Term.mk_var v) args'
+      match id_kind_of_s ~ctx ~functions env s with
+      | ICstr c -> mk_data ctx c args'
+      | ITupCstr -> mk_tup ctx args'
+      | IVar v -> mk_app (Term.mk_var ctx v) args'
       | IBinop op ->
         (match args' with
         | [ t1; t2 ] -> mk_bin op t1 t2
@@ -477,9 +477,9 @@ let rec term_of_smt
       (Fmt.str "Composite identifier %a not supported." Sexp.pp_hum (sexp_of_smtTerm st))
 ;;
 
-let sorted_vars_of_vars (vars : VarSet.t) : smtSortedVar list =
+let sorted_vars_of_vars ~(ctx : Context.t) (vars : VarSet.t) : smtSortedVar list =
   List.map
-    ~f:(fun v -> mk_symb v.vname, sort_of_rtype (Variable.vtype_or_new v))
+    ~f:(fun v -> mk_symb v.vname, sort_of_rtype (Variable.vtype_or_new ctx v))
     (Set.elements vars)
 ;;
 
@@ -489,6 +489,8 @@ let sorted_vars_of_vars (vars : VarSet.t) : smtSortedVar list =
 type term_model = (string, term, Base.String.comparator_witness) Base.Map.t
 
 let constmap_of_s_exprs
+    ~(ctx : Context.t)
+    ~(functions : PMRS.Functions.ctx)
     (starting_map : (string, term, String.comparator_witness) Map.t)
     (s_exprs : Sexp.t list)
   =
@@ -501,7 +503,7 @@ let constmap_of_s_exprs
           | List [] ->
             let t_val_o =
               let%map smt_value = smtTerm_of_sexp value in
-              term_of_smt (Map.empty (module String)) smt_value
+              term_of_smt ~ctx ~functions (Map.empty (module String)) smt_value
             in
             (match t_val_o with
             | Some t_val -> Map.set map ~key:s ~data:t_val
@@ -524,18 +526,28 @@ let constmap_of_s_exprs
   | _ -> starting_map
 ;;
 
-let model_to_constmap (s : solver_response) =
+let model_to_constmap
+    ~(ctx : Context.t)
+    ~(functions : PMRS.Functions.ctx)
+    (s : solver_response)
+  =
   let empty_map = Map.empty (module String) in
   match s with
   | Unsupported | Unknown | Unsat | Sat | Success -> empty_map
-  | SExps s_exprs -> constmap_of_s_exprs empty_map s_exprs
+  | SExps s_exprs -> constmap_of_s_exprs ~ctx ~functions empty_map s_exprs
   | Error _ -> failwith "Smt solver error"
 ;;
 
-let model_to_varmap (ctx : VarSet.t) (s : solver_response) : term VarMap.t =
-  let map = Map.to_alist (model_to_constmap s) in
+let model_to_varmap
+    ~(ctx : Context.t)
+    ~(functions : PMRS.Functions.ctx)
+    (hctx : VarSet.t)
+    (s : solver_response)
+    : term VarMap.t
+  =
+  let map = Map.to_alist (model_to_constmap ~ctx ~functions s) in
   let f imap (vname, t) =
-    match VarSet.find_by_name ctx vname with
+    match VarSet.find_by_name hctx vname with
     | Some v -> Map.set imap ~key:v ~data:t
     | None -> imap
   in
@@ -548,6 +560,8 @@ let model_to_varmap (ctx : VarSet.t) (s : solver_response) : term VarMap.t =
     call.
 *)
 let request_different_models
+    ~(ctx : Context.t)
+    ~(functions : PMRS.Functions.ctx)
     (model : term_model)
     (num_models : int)
     (solver : SyncSmt.online_solver)
@@ -557,7 +571,7 @@ let request_different_models
     (* Assert all variables different. *)
     List.iter
       ~f:(fun (varname, value) ->
-        let smt_val = smt_of_term value in
+        let smt_val = smt_of_term ~ctx value in
         smt_assert solver (mk_not (mk_eq (mk_var varname) smt_val)))
       (Map.to_alist model);
     match check_sat solver with
@@ -565,7 +579,7 @@ let request_different_models
       (match get_model solver with
       | SExps s ->
         (* New model has been found, recursively find new ones. *)
-        let new_model = model_to_constmap (SExps s) in
+        let new_model = model_to_constmap ~ctx ~functions (SExps s) in
         if i > 0
         then req_loop new_model (i - 1) (new_model :: models)
         else new_model :: models
@@ -576,6 +590,8 @@ let request_different_models
 ;;
 
 let request_different_models_async
+    ~(ctx : Context.t)
+    ~(functions : PMRS.Functions.ctx)
     (model : term_model Lwt.t)
     (num_models : int)
     (solver : AsyncSmt.solver)
@@ -586,7 +602,7 @@ let request_different_models_async
     let* _ =
       Lwt_list.iter_s
         (fun (varname, value) ->
-          let smt_val = smt_of_term value in
+          let smt_val = smt_of_term ~ctx value in
           AsyncSmt.smt_assert solver (mk_not (mk_eq (mk_var varname) smt_val)))
         (Map.to_alist model)
     in
@@ -597,7 +613,7 @@ let request_different_models_async
       (match model with
       | SExps s ->
         (* New model has been found, recursively find new ones. *)
-        let new_model = model_to_constmap (SExps s) in
+        let new_model = model_to_constmap ~ctx ~functions (SExps s) in
         if i > 0
         then req_loop new_model (i - 1) (Lwt.return (new_model :: models))
         else Lwt.return (new_model :: models)
@@ -617,9 +633,9 @@ module Commands = struct
     | _ -> []
   ;;
 
-  let decls_of_vars (vars : VarSet.t) : command list =
+  let decls_of_vars ~(ctx : Context.t) (vars : VarSet.t) : command list =
     let f v =
-      let t = Variable.vtype_or_new v in
+      let t = Variable.vtype_or_new ctx v in
       match t with
       | RType.TFun _ ->
         let intypes, outtypes = RType.fun_typ_unpack t in
@@ -635,6 +651,7 @@ module Commands = struct
   ;;
 
   let mk_def_fun
+      ~(ctx : Context.t)
       (name : string)
       (args : (string * RType.t) list)
       (rtype : RType.t)
@@ -644,7 +661,7 @@ module Commands = struct
     let smt_args =
       List.map ~f:(fun (name, rtype) -> mk_symb name, sort_of_rtype rtype) args
     in
-    DefineFun (mk_symb name, smt_args, sort_of_rtype rtype, smt_of_term body)
+    DefineFun (mk_symb name, smt_args, sort_of_rtype rtype, smt_of_term ~ctx body)
   ;;
 
   let mk_preamble
@@ -699,19 +716,24 @@ let smtPattern_of_term (t : term) : smtPattern option =
 ;;
 
 (* Work in progress *)
-let build_match_cases pmrs _nont vars (relevant_rules : PMRS.rewrite_rule list)
+let build_match_cases
+    ~(ctx : Context.t)
+    (pmrs : PMRS.t)
+    _nont
+    vars
+    (relevant_rules : PMRS.rewrite_rule list)
     : (smtTerm * match_case list) option
   =
   let build_with matched_var rest_args =
     let rule_to_match_case (_, var_args, pat, body) =
       let pattern =
         match pat with
-        | Some p -> Some (smtPattern_of_pattern p)
+        | Some p -> Some (smtPattern_of_pattern ~ctx p)
         | None -> None
       in
       let non_pattern_matched_args = pmrs.PMRS.pargs @ var_args in
       let case_body =
-        let extra_param_args = List.map ~f:Term.mk_var pmrs.pargs in
+        let extra_param_args = List.map ~f:(Term.mk_var ctx) pmrs.pargs in
         let body' =
           let case f t =
             match t.tkind with
@@ -720,7 +742,10 @@ let build_match_cases pmrs _nont vars (relevant_rules : PMRS.rewrite_rule list)
               then (
                 let args' = List.map ~f args in
                 Some
-                  Term.(mk_app (mk_var (Variable.mk fv.vname)) (extra_param_args @ args')))
+                  Term.(
+                    mk_app
+                      (mk_var ctx (Variable.mk ctx fv.vname))
+                      (extra_param_args @ args')))
               else None
             | _ -> None
           in
@@ -729,14 +754,14 @@ let build_match_cases pmrs _nont vars (relevant_rules : PMRS.rewrite_rule list)
         let sub =
           match
             List.map2
-              ~f:(fun v x -> Term.mk_var v, Term.mk_var x)
+              ~f:(fun v x -> Term.mk_var ctx v, Term.mk_var ctx x)
               non_pattern_matched_args
               rest_args
           with
           | Ok zipped -> zipped
           | Unequal_lengths -> failwith "Unexpected."
         in
-        smt_of_term (substitution sub body')
+        smt_of_term ~ctx (substitution sub body')
       in
       Option.map ~f:(fun x -> x, case_body) pattern
     in
@@ -749,10 +774,10 @@ let build_match_cases pmrs _nont vars (relevant_rules : PMRS.rewrite_rule list)
   | _ -> None
 ;;
 
-let single_rule_case (pmrs : PMRS.t) nont vars (args, body) : smtTerm =
-  let _, tout = RType.fun_typ_unpack (Variable.vtype_or_new nont) in
+let single_rule_case ~(ctx : Context.t) (pmrs : PMRS.t) nont vars (args, body) : smtTerm =
+  let _, tout = RType.fun_typ_unpack (Variable.vtype_or_new ctx nont) in
   let body' =
-    let extra_param_args = List.map ~f:Term.mk_var pmrs.pargs in
+    let extra_param_args = List.map ~f:(Term.mk_var ctx) pmrs.pargs in
     let case f t =
       match t.tkind with
       | TApp ({ tkind = TVar fv; _ }, args) ->
@@ -760,7 +785,11 @@ let single_rule_case (pmrs : PMRS.t) nont vars (args, body) : smtTerm =
         then (
           let args' = List.map ~f args in
           let all_args = extra_param_args @ args' in
-          Some (mk_app ~typ:(Some tout) (Term.mk_var (Variable.mk fv.vname)) all_args))
+          Some
+            (mk_app
+               ~typ:(Some tout)
+               (Term.mk_var ctx (Variable.mk ctx fv.vname))
+               all_args))
         else None
       | _ -> None
     in
@@ -768,48 +797,54 @@ let single_rule_case (pmrs : PMRS.t) nont vars (args, body) : smtTerm =
   in
   let sub =
     match
-      List.map2 ~f:(fun v x -> Term.mk_var v, Term.mk_var x) (pmrs.pargs @ args) vars
+      List.map2
+        ~f:(fun v x -> Term.mk_var ctx v, Term.mk_var ctx x)
+        (pmrs.pargs @ args)
+        vars
     with
     | Ok zipped -> zipped
     | Unequal_lengths ->
       Log.error_msg "single_rule_case";
       failwith "Unexpected."
   in
-  smt_of_term (substitution sub body')
+  smt_of_term ~ctx (substitution sub body')
 ;;
 
-let vars_and_formals (pmrs : PMRS.t) (fvar : variable) =
-  let args_t, out_t = RType.fun_typ_unpack (Variable.vtype_or_new fvar) in
+let vars_and_formals ~(ctx : Context.t) (pmrs : PMRS.t) (fvar : variable) =
+  let args_t, out_t = RType.fun_typ_unpack (Variable.vtype_or_new ctx fvar) in
   let vars, formals =
     List.unzip
       (List.map
          ~f:(fun rt ->
            let v =
              Variable.mk
+               ctx
                ~t:(Some rt)
-               (Alpha.fresh ~s:("x" ^ String.prefix fvar.vname 2) ())
+               (Alpha.fresh ~s:("x" ^ String.prefix fvar.vname 2) ctx.names)
            in
            v, (mk_symb v.vname, sort_of_rtype rt))
-         (List.map ~f:(fun v -> Variable.vtype_or_new v) pmrs.pargs @ args_t))
+         (List.map ~f:(fun v -> Variable.vtype_or_new ctx v) pmrs.pargs @ args_t))
   in
   out_t, vars, formals
 ;;
 
-let _smt_of_pmrs (pmrs : PMRS.t) : (smtSymbol list * command) list * command list =
+let _smt_of_pmrs ~(ctx : Context.t) (pmrs : PMRS.t)
+    : (smtSymbol list * command) list * command list
+  =
   (* Sort declarations. *)
   let datatype_decls =
     List.concat_map
-      ~f:declare_datatype_of_rtype
+      ~f:(declare_datatype_of_rtype ~ctx)
       (* All the types that can contain dataypes, including tuples. *)
       PMRS.(
         (pmrs.poutput_typ :: pmrs.pinput_typ)
         @ List.concat_map (Set.elements pmrs.pnon_terminals) ~f:(fun v ->
-              let int, out = RType.fun_typ_unpack (Variable.vtype_or_new v) in
+              let int, out = RType.fun_typ_unpack (Variable.vtype_or_new ctx v) in
               out :: int))
   in
   (* Define recursive functions. *)
   let fun_of_nont (nont : variable) : (func_dec * smtTerm) option =
-    let out_t, vars, formals = vars_and_formals pmrs nont in
+    let out_t, vars, formals = vars_and_formals ~ctx pmrs nont in
     let maybe_body =
       let relevant_rules =
         Map.data (Map.filter ~f:(fun (k, _, _, _) -> k.vid = nont.vid) pmrs.prules)
@@ -819,15 +854,17 @@ let _smt_of_pmrs (pmrs : PMRS.t) : (smtSymbol list * command) list * command lis
       in
       if all_pattern_matching
       then (
-        match build_match_cases pmrs nont vars relevant_rules with
+        match build_match_cases ~ctx pmrs nont vars relevant_rules with
         | Some (x, match_cases) -> Some (SmtTMatch (x, match_cases))
         | None ->
           (match relevant_rules with
-          | [ (_, args, _, body) ] -> Some (single_rule_case pmrs nont vars (args, body))
+          | [ (_, args, _, body) ] ->
+            Some (single_rule_case ~ctx pmrs nont vars (args, body))
           | _ -> None))
       else (
         match relevant_rules with
-        | [ (_, args, _, body) ] -> Some (single_rule_case pmrs nont vars (args, body))
+        | [ (_, args, _, body) ] ->
+          Some (single_rule_case ~ctx pmrs nont vars (args, body))
         | _ -> None)
     in
     Option.map maybe_body ~f:(fun body ->
@@ -841,10 +878,12 @@ let _smt_of_pmrs (pmrs : PMRS.t) : (smtSymbol list * command) list * command lis
       (* When PMRS is parametric, main symbol might be different from function symbol.  *)
       if not Variable.(pmrs.pvar = pmrs.pmain_symb)
       then (
-        let out_t, vars, formals = vars_and_formals pmrs pmrs.pvar in
-        let body = Term.mk_app_v pmrs.pmain_symb (List.map ~f:Term.mk_var vars) in
+        let out_t, vars, formals = vars_and_formals ~ctx pmrs pmrs.pvar in
+        let body =
+          Term.mk_app_v ctx pmrs.pmain_symb (List.map ~f:(Term.mk_var ctx) vars)
+        in
         [ DefineFun
-            (mk_symb pmrs.pvar.vname, formals, sort_of_rtype out_t, smt_of_term body)
+            (mk_symb pmrs.pvar.vname, formals, sort_of_rtype out_t, smt_of_term ~ctx body)
         ])
       else []
     in
@@ -855,11 +894,15 @@ let _smt_of_pmrs (pmrs : PMRS.t) : (smtSymbol list * command) list * command lis
 
 let mk_assert = mk_assert
 
-let smt_of_pmrs (pmrs : PMRS.t) : command list =
-  let deps = PMRS.depends pmrs in
-  let sort_decls_of_deps, decls_of_deps = List.unzip (List.map ~f:_smt_of_pmrs deps) in
+let smt_of_pmrs ~(ctx : Context.t) ~(functions : PMRS.Functions.ctx) (pmrs : PMRS.t)
+    : command list
+  =
+  let deps = PMRS.depends ~ctx ~glob:functions pmrs in
+  let sort_decls_of_deps, decls_of_deps =
+    List.unzip (List.map ~f:(_smt_of_pmrs ~ctx) deps)
+  in
   let sort_decls, main_decl =
-    try _smt_of_pmrs pmrs with
+    try _smt_of_pmrs ~ctx pmrs with
     | Failure s ->
       Log.error_msg "Failed to translate PMRS to SMT definitions.";
       failwith s
