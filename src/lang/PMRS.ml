@@ -176,7 +176,7 @@ let pp ~(ctx : Context.t) (frmt : Formatter.t) ?(short = false) (pmrs : t) : uni
       pmrs.pinput_typ
       RType.pp
       pmrs.poutput_typ
-      (option (box pp_spec))
+      (option (box (pp_spec ~ctx)))
       (Specifications.get_spec pmrs.pvar)
       (if short then fun _ _ -> () else braces pp_rules)
       ())
@@ -353,7 +353,8 @@ let infer_pmrs_types ~(ctx : Context.t) (prog : t) =
     let c_rule = RType.merge_subs cur_loc c_body c_head in
     match RType.unify (RType.mkv (substs @ c_rule) @ [ t_head.ttyp, t_body.ttyp ]) with
     | Ok res ->
-      Map.set map ~key ~data:(nt, args, pat, rewrite_types (RType.mkv res) t_body), res
+      ( Map.set map ~key ~data:(nt, args, pat, rewrite_types ctx (RType.mkv res) t_body)
+      , res )
     | Error e ->
       Log.error_msg Fmt.(str "Error: %a" Sexp.pp_hum e);
       Log.loc_fatal_errmsg
@@ -372,11 +373,12 @@ let infer_pmrs_types ~(ctx : Context.t) (prog : t) =
   in
   match RType.unify (RType.mkv new_subs) with
   | Ok usubs ->
-    Variable.update_var_types (RType.mkv usubs);
+    Variable.update_var_types ctx (RType.mkv usubs);
     let typ_in, typ_out =
       RType.fun_typ_unpack (Variable.vtype_or_new ctx prog.pmain_symb)
     in
     Variable.update_var_types
+      ctx
       [ Variable.vtype_or_new ctx prog.pvar, Variable.vtype_or_new ctx prog.pmain_symb ];
     (* Change types in the specification. *)
     (* Ensures. *)
@@ -428,6 +430,7 @@ let infer_pmrs_types ~(ctx : Context.t) (prog : t) =
 ;;
 
 let unify_two_with_vartype_update
+    (ctx : Context.t)
     ((theta, theta') : RType.t * RType.t)
     ((tau, tau') : RType.t * RType.t)
     : RType.substitution
@@ -438,7 +441,7 @@ let unify_two_with_vartype_update
   | Ok sb1, Ok sb2 ->
     (match RType.unify (RType.mkv (sb1 @ sb2)) with
     | Ok sb' ->
-      Term.Variable.update_var_types (RType.mkv sb');
+      Term.Variable.update_var_types ctx (RType.mkv sb');
       sb'
     | Error e ->
       Log.error_msg Fmt.(str "Error: %a" Sexp.pp_hum e);
@@ -455,12 +458,12 @@ let unify_two_with_vartype_update
     Log.fatal ()
 ;;
 
-let unify_one_with_update (t, t') =
+let unify_one_with_update ctx (t, t') =
   let sb1 = RType.unify_one t t' in
   match sb1 with
   | Ok sb1 ->
     (match RType.unify (RType.mkv sb1) with
-    | Ok sb' -> Term.Variable.update_var_types (RType.mkv sb')
+    | Ok sb' -> Term.Variable.update_var_types ctx (RType.mkv sb')
     | Error e ->
       Log.error_msg Fmt.(str "Error: %a" Sexp.pp_hum e);
       Log.error_msg "Could not unify θ and τ in problem definition.";

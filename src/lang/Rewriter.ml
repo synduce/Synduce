@@ -185,9 +185,12 @@ module IS = struct
 end
 
 module RContext = struct
-  type t = { vars : (int, variable) Hashtbl.t }
+  type t =
+    { vars : (int, variable) Hashtbl.t
+    ; parent : Context.t
+    }
 
-  let create () = { vars = Hashtbl.create (module Int) }
+  let create ctx = { vars = Hashtbl.create (module Int); parent = ctx }
   let register_var (ctx : t) (v : variable) = Hashtbl.set ctx.vars ~key:v.vid ~data:v
   let get_var (ctx : t) (id : int) = Hashtbl.find ctx.vars id
 end
@@ -222,61 +225,53 @@ module Expression = struct
     | EOp of Operator.t * t list
   [@@deriving sexp]
 
-  let pp_ivar ~(ctx : Context.t) ~(rctx : RContext.t) (f : Formatter.t) (vid : int) : unit
-    =
+  let pp_ivar ~(ctx : RContext.t) (f : Formatter.t) (vid : int) : unit =
     Fmt.(
-      match RContext.get_var rctx vid with
-      | Some v -> pf f "%a" (styled (`Fg `Green) (styled `Italic (Variable.pp ctx))) v
+      match RContext.get_var ctx vid with
+      | Some v ->
+        pf f "%a" (styled (`Fg `Green) (styled `Italic (Variable.pp ctx.parent))) v
       | None -> pf f "?%a" (styled (`Fg `Green) (styled `Italic int)) vid)
   ;;
 
-  let pp_ivarset
-      ?(ctx = Context.create ())
-      ~(rctx : RContext.t)
-      (f : Formatter.t)
-      (vis : IS.t)
-      : unit
-    =
-    Fmt.(braces (list ~sep:comma (pp_ivar ~rctx ~ctx)) f (Set.elements vis))
+  let pp_ivarset ~(ctx : RContext.t) (f : Formatter.t) (vis : IS.t) : unit =
+    Fmt.(braces (list ~sep:comma (pp_ivar ~ctx)) f (Set.elements vis))
   ;;
 
-  let rec pp ?(ctx = Context.create ()) ~(rctx : RContext.t) (f : Formatter.t) (expr : t)
-      : unit
-    =
+  let rec pp ~(ctx : RContext.t) (f : Formatter.t) (expr : t) : unit =
     Fmt.(
       match expr with
       | ETrue -> pf f "#t"
       | EFalse -> pf f "#f"
       | EInt i -> pf f "%i" i
       | EChar c -> pf f "%c" c
-      | EVar i -> pp_ivar ~rctx ~ctx f i
+      | EVar i -> pp_ivar ~ctx f i
       | EBox kind ->
         (match kind with
         | Indexed i -> pf f ":%a" (styled `Faint int) i
         | Typed t -> pf f ":%a" (styled `Faint RType.pp) t
         | Position i -> pf f "@%a" (styled `Faint int) i)
-      | ETup tl -> pf f "@[(%a)@]" (list ~sep:comma (pp ~rctx ~ctx)) tl
-      | ESel (t, i) -> pf f "@[(%a).%i@]" (pp ~rctx ~ctx) t i
+      | ETup tl -> pf f "@[(%a)@]" (list ~sep:comma (pp ~ctx)) tl
+      | ESel (t, i) -> pf f "@[(%a).%i@]" (pp ~ctx) t i
       | EIte (a, b, c) ->
         pf
           f
           "@[(%a@;%a %a@ %a@ %a %a)@]"
           (styled `Faint (styled `Bold string))
           "if"
-          (pp ~rctx ~ctx)
+          (pp ~ctx)
           a
           (styled `Faint (styled `Bold string))
           "then"
-          (pp ~rctx ~ctx)
+          (pp ~ctx)
           b
           (styled `Faint (styled `Bold string))
           "else"
-          (pp ~rctx ~ctx)
+          (pp ~ctx)
           c
-      | EData (c, tl) -> pf f "@[%s(%a)@]" c (list ~sep:comma (pp ~rctx ~ctx)) tl
+      | EData (c, tl) -> pf f "@[%s(%a)@]" c (list ~sep:comma (pp ~ctx)) tl
       | EOp (op, args) ->
         (match args with
-        | [ a ] -> pf f "@[(%a %a)@]" Operator.pp op (pp ~rctx ~ctx) a
+        | [ a ] -> pf f "@[(%a %a)@]" Operator.pp op (pp ~ctx) a
         | [ a; b ] ->
           (match op with
           | Binary Max | Binary Min ->
@@ -285,19 +280,19 @@ module Expression = struct
               "@[%a(%a, %a)@]"
               (styled (`Fg `Yellow) Operator.pp)
               op
-              (pp ~rctx ~ctx)
+              (pp ~ctx)
               a
-              (pp ~rctx ~ctx)
+              (pp ~ctx)
               b
           | _ ->
             pf
               f
               "@[(%a %a@ %a)@]"
-              (pp ~rctx ~ctx)
+              (pp ~ctx)
               a
               (styled (`Fg `Yellow) Operator.pp)
               op
-              (pp ~rctx ~ctx)
+              (pp ~ctx)
               b)
         | _ ->
           pf
@@ -305,7 +300,7 @@ module Expression = struct
             "@[(%a %a)@]"
             (styled (`Fg `Yellow) Operator.pp)
             op
-            (list ~sep:sp (pp ~rctx ~ctx))
+            (list ~sep:sp (pp ~ctx))
             args))
   ;;
 
@@ -467,7 +462,7 @@ module Expression = struct
     failwith "TODO: Not implemented."
   ;;
 
-  let of_term ~(rctx : RContext.t) t0 : t option =
+  let of_term ~(ctx : RContext.t) t0 : t option =
     let rec f t =
       match t.tkind with
       | TBox t -> f t
@@ -479,7 +474,7 @@ module Expression = struct
           | CTrue -> mk_e_true
           | CFalse -> mk_e_false))
       | TVar v ->
-        RContext.register_var rctx v;
+        RContext.register_var ctx v;
         mk_e_var v.vid
       | TData (c, tl) -> mk_e_data c (List.map ~f tl)
       | TTup tl -> mk_e_tup (List.map ~f tl)
@@ -517,7 +512,7 @@ module Expression = struct
     | _ -> None
   ;;
 
-  let to_term ~(ctx : Context.t) ~(rctx : RContext.t) e : term option =
+  let to_term ~(ctx : RContext.t) e : term option =
     let rec f e =
       match e with
       | ETrue -> Some (Terms.bool true)
@@ -525,22 +520,23 @@ module Expression = struct
       | EInt i -> Some (Terms.int i)
       | EChar c -> Some (Terms.char c)
       | EVar i ->
-        let%map v = RContext.get_var rctx i in
-        mk_var ctx v
+        let%map v = RContext.get_var ctx i in
+        mk_var ctx.parent v
       | EBox kind ->
         (match kind with
         | Indexed i ->
-          let%map v = RContext.get_var rctx i in
-          mk_var ctx v
+          let%map v = RContext.get_var ctx i in
+          mk_var ctx.parent v
         | _ -> None)
-      | ETup tl -> Option.map ~f:(mk_tup ctx) (Option.all (List.map ~f tl))
-      | ESel (t, i) -> Option.map ~f:(fun t' -> mk_sel ctx t' i) (f t)
+      | ETup tl -> Option.map ~f:(mk_tup ctx.parent) (Option.all (List.map ~f tl))
+      | ESel (t, i) -> Option.map ~f:(fun t' -> mk_sel ctx.parent t' i) (f t)
       | EIte (c, tt, tf) ->
         let%map c' = f c
         and tt' = f tt
         and tf' = f tf in
         mk_ite c' tt' tf'
-      | EData (c, tl) -> Option.map ~f:(mk_data ctx c) (Option.all (List.map ~f tl))
+      | EData (c, tl) ->
+        Option.map ~f:(mk_data ctx.parent c) (Option.all (List.map ~f tl))
       | EOp (op, tl) ->
         (match tl, op with
         | [ a ], Unary op ->
@@ -912,23 +908,24 @@ module Skeleton = struct
     | SNonGuessable -> Fmt.(pf frmt "!?")
   ;;
 
-  let rec of_expression ~(rctx : RContext.t) : Expression.t -> t option = function
+  let rec of_expression ~(ctx : RContext.t) : Expression.t -> t option = function
     | EInt _ -> Some (SType RType.TInt)
     | EChar _ -> Some (SType RType.TChar)
     | EFalse | ETrue -> Some (SType RType.TBool)
     | EVar v ->
-      Option.(RContext.get_var rctx v >>= Variable.vtype >>= fun t -> Some (SType t))
+      Option.(
+        RContext.get_var ctx v >>= Variable.vtype ctx.parent >>= fun t -> Some (SType t))
     | EBox boxkind ->
       (match boxkind with
       | Expression.Position i -> Some (SArg i)
       | _ -> None)
     | ETup tl ->
-      let%map tl = all_or_none (List.map ~f:(of_expression ~rctx) tl) in
+      let%map tl = all_or_none (List.map ~f:(of_expression ~ctx) tl) in
       STuple tl
     | EIte (a, b, c) ->
-      let%bind a = of_expression ~rctx a in
-      let%bind b = of_expression ~rctx b in
-      let%map c = of_expression ~rctx c in
+      let%bind a = of_expression ~ctx a in
+      let%bind b = of_expression ~ctx b in
+      let%map c = of_expression ~ctx c in
       SIte (a, b, c)
     | ESel _ | EData _ -> None
     | EOp (op, args) ->
@@ -936,16 +933,16 @@ module Skeleton = struct
       | Unary uop ->
         (match args with
         | [ arg ] ->
-          let%map arg = of_expression ~rctx arg in
+          let%map arg = of_expression ~ctx arg in
           SUn (uop, arg)
         | _ -> None)
       | Binary bop ->
         (match args with
         | arg1 :: arg2 :: tl ->
-          let%bind arg1 = of_expression ~rctx arg1 in
-          let%map arg2 = of_expression ~rctx (EOp (Binary bop, arg2 :: tl)) in
+          let%bind arg1 = of_expression ~ctx arg1 in
+          let%map arg2 = of_expression ~ctx (EOp (Binary bop, arg2 :: tl)) in
           SBin (bop, arg1, arg2)
-        | [ arg ] -> of_expression ~rctx arg
+        | [ arg ] -> of_expression ~ctx arg
         | [] -> None))
   ;;
 end
@@ -1227,9 +1224,9 @@ let match_as_subexpr ?(lemma = None) (bid : boxkind) (sube : t) ~(of_ : t) : t o
 
 let simplify_term ~(ctx : Context.t) (t : term) : term =
   let simpl =
-    let rctx = RContext.create () in
-    let%bind expr = of_term ~rctx t in
-    to_term ~ctx ~rctx (normalize expr)
+    let ctx = RContext.create ctx in
+    let%bind expr = of_term ~ctx t in
+    to_term ~ctx (normalize expr)
   in
   match simpl with
   | Some s -> s

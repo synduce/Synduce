@@ -13,7 +13,9 @@ val subexpressions_without_boxes
 
 module Solver : sig
   val presolve_equations
-    :  xi:Term.variable
+    :  orig_ctx:Term.Context.t
+    -> ?ctx:RContext.t
+    -> xi:Term.variable
     -> (Term.term * Term.term option * Term.term * Term.term) list
     -> [> `First of string * Term.variable list * Term.term
        | `Second of Skeleton.t
@@ -21,9 +23,10 @@ module Solver : sig
        ]
 
   val functional_equation
-    :  func_side:Term.term list
+    :  ctx:Term.Context.t
+    -> func_side:Term.term list
     -> lemma:Term.term option
     -> Term.term
     -> (Term.variable * Term.VarSet.t) list
-    -> (Term.variable * Term.term) list * Expression.t option
+    -> (Term.variable * Term.term) list * Expression.t option * RContext.t
 end

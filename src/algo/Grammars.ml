@@ -364,17 +364,19 @@ let make_basic_guess (eqns : (term * term option * term * term) list) (xi : vari
 ;;
 
 let make_unification_guess
+    ~(ctx : Context.t)
     (eqns : (term * term option * term * term) list)
     (xi : variable)
     : [> `First of string * variable list * term | `Second of Skeleton.t | `Third ]
   =
-  match Deduction.Solver.presolve_equations ~xi eqns with
+  match Deduction.Solver.presolve_equations ~orig_ctx:ctx ~xi eqns with
   | `Third -> make_basic_guess eqns xi
   | _ as l -> l
 ;;
 
 let make_guess
     ?(level = 1)
+    ~(ctx : Context.t)
     (xi : variable)
     (eqns : (term * term option * term * term) list)
     : [> `First of symbol * variable list * term | `Second of Skeleton.t | `Third ]
@@ -382,6 +384,6 @@ let make_guess
   match level with
   | 0 -> `Third
   | 1 -> make_basic_guess eqns xi
-  | 2 -> make_unification_guess eqns xi
+  | 2 -> make_unification_guess ~ctx eqns xi
   | _ -> `Third
 ;;

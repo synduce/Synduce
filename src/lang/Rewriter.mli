@@ -40,9 +40,12 @@ module IS : sig
 end
 
 module RContext : sig
-  type t = { vars : (int, Term.variable) Hashtbl.t }
+  type t =
+    { vars : (int, Term.variable) Hashtbl.t
+    ; parent : Term.Context.t
+    }
 
-  val create : unit -> t
+  val create : Term.Context.t -> t
   val register_var : t -> Term.variable -> unit
   val get_var : t -> int -> Term.variable option
 end
@@ -71,9 +74,9 @@ module Expression : sig
     | EData of string * t list
     | EOp of Term.Operator.t * t list
 
-  val pp_ivar : ctx:Term.Context.t -> rctx:RContext.t -> Formatter.t -> int -> unit
-  val pp_ivarset : ?ctx:Term.Context.t -> rctx:RContext.t -> Formatter.t -> IS.t -> unit
-  val pp : ?ctx:Term.Context.t -> rctx:RContext.t -> t Fmt.t
+  val pp_ivar : ctx:RContext.t -> Formatter.t -> int -> unit
+  val pp_ivarset : ctx:RContext.t -> Formatter.t -> IS.t -> unit
+  val pp : ctx:RContext.t -> t Fmt.t
   val mk_e_true : t
   val mk_e_false : t
   val mk_e_int : int -> t
@@ -122,8 +125,8 @@ module Expression : sig
   val comparator : (t, comparator_witness) Comparator.t
   val free_variables : t -> (int, Base.Int.comparator_witness) Base.Set.t
   val alpha_equal : t -> t -> bool
-  val of_term : rctx:RContext.t -> Term.term -> t option
-  val to_term : ctx:Term.Context.t -> rctx:RContext.t -> t -> Term.term option
+  val of_term : ctx:RContext.t -> Term.term -> t option
+  val to_term : ctx:RContext.t -> t -> Term.term option
   val simplify : t -> t
   val apply : t -> t list -> t
   val normalize : t -> t
@@ -145,7 +148,7 @@ module Skeleton : sig
     | SNonGuessable
 
   val pp : t Fmt.t
-  val of_expression : rctx:RContext.t -> Expression.t -> t option
+  val of_expression : ctx:RContext.t -> Expression.t -> t option
 end
 
 val factorize : Expression.t -> Expression.t

@@ -13,15 +13,23 @@ open Lwt.Syntax
 (*                               CHECKING UNREALIZABILITY                                        *)
 (* ============================================================================================= *)
 
-let smt_unsatisfiability_check (unknowns : VarSet.t) (eqns : equation list) : unit =
+let smt_unsatisfiability_check
+    ~(ctx : Context.t)
+    (unknowns : VarSet.t)
+    (eqns : equation list)
+    : unit
+  =
   let free_vars =
     let f fvs eqn =
       let precond, lhs, rhs = eqn.eprecond, eqn.elhs, eqn.erhs in
       let set' =
         VarSet.union_list
-          [ Analysis.free_variables lhs
-          ; Analysis.free_variables rhs
-          ; Option.value_map precond ~f:Analysis.free_variables ~default:VarSet.empty
+          [ Analysis.free_variables ~ctx lhs
+          ; Analysis.free_variables ~ctx rhs
+          ; Option.value_map
+              precond
+              ~f:(Analysis.free_variables ~ctx)
+              ~default:VarSet.empty
           ]
       in
       Set.union fvs set'
@@ -49,6 +57,7 @@ let smt_unsatisfiability_check (unknowns : VarSet.t) (eqns : equation list) : un
     Commands.mk_preamble
       ~logic:
         (SmtLogic.infer_logic
+           ~ctx
            ~with_uninterpreted_functions:true
            ~for_induction:false
            ~quantifier_free:false
@@ -103,11 +112,11 @@ let merge_all (cl : unrealizability_ctex list) : unrealizability_ctex list =
   List.map cl ~f:(fun cex -> merge_in cex (List.filter ~f:(same_origin cex) cl))
 ;;
 
-let reinterpret_model vseti (m0i, m0j') var_subst =
+let reinterpret_model ~ctx vseti (m0i, m0j') var_subst =
   let mi, mj =
     List.fold var_subst ~init:(VarMap.empty, VarMap.empty) ~f:(fun (mi, mj) (v, v') ->
         let primed_name = v'.vname in
-        Variable.free v';
+        Variable.free ctx v';
         match Map.find m0i v.vname with
         | Some data ->
           let new_m = Map.set mi ~key:v ~data in
@@ -131,14 +140,21 @@ let reinterpret_model vseti (m0i, m0j') var_subst =
   mi, mj
 ;;
 
-let unrealizability_ctex_of_constmap (i, j) (eqn_i, eqn_j) (vseti, vsetj) var_subst model =
+let unrealizability_ctex_of_constmap
+    ~ctx
+    (i, j)
+    (eqn_i, eqn_j)
+    (vseti, vsetj)
+    var_subst
+    model
+  =
   let m0i, m0j =
     Map.partitioni_tf
       ~f:(fun ~key ~data:_ -> Option.is_some (VarSet.find_by_name vseti key))
       model
   in
   (* Remap the names to ids of the original variables in m' *)
-  let m_i, m_j = reinterpret_model vseti (m0i, m0j) var_subst in
+  let m_i, m_j = reinterpret_model ~ctx vseti (m0i, m0j) var_subst in
   let vset = Set.union vseti vsetj in
   let ctex_i : ctex =
     { ctex_eqn = eqn_i; ctex_model = m_i; ctex_vars = vset; ctex_stat = Unknown }
@@ -149,10 +165,10 @@ let unrealizability_ctex_of_constmap (i, j) (eqn_i, eqn_j) (vseti, vsetj) var_su
   { i; j; ci = ctex_i; cj = ctex_j }
 ;;
 
-let skeleton_match ~unknowns (e1 : term) (e2 : term) : (term * term) list option =
-  let args1, e1' = Matching.skeletize ~functions:unknowns e1
-  and args2, e2' = Matching.skeletize ~functions:unknowns e2 in
-  match Matching.matches ~boundvars:unknowns ~pattern:e1' e2' with
+let skeleton_match ~ctx ~unknowns (e1 : term) (e2 : term) : (term * term) list option =
+  let args1, e1' = Matching.skeletize ~functions:unknowns ~ctx e1
+  and args2, e2' = Matching.skeletize ~functions:unknowns ~ctx e2 in
+  match Matching.matches ~ctx ~boundvars:unknowns ~pattern:e1' e2' with
   | Some subs ->
     let f (v1, packedv) =
       match packedv.tkind with
@@ -163,15 +179,15 @@ let skeleton_match ~unknowns (e1 : term) (e2 : term) : (term * term) list option
   | None -> None
 ;;
 
-let components_of_unrealizability ~unknowns (eqn1 : equation) (eqn2 : equation)
+let components_of_unrealizability ~ctx ~unknowns (eqn1 : equation) (eqn2 : equation)
     : ((term * term) list * (term * term)) option
   =
   let validate terms =
     List.for_all terms ~f:(fun (t, t') ->
-        Set.is_empty (Set.inter (Analysis.free_variables t) unknowns)
-        && Set.is_empty (Set.inter (Analysis.free_variables t') unknowns))
+        Set.is_empty (Set.inter (Analysis.free_variables ~ctx t) unknowns)
+        && Set.is_empty (Set.inter (Analysis.free_variables ~ctx t') unknowns))
   in
-  match skeleton_match ~unknowns eqn1.erhs eqn2.erhs with
+  match skeleton_match ~ctx ~unknowns eqn1.erhs eqn2.erhs with
   | Some args_1_2 ->
     if validate ((eqn1.elhs, eqn2.elhs) :: args_1_2)
     then Some (args_1_2, (eqn1.elhs, eqn2.elhs))
@@ -183,24 +199,27 @@ let components_of_unrealizability ~unknowns (eqn1 : equation) (eqn2 : equation)
     else None
 ;;
 
-let gen_info (eqn_i, eqn_j) unknowns =
+let gen_info ~ctx (eqn_i, eqn_j) unknowns =
   let fv e =
     VarSet.union_list
-      (List.map e.eelim ~f:(fun (_, elim) -> Analysis.free_variables elim)
+      (List.map e.eelim ~f:(fun (_, elim) -> Analysis.free_variables ~ctx elim)
       @ [ Set.filter
-            ~f:(fun v -> RType.is_base (Variable.vtype_or_new v))
-            (Analysis.free_variables e.eterm)
+            ~f:(fun v -> RType.is_base (Variable.vtype_or_new ctx v))
+            (Analysis.free_variables ~ctx e.eterm)
         ]
-      @ [ Analysis.free_variables e.elhs
-        ; Analysis.free_variables e.erhs
-        ; Option.value_map ~default:VarSet.empty ~f:Analysis.free_variables e.eprecond
+      @ [ Analysis.free_variables ~ctx e.elhs
+        ; Analysis.free_variables ~ctx e.erhs
+        ; Option.value_map
+            ~default:VarSet.empty
+            ~f:(Analysis.free_variables ~ctx)
+            e.eprecond
         ])
   in
   let vseti = Set.diff (fv eqn_i) unknowns
   and vsetj = Set.diff (fv eqn_j) unknowns in
-  let var_subst = VarSet.prime vsetj in
+  let var_subst = VarSet.prime ctx vsetj in
   let vsetj' = VarSet.of_list (List.map ~f:snd var_subst) in
-  let sub = List.map ~f:(fun (v, v') -> mk_var v, mk_var v') var_subst in
+  let sub = List.map ~f:(fun (v, v') -> mk_var ctx v, mk_var ctx v') var_subst in
   vseti, vsetj, vsetj', sub, var_subst
 ;;
 
@@ -210,7 +229,7 @@ let gen_info (eqn_i, eqn_j) unknowns =
   If the returned list is empty, the problem may be solvable/realizable.
   If the returned list is not empty, the problem is not solvable / unrealizable.
 *)
-let check_unrealizable (unknowns : VarSet.t) (eqns : equation_system)
+let check_unrealizable ~(ctx : Context.t) (unknowns : VarSet.t) (eqns : equation_system)
     : unrealizability_ctex list Lwt.t * int Lwt.u
   =
   Log.debug (fun f () -> Fmt.(pf f "Checking unrealizability..."));
@@ -222,9 +241,9 @@ let check_unrealizable (unknowns : VarSet.t) (eqns : equation_system)
     let check_eqn_accum (ctexs : unrealizability_ctex list Lwt.t) ((i, eqn_i), (j, eqn_j))
       =
       let* ctexs = ctexs in
-      let vseti, vsetj, vsetj', sub, var_subst = gen_info (eqn_i, eqn_j) unknowns in
+      let vseti, vsetj, vsetj', sub, var_subst = gen_info ~ctx (eqn_i, eqn_j) unknowns in
       (* Extract the arguments of the rhs, if it is a proper skeleton. *)
-      match components_of_unrealizability ~unknowns eqn_i eqn_j with
+      match components_of_unrealizability ~ctx ~unknowns eqn_i eqn_j with
       | None -> return ctexs (* If we cannot match the expected structure, skip it. *)
       | Some (rhs_args_ij, (lhs_i, lhs_j)) ->
         let lhs_diff =
@@ -244,7 +263,7 @@ let check_unrealizable (unknowns : VarSet.t) (eqns : equation_system)
             let* _ =
               AsyncSmt.exec_all
                 solver
-                (Commands.decls_of_vars (Analysis.free_variables pre_i))
+                (Commands.decls_of_vars (Analysis.free_variables ~ctx pre_i))
             in
             AsyncSmt.smt_assert solver (smt_of_term pre_i)
           | None -> return ()
@@ -256,7 +275,7 @@ let check_unrealizable (unknowns : VarSet.t) (eqns : equation_system)
             let* _ =
               AsyncSmt.exec_all
                 solver
-                (Commands.decls_of_vars (Analysis.free_variables pre_j))
+                (Commands.decls_of_vars (Analysis.free_variables ~ctx pre_j))
             in
             AsyncSmt.smt_assert solver (smt_of_term (substitution sub pre_j))
           | None -> return ()
@@ -303,6 +322,7 @@ let check_unrealizable (unknowns : VarSet.t) (eqns : equation_system)
                 List.map
                   ~f:
                     (unrealizability_ctex_of_constmap
+                       ~ctx
                        (i, j)
                        (eqn_i, eqn_j)
                        (vseti, vsetj)
@@ -327,7 +347,7 @@ let check_unrealizable (unknowns : VarSet.t) (eqns : equation_system)
     let+ _ = AsyncSmt.close_solver solver in
     let elapsed = Unix.gettimeofday () -. start_time in
     Log.debug (fun f () -> Fmt.(pf f "... finished in %3.4fs" elapsed));
-    AlgoLog.show_unrealizability_witnesses unknowns eqns ctexs;
+    AlgoLog.show_unrealizability_witnesses ~ctx unknowns eqns ctexs;
     ctexs
   in
   AsyncSmt.(cancellable_task (make_solver "z3") task)
@@ -347,7 +367,9 @@ let add_cause (ctx : ctex_stat) (cause : spurious_cause) =
 
 (*               CLASSIFYING SPURIOUS COUNTEREXAMPLES - NOT IN REFERENCE IMAGE                   *)
 
-let check_image_sat ~p ctex : (Stats.verif_method * SmtLib.solver_response) Lwt.t * int u =
+let check_image_sat ~(ctx : Context.t) ~(p : PsiDef.t) ctex
+    : (Stats.verif_method * SmtLib.solver_response) Lwt.t * int u
+  =
   let f_compose_r t =
     let repr_of_v =
       if p.PsiDef.repr_is_identity then t else Reduce.reduce_pmrs p.PsiDef.repr t
@@ -362,7 +384,7 @@ let check_image_sat ~p ctex : (Stats.verif_method * SmtLib.solver_response) Lwt.
       (* Build equations of the form (f t) != (value of elimination var in model) *)
       let term_eqs =
         List.map ctex.ctex_eqn.eelim ~f:(fun (_, elimv) ->
-            Terms.(f_compose_r t == Eval.in_model ctex.ctex_model elimv))
+            Terms.(f_compose_r t == Eval.in_model ~ctx ctex.ctex_model elimv))
       in
       let rec aux accum tlist =
         let f binder eqn =
@@ -371,7 +393,7 @@ let check_image_sat ~p ctex : (Stats.verif_method * SmtLib.solver_response) Lwt.
           let* () =
             AsyncSmt.exec_all
               solver_instance
-              (Commands.decls_of_vars (Analysis.free_variables eqn))
+              (Commands.decls_of_vars (Analysis.free_variables ~ctx eqn))
           in
           let* () = AsyncSmt.smt_assert solver_instance (smt_of_term eqn) in
           let* res = AsyncSmt.check_sat solver_instance in
@@ -404,6 +426,7 @@ let check_image_sat ~p ctex : (Stats.verif_method * SmtLib.solver_response) Lwt.
     (* Run the bounded checking loop. *)
     let* res =
       Expand.lwt_expand_loop
+        ~ctx
         steps
         t_check
         (return (TermSet.singleton ctex.ctex_eqn.eterm))
@@ -414,14 +437,17 @@ let check_image_sat ~p ctex : (Stats.verif_method * SmtLib.solver_response) Lwt.
   AsyncSmt.(cancellable_task (make_solver "z3") build_task)
 ;;
 
-let check_image_unsat ~p ctex : (Stats.verif_method * SmtLib.solver_response) t * int u =
+let check_image_unsat ~ctx ~p ctex
+    : (Stats.verif_method * SmtLib.solver_response) t * int u
+  =
   let f_compose_r t =
     let repr_of_v =
-      if p.PsiDef.repr_is_identity then t else mk_app_v p.PsiDef.repr.pvar [ t ]
+      if p.PsiDef.repr_is_identity then t else mk_app_v ctx p.PsiDef.repr.pvar [ t ]
     in
     mk_app_v
+      ctx
       p.PsiDef.reference.pvar
-      (List.map ~f:mk_var p.PsiDef.reference.pargs @ [ repr_of_v ])
+      (List.map ~f:(mk_var ctx) p.PsiDef.reference.pargs @ [ repr_of_v ])
   in
   let build_task (solver, task_start) =
     let* _ = task_start in
@@ -433,6 +459,7 @@ let check_image_unsat ~p ctex : (Stats.verif_method * SmtLib.solver_response) t 
            ~incremental:false
            ~logic:
              (SmtLogic.infer_logic
+                ~ctx
                 ~quantifier_free:false
                 ~for_induction:true
                 ~with_uninterpreted_functions:true
@@ -458,13 +485,15 @@ let check_image_unsat ~p ctex : (Stats.verif_method * SmtLib.solver_response) t 
             | TTup comps ->
               List.mapi comps ~f:(fun i t ->
                   Terms.(
-                    Eval.in_model ctex.ctex_model t == mk_sel (f_compose_r orig_rec_var) i))
+                    Eval.in_model ~ctx ctex.ctex_model t
+                    == mk_sel ctx (f_compose_r orig_rec_var) i))
             | _ ->
-              Terms.[ Eval.in_model ctex.ctex_model elimv == f_compose_r orig_rec_var ])
+              Terms.
+                [ Eval.in_model ~ctx ctex.ctex_model elimv == f_compose_r orig_rec_var ])
           ctex.ctex_eqn.eelim
       in
       ( VarSet.union_list
-          (List.map ctex.ctex_eqn.eelim ~f:(fun (x, _) -> Analysis.free_variables x))
+          (List.map ctex.ctex_eqn.eelim ~f:(fun (x, _) -> Analysis.free_variables ~ctx x))
       , (* Assert that the variables have the values assigned by the model. *)
         SmtLib.mk_assoc_and (List.map ~f:smt_of_term eqns) )
     in
@@ -483,20 +512,26 @@ let check_image_unsat ~p ctex : (Stats.verif_method * SmtLib.solver_response) t 
   [check_ctex_in_image ~p ctex] checks whether the recursion elimination's variables values in the
   model of [ctex] are in the image of (p.PsiDef.reference o p.PsiDef.repr).
 *)
-let check_ctex_in_image ?(ignore_unknown = false) ~(p : PsiDef.t) (ctex : ctex) : ctex =
+let check_ctex_in_image
+    ?(ignore_unknown = false)
+    ~(ctx : Context.t)
+    ~(p : PsiDef.t)
+    (ctex : ctex)
+    : ctex
+  =
   Log.verbose_msg
     Fmt.(
       str "Checking whether ctex is in the image of %s..." p.PsiDef.reference.pvar.vname);
   let vmethod, resp =
-    if Analysis.is_bounded ctex.ctex_eqn.eterm
+    if Analysis.is_bounded ~ctx ctex.ctex_eqn.eterm
     then Stats.Induction, SmtLib.Sat
     else (
       try
         Lwt_main.run
           ((* This call is expected to respond "unsat" when terminating. *)
-           let pr1, resolver1 = check_image_sat ~p ctex in
+           let pr1, resolver1 = check_image_sat ~ctx ~p ctex in
            (* This call is expected to respond "sat" when terminating. *)
-           let pr2, resolver2 = check_image_unsat ~p ctex in
+           let pr2, resolver2 = check_image_unsat ~ctx ~p ctex in
            Lwt.wakeup resolver2 1;
            Lwt.wakeup resolver1 1;
            (* The first call to return is kept, the other one is ignored. *)
@@ -507,7 +542,7 @@ let check_ctex_in_image ?(ignore_unknown = false) ~(p : PsiDef.t) (ctex : ctex) 
         Log.error_msg "Please inspect logs.";
         Stats.Induction, SmtLib.Unknown)
   in
-  AlgoLog.image_ctex_class p ctex resp vmethod;
+  AlgoLog.image_ctex_class ~ctx p ctex resp vmethod;
   match resp with
   | Sat -> ctex
   | Unsat -> { ctex with ctex_stat = add_cause ctex.ctex_stat NotInReferenceImage }
@@ -529,7 +564,7 @@ let rec find_original_var_and_proj v (og, elimv) =
   | _ -> None
 ;;
 
-let mk_model_sat_asserts ctex f_o_r instantiate =
+let mk_model_sat_asserts ~ctx ctex f_o_r instantiate =
   let f v =
     let v_val = Map.find_exn ctex.ctex_model v in
     match List.find_map ~f:(find_original_var_and_proj v) ctex.ctex_eqn.eelim with
@@ -539,28 +574,29 @@ let mk_model_sat_asserts ctex f_o_r instantiate =
         let instantiation = Option.value_exn (instantiate ov) in
         if proj >= 0
         then (
-          let t = Reduce.reduce_term (mk_sel (f_o_r instantiation) proj) in
+          let t = Reduce.reduce_term (mk_sel ctx (f_o_r instantiation) proj) in
           smt_of_term Terms.(t == v_val))
         else (
           let t = f_o_r instantiation in
           smt_of_term Terms.(t == v_val))
       | _ ->
         Log.error_msg
-          Fmt.(str "Warning: skipped instantiating %a." pp_term original_recursion_var);
+          Fmt.(
+            str "Warning: skipped instantiating %a." (pp_term ctx) original_recursion_var);
         SmtLib.mk_true)
-    | None -> smt_of_term Terms.(mk_var v == v_val)
+    | None -> smt_of_term Terms.(mk_var ctx v == v_val)
   in
   List.map ~f (Map.keys ctex.ctex_model)
 ;;
 
-(** [check_tinv_unsat ~p tinv c] checks whether the counterexample [c] satisfies the predicate
+(** [check_tinv_unsat ~ctx ~p tinv c] checks whether the counterexample [c] satisfies the predicate
   [tinv] in the synthesis problem [p]. The function returns a promise of a solver response and
   the resolver associated to that promise (the promise is cancellable).
   If the solver response is unsat, then there is a proof that the counterexample [c] does not
   satisfy the predicate [tinv]. In general, if the reponse is not unsat, the solver either
   stalls or returns unknown.
 *)
-let check_tinv_unsat ~(p : PsiDef.t) (tinv : PMRS.t) (ctex : ctex)
+let check_tinv_unsat ~(ctx : Context.t) ~(p : PsiDef.t) (tinv : PMRS.t) (ctex : ctex)
     : (Stats.verif_method * SmtLib.solver_response) t * int Lwt.u
   =
   let build_task (cvc4_instance, task_start) =
@@ -568,7 +604,7 @@ let check_tinv_unsat ~(p : PsiDef.t) (tinv : PMRS.t) (ctex : ctex)
     (* Problem components. *)
     let fv =
       Set.union
-        (Analysis.free_variables ctex.ctex_eqn.eterm)
+        (Analysis.free_variables ~ctx ctex.ctex_eqn.eterm)
         (VarSet.of_list p.PsiDef.reference.pargs)
     in
     let pmrs_decls =
@@ -578,23 +614,24 @@ let check_tinv_unsat ~(p : PsiDef.t) (tinv : PMRS.t) (ctex : ctex)
     in
     let f_compose_r t =
       let repr_of_v =
-        if p.PsiDef.repr_is_identity then t else mk_app_v p.PsiDef.repr.pvar [ t ]
+        if p.PsiDef.repr_is_identity then t else mk_app_v ctx p.PsiDef.repr.pvar [ t ]
       in
       mk_app_v
+        ctx
         p.PsiDef.reference.pvar
-        (List.map ~f:mk_var p.PsiDef.reference.pargs @ [ repr_of_v ])
+        (List.map ~f:(mk_var ctx) p.PsiDef.reference.pargs @ [ repr_of_v ])
     in
     (* Create the formula. *)
     let formula =
       (* Assert that Tinv(t) is true. *)
-      let term_sat_tinv = mk_app_v tinv.pvar [ ctex.ctex_eqn.eterm ] in
+      let term_sat_tinv = mk_app_v ctx tinv.pvar [ ctex.ctex_eqn.eterm ] in
       (* Substitute recursion elimnation by recursive calls. *)
       let subs =
         List.concat_map
           ~f:(fun (orig_rec_var, elimv) ->
             match elimv.tkind with
             | TTup comps ->
-              List.mapi comps ~f:(fun i t -> t, mk_sel (f_compose_r orig_rec_var) i)
+              List.mapi comps ~f:(fun i t -> t, mk_sel ctx (f_compose_r orig_rec_var) i)
             | _ -> [ elimv, f_compose_r orig_rec_var ])
           ctex.ctex_eqn.eelim
       in
@@ -603,10 +640,12 @@ let check_tinv_unsat ~(p : PsiDef.t) (tinv : PMRS.t) (ctex : ctex)
         Option.to_list (Option.map ~f:(substitution subs) ctex.ctex_eqn.eprecond)
       in
       (* Assert that the variables have the values assigned by the model. *)
-      let model_sat = mk_model_sat_asserts ctex f_compose_r (fun t -> Some (mk_var t)) in
+      let model_sat =
+        mk_model_sat_asserts ctex f_compose_r (fun t -> Some (mk_var ctx t))
+      in
       let formula_body =
         SmtLib.mk_assoc_and
-          (List.map ~f:smt_of_term (term_sat_tinv :: preconds) @ model_sat)
+          (List.map ~f:smt_of_term (term_sat_tinv :: preconds) @ model_sat ~ctx)
       in
       SmtLib.mk_exists (sorted_vars_of_vars fv) formula_body
     in
@@ -614,6 +653,7 @@ let check_tinv_unsat ~(p : PsiDef.t) (tinv : PMRS.t) (ctex : ctex)
     let preamble =
       let logic =
         SmtLogic.infer_logic
+          ~ctx
           ~quantifier_free:false
           ~for_induction:true
           ~with_uninterpreted_functions:true
@@ -632,11 +672,11 @@ let check_tinv_unsat ~(p : PsiDef.t) (tinv : PMRS.t) (ctex : ctex)
   AsyncSmt.(cancellable_task (AsyncSmt.make_solver "cvc") build_task)
 ;;
 
-(** [check_tinv_sat ~p tinv ctex] checks whether the counterexample [ctex] satisfies
+(** [check_tinv_sat ~ctx ~p tinv ctex] checks whether the counterexample [ctex] satisfies
     the invariant [tinv] (a PMRS). The function returns a pair of a promise of a solver
     response and a resolver for that promise. The promise is cancellable.
  *)
-let check_tinv_sat ~(p : PsiDef.t) (tinv : PMRS.t) (ctex : ctex)
+let check_tinv_sat ~(ctx : Context.t) ~(p : PsiDef.t) (tinv : PMRS.t) (ctex : ctex)
     : (Stats.verif_method * SmtLib.solver_response) t * int Lwt.u
   =
   let f_compose_r t =
@@ -651,7 +691,7 @@ let check_tinv_sat ~(p : PsiDef.t) (tinv : PMRS.t) (ctex : ctex)
     let t_check binder t =
       let tinv_t = Reduce.reduce_pmrs tinv t in
       let rec_instantation =
-        Option.value ~default:VarMap.empty (Matching.matches t ~pattern:initial_t)
+        Option.value ~default:VarMap.empty (Matching.matches ~ctx t ~pattern:initial_t)
       in
       let preconds =
         let subs =
@@ -672,10 +712,10 @@ let check_tinv_sat ~(p : PsiDef.t) (tinv : PMRS.t) (ctex : ctex)
       let model_sat = mk_model_sat_asserts ctex f_compose_r (Map.find rec_instantation) in
       let vars =
         VarSet.union_list
-          (Option.(to_list (map ~f:Analysis.free_variables ctex.ctex_eqn.eprecond))
+          (Option.(to_list (map ~f:(Analysis.free_variables ~ctx) ctex.ctex_eqn.eprecond))
           @ [ ctex.ctex_vars
-            ; Analysis.free_variables t
-            ; Analysis.free_variables (f_compose_r t)
+            ; Analysis.free_variables ~ctx t
+            ; Analysis.free_variables ~ctx (f_compose_r t)
             ])
       in
       (* Start sequence of solver commands, bind on accum. *)
@@ -685,7 +725,9 @@ let check_tinv_sat ~(p : PsiDef.t) (tinv : PMRS.t) (ctex : ctex)
       (* Assert that Tinv(t) *)
       let* () = AsyncSmt.smt_assert solver (smt_of_term tinv_t) in
       (* Assert that term satisfies model. *)
-      let* () = AsyncSmt.smt_assert solver (SmtLib.mk_assoc_and (preconds @ model_sat)) in
+      let* () =
+        AsyncSmt.smt_assert solver (SmtLib.mk_assoc_and (preconds @ model_sat ~ctx))
+      in
       (* Assert that preconditions hold. *)
       let* resp = AsyncSmt.check_sat solver in
       let* () = AsyncSmt.spop solver in
@@ -697,11 +739,12 @@ let check_tinv_sat ~(p : PsiDef.t) (tinv : PMRS.t) (ctex : ctex)
         solver
         (Commands.mk_preamble
            ~incremental:(String.is_prefix ~prefix:"CVC" solver.s_name)
-           ~logic:(SmtLogic.infer_logic ~logic_infos:(AState.PsiDef.logics p) [])
+           ~logic:(SmtLogic.infer_logic ~ctx ~logic_infos:(AState.PsiDef.logics p) [])
            ())
     in
     let* res =
       Expand.lwt_expand_loop
+        ~ctx
         steps
         t_check
         (return (TermSet.singleton ctex.ctex_eqn.eterm))
@@ -712,14 +755,15 @@ let check_tinv_sat ~(p : PsiDef.t) (tinv : PMRS.t) (ctex : ctex)
   AsyncSmt.(cancellable_task (make_solver "z3") task)
 ;;
 
-let satisfies_tinv ~(p : PsiDef.t) (tinv : PMRS.t) (ctex : ctex) : ctex =
+let satisfies_tinv ~(ctx : Context.t) ~(p : PsiDef.t) (tinv : PMRS.t) (ctex : ctex) : ctex
+  =
   let vmethod, resp =
     try
       Lwt_main.run
         ((* This call is expected to respond "unsat" when terminating. *)
-         let pr1, resolver1 = check_tinv_unsat ~p tinv ctex in
+         let pr1, resolver1 = check_tinv_unsat ~ctx ~p tinv ctex in
          (* This call is expected to respond "sat" when terminating. *)
-         let pr2, resolver2 = check_tinv_sat ~p tinv ctex in
+         let pr2, resolver2 = check_tinv_sat ~ctx ~p tinv ctex in
          Lwt.wakeup resolver2 1;
          Lwt.wakeup resolver1 1;
          (* The first call to return is kept, the other one is ignored. *)
@@ -730,7 +774,7 @@ let satisfies_tinv ~(p : PsiDef.t) (tinv : PMRS.t) (ctex : ctex) : ctex =
       Log.error_msg "Please inspect logs.";
       Stats.Induction, SmtLib.Unknown
   in
-  AlgoLog.requires_ctex_class tinv ctex resp vmethod;
+  AlgoLog.requires_ctex_class ~ctx tinv ctex resp vmethod;
   match resp with
   | Sat -> { ctex with ctex_stat = Valid }
   | Unsat -> { ctex with ctex_stat = add_cause ctex.ctex_stat ViolatesTargetRequires }
@@ -740,13 +784,13 @@ let satisfies_tinv ~(p : PsiDef.t) (tinv : PMRS.t) (ctex : ctex) : ctex =
 (** Classify counterexamples into positive or negative counterexamples with respect
     to the Tinv predicate in the problem.
 *)
-let classify_ctexs ~(p : PsiDef.t) (ctexs : ctex list) : ctex list =
+let classify_ctexs ~(ctx : Context.t) ~(p : PsiDef.t) (ctexs : ctex list) : ctex list =
   let classify_with_tinv tinv ctexs =
     (* TODO: DT_LIA for z3, DTLIA for cvc4... Should write a type to represent logics. *)
-    let f (ctex : ctex) = satisfies_tinv ~p tinv ctex in
+    let f (ctex : ctex) = satisfies_tinv ~ctx ~p tinv ctex in
     List.map ~f ctexs
   in
-  let classify_wrt_ref b = List.map ~f:(check_ctex_in_image ~ignore_unknown:b ~p) in
+  let classify_wrt_ref b = List.map ~f:(check_ctex_in_image ~ctx ~ignore_unknown:b ~p) in
   Log.start_section "Classify counterexamples...";
   (* First pass ignoring unknowns. *)
   (* let ctexs = classify_wrt_ref true ctexs in *)

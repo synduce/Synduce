@@ -21,12 +21,20 @@ let rec simple_flattening (tl : term list) =
   The character '$' is used to build projections and should not be used anywhere else.
   (It is compatible with usage in smtlib but not in the ocaml program.)
 *)
-let mk_projs (targs : RType.t list) (tl : RType.t list) (xi : Variable.t) =
+let mk_projs
+    ~(ctx : Context.t)
+    (targs : RType.t list)
+    (tl : RType.t list)
+    (xi : Variable.t)
+  =
   let f i t =
     match targs with
-    | [] -> Variable.mk ~t:(Some t) (xi.vname ^ "$" ^ Int.to_string i)
+    | [] -> Variable.mk ctx ~t:(Some t) (xi.vname ^ "$" ^ Int.to_string i)
     | _ ->
-      Variable.mk ~t:(Some (RType.fun_typ_pack targs t)) (xi.vname ^ "$" ^ Int.to_string i)
+      Variable.mk
+        ctx
+        ~t:(Some (RType.fun_typ_pack targs t))
+        (xi.vname ^ "$" ^ Int.to_string i)
   in
   List.mapi ~f tl
 ;;
@@ -37,12 +45,13 @@ let mk_projs (targs : RType.t list) (tl : RType.t list) (xi : Variable.t) =
   Does not reduce the term after applying the projections.
 *)
 let apply_projections
+    ~(ctx : Context.t)
     (projs : (int, variable list, Int.comparator_witness) Map.t)
     (t : term)
     : term
   =
   let pack xlist args =
-    List.map xlist ~f:(fun newx -> fst (infer_type (mk_app (mk_var newx) args)))
+    List.map xlist ~f:(fun newx -> fst (infer_type ctx (mk_app (mk_var ctx newx) args)))
   in
   let case f t0 =
     match t0.tkind with
@@ -51,11 +60,11 @@ let apply_projections
       | Some xlist ->
         let args' = List.map ~f args in
         let projected = pack xlist args' in
-        Some (mk_tup projected)
+        Some (mk_tup ctx projected)
       | None -> None)
     | TVar x ->
       (match Map.find projs x.vid with
-      | Some components -> Some (mk_tup (List.map ~f:mk_var components))
+      | Some components -> Some (mk_tup ctx (List.map ~f:(mk_var ctx) components))
       | None -> None)
     | _ -> None
   in
@@ -76,27 +85,28 @@ let projection_eqns (lhs : term) (rhs : term) =
 (** [invar invariants lhs_e rhs_e] filters the terms in `invariants` that have no free variable
   in common with  [lhs_e] or [rhs_e] and return the conjunction of all these invariants.
   *)
-let invar invariants lhs_e rhs_e =
+let invar ~(ctx : Context.t) invariants lhs_e rhs_e =
   let f inv_expr =
     not
       Analysis.(
         Set.is_empty
           (Set.inter
-             (Set.union (free_variables lhs_e) (free_variables rhs_e))
-             (free_variables inv_expr)))
+             (Set.union (free_variables ~ctx lhs_e) (free_variables ~ctx rhs_e))
+             (free_variables ~ctx inv_expr)))
   in
   let conjs = List.filter ~f (Set.elements invariants) in
   mk_assoc Binop.And conjs
 ;;
 
 let proj_and_detuple_eqns
+    ~(ctx : Context.t)
     (projections : (int, variable list, Int.comparator_witness) Map.t)
     (eqns : equation list)
   =
   let apply_p = apply_projections projections in
   let f eqn =
-    let lhs' = Reduce.reduce_term (apply_p eqn.elhs)
-    and rhs' = Reduce.reduce_term (apply_p eqn.erhs) in
+    let lhs' = Reduce.reduce_term (apply_p ~ctx eqn.elhs)
+    and rhs' = Reduce.reduce_term (apply_p ~ctx eqn.erhs) in
     let eqs = projection_eqns lhs' rhs' in
     List.map ~f:(fun (_l, _r) -> { eqn with elhs = _l; erhs = _r }) eqs
   in
@@ -111,21 +121,21 @@ let proj_and_detuple_eqns
   @returns a tuple containing the set of new functions created and a map from
   non-projected functions to the list of functions corrresponding to the projections.
  *)
-let proj_functions (functions : VarSet.t)
+let proj_functions ~(ctx : Context.t) (functions : VarSet.t)
     : VarSet.t * (int, variable list, Int.comparator_witness) Map.t
   =
   let function_projections, new_functions =
     let f (l, vs) xi =
-      match Variable.vtype_or_new xi with
+      match Variable.vtype_or_new ctx xi with
       | RType.TFun _ ->
-        let targs, tout = RType.fun_typ_unpack (Variable.vtype_or_new xi) in
+        let targs, tout = RType.fun_typ_unpack (Variable.vtype_or_new ctx xi) in
         (match tout with
         | TTup tl ->
-          let new_vs = mk_projs targs tl xi in
+          let new_vs = mk_projs ~ctx targs tl xi in
           l @ [ xi, Some new_vs ], Set.union vs (VarSet.of_list new_vs)
         | _ -> l @ [ xi, None ], Set.add vs xi)
       | RType.TTup tl ->
-        let new_vs = mk_projs [] tl xi in
+        let new_vs = mk_projs ~ctx [] tl xi in
         l @ [ xi, Some new_vs ], Set.union vs (VarSet.of_list new_vs)
       | _ -> l @ [ xi, None ], Set.add vs xi
     in
