@@ -12,39 +12,41 @@ type rloc =
   ; rtokens : VarSet.t (** Each location has some tokens. *)
   }
 
-let default_rloc = { rid = -1; rxi = Variable.mk "null"; rtokens = VarSet.empty }
+let default_rloc =
+  { rid = -1; rxi = Variable.mk (Context.create ()) "null"; rtokens = VarSet.empty }
+;;
 
-let _pp_rloc (frmt : Formatter.t) (r : rloc) =
-  Fmt.(pf frmt "@[[%i:%a]<%a>@]" r.rid Variable.pp r.rxi VarSet.pp r.rtokens)
+let _pp_rloc ~(ctx : Context.t) (frmt : Formatter.t) (r : rloc) =
+  Fmt.(pf frmt "@[[%i:%a]<%a>@]" r.rid (Variable.pp ctx) r.rxi (VarSet.pp ctx) r.rtokens)
 ;;
 
 (* ============================================================================================= *)
 (*                    ANALYSIS FUNCTIONS                                                         *)
 (* ============================================================================================= *)
-let analyze_rec_args_at_loc (p : PsiDef.t) (r : rloc) =
+let analyze_rec_args_at_loc ~(ctx : Context.t) (p : PsiDef.t) (r : rloc) =
   match Map.find p.PsiDef.target.prules r.rid with
   | Some (_, lhs_args, _, _) ->
     Set.partition_tf r.rtokens ~f:(fun v ->
-        (not (RType.is_base (Variable.vtype_or_new v)))
+        (not (RType.is_base (Variable.vtype_or_new ctx v)))
         (* Only the last element can be deconstructed in the PMRS model. *)
         && List.is_prefix lhs_args ~equal:Variable.equal ~prefix:[ v ])
   | None -> VarSet.empty, VarSet.empty
 ;;
 
-let safe_remove_unknown (r : rloc) p =
+let safe_remove_unknown ~(ctx : Context.t) (r : rloc) p =
   let unknown_in_other_rules =
     Map.existsi p.PsiDef.target.prules ~f:(fun ~key ~data ->
         let _, _, _, rhs = data in
-        (not (key = r.rid)) && Set.mem (Analysis.free_variables rhs) r.rxi)
+        (not (key = r.rid)) && Set.mem (Analysis.free_variables ~ctx rhs) r.rxi)
   in
   if unknown_in_other_rules
   then p.PsiDef.target.psyntobjs
   else Set.remove p.PsiDef.target.psyntobjs r.rxi
 ;;
 
-let applicable_nonterminals (p : PsiDef.t) (args : TermSet.t) =
+let applicable_nonterminals ~(ctx : Context.t) (p : PsiDef.t) (args : TermSet.t) =
   let f nont =
-    let in_typs, _ = RType.fun_typ_unpack (Variable.vtype_or_new nont) in
+    let in_typs, _ = RType.fun_typ_unpack (Variable.vtype_or_new ctx nont) in
     let arg_choices =
       List.fold_left
         in_typs
@@ -64,70 +66,77 @@ let applicable_nonterminals (p : PsiDef.t) (args : TermSet.t) =
 (*                    RECURSION SKELETON EXPANSION FUNCTIONS                                     *)
 (* ============================================================================================= *)
 
-let extend_function ~from:(f : variable) ~to_:(g : variable) (extra_args : term list) =
+let extend_function
+    ~(ctx : Context.t)
+    ~from:(f : variable)
+    ~to_:(g : variable)
+    (extra_args : term list)
+  =
   let case _ t =
     match t.tkind with
     | TApp ({ tkind = TVar f'; _ }, args) when Variable.equal f f' ->
-      Some (mk_app (mk_var g) (args @ extra_args))
-    | TVar f' when Variable.equal f f' -> Some (mk_app (mk_var g) extra_args)
+      Some (mk_app (mk_var ctx g) (args @ extra_args))
+    | TVar f' when Variable.equal f f' -> Some (mk_app (mk_var ctx g) extra_args)
     | _ -> None
   in
   transform ~case
 ;;
 
-let mk_new_rule xi (nt, args, decons_arg, rhs) (constrname, constrargs) =
+let mk_new_rule ~(ctx : Context.t) xi (nt, args, decons_arg, rhs) (constrname, constrargs)
+  =
   let pat_vars =
     List.map
-      ~f:(fun typ -> Variable.mk ~t:(Some typ) (Alpha.fresh ~s:decons_arg.vname ()))
+      ~f:(fun typ ->
+        Variable.mk ctx ~t:(Some typ) (Alpha.fresh ~s:decons_arg.vname ctx.names))
       constrargs
   in
   let new_scalars =
-    List.filter ~f:(fun v -> RType.is_base (Variable.vtype_or_new v)) pat_vars
+    List.filter ~f:(fun v -> RType.is_base (Variable.vtype_or_new ctx v)) pat_vars
   in
   let pat = PatConstr (constrname, List.map ~f:mk_pat_var pat_vars) in
-  let new_args = List.map ~f:mk_var new_scalars in
+  let new_args = List.map ~f:(mk_var ctx) new_scalars in
   let new_unknown =
     (* Input type is extended by adding arguments *)
-    let in_t, out_t = RType.fun_typ_unpack (Variable.vtype_or_new xi) in
+    let in_t, out_t = RType.fun_typ_unpack (Variable.vtype_or_new ctx xi) in
     let extra_t = List.map ~f:type_of new_args in
     let t = Some (RType.fun_typ_pack (in_t @ extra_t) out_t) in
-    Variable.mk ~t (Alpha.fresh ~s:xi.vname ())
+    Variable.mk ctx ~t (Alpha.fresh ~s:xi.vname ctx.names)
   in
-  let new_rhs = extend_function ~from:xi ~to_:new_unknown new_args rhs in
+  let new_rhs = extend_function ~ctx ~from:xi ~to_:new_unknown new_args rhs in
   let new_rewrite_rule = nt, args, Some pat, new_rhs in
   new_unknown, new_rewrite_rule
 ;;
 
-let with_args ~(p : PsiDef.t) (r : rloc) (cargs : term list) =
+let with_args ~(ctx : Context.t) ~(p : PsiDef.t) (r : rloc) (cargs : term list) =
   let new_xi =
-    let in_t, re_t = RType.fun_typ_unpack (Variable.vtype_or_new r.rxi) in
+    let in_t, re_t = RType.fun_typ_unpack (Variable.vtype_or_new ctx r.rxi) in
     (* Input type is extended by adding arguments *)
     let t = Some (RType.fun_typ_pack (in_t @ List.map ~f:type_of cargs) re_t) in
-    Variable.mk ~t (Alpha.fresh ~s:r.rxi.vname ())
+    Variable.mk ctx ~t (Alpha.fresh ~s:r.rxi.vname ctx.names)
   in
   let add_arg_and_replace_unknown _t =
     let nt, lhs, pat, rhs = Map.find_exn p.PsiDef.target.prules r.rid in
-    nt, lhs, pat, extend_function ~from:r.rxi ~to_:new_xi cargs rhs
+    nt, lhs, pat, extend_function ~ctx ~from:r.rxi ~to_:new_xi cargs rhs
   in
   let new_psi_target =
     { p.PsiDef.target with
-      psyntobjs = Set.add (safe_remove_unknown r p) new_xi
+      psyntobjs = Set.add (safe_remove_unknown ~ctx r p) new_xi
     ; prules = Map.update p.PsiDef.target.prules r.rid ~f:add_arg_and_replace_unknown
     }
   in
   PsiDef.{ p with id = new_psi_id (); target = new_psi_target }, { r with rxi = new_xi }
 ;;
 
-let with_deconstruction ~(p : PsiDef.t) (r : rloc) (dec : variable)
+let with_deconstruction ~(ctx : Context.t) ~(p : PsiDef.t) (r : rloc) (dec : variable)
     : (PsiDef.t * VarSet.t) option
   =
   let deconstruct_one (nt, lhs_args, _, rhs) v =
-    match RType.get_variants (Variable.vtype_or_new v) with
+    match RType.get_variants ctx.types (Variable.vtype_or_new ctx v) with
     | _ :: _ as cases ->
       let last_arg = List.last_exn lhs_args in
       let other_args = List.drop_last_exn lhs_args in
       let new_cases =
-        List.map ~f:(mk_new_rule r.rxi (nt, other_args, last_arg, rhs)) cases
+        List.map ~f:(mk_new_rule ~ctx r.rxi (nt, other_args, last_arg, rhs)) cases
       in
       let new_rules =
         match new_cases with
@@ -154,7 +163,7 @@ let with_deconstruction ~(p : PsiDef.t) (r : rloc) (dec : variable)
       in
       (match new_rules with
       | Some (n_xis, nr) ->
-        let psyntobjs = safe_remove_unknown r p in
+        let psyntobjs = safe_remove_unknown ~ctx r p in
         Some
           ( PsiDef.
               { p with
@@ -196,29 +205,31 @@ module ExtensionPoint = struct
   let mk_cst_ext r args = r, CstExt args
   let mk_rec_ext r args = r, RecExt args
 
-  let apply ((r, k) : t) (p : PsiDef.t) : (PsiDef.t * VarSet.t) option =
+  let apply ~(ctx : Context.t) ((r, k) : t) (p : PsiDef.t) : (PsiDef.t * VarSet.t) option =
     match k with
-    | RecDeconstr d -> with_deconstruction ~p r d
+    | RecDeconstr d -> with_deconstruction ~ctx ~p r d
     | RecExt args ->
-      let p', r' = with_args ~p r args in
+      let p', r' = with_args ~ctx ~p r args in
       Some (p', VarSet.singleton r'.rxi)
     | CstExt args ->
-      let p', r' = with_args ~p r args in
+      let p', r' = with_args ~ctx ~p r args in
       Some (p', VarSet.singleton r'.rxi)
     | NoExt -> None
   ;;
 end
 
-let ext_with_rec_args ~(p : PsiDef.t) (r : rloc) : ExtensionPoint.t list =
+let ext_with_rec_args ~(ctx : Context.t) ~(p : PsiDef.t) (r : rloc)
+    : ExtensionPoint.t list
+  =
   if Set.is_empty r.rtokens
   then []
   else (
     (* Analayse whether the arguments are usable as-is or need to be unpacked. *)
-    let args_require_deconstruction, args_usable = analyze_rec_args_at_loc p r in
+    let args_require_deconstruction, args_usable = analyze_rec_args_at_loc ~ctx p r in
     let arg_choices =
       List.map
-        ~f:(fun (f, args) -> mk_app (mk_var f) args)
-        (applicable_nonterminals p (TermSet.of_varset args_usable))
+        ~f:(fun (f, args) -> mk_app (mk_var ctx f) args)
+        (applicable_nonterminals ~ctx p (TermSet.of_varset args_usable))
     in
     List.map ~f:(ExtensionPoint.mk_rec_ext r) (subsets arg_choices)
     @ List.map
@@ -226,19 +237,24 @@ let ext_with_rec_args ~(p : PsiDef.t) (r : rloc) : ExtensionPoint.t list =
         (Set.elements args_require_deconstruction))
 ;;
 
-let ext_with_constant_args (r : rloc) : ExtensionPoint.t option =
+let ext_with_constant_args ~(ctx : Context.t) (r : rloc) : ExtensionPoint.t option =
   let cargs =
     let of_base_type, _ =
-      Set.partition_tf r.rtokens ~f:(fun v -> RType.is_base (Variable.vtype_or_new v))
+      Set.partition_tf r.rtokens ~f:(fun v -> RType.is_base (Variable.vtype_or_new ctx v))
     in
     Set.elements of_base_type
   in
   match cargs with
-  | _ :: _ -> Some (ExtensionPoint.mk_cst_ext r (List.map ~f:mk_var cargs))
+  | _ :: _ -> Some (ExtensionPoint.mk_cst_ext r (List.map ~f:(mk_var ctx) cargs))
   | _ -> None
 ;;
 
-let find_extension_locs ?(mask = VarSet.empty) ?(only = None) (p : PsiDef.t) =
+let find_extension_locs
+    ?(mask = VarSet.empty)
+    ?(only = None)
+    ~(ctx : Context.t)
+    (p : PsiDef.t)
+  =
   let g = p.PsiDef.target in
   let synt_objs =
     match only with
@@ -249,13 +265,13 @@ let find_extension_locs ?(mask = VarSet.empty) ?(only = None) (p : PsiDef.t) =
   (* Check for each rule.  *)
   let f ((rule_id, rrule) : int * rewrite_rule) =
     let _, lhs_args, lhs_pat, rhs = rrule in
-    let rhs_argset = Analysis.free_variables ~include_functions:false rhs in
-    let rhs_funcs = Analysis.free_variables ~include_functions:true rhs in
+    let rhs_argset = Analysis.free_variables ~ctx ~include_functions:false rhs in
+    let rhs_funcs = Analysis.free_variables ~ctx ~include_functions:true rhs in
     let lhs_argset =
       Set.union
         (VarSet.of_list lhs_args)
         (Option.value_map lhs_pat ~default:VarSet.empty ~f:(fun p ->
-             Analysis.free_variables (Term.term_of_pattern p)))
+             Analysis.free_variables ~ctx (Term.term_of_pattern ctx p)))
     in
     if not (Set.are_disjoint synt_objs rhs_funcs)
     then (
@@ -266,7 +282,7 @@ let find_extension_locs ?(mask = VarSet.empty) ?(only = None) (p : PsiDef.t) =
         List.concat_map
           ~f:(fun rxi ->
             let _, _, _, rhs_rrule = rrule in
-            let more_args = Set.diff more_args (Analysis.argset_of rxi rhs_rrule) in
+            let more_args = Set.diff more_args (Analysis.argset_of rxi ~ctx rhs_rrule) in
             if Set.is_empty more_args
             then []
             else [ { rid = rule_id; rxi; rtokens = more_args } ])
@@ -319,17 +335,17 @@ let _root_path (p : PsiDef.t) =
   | None -> None
 ;;
 
-let rec expand_vertex ?(mask = VarSet.empty) ?(n = 10) (p : PsiDef.t) =
+let rec expand_vertex ?(mask = VarSet.empty) ?(n = 10) ~(ctx : Context.t) (p : PsiDef.t) =
   if n < 0
   then ()
   else (
     PGraph.add_vertex enumeration_graph p;
-    List.iter (find_extension_locs ~mask p) ~f:(fun rloc ->
+    List.iter (find_extension_locs ~ctx ~mask p) ~f:(fun rloc ->
         (* First try adding constant-time computable args. *)
         let p', rloc' =
-          match ext_with_constant_args rloc with
+          match ext_with_constant_args ~ctx rloc with
           | Some ept ->
-            (match ExtensionPoint.apply ept p with
+            (match ExtensionPoint.apply ~ctx ept p with
             | Some (pd, new_xis) ->
               let new_edge = PGraph.E.create p ept pd in
               PGraph.add_edge_e enumeration_graph new_edge;
@@ -337,8 +353,8 @@ let rec expand_vertex ?(mask = VarSet.empty) ?(n = 10) (p : PsiDef.t) =
             | None -> p, rloc)
           | None -> p, rloc
         in
-        List.iter (ext_with_rec_args ~p:p' rloc') ~f:(fun ept ->
-            match ExtensionPoint.apply ept p' with
+        List.iter (ext_with_rec_args ~ctx ~p:p' rloc') ~f:(fun ept ->
+            match ExtensionPoint.apply ~ctx ept p' with
             | Some (new_p, new_xis) ->
               PGraph.add_edge_e enumeration_graph (PGraph.E.create p' ept new_p);
               let new_mask =
@@ -346,12 +362,12 @@ let rec expand_vertex ?(mask = VarSet.empty) ?(n = 10) (p : PsiDef.t) =
                 | RecDeconstr _ -> mask
                 | _ -> Set.union mask new_xis
               in
-              expand_vertex ~mask:new_mask ~n:(n - 1) new_p
+              expand_vertex ~ctx ~mask:new_mask ~n:(n - 1) new_p
             | _ -> ())))
 ;;
 
-let enumerate_p (p : PsiDef.t) =
-  expand_vertex p;
+let enumerate_p ~(ctx : Context.t) (p : PsiDef.t) =
+  expand_vertex ~ctx p;
   list_problems ()
 ;;
 

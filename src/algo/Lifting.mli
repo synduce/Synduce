@@ -20,7 +20,8 @@ val get_mapped_value : ctx:Context.t -> p:PsiDef.t -> lifting -> term -> term op
 
 (** Interactively add expressions for the value of the lifting. *)
 val interactive_add_lifting_expression
-  :  ctx:Context.t
+  :  fctx:PMRS.Functions.ctx
+  -> ctx:Context.t
   -> p:PsiDef.t
   -> lifting
   -> term
@@ -55,7 +56,8 @@ val compose_parts : ctx:Context.t -> PsiDef.t -> Term.term option
 
 (** Deduce the lifting expresions needed to solve lhs = rhs *)
 val deduce_lifting_expressions
-  :  ctx:Context.t
+  :  fctx:PMRS.Functions.ctx
+  -> ctx:Context.t
   -> p:PsiDef.t
   -> lifting
   -> Term.term option

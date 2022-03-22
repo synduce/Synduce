@@ -3,6 +3,7 @@ open Base
 open Lang
 open Lang.SmtInterface
 open Lang.Term
+open Env
 open Smtlib
 open Utils
 
@@ -10,9 +11,9 @@ open Utils
 (*                               Checking correctness of solutions                               *)
 (* ============================================================================================= *)
 
-let constr_eqn (eqn : equation) =
+let constr_eqn ~(ctx : env) (eqn : equation) =
   let rec mk_equality (lhs, rhs) =
-    let lhs, rhs = Lang.Reduce.reduce_term lhs, Lang.Reduce.reduce_term rhs in
+    let lhs, rhs = ctx_reduce ctx lhs, ctx_reduce ctx rhs in
     match lhs.tkind, rhs.tkind with
     (* If terms are tuples, equate each tuple component and take conjunction. *)
     | TTup ltl, TTup rtl ->
@@ -26,6 +27,8 @@ let constr_eqn (eqn : equation) =
     | _ -> Terms.(lhs == rhs)
   in
   let equality = mk_equality (eqn.elhs, eqn.erhs) in
+  ctx
+  >-
   match eqn.eprecond with
   | Some inv -> smt_of_term Terms.(~!inv || equality)
   | None -> smt_of_term equality
@@ -58,6 +61,7 @@ let check_eqn solver has_sat eqn =
    that case, the partially-bounded checking reverts to (fully-)bounded checking.
 *)
 let partial_bounding_checker
+    ~(ctx : env)
     ~(p : PsiDef.t)
     (lstate : refinement_loop_state)
     (t_set : TermSet.t)
@@ -66,20 +70,21 @@ let partial_bounding_checker
   let f (acc_tset, acc_lstate) t =
     match Specifications.get_requires p.PsiDef.target.pvar with
     | Some req ->
-      (match Lemmas.get_lemma ~p acc_lstate.term_state ~key:t with
+      (match ctx >- Lemmas.get_lemma ~p acc_lstate.term_state ~key:t with
       | Some _ ->
         (* Everything ok, a lemma has been computed *)
         acc_tset @ [ t, t ], acc_lstate
       | None ->
         (* There is a requires and no lemma, the term has to be bounded. *)
-        let bt = Expand.make_bounded t in
-        let lem_t = Reduce.reduce_term (mk_app req [ bt ]) in
+        let bt = ctx >- Expand.make_bounded t in
+        let lem_t = ctx_reduce ctx (mk_app req [ bt ]) in
         let lem_info =
-          Lemmas.Interactive.set_term_lemma
-            ~p
-            acc_lstate.term_state
-            ~key:(bt, None)
-            ~lemma:lem_t
+          ctx
+          >- Lemmas.Interactive.set_term_lemma
+               ~p
+               acc_lstate.term_state
+               ~key:(bt, None)
+               ~lemma:lem_t
         in
         acc_tset @ [ t, bt ], { acc_lstate with term_state = lem_info })
     | None -> acc_tset @ [ t, t ], acc_lstate
@@ -88,6 +93,7 @@ let partial_bounding_checker
 ;;
 
 let check_solution
+    ~(ctx : env)
     ~(p : PsiDef.t)
     (lstate : refinement_loop_state)
     (soln : (string * variable list * term) list)
@@ -103,46 +109,49 @@ let check_solution
   Config.verbose := false;
   let start_time = Unix.gettimeofday () in
   (* Replace the unknowns with their solution. *)
-  let target_inst = Lang.Reduce.instantiate_with_solution p.PsiDef.target soln in
+  let target_inst = ctx >>- Reduce.instantiate_with_solution p.PsiDef.target soln in
   let free_vars = VarSet.empty in
   let solver = SyncSmt.make_solver !Config.verification_solver in
   let preamble =
     let logic =
-      SmtLogic.infer_logic
-        ~quantifier_free:true
-        ~with_uninterpreted_functions:false
-        ~logic_infos:[ p.PsiDef.reference.plogic; p.PsiDef.target.plogic ]
-        []
+      ctx
+      >- SmtLogic.infer_logic
+           ~quantifier_free:true
+           ~with_uninterpreted_functions:false
+           ~logic_infos:[ p.PsiDef.reference.plogic; p.PsiDef.target.plogic ]
+           []
     in
     Commands.mk_preamble
       ~incremental:(String.is_prefix ~prefix:"CVC" solver.s_name)
       ~logic
       ~models:true
       ()
-    @ Commands.decls_of_vars free_vars
+    @ (ctx >- Commands.decls_of_vars free_vars)
   in
   let expand_and_check i (t0 : term) =
-    let t_set, u_set = Expand.to_maximally_reducible p t0 in
-    let t_set, tmp_lstate = partial_bounding_checker ~p lstate t_set in
+    let t_set, u_set = ctx >>- Expand.to_maximally_reducible p t0 in
+    let t_set, tmp_lstate = partial_bounding_checker ~ctx ~p lstate t_set in
     let num_terms_to_check = List.length t_set in
     if num_terms_to_check > 0
     then (
       let sys_eqns, _ =
         Equations.make
+          ~ctx
           ~force_replace_off:true
           ~p:{ p with target = target_inst }
           ~term_state:tmp_lstate.term_state
           ~lifting:lstate.lifting
           (TermSet.of_list (List.map ~f:snd t_set))
       in
-      let smt_eqns = List.map sys_eqns ~f:constr_eqn in
+      let smt_eqns = List.map sys_eqns ~f:(constr_eqn ~ctx) in
       (* Solver calls. *)
       SyncSmt.spush solver;
       (* Declare all the new variables used in the system of equations. *)
       SyncSmt.exec_all
         solver
-        (Commands.decls_of_vars
-           (Set.diff (Equations.free_vars_of_equations sys_eqns) free_vars));
+        (ctx
+        >- Commands.decls_of_vars
+             (Set.diff (Equations.free_vars_of_equations ~ctx sys_eqns) free_vars));
       let has_ctex =
         List.fold_until ~finish:(fun x -> x) ~init:false ~f:(check_eqn solver) smt_eqns
       in
@@ -217,46 +226,48 @@ let bounded_check_eqn ?(use_concrete_ctex = false) solver eqn =
 (* Perform a bounded check of the solution *)
 let bounded_check
     ?(use_concrete_ctex = false)
+    ~(ctx : env)
     ~(p : PsiDef.t)
     (soln : (string * variable list * term) list)
   =
   Log.info (fun f () -> Fmt.(pf f "Checking solution (bounded check)..."));
   let start_time = Unix.gettimeofday () in
-  let target_inst = Lang.Reduce.instantiate_with_solution p.PsiDef.target soln in
+  let target_inst = ctx >>- Lang.Reduce.instantiate_with_solution p.PsiDef.target soln in
   let free_vars = VarSet.empty in
-  let init_vardecls = Commands.decls_of_vars free_vars in
+  let init_vardecls = ctx >- Commands.decls_of_vars free_vars in
   let solver = SyncSmt.make_solver !Config.verification_solver in
   SyncSmt.load_min_max_defs solver;
   let check term =
     let sys_eqns, _ =
       Equations.make
+        ~ctx
         ~force_replace_off:true
         ~p:{ p with target = target_inst }
         ~term_state:Lemmas.empty_term_state
         ~lifting:Lifting.empty_lifting
         (TermSet.singleton term)
     in
-    let smt_eqns = List.map sys_eqns ~f:(fun t -> t, constr_eqn t) in
+    let smt_eqns = List.map sys_eqns ~f:(fun t -> t, constr_eqn ~ctx t) in
     let new_free_vars =
       let f fv (eqn : equation) =
         Set.union
           fv
           (Set.union
-             (Lang.Analysis.free_variables eqn.elhs)
-             (Lang.Analysis.free_variables eqn.erhs))
+             (ctx >- Analysis.free_variables eqn.elhs)
+             (ctx >- Analysis.free_variables eqn.erhs))
       in
       Set.diff (List.fold ~f ~init:VarSet.empty sys_eqns) free_vars
     in
     SyncSmt.exec_all solver init_vardecls;
-    SyncSmt.exec_all solver (Commands.decls_of_vars new_free_vars);
+    SyncSmt.exec_all solver (ctx >- Commands.decls_of_vars new_free_vars);
     let rec search_ctex _eqns =
       match _eqns with
       | [] -> None
       | (eqn, smt_eqn) :: tl ->
         (match bounded_check_eqn ~use_concrete_ctex solver smt_eqn with
         | Sat, Some model_response ->
-          let model = model_to_constmap model_response in
-          let concr = Lang.Analysis.concretize ~model in
+          let model = ctx >>- model_to_constmap model_response in
+          let concr = ctx >- Lang.Analysis.concretize ~model in
           let t, inv, lhs, rhs = eqn.eterm, eqn.eprecond, eqn.elhs, eqn.erhs in
           Some
             { eterm = concr t
@@ -295,7 +306,9 @@ let bounded_check
   let tset =
     List.sort
       ~compare:term_size_compare
-      (Lang.Analysis.terms_of_max_depth (!Config.Optims.check_depth - 1) !AState._theta)
+      (ctx
+      >- Lang.Analysis.terms_of_max_depth (!Config.Optims.check_depth - 1) !AState._theta
+      )
   in
   Log.debug_msg Fmt.(str "%i terms to check" (List.length tset));
   let ctex_or_none =
@@ -319,23 +332,24 @@ let bounded_check
 (*                                 Other verification/checking functions                         *)
 (* ============================================================================================= *)
 
-let invert (recf : PMRS.t) (c : Constant.t) : term list option =
+let invert ~(ctx : env) (recf : PMRS.t) (c : Constant.t) : term list option =
   let check_bounded_sol solver terms =
     let f accum t =
-      let vars = Analysis.free_variables t in
-      let f_t = Reduce.reduce_pmrs recf t in
+      let vars = ctx >- Analysis.free_variables t in
+      let f_t = ctx >>- Reduce.reduce_pmrs recf t in
       let f_t_eq_c = mk_bin Eq f_t (mk_const c) in
       SyncSmt.spush solver;
-      SyncSmt.exec_all solver (Commands.decls_of_vars vars);
-      SyncSmt.smt_assert solver (smt_of_term f_t_eq_c);
+      SyncSmt.exec_all solver (ctx >- Commands.decls_of_vars vars);
+      SyncSmt.smt_assert solver (ctx >- smt_of_term f_t_eq_c);
       let sol =
         match SyncSmt.check_sat solver with
         | Sat ->
           let model_as_subst =
-            VarMap.to_subst (model_to_varmap vars (SyncSmt.get_model solver))
+            VarMap.to_subst
+              ctx.ctx
+              (ctx >>- model_to_varmap vars (SyncSmt.get_model solver))
           in
-          Continue_or_stop.Stop
-            (Some (Reduce.reduce_term (substitution model_as_subst t)))
+          Continue_or_stop.Stop (Some (ctx_reduce ctx (substitution model_as_subst t)))
         | _ -> Continue_or_stop.Continue accum
       in
       SyncSmt.spop solver;
@@ -345,18 +359,18 @@ let invert (recf : PMRS.t) (c : Constant.t) : term list option =
   in
   match recf.pinput_typ with
   | [ typ1 ] ->
-    let x1 = Variable.mk ~t:(Some typ1) (Alpha.fresh ()) in
+    let x1 = Variable.mk ctx.ctx ~t:(Some typ1) (Alpha.fresh ctx.ctx.names) in
     let solver = SyncSmt.make_solver !Config.verification_solver in
     let rec expand_loop u =
       match Set.min_elt u with
       | Some t0 ->
-        let tset, u' = Expand.simple t0 in
+        let tset, u' = ctx >- Expand.simple t0 in
         (match check_bounded_sol solver tset with
         | Some s -> Some s
         | None -> expand_loop (Set.union (Set.remove u t0) u'))
       | None -> None
     in
-    let res = expand_loop (TermSet.singleton (mk_var x1)) in
+    let res = expand_loop (TermSet.singleton (mk_var ctx.ctx x1)) in
     SyncSmt.close_solver solver;
     Option.map ~f:(fun x -> [ x ]) res
   | _ ->

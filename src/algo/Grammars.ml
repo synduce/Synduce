@@ -226,7 +226,11 @@ let bool_parametric
     @ main_grammar
 ;;
 
-let tuple_grammar_constr (params : grammar_parameters) (types : RType.t list) =
+let tuple_grammar_constr
+    ~(ctx : Context.t)
+    (params : grammar_parameters)
+    (types : RType.t list)
+  =
   let use_bool = ref params.g_bools in
   let tuple_args =
     List.map types ~f:(function
@@ -243,7 +247,7 @@ let tuple_grammar_constr (params : grammar_parameters) (types : RType.t list) =
         "Tr"
         (mk_sort_app
            (mk_id_simple "Tuple")
-           (List.map ~f:SygusInterface.sort_of_rtype types))
+           (List.map ~f:(SygusInterface.sort_of_rtype ~ctx) types))
         [ E.gterm (mk_t_app (mk_id_simple "mkTuple") tuple_args) ]
     else (
       let tuple_type_name = Tuples.type_name_of_types types in
@@ -268,12 +272,12 @@ let rec project ~(ctx : Context.t) (v : variable) =
   let rec aux =
     RType.(
       function
-      | (TInt | TBool) as t -> [ E.var v.vname, sort_of_rtype t ]
+      | (TInt | TBool) as t -> [ E.var v.vname, sort_of_rtype ~ctx t ]
       | TParam _ -> [ E.var v.vname, E.int_sort ]
       | TTup types ->
         let l = List.map ~f:aux types in
         List.concat (List.mapi l ~f:(tuple_sel types))
-      | _ as t -> [ E.var v.vname, sort_of_rtype t ])
+      | _ as t -> [ E.var v.vname, sort_of_rtype ~ctx t ])
   in
   aux (Variable.vtype_or_new ctx v)
 
@@ -316,7 +320,7 @@ let generate_grammar
     | TInt -> Some (int_parametric ~guess params)
     | TBool -> Some (bool_parametric ~short_predicate ~guess ~special_const_prod params)
     (* Ignore guess if it's a tuple that needs to be generated. *)
-    | TTup types -> Some (tuple_grammar_constr params types)
+    | TTup types -> Some (tuple_grammar_constr ~ctx params types)
     | _ -> None)
 ;;
 

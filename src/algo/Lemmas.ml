@@ -165,7 +165,12 @@ let create_or_update_term_state_with_ctex
   This function extract a skeleton for the lemma when the input is the application of
   tinv to the term of the term detail.
  *)
-let skeleton_of_tinv ~(ctx : Context.t) (det : term_state_detail) (tinv_of_t : term) =
+let skeleton_of_tinv
+    ~(fctx : PMRS.Functions.ctx)
+    ~(ctx : Context.t)
+    (det : term_state_detail)
+    (tinv_of_t : term)
+  =
   let arg_num var =
     Option.(List.findi ~f:(fun _ a -> Variable.equal a var) det.scalar_vars >>| fst)
   in
@@ -179,7 +184,7 @@ let skeleton_of_tinv ~(ctx : Context.t) (det : term_state_detail) (tinv_of_t : t
              (substitution det.recurs_elim arg))
          args)
   in
-  let tinv_of_t' = Reduce.reduce_term ~projecting:true tinv_of_t in
+  let tinv_of_t' = Reduce.reduce_term ~ctx ~fctx ~projecting:true tinv_of_t in
   let case _ t =
     match t.tkind with
     | TSel ({ tkind = TApp (f, _); _ }, i) ->
@@ -232,7 +237,11 @@ let skeleton_of_tinv ~(ctx : Context.t) (det : term_state_detail) (tinv_of_t : t
   objective (SyGuS command).
   All strategies should be executed in order to find a solution efficiently.
  *)
-let synthfun_of_det ~(ctx : Context.t) ~(p : PsiDef.t) (det : term_state_detail)
+let synthfun_of_det
+    ~(fctx : PMRS.Functions.ctx)
+    ~(ctx : Context.t)
+    ~(p : PsiDef.t)
+    (det : term_state_detail)
     : (Sygus.command * string) list
   =
   let opset =
@@ -258,13 +267,14 @@ let synthfun_of_det ~(ctx : Context.t) ~(p : PsiDef.t) (det : term_state_detail)
         RType.TBool
     in
     let logic = logic_of_operators opset in
-    mk_synthinv det.lemma.vname det.scalar_vars grammar, logic
+    mk_synthinv ~ctx det.lemma.vname det.scalar_vars grammar, logic
   in
   if !Config.Optims.make_partial_lemma_sketches
   then (
     let skeleton_guess =
       match p.tinv with
-      | Some tinv -> skeleton_of_tinv ~ctx det (Reduce.reduce_pmrs tinv det.term)
+      | Some tinv ->
+        skeleton_of_tinv ~fctx ~ctx det (Reduce.reduce_pmrs ~ctx ~fctx tinv det.term)
       | _ -> None
     in
     [ gen_of_guess true skeleton_guess; gen_of_guess false skeleton_guess ])
@@ -378,19 +388,19 @@ let ctex_model_to_args
         Log.error Fmt.(fun fmt () -> pf fmt "I was looking for %s" param_name);
         Log.error Fmt.(fun fmt () -> pf fmt "The ctex: %a" (pp_ctex ~ctx) ctex);
         failwith "Failed to extract argument list from ctex model."
-      | Some t -> sygus_of_term t)
+      | Some t -> sygus_of_term ~ctx t)
 ;;
 
 let constraint_of_neg_ctex ~ctx (det : term_state_detail) ctex =
   let neg_constraint =
     mk_un Not (mk_app (mk_var ctx det.lemma) (Map.data ctex.ctex_model))
   in
-  Sygus.mk_c_constraint (sygus_of_term neg_constraint)
+  Sygus.mk_c_constraint (sygus_of_term ~ctx neg_constraint)
 ;;
 
 let constraint_of_pos_ctex ~ctx (det : term_state_detail) ctex =
   let pos_constraint = mk_app (mk_var ctx det.lemma) (Map.data ctex.ctex_model) in
-  Sygus.mk_c_constraint (sygus_of_term pos_constraint)
+  Sygus.mk_c_constraint (sygus_of_term ~ctx pos_constraint)
 ;;
 
 let log_soln ~ctx s vs t =
@@ -405,6 +415,7 @@ let log_soln ~ctx s vs t =
 ;;
 
 let handle_lemma_synth_response
+    ~(fctx : PMRS.Functions.ctx)
     ~(ctx : Context.t)
     (det : term_state_detail)
     ((task, resolver) : Sygus.solver_response option Lwt.t * int Lwt.u)
@@ -414,7 +425,7 @@ let handle_lemma_synth_response
     let body, _ =
       infer_type
         ctx
-        (term_of_sygus (VarSet.to_env (VarSet.of_list det.scalar_vars)) fbody)
+        (term_of_sygus ~fctx ~ctx (VarSet.to_env (VarSet.of_list det.scalar_vars)) fbody)
     in
     body
   in
@@ -511,13 +522,15 @@ let smt_of_recurs_elim_eqns ~(ctx : Context.t) (elim : (term * term) list) ~(p :
   let lst =
     List.map
       ~f:(fun (t1, t2) ->
-        S.mk_eq (smt_of_term (mk_f_compose_r_orig ~ctx ~p t1)) (smt_of_term t2))
+        S.mk_eq (smt_of_term ~ctx (mk_f_compose_r_orig ~ctx ~p t1)) (smt_of_term ~ctx t2))
       elim
   in
   if equal (List.length lst) 0 then S.mk_true else S.mk_assoc_and lst
 ;;
 
-let smt_of_aux_ensures ~(ctx : Context.t) ~(p : PsiDef.t) : S.smtTerm list =
+let smt_of_aux_ensures ~(fctx : PMRS.Functions.ctx) ~(ctx : Context.t) ~(p : PsiDef.t)
+    : S.smtTerm list
+  =
   let mk_sort maybe_rtype =
     match maybe_rtype with
     | None -> S.mk_int_sort
@@ -559,16 +572,16 @@ let smt_of_aux_ensures ~(ctx : Context.t) ~(p : PsiDef.t) : S.smtTerm list =
             ~f:(fun var -> S.SSimple var.vname, mk_sort (Variable.vtype ctx var))
             arg_vs
         in
-        let ens = Reduce.reduce_term (mk_app t [ mk_app_v ctx v args ]) in
-        let smt = S.mk_forall quants (smt_of_term ens) in
+        let ens = Reduce.reduce_term ~fctx ~ctx (mk_app t [ mk_app_v ctx v args ]) in
+        let smt = S.mk_forall quants (smt_of_term ~ctx ens) in
         smt :: acc)
     vars
 ;;
 
-let smt_of_tinv_app ~(p : PsiDef.t) (det : term_state_detail) =
+let smt_of_tinv_app ~(ctx : Context.t) ~(p : PsiDef.t) (det : term_state_detail) =
   match p.tinv with
   | None -> failwith "No TInv has been specified. Cannot make smt of tinv app."
-  | Some pmrs -> S.mk_simple_app pmrs.pvar.vname [ smt_of_term det.term ]
+  | Some pmrs -> S.mk_simple_app pmrs.pvar.vname [ smt_of_term ~ctx det.term ]
 ;;
 
 let smt_of_lemma_app (det : term_state_detail) =
@@ -595,11 +608,11 @@ let smt_of_lemma_validity ~(ctx : Context.t) ~(p : PsiDef.t) (det : term_state_d
   let preconds =
     match det.current_preconds with
     | None -> []
-    | Some pre -> [ smt_of_term pre ]
+    | Some pre -> [ smt_of_term ~ctx pre ]
   in
   let if_condition =
     S.mk_assoc_and
-      ([ smt_of_tinv_app ~p det; smt_of_recurs_elim_eqns ~ctx det.recurs_elim ~p ]
+      ([ smt_of_tinv_app ~ctx ~p det; smt_of_recurs_elim_eqns ~ctx det.recurs_elim ~p ]
       @ preconds)
   in
   let if_then = smt_of_lemma_app det in
@@ -608,11 +621,13 @@ let smt_of_lemma_validity ~(ctx : Context.t) ~(p : PsiDef.t) (det : term_state_d
 ;;
 
 let set_up_lemma_solver
+    ~(fctx : PMRS.Functions.ctx)
     ~(ctx : Context.t)
     ~(p : PsiDef.t)
     solver
     (det : term_state_detail)
   =
+  let loc_smt_ = smt_of_pmrs ~fctx ~ctx in
   let preamble =
     Commands.mk_preamble
       ~logic:
@@ -638,16 +653,17 @@ let set_up_lemma_solver
           let%lwt _ = AsyncSmt.exec_command solver x in
           return ())
         ((* Start by defining tinv. *)
-         Option.(map ~f:smt_of_pmrs p.tinv |> value ~default:[])
+         Option.(map ~f:loc_smt_ p.tinv |> value ~default:[])
         (* PMRS definitions.*)
         (* Reference function. *)
-        @ smt_of_pmrs p.PsiDef.reference
+        @ loc_smt_ p.PsiDef.reference
         (* Representation function. *)
-        @ (if p.PsiDef.repr_is_identity then [] else smt_of_pmrs p.PsiDef.repr)
+        @ (if p.PsiDef.repr_is_identity then [] else loc_smt_ p.PsiDef.repr)
         (* Assert invariants on functions *)
-        @ List.map ~f:S.mk_assert (smt_of_aux_ensures ~ctx ~p)
+        @ List.map ~f:S.mk_assert (smt_of_aux_ensures ~fctx ~ctx ~p)
         (* Declare lemmas. *)
         @ [ Commands.mk_def_fun
+              ~ctx
               det.lemma.vname
               (List.map
                  ~f:(fun v -> v.vname, Variable.vtype_or_new ctx v)
@@ -671,7 +687,7 @@ let smt_of_disallow_ctex_values ~(ctx : Context.t) (det : term_state_detail) : S
           let subs = subs_from_elim_to_elim ~ctx det.recurs_elim ctex.ctex_eqn.eelim in
           Term.substitution subs (mk_var ctx key)
         in
-        smt_of_term Terms.(var == data) :: acc)
+        smt_of_term ~ctx Terms.(var == data) :: acc)
       ~init:[]
       ctex.ctex_model
   in
@@ -689,12 +705,14 @@ let set_up_to_get_model
   let%lwt () =
     AsyncSmt.exec_all
       solver
-      (Commands.decls_of_vars (Analysis.free_variables ~ctx det.term))
+      (Commands.decls_of_vars ~ctx (Analysis.free_variables ~ctx det.term))
   in
-  let%lwt _ = AsyncSmt.smt_assert solver (smt_of_tinv_app ~p det) in
+  let%lwt _ = AsyncSmt.smt_assert solver (smt_of_tinv_app ~ctx ~p det) in
   (* Step 2. Declare scalars (vars for recursion elimination & spec param) and their constraints (preconds & recurs elim eqns) *)
   let%lwt () =
-    AsyncSmt.exec_all solver (Commands.decls_of_vars (VarSet.of_list det.scalar_vars))
+    AsyncSmt.exec_all
+      solver
+      (Commands.decls_of_vars ~ctx (VarSet.of_list det.scalar_vars))
   in
   let%lwt _ =
     AsyncSmt.exec_command
@@ -704,7 +722,7 @@ let set_up_to_get_model
   let%lwt () =
     match det.current_preconds with
     | None -> return ()
-    | Some pre -> AsyncSmt.smt_assert solver (smt_of_term pre)
+    | Some pre -> AsyncSmt.smt_assert solver (smt_of_term ~ctx pre)
   in
   (* Step 3. Disallow repeated positive examples. *)
   let%lwt () =
@@ -716,7 +734,13 @@ let set_up_to_get_model
   AsyncSmt.smt_assert solver (S.mk_not (smt_of_lemma_app det))
 ;;
 
-let mk_model_sat_asserts ~(ctx : Context.t) det f_o_r instantiate =
+let mk_model_sat_asserts
+    ~(fctx : PMRS.Functions.ctx)
+    ~(ctx : Context.t)
+    det
+    f_o_r
+    instantiate
+  =
   let f v =
     let v_val =
       mk_var ctx (List.find_exn ~f:(fun x -> equal v.vid x.vid) det.scalar_vars)
@@ -728,20 +752,24 @@ let mk_model_sat_asserts ~(ctx : Context.t) det f_o_r instantiate =
         let instantiation = Option.value_exn (instantiate ov) in
         if proj >= 0
         then (
-          let t = Reduce.reduce_term (mk_sel ctx (f_o_r instantiation) proj) in
-          smt_of_term Terms.(t == v_val))
-        else smt_of_term Terms.(f_o_r instantiation == v_val)
+          let t = Reduce.reduce_term ~fctx ~ctx (mk_sel ctx (f_o_r instantiation) proj) in
+          smt_of_term ~ctx Terms.(t == v_val))
+        else smt_of_term ~ctx Terms.(f_o_r instantiation == v_val)
       | _ ->
         Log.error_msg
           Fmt.(
             str "Warning: skipped instantiating %a." (pp_term ctx) original_recursion_var);
         SmtLib.mk_true)
-    | None -> smt_of_term Terms.(mk_var ctx v == v_val)
+    | None -> smt_of_term ~ctx Terms.(mk_var ctx v == v_val)
   in
   List.map ~f det.scalar_vars
 ;;
 
-let verify_lemma_bounded ~(ctx : Context.t) ~(p : PsiDef.t) (det : term_state_detail)
+let verify_lemma_bounded
+    ~(fctx : PMRS.Functions.ctx)
+    ~(ctx : Context.t)
+    ~(p : PsiDef.t)
+    (det : term_state_detail)
     : (Utils.Stats.verif_method * S.solver_response) Lwt.t * int Lwt.u
   =
   let logic = SmtLogic.infer_logic ~ctx ~logic_infos:(AState.PsiDef.logics p) [] in
@@ -755,7 +783,7 @@ let verify_lemma_bounded ~(ctx : Context.t) ~(p : PsiDef.t) (det : term_state_de
             ~incremental:(String.is_prefix ~prefix:"CVC" solver.s_name)
             ~logic
             ()
-          @ decls_of_vars (VarSet.of_list det.scalar_vars))
+          @ decls_of_vars ~ctx (VarSet.of_list det.scalar_vars))
     in
     let steps = ref 0 in
     let rec check_bounded_sol accum terms =
@@ -766,9 +794,14 @@ let verify_lemma_bounded ~(ctx : Context.t) ~(p : PsiDef.t) (det : term_state_de
         let%lwt _ = accum in
         let f_compose_r t =
           let repr_of_v =
-            if p.PsiDef.repr_is_identity then t else Reduce.reduce_pmrs p.PsiDef.repr t
+            if p.PsiDef.repr_is_identity
+            then t
+            else Reduce.reduce_pmrs ~fctx ~ctx p.PsiDef.repr t
           in
-          Reduce.reduce_term (Reduce.reduce_pmrs p.PsiDef.reference repr_of_v)
+          Reduce.reduce_term
+            ~fctx
+            ~ctx
+            (Reduce.reduce_pmrs ~fctx ~ctx p.PsiDef.reference repr_of_v)
         in
         let subs =
           List.map
@@ -785,7 +818,7 @@ let verify_lemma_bounded ~(ctx : Context.t) ~(p : PsiDef.t) (det : term_state_de
             (Option.map ~f:(fun t -> substitution subs t) det.current_preconds)
         in
         let model_sat =
-          mk_model_sat_asserts ~ctx det f_compose_r (Map.find rec_instantation)
+          mk_model_sat_asserts ~fctx ~ctx det f_compose_r (Map.find rec_instantation)
         in
         let%lwt () = AsyncSmt.spush solver in
         (* Assert that preconditions hold and map original term's recurs elim variables to the variables that they reduce to for this concrete term. *)
@@ -793,6 +826,7 @@ let verify_lemma_bounded ~(ctx : Context.t) ~(p : PsiDef.t) (det : term_state_de
           AsyncSmt.exec_all
             solver
             (Commands.decls_of_vars
+               ~ctx
                (List.fold
                   ~init:VarSet.empty
                   ~f:(fun acc t -> Set.union acc (Analysis.free_variables ~ctx t))
@@ -801,20 +835,20 @@ let verify_lemma_bounded ~(ctx : Context.t) ~(p : PsiDef.t) (det : term_state_de
         let%lwt () =
           AsyncSmt.smt_assert
             solver
-            (SmtLib.mk_assoc_and (List.map ~f:smt_of_term preconds @ model_sat))
+            (SmtLib.mk_assoc_and (List.map ~f:(smt_of_term ~ctx) preconds @ model_sat))
         in
         (* Assert that TInv is true for this concrete term t *)
         let%lwt _ =
           match p.tinv with
           | None -> return ()
           | Some tinv ->
-            let tinv_t = Reduce.reduce_pmrs tinv t in
+            let tinv_t = Reduce.reduce_pmrs ~fctx ~ctx tinv t in
             let%lwt _ =
               AsyncSmt.exec_all
                 solver
-                (Commands.decls_of_vars (Analysis.free_variables ~ctx tinv_t))
+                (Commands.decls_of_vars ~ctx (Analysis.free_variables ~ctx tinv_t))
             in
-            let%lwt _ = AsyncSmt.smt_assert solver (smt_of_term tinv_t) in
+            let%lwt _ = AsyncSmt.smt_assert solver (smt_of_term ~ctx tinv_t) in
             return ()
         in
         (* Assert that lemma is false for this concrete term t  *)
@@ -823,7 +857,7 @@ let verify_lemma_bounded ~(ctx : Context.t) ~(p : PsiDef.t) (det : term_state_de
           | Some lemma ->
             AsyncSmt.exec_command
               solver
-              (S.mk_assert (S.mk_not (smt_of_term (substitution subs lemma))))
+              (S.mk_assert (S.mk_not (smt_of_term ~ctx (substitution subs lemma))))
           | _ -> return S.Unknown
         in
         let%lwt resp = AsyncSmt.check_sat solver in
@@ -876,12 +910,16 @@ let verify_lemma_bounded ~(ctx : Context.t) ~(p : PsiDef.t) (det : term_state_de
   AsyncSmt.(cancellable_task (make_solver "z3") task)
 ;;
 
-let verify_lemma_unbounded ~(ctx : Context.t) ~(p : PsiDef.t) (det : term_state_detail)
+let verify_lemma_unbounded
+    ~(fctx : PMRS.Functions.ctx)
+    ~(ctx : Context.t)
+    ~(p : PsiDef.t)
+    (det : term_state_detail)
     : (Utils.Stats.verif_method * S.solver_response) Lwt.t * int Lwt.u
   =
   let build_task (cvc4_instance, task_start) =
     let%lwt _ = task_start in
-    let%lwt () = set_up_lemma_solver cvc4_instance ~ctx ~p det in
+    let%lwt () = set_up_lemma_solver cvc4_instance ~fctx ~ctx ~p det in
     let%lwt () =
       (Lwt_list.iter_p (fun x ->
            let%lwt _ = AsyncSmt.exec_command cvc4_instance x in
@@ -910,7 +948,11 @@ let verify_lemma_unbounded ~(ctx : Context.t) ~(p : PsiDef.t) (det : term_state_
   another call to a SMT solver. The induction solver attempts to prove that the solution
   is correct while the smt solver attempt to find a counterexample.
 *)
-let verify_lemma_candidate ~(ctx : Context.t) ~(p : PsiDef.t) (det : term_state_detail)
+let verify_lemma_candidate
+    ~(fctx : PMRS.Functions.ctx)
+    ~(ctx : Context.t)
+    ~(p : PsiDef.t)
+    (det : term_state_detail)
     : Utils.Stats.verif_method * SyncSmt.solver_response
   =
   match det.lemma_candidate with
@@ -920,8 +962,8 @@ let verify_lemma_candidate ~(ctx : Context.t) ~(p : PsiDef.t) (det : term_state_
     let resp =
       try
         Lwt_main.run
-          (let pr1, resolver1 = verify_lemma_bounded ~ctx ~p det in
-           let pr2, resolver2 = verify_lemma_unbounded ~ctx ~p det in
+          (let pr1, resolver1 = verify_lemma_bounded ~fctx ~ctx ~p det in
+           let pr2, resolver2 = verify_lemma_unbounded ~fctx ~ctx ~p det in
            Lwt.wakeup resolver2 1;
            Lwt.wakeup resolver1 1;
            (* The first call to return is kept, the other one is ignored. *)
@@ -935,10 +977,15 @@ let verify_lemma_candidate ~(ctx : Context.t) ~(p : PsiDef.t) (det : term_state_
     resp
 ;;
 
-let parse_positive_example_solver_model response (det : term_state_detail) =
+let parse_positive_example_solver_model
+    ~(fctx : PMRS.Functions.ctx)
+    ~(ctx : Context.t)
+    response
+    (det : term_state_detail)
+  =
   match response with
   | SmtLib.SExps s ->
-    let model = model_to_constmap (SExps s) in
+    let model = model_to_constmap ~ctx ~fctx (SExps s) in
     let m, _ =
       Map.partitioni_tf
         ~f:(fun ~key ~data:_ ->
@@ -1022,7 +1069,11 @@ module Interactive = struct
     | Some det -> Map.add_exn ts ~key ~data:{ det with lemmas = [ lemma ] }
   ;;
 
-  let add_lemmas ~(ctx : Context.t) ~(p : PsiDef.t) (lstate : refinement_loop_state)
+  let add_lemmas
+      ~(fctx : PMRS.Functions.ctx)
+      ~(ctx : Context.t)
+      ~(p : PsiDef.t)
+      (lstate : refinement_loop_state)
       : refinement_loop_state
     =
     let env_in_p = VarSet.of_list p.PsiDef.reference.pargs in
@@ -1052,7 +1103,7 @@ module Interactive = struct
           with
           | Failure _ -> None
         in
-        let pred_term = term_of_smt env in
+        let pred_term = term_of_smt ~ctx ~fctx env in
         let term x =
           match get_precise_lemma ~ctx ~p existing_lemmas ~key:(t, None) with
           | None -> pred_term x
@@ -1163,7 +1214,11 @@ module Interactive = struct
   ;;
 end
 
-let synthesize_new_lemma ~(ctx : Context.t) ~(p : PsiDef.t) (det : term_state_detail)
+let synthesize_new_lemma
+    ~(fctx : PMRS.Functions.ctx)
+    ~(ctx : Context.t)
+    ~(p : PsiDef.t)
+    (det : term_state_detail)
     : term option
   =
   let with_synth_obj i synth_obj logic =
@@ -1185,6 +1240,7 @@ let synthesize_new_lemma ~(ctx : Context.t) ~(p : PsiDef.t) (det : term_state_de
     in
     match
       handle_lemma_synth_response
+        ~fctx
         ~ctx
         det
         (SygusInterface.SygusSolver.solve_commands commands)
@@ -1192,7 +1248,7 @@ let synthesize_new_lemma ~(ctx : Context.t) ~(p : PsiDef.t) (det : term_state_de
     | None -> None
     | Some solns -> List.nth solns 0
   in
-  match synthfun_of_det ~ctx ~p det with
+  match synthfun_of_det ~fctx ~ctx ~p det with
   | [ (synth_obj, logic) ] -> with_synth_obj 0 synth_obj logic
   | obj_choices ->
     let lwt_tasks =
@@ -1213,10 +1269,14 @@ let synthesize_new_lemma ~(ctx : Context.t) ~(p : PsiDef.t) (det : term_state_de
 (*                                  Main entry points                                            *)
 (* ============================================================================================= *)
 
-let rec lemma_refinement_loop ~(ctx : Context.t) ~(p : PsiDef.t) (det : term_state_detail)
+let rec lemma_refinement_loop
+    ~(fctx : PMRS.Functions.ctx)
+    ~(ctx : Context.t)
+    ~(p : PsiDef.t)
+    (det : term_state_detail)
     : term_state_detail option
   =
-  match synthesize_new_lemma ~ctx ~p det with
+  match synthesize_new_lemma ~fctx ~ctx ~p det with
   | None ->
     Log.debug_msg "Lemma synthesis failure.";
     None
@@ -1225,14 +1285,18 @@ let rec lemma_refinement_loop ~(ctx : Context.t) ~(p : PsiDef.t) (det : term_sta
     then
       Interactive.interactive_check_lemma
         ~ctx
-        (lemma_refinement_loop ~ctx ~p)
+        (lemma_refinement_loop ~fctx ~ctx ~p)
         det.lemma.vname
         det.scalar_vars
         lemma_term
         det
     else (
       match
-        verify_lemma_candidate ~ctx ~p { det with lemma_candidate = Some lemma_term }
+        verify_lemma_candidate
+          ~fctx
+          ~ctx
+          ~p
+          { det with lemma_candidate = Some lemma_term }
       with
       | vmethod, Unsat ->
         let lemma =
@@ -1245,7 +1309,7 @@ let rec lemma_refinement_loop ~(ctx : Context.t) ~(p : PsiDef.t) (det : term_sta
       | vmethod, SmtLib.SExps x ->
         AlgoLog.lemma_not_proved_correct vmethod;
         let new_positive_ctexs =
-          parse_positive_example_solver_model (SmtLib.SExps x) det
+          parse_positive_example_solver_model ~fctx ~ctx (SmtLib.SExps x) det
         in
         List.iter
           ~f:(fun ctex ->
@@ -1253,6 +1317,7 @@ let rec lemma_refinement_loop ~(ctx : Context.t) ~(p : PsiDef.t) (det : term_sta
                 Fmt.(pf f "Found a positive example: %a" (box (pp_ctex ~ctx)) ctex)))
           new_positive_ctexs;
         lemma_refinement_loop
+          ~fctx
           ~ctx
           ~p
           { det with positive_ctexs = det.positive_ctexs @ new_positive_ctexs }
@@ -1294,6 +1359,7 @@ let ctexs_for_ensures_synt ctex =
 ;;
 
 let refine_ensures_predicates
+    ~(fctx : PMRS.Functions.ctx)
     ~(ctx : Context.t)
     ~(p : PsiDef.t)
     ~(neg_ctexs : ctex list)
@@ -1305,13 +1371,15 @@ let refine_ensures_predicates
     Fmt.(
       fun fmt () ->
         pf fmt "%i counterexamples violate image assumption." (List.length neg_ctexs));
-  let maybe_pred = ImagePredicates.synthesize ~ctx ~p pos_ctexs neg_ctexs [] in
+  let maybe_pred =
+    ImagePredicates.synthesize ~ctx:(Env.group ctx fctx) ~p pos_ctexs neg_ctexs []
+  in
   match maybe_pred with
   | None -> lstate.term_state, `CoarseningFailure
   | Some ensures ->
     (match Specifications.get_ensures p.PsiDef.reference.pvar with
     | None ->
-      AlgoLog.show_new_ensures_predicate ~ctx p.PsiDef.reference.pvar ensures;
+      AlgoLog.show_new_ensures_predicate ~fctx ~ctx p.PsiDef.reference.pvar ensures;
       Specifications.set_ensures p.PsiDef.reference.pvar ensures
     | Some old_ensures ->
       let var : variable =
@@ -1326,12 +1394,13 @@ let refine_ensures_predicates
              (mk_app old_ensures [ mk_var ctx var ])
              (mk_app ensures [ mk_var ctx var ]))
       in
-      AlgoLog.show_new_ensures_predicate ~ctx p.PsiDef.reference.pvar new_pred;
+      AlgoLog.show_new_ensures_predicate ~fctx ~ctx p.PsiDef.reference.pvar new_pred;
       Specifications.set_ensures p.PsiDef.reference.pvar new_pred);
     lstate.term_state, `CoarseningOk
 ;;
 
 let synthesize_lemmas
+    ~(fctx : PMRS.Functions.ctx)
     ~(ctx : Context.t)
     ~(p : PsiDef.t)
     synt_failure_info
@@ -1373,7 +1442,7 @@ let synthesize_lemmas
       let classified_ctexs =
         if !Config.classify_ctex
         then Interactive.classify_ctexs_opt ~ctx ctexs
-        else classify_ctexs ~ctx ~p ctexs
+        else classify_ctexs ~functions:fctx ~ctx ~p ctexs
       in
       (* Positive and negatives for the ensures predicates. *)
       let ensures_positives, ensures_negatives, _ =
@@ -1391,6 +1460,7 @@ let synthesize_lemmas
     match ensures_negatives, lemma_synt_negatives with
     | _ :: _, _ ->
       refine_ensures_predicates
+        ~fctx
         ~ctx
         ~p
         ~neg_ctexs:ensures_negatives
@@ -1414,7 +1484,7 @@ let synthesize_lemmas
             else if not status
             then acc, status
             else (
-              match lemma_refinement_loop ~ctx ~p det with
+              match lemma_refinement_loop ~fctx ~ctx ~p det with
               | None -> acc, false
               | Some det -> Map.add_exn ~key ~data:det acc, status))
       in

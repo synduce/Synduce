@@ -81,6 +81,7 @@ let get_mapped_value ~(ctx : Context.t) ~(p : PsiDef.t) (l : lifting) (t : term)
   Interactively add an expression for the lifting.
 *)
 let interactive_add_lifting_expression
+    ~(fctx : PMRS.Functions.ctx)
     ~(ctx : Context.t)
     ~(p : PsiDef.t)
     (l : lifting)
@@ -105,7 +106,7 @@ let interactive_add_lifting_expression
       with
       | Failure _ -> None
     in
-    let l_term = Option.map ~f:(SmtInterface.term_of_smt env) smtterm in
+    let l_term = Option.map ~f:(SmtInterface.term_of_smt ~ctx ~fctx env) smtterm in
     (match l_term with
     | None -> l, None
     | Some x ->
@@ -341,7 +342,7 @@ let apply_lifting ~(ctx : Context.t) ~(p : PsiDef.t) (new_lifting : RType.t list
     in
     let free_theta = PMRS.extract_rec_input_typ target' in
     (* Update the input type, w.r.t to the the theta stored. *)
-    PMRS.unify_one_with_update (free_theta, !_theta);
+    PMRS.unify_one_with_update ctx (free_theta, !_theta);
     (* Update the output type. *)
     (match
        RType.unify_one
@@ -360,17 +361,18 @@ let apply_lifting ~(ctx : Context.t) ~(p : PsiDef.t) (new_lifting : RType.t list
   PsiDef.{ p with target = target'; lifting = p.lifting @ new_lifting }
 ;;
 
-let lift_interactive ~(ctx : Context.t) ~p lifting boxes =
+let lift_interactive ~(fctx : PMRS.Functions.ctx) ~(ctx : Context.t) ~p lifting boxes =
   List.fold
     ~init:lifting
     ~f:(fun l (i, t) ->
       match LiftingMap.get ~ctx l.tmap (i, t) with
       | Some _ -> l
-      | None -> fst (interactive_add_lifting_expression ~ctx ~p l t i))
+      | None -> fst (interactive_add_lifting_expression ~fctx ~ctx ~p l t i))
     boxes
 ;;
 
 let deduce_lifting_expressions
+    ~(fctx : PMRS.Functions.ctx)
     ~(ctx : Context.t)
     ~(p : PsiDef.t)
     (lifting : lifting)
@@ -391,7 +393,7 @@ let deduce_lifting_expressions
       rhs
   in
   if !Config.interactive_lifting
-  then lift_interactive ~p ~ctx lifting boxes
+  then lift_interactive ~p ~ctx ~fctx lifting boxes
   else (
     let subs, boxvar_to_linput =
       (* Create fresh variables for boxes and a map from var id to box argument. *)
@@ -428,7 +430,7 @@ let deduce_lifting_expressions
         in
         boxvar_to_linput
         |> List.map ~f
-        |> Deduction.Solver.functional_equation ~ctx ~func_side:rhs_args ~lemma lhs
+        |> Deduction.Solver.functional_equation ~fctx ~ctx ~func_side:rhs_args ~lemma lhs
       in
       let _ = Option.map ~f:(analyze_leftover ~ctx:sol_ctx) maybe_leftover_expr in
       List.fold var_to_lifting_expr ~init:lifting ~f:(fun l (v, t) ->

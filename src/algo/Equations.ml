@@ -2,7 +2,8 @@ open AState
 open Base
 open EquationShow
 open Lang
-open Lang.Term
+open Term
+open Env
 open Projection
 open Syguslib
 open SygusInterface
@@ -33,31 +34,34 @@ let check_equation ~(p : PsiDef.t) (eqn : equation) : bool =
    The result is a maximally reduced term with some applicative
    terms of the form (p.PsiDef.reference x) where x is a variable.
 *)
-let compute_lhs p t =
-  let t' = Reduce.reduce_pmrs p.PsiDef.repr t in
-  let r_t = Expand.replace_rhs_of_main p p.PsiDef.repr t' in
+let compute_lhs ~ctx p t =
+  let t' = (ctx >>- Reduce.reduce_pmrs) p.PsiDef.repr t in
+  let r_t = Expand.replace_rhs_of_main ~ctx:ctx.ctx p p.PsiDef.repr t' in
   let subst_params =
     let l = List.zip_exn p.PsiDef.reference.pargs p.PsiDef.target.pargs in
-    List.map l ~f:(fun (v1, v2) -> mk_var v1, mk_var v2)
+    List.map l ~f:(fun (v1, v2) -> mk_var ctx.ctx v1, mk_var ctx.ctx v2)
   in
-  let f_r_t = Reduce.reduce_pmrs p.PsiDef.reference r_t in
+  let f_r_t = (ctx >>- Reduce.reduce_pmrs) p.PsiDef.reference r_t in
   let final = substitution subst_params f_r_t in
-  Expand.replace_rhs_of_mains p (Reduce.reduce_term final)
+  Expand.replace_rhs_of_mains
+    ~ctx:ctx.ctx
+    p
+    (Reduce.reduce_term ~ctx:ctx.ctx ~fctx:ctx.functions final)
 ;;
 
-let remap_rec_calls p t =
-  let proj_func = Lifting.proj_to_lifting p in
-  let lift_func = Lifting.compose_parts p in
+let remap_rec_calls ~ctx p t =
+  let proj_func = Lifting.proj_to_lifting ~ctx:ctx.ctx p in
+  let lift_func = Lifting.compose_parts ~ctx:ctx.ctx p in
   let g = p.PsiDef.target in
   let lift_wrapper tx =
     match proj_func, lift_func with
     | Some pf, Some lf ->
-      let t1 = mk_app (mk_var g.pmain_symb) [ tx ] in
+      let t1 = mk_app (mk_var ctx.ctx g.pmain_symb) [ tx ] in
       let t2 = mk_box (pf t1) in
-      mk_app lf [ compute_lhs p tx; t2 ]
-    | _ -> compute_lhs p tx
+      mk_app lf [ compute_lhs ~ctx p tx; t2 ]
+    | _ -> compute_lhs ~ctx p tx
   in
-  let t' = Expand.replace_rhs_of_main p g t in
+  let t' = Expand.replace_rhs_of_main ~ctx:ctx.ctx p g t in
   let f a t0 =
     match t0.tkind with
     | TApp ({ tkind = TVar g'; _ }, args) ->
@@ -76,7 +80,7 @@ let remap_rec_calls p t =
   if Term.term_equal res t' then t (* Don't revert step taken before *) else res
 ;;
 
-let compute_rhs_with_replacing p t =
+let compute_rhs_with_replacing ~ctx p t =
   let g = p.PsiDef.target in
   let custom_reduce x =
     let one_step t0 =
@@ -84,10 +88,10 @@ let compute_rhs_with_replacing p t =
       let rewrite_rule _t =
         match _t.tkind with
         | TApp ({ tkind = TVar f; _ }, fargs) ->
-          (match Reduce.rule_lookup g.prules f fargs with
+          (match Reduce.rule_lookup ctx.ctx g.prules f fargs with
           | [] -> None
           | hd :: _ ->
-            let hd' = remap_rec_calls p hd in
+            let hd' = remap_rec_calls ~ctx p hd in
             rstep := true;
             Some hd')
         (* Replace recursive calls to g by calls to f circ g,
@@ -99,96 +103,103 @@ let compute_rhs_with_replacing p t =
     in
     Reduce.until_irreducible one_step x
   in
-  let app_t = mk_app (mk_var g.pmain_symb) [ t ] in
-  let t' = Reduce.reduce_term (custom_reduce app_t) in
-  let _res = Expand.replace_rhs_of_mains p t' in
+  let app_t = mk_app (mk_var ctx.ctx g.pmain_symb) [ t ] in
+  let t' = Reduce.reduce_term ~ctx:ctx.ctx ~fctx:ctx.functions (custom_reduce app_t) in
+  let _res = Expand.replace_rhs_of_mains ~ctx:ctx.ctx p t' in
   _res
 ;;
 
-let compute_rhs ?(force_replace_off = false) p t =
+let compute_rhs ?(force_replace_off = false) ~ctx p t =
   if not force_replace_off
   then (
-    let res = compute_rhs_with_replacing p t in
+    let res = compute_rhs_with_replacing ~ctx p t in
     res)
   else (
     let res =
       Expand.replace_rhs_of_mains
+        ~ctx:ctx.ctx
         p
-        (Reduce.reduce_term (Reduce.reduce_pmrs p.PsiDef.target t))
+        (Reduce.reduce_term
+           ~ctx:ctx.ctx
+           ~fctx:ctx.functions
+           ((ctx >>- Reduce.reduce_pmrs) p.PsiDef.target t))
     in
     res)
 ;;
 
-let compute_preconds ~p ~term_state subst eterm =
-  match Lemmas.get_lemma ~p term_state ~key:eterm with
+let compute_preconds ~ctx ~p ~term_state subst eterm =
+  match Lemmas.get_lemma ~ctx:ctx.ctx ~p term_state ~key:eterm with
   | Some lemma_for_eterm ->
-    let t = Reduce.reduce_term (subst lemma_for_eterm) in
+    let t = Reduce.reduce_term ~ctx:ctx.ctx ~fctx:ctx.functions (subst lemma_for_eterm) in
     Some t
   | None ->
     (* If the term is bounded and there is a invariant, add a precondition.
          This will avoid calls to the lemma synthesis.
       *)
-    if Analysis.is_bounded eterm
+    if Analysis.is_bounded ~ctx:ctx.ctx eterm
     then
       Option.map
         ~f:(fun req ->
-          let t = Reduce.reduce_term (mk_app req [ eterm ]) in
+          let t =
+            Reduce.reduce_term ~ctx:ctx.ctx ~fctx:ctx.functions (mk_app req [ eterm ])
+          in
           t)
         (Specifications.get_requires p.PsiDef.target.PMRS.pvar)
     else None
 ;;
 
-let filter_elims all_subs t =
+let filter_elims ~ctx all_subs t =
   List.remove_consecutive_duplicates
     ~equal:(fun (x1, _) (x2, _) -> Terms.equal x1 x2)
     (List.filter_map all_subs ~f:(fun (t_rec, t_scalar) ->
          match
            Set.to_list
-             (Set.inter (Analysis.free_variables t_rec) (Analysis.free_variables t))
+             (Set.inter
+                (Analysis.free_variables ~ctx t_rec)
+                (Analysis.free_variables ~ctx t))
          with
          | [] -> None
-         | x :: _ -> Some (mk_var x, t_scalar)))
+         | x :: _ -> Some (mk_var ctx x, t_scalar)))
 ;;
 
 let make
     ?(force_replace_off = false)
+    ~(ctx : env)
     ~(p : PsiDef.t)
     ~(term_state : term_state)
     ~(lifting : lifting)
     (tset : TermSet.t)
     : equation list * lifting
   =
-  let proj_to_non_lifting = Lifting.proj_to_non_lifting p in
+  let proj_to_non_lifting = Lifting.proj_to_non_lifting ~ctx:ctx.ctx p in
   (* Compute a first set of constraints E(t) : spec o repr (t) = target (t) *)
   let eqns =
     let fold_f eqns t =
-      let lhs = compute_lhs p t in
-      let rhs = compute_rhs ~force_replace_off p t in
+      let lhs = compute_lhs ~ctx p t in
+      let rhs = compute_rhs ~ctx ~force_replace_off p t in
       eqns @ [ t, lhs, rhs ]
     in
     Set.fold ~init:[] ~f:fold_f tset
   in
   (* Compute the recursion eliminations as well as related invariants that need applying. *)
   let all_subs, invariants =
-    Expand.subst_recursive_calls
+    (ctx >>- Expand.subst_recursive_calls)
       p
       (List.concat (List.map ~f:(fun (_, lhs, rhs) -> [ lhs; rhs ]) eqns))
   in
   (* Substitution function: some substitution opportunities appear after a first pass of subsitution
      followed by a lambda-reduction.
   *)
-  let applic x =
-    x |> substitution all_subs |> Reduce.reduce_term |> substitution all_subs
-  in
-  show_invariants invariants;
+  let applic x = x |> substitution all_subs |> ctx_reduce ctx |> substitution all_subs in
+  show_invariants ~ctx:ctx.ctx invariants;
   let pure_eqns, lifting =
     let f (eqns_accum, lifting) (eterm, lhs, rhs) =
       (* Compute the lhs and rhs of the equations. *)
-      let lhs' = Reduce.reduce_term (applic lhs)
-      and rhs' = Reduce.reduce_term (applic rhs) in
+      let lhs' = ctx_reduce ctx (applic lhs)
+      and rhs' = ctx_reduce ctx (applic rhs) in
       let rhs' =
         match proj_to_non_lifting with
-        | Some func_term -> Reduce.reduce_term (mk_app func_term [ rhs' ])
+        | Some func_term -> ctx_reduce ctx (mk_app func_term [ rhs' ])
         | None -> rhs'
       in
       let lhs'', rhs'' =
@@ -199,25 +210,30 @@ let make
       (* Filter the relevant part of the recursion elimination substitution, and only retain a map
              from recursive-typed variable to scalar variables replacing calls.
       *)
-      let eelim = filter_elims all_subs eterm in
+      let eelim = (ctx >- filter_elims) all_subs eterm in
       (* Get the precondition, from the lemmas in the term state, *)
-      let precond = compute_preconds ~p ~term_state applic eterm in
+      let precond = compute_preconds ~ctx ~p ~term_state applic eterm in
       let lifting' =
         let eprecond =
-          match invar invariants lhs'' rhs'' with
+          match (ctx >- invar) invariants lhs'' rhs'' with
           | Some im_f ->
             (match precond with
             | Some pl -> Some (mk_bin And im_f pl)
             | None -> Some im_f)
           | None -> precond
         in
-        Lifting.deduce_lifting_expressions ~p lifting eprecond lhs'' rhs''
+        (ctx >>- Lifting.deduce_lifting_expressions)
+          ~p
+          lifting
+          eprecond
+          ~lhs:lhs''
+          ~rhs:rhs''
       in
       (* Replace the boxed expressions of the lifting. *)
       let rhs'' =
         rhs'
-        |> Lifting.replace_boxed_expressions ~p lifting'
-        |> Reduce.reduce_term ~unboxing:true
+        |> (ctx >- Lifting.replace_boxed_expressions) ~p lifting'
+        |> ctx_reduce ctx ~unboxing:true
       in
       (* If possible project equation of tuples into tuple of equations. *)
       let projs = projection_eqns lhs'' rhs'' in
@@ -226,7 +242,7 @@ let make
             ~f:(fun (elhs, erhs) ->
               (* Select the relevant preconditions. *)
               let eprecond =
-                match invar invariants elhs erhs with
+                match (ctx >- invar) invariants elhs erhs with
                 | Some im_f ->
                   (match precond with
                   | Some pl -> Some (mk_bin And im_f pl)
@@ -239,43 +255,44 @@ let make
     in
     List.fold ~init:([], lifting) ~f eqns
   in
-  show_equations tset pure_eqns;
+  (ctx >- show_equations) tset pure_eqns;
   (* Phase 2 of the equation generation.
      Generate the equations corresponding to the lifting constraints. *)
   let lifting_eqns =
     let constraint_of_lift_expr ((i, t0), elhs) =
-      let t0_rhs = compute_rhs p t0 in
+      let t0_rhs = compute_rhs ~ctx p t0 in
       let erhs =
-        mk_sel t0_rhs i
-        |> Reduce.reduce_term
-        |> Lifting.replace_boxed_expressions ~p lifting
-        |> Reduce.reduce_term ~unboxing:true
+        mk_sel ctx.ctx t0_rhs i
+        |> ctx_reduce ctx
+        |> (ctx >- Lifting.replace_boxed_expressions) ~p lifting
+        |> ctx_reduce ctx ~unboxing:true
       in
-      let precond = compute_preconds ~p ~term_state (fun x -> x) t0 in
+      let precond = compute_preconds ~ctx ~p ~term_state (fun x -> x) t0 in
       let eprecond =
-        match invar invariants elhs erhs with
+        match ctx >- invar invariants elhs erhs with
         | Some im_f ->
           (match precond with
           | Some pl -> Some (mk_bin And im_f pl)
           | None -> Some im_f)
         | None -> precond
       in
-      let eelim = filter_elims all_subs t0 in
+      let eelim = ctx >- filter_elims all_subs t0 in
       { eterm = t0; esplitter = None; elhs; erhs; eprecond; eelim }
     in
     List.map ~f:constraint_of_lift_expr lifting.tmap
   in
-  show_lifting_constraints lifting_eqns;
+  ctx >- show_lifting_constraints lifting_eqns;
   match
     List.find ~f:(fun eq -> not (check_equation ~p eq)) (pure_eqns @ lifting_eqns)
   with
   | Some not_pure ->
-    Log.error_msg Fmt.(str "Not pure: %a" pp_equation not_pure);
+    Log.error_msg Fmt.(str "Not pure: %a" (ctx >- pp_equation) not_pure);
     failwith "Equation not pure."
   | None -> pure_eqns @ lifting_eqns, lifting
 ;;
 
 let revert_projs
+    ~(ctx : env)
     (orig_xi : VarSet.t)
     (projections : (int, variable list, Int.comparator_witness) Map.t)
     (soln : (string * variable list * term) list)
@@ -293,13 +310,13 @@ let revert_projs
     let f accum (_, args, body) =
       let subst =
         match List.zip args main_args with
-        | Ok l -> List.map l ~f:(fun (v1, v2) -> mk_var v1, mk_var v2)
+        | Ok l -> List.map l ~f:(fun (v1, v2) -> mk_var ctx.ctx v1, mk_var ctx.ctx v2)
         | Unequal_lengths -> failwith "Projections should have same number of arguments."
       in
       accum @ [ substitution subst body ]
     in
     let tuple_elts = List.fold ~f ~init:[ first_body ] rest in
-    mk_tup tuple_elts
+    mk_tup ctx.ctx tuple_elts
   in
   (* Helper sets *)
   let all_proj_names, xi_projected =
@@ -330,12 +347,14 @@ let revert_projs
   rest @ new_xi_solns
 ;;
 
-let free_vars_of_equations (sys_eq : equation list) : VarSet.t =
+let free_vars_of_equations ~(ctx : env) (sys_eq : equation list) : VarSet.t =
   VarSet.union_list
     (List.concat_map
        ~f:(fun eqn ->
-         [ Analysis.free_variables eqn.elhs; Analysis.free_variables eqn.erhs ]
-         @ Option.(to_list (map ~f:Analysis.free_variables eqn.eprecond)))
+         [ ctx >- Analysis.free_variables eqn.elhs
+         ; ctx >- Analysis.free_variables eqn.erhs
+         ]
+         @ Option.(to_list (map ~f:(Analysis.free_variables ~ctx:ctx.ctx) eqn.eprecond)))
        sys_eq)
 ;;
 
@@ -350,26 +369,26 @@ module Solve = struct
     List.dedup_and_sort ~compare:(fun (n1, _, _) (n2, _, _) -> String.compare n1 n2)
   ;;
 
-  let pp_partial_soln (f : Formatter.t) soln =
+  let pp_partial_soln ~(ctx : env) (f : Formatter.t) soln =
     Fmt.(
       list ~sep:comma (fun fmrt (s, args, bod) ->
           match args with
-          | [] -> pf fmrt "@[<hov 2>@[%s@] = @[%a@]@]" s pp_term bod
+          | [] -> pf fmrt "@[<hov 2>@[%s@] = @[%a@]@]" s (pp_term ctx.ctx) bod
           | _ ->
             pf
               fmrt
               "@[<hov 2>@[%s(%a)@] = @[%a@]@]"
               s
-              (list ~sep:comma Variable.pp)
+              (list ~sep:comma (Variable.pp ctx.ctx))
               args
-              pp_term
+              (pp_term ctx.ctx)
               bod))
       f
       soln
   ;;
 
   (** Combine two steps of partial solving.*)
-  let combine ?(verb = false) prev_sol new_response =
+  let combine ?(verb = false) ~ctx prev_sol new_response =
     Either.(
       match prev_sol, new_response with
       | First soln, (resp, First soln') ->
@@ -378,7 +397,11 @@ module Solve = struct
           Log.debug
             Fmt.(
               fun frmt () ->
-                pf frmt "@[Partial solution:@;@[<hov 2>%a@]@]" pp_partial_soln soln');
+                pf
+                  frmt
+                  "@[Partial solution:@;@[<hov 2>%a@]@]"
+                  (pp_partial_soln ~ctx)
+                  soln');
         resp, First (soln @ soln')
       | Second ctexs, (resp, Second ctexs') -> resp, Second (ctexs @ ctexs')
       | Second ctexs, (resp, First _) | First _, (resp, Second ctexs) ->
@@ -388,7 +411,7 @@ module Solve = struct
   (** Solve the trivial equations first, avoiding the overhead from the
      sygus solver.
   *)
-  let solve_constant_eqns (unknowns : VarSet.t) (eqns : equation list) =
+  let solve_constant_eqns ~ctx (unknowns : VarSet.t) (eqns : equation list) =
     let ok_precond precond =
       match precond with
       | Some { tkind = TConst Constant.CFalse; _ } -> false
@@ -407,7 +430,7 @@ module Solve = struct
     in
     let resolved = VarSet.of_list (List.map ~f:Utils.first constant_soln) in
     let new_eqns =
-      let substs = List.map ~f:(fun (x, lhs) -> mk_var x, lhs) constant_soln in
+      let substs = List.map ~f:(fun (x, lhs) -> mk_var ctx.ctx x, lhs) constant_soln in
       List.map other_eqns ~f:(fun eqn ->
           { eqn with
             elhs = substitution substs eqn.elhs
@@ -421,15 +444,18 @@ module Solve = struct
     then
       Log.debug
         Fmt.(
-          fun fmt () -> pf fmt "@[Constant:@;@[<hov 2>%a@]@]" pp_partial_soln partial_soln);
+          fun fmt () ->
+            pf fmt "@[Constant:@;@[<hov 2>%a@]@]" (pp_partial_soln ~ctx) partial_soln);
     partial_soln, Set.diff unknowns resolved, new_eqns
   ;;
 
   (** Solve the syntactic definitions. *)
-  let solve_syntactic_definitions (unknowns : VarSet.t) (eqns : equation list) =
+  let solve_syntactic_definitions ~ctx (unknowns : VarSet.t) (eqns : equation list) =
     (* Are all arguments free? *)
     let ok_rhs_args _args =
-      let arg_vars = VarSet.union_list (List.map ~f:Analysis.free_variables _args) in
+      let arg_vars =
+        VarSet.union_list (List.map ~f:(Analysis.free_variables ~ctx:ctx.ctx) _args)
+      in
       Set.is_empty (Set.inter unknowns arg_vars)
     in
     (* Is lhs, args a full definition of the function? *)
@@ -437,7 +463,7 @@ module Solve = struct
       let argv = List.map args ~f:ext_var_or_none in
       let argset = VarSet.of_list (List.concat (List.filter_opt argv)) in
       if List.for_all ~f:Option.is_some argv
-         && Set.is_empty (Set.diff (Analysis.free_variables lhs) argset)
+         && Set.is_empty (Set.diff (ctx >- Analysis.free_variables lhs) argset)
       then (
         let args = List.filter_opt argv in
         if List.length (List.concat args) = Set.length argset then Some args else None)
@@ -454,16 +480,19 @@ module Solve = struct
         List.map args ~f:(fun arg_tuple ->
             let t =
               match arg_tuple with
-              | [ v ] -> Variable.vtype_or_new v
-              | l -> RType.TTup (List.map ~f:Variable.vtype_or_new l)
+              | [ v ] -> Variable.vtype_or_new ctx.ctx v
+              | l -> RType.TTup (List.map ~f:(Variable.vtype_or_new ctx.ctx) l)
             in
-            let v = Variable.mk ~t:(Some t) (Alpha.fresh ()) in
+            let v = Variable.mk ctx.ctx ~t:(Some t) (Alpha.fresh ctx.ctx.names) in
             match arg_tuple with
-            | [ arg ] -> v, [ mk_var arg, mk_var v ]
-            | l -> v, List.mapi l ~f:(fun i arg -> mk_var arg, mk_sel (mk_var v) i))
+            | [ arg ] -> v, [ mk_var ctx.ctx arg, mk_var ctx.ctx v ]
+            | l ->
+              ( v
+              , List.mapi l ~f:(fun i arg ->
+                    mk_var ctx.ctx arg, mk_sel ctx.ctx (mk_var ctx.ctx v) i) ))
       in
       let new_args, subst = List.unzip pre_subst in
-      new_args, Reduce.reduce_term (substitution (List.concat subst) lhs)
+      new_args, ctx_reduce ctx (substitution (List.concat subst) lhs)
     in
     (* Find syntactic definiitons, and check there is no conflict between definitions. *)
     let full_defs, other_eqns =
@@ -491,14 +520,15 @@ module Solve = struct
               let all_equal =
                 List.for_all tl ~f:(fun (lam_args2, lam_body2, _) ->
                     (* Check (fun args2 -> body2) args1 = body1 *)
-                    Terms.equal
-                      lam_body1
-                      (Reduce.reduce_term
-                         (mk_app
-                            (mk_fun
-                               (List.map ~f:(fun v -> FPatVar v) lam_args2)
-                               lam_body2)
-                            (List.map ~f:mk_var lam_args1))))
+                    let x =
+                      mk_app
+                        (mk_fun
+                           ctx.ctx
+                           (List.map ~f:(fun v -> FPatVar v) lam_args2)
+                           lam_body2)
+                        (List.map ~f:(mk_var ctx.ctx) lam_args1)
+                    in
+                    Terms.equal lam_body1 (ctx_reduce ctx x))
               in
               if all_equal
               then Either.First (unknown, (lam_args1, lam_body1))
@@ -511,13 +541,15 @@ module Solve = struct
       let substs =
         List.map full_defs ~f:(fun (x, (lhs_args, lhs_body)) ->
             let t, _ =
-              infer_type (mk_fun (List.map ~f:(fun x -> FPatVar x) lhs_args) lhs_body)
+              infer_type
+                ctx.ctx
+                (mk_fun ctx.ctx (List.map ~f:(fun x -> FPatVar x) lhs_args) lhs_body)
             in
-            mk_var x, t)
+            mk_var ctx.ctx x, t)
       in
       List.map other_eqns ~f:(fun eqn ->
-          let new_lhs = Reduce.reduce_term (substitution substs eqn.elhs) in
-          let new_rhs = Reduce.reduce_term (substitution substs eqn.erhs) in
+          let new_lhs = ctx_reduce ctx (substitution substs eqn.elhs) in
+          let new_rhs = ctx_reduce ctx (substitution substs eqn.erhs) in
           { eqn with elhs = new_lhs; erhs = new_rhs })
     in
     let partial_soln =
@@ -526,7 +558,8 @@ module Solve = struct
     if List.length partial_soln > 0
     then
       Log.debug_msg
-        Fmt.(str "Syntactic definition:@;@[<hov 2>%a@]" pp_partial_soln partial_soln);
+        Fmt.(
+          str "Syntactic definition:@;@[<hov 2>%a@]" (pp_partial_soln ~ctx) partial_soln);
     partial_soln, Set.diff unknowns resolved, new_eqns
   ;;
 
@@ -535,49 +568,57 @@ module Solve = struct
       ?(bools = false)
       ?(eqns = [])
       ?(ops = OpSet.empty)
+      ~(ctx : env)
       (unknowns : VarSet.t)
     =
     let xi_formals (xi : variable) : variable list * RType.t =
-      let tv = Variable.vtype_or_new xi in
+      let tv = Variable.vtype_or_new ctx.ctx xi in
       let targs, tout = RType.fun_typ_unpack tv in
-      List.map ~f:(fun typ -> Variable.mk ~t:(Some typ) (Alpha.fresh ())) targs, tout
+      ( List.map
+          ~f:(fun typ -> Variable.mk ctx.ctx ~t:(Some typ) (Alpha.fresh ctx.ctx.names))
+          targs
+      , tout )
     in
     let f xi =
       let args, ret_type = xi_formals xi in
       let guess =
-        Grammars.make_guess
-          xi
-          ~level:!Config.Optims.optimize_grammars
-          (List.map ~f:(fun eqn -> eqn.eterm, eqn.eprecond, eqn.elhs, eqn.erhs) eqns)
+        ctx
+        >- Grammars.make_guess
+             xi
+             ~level:!Config.Optims.optimize_grammars
+             (List.map ~f:(fun eqn -> eqn.eterm, eqn.eprecond, eqn.elhs, eqn.erhs) eqns)
       in
       let default_grammar =
-        Grammars.generate_grammar
-          ~nonlinear
-          ~guess:None
-          ~bools
-          ~special_const_prod:false
-          ops
-          args
-          ret_type
+        ctx
+        >- Grammars.generate_grammar
+             ~nonlinear
+             ~guess:None
+             ~bools
+             ~special_const_prod:false
+             ops
+             args
+             ret_type
       in
       match guess with
       | `First partial_soln ->
         Log.verbose_msg "Partial solution!";
-        Either.First (partial_soln, mk_synthfun xi.vname args ret_type default_grammar)
+        Either.First
+          (partial_soln, ctx >- mk_synthfun xi.vname args ret_type default_grammar)
       | `Second skeleton ->
         Log.verbose_msg "Got a skeleton, no partial solution.";
         let opt_grammar =
-          Grammars.generate_grammar
-            ~nonlinear
-            ~guess:(Some skeleton)
-            ~bools
-            ~special_const_prod:false
-            ops
-            args
-            ret_type
+          ctx
+          >- Grammars.generate_grammar
+               ~nonlinear
+               ~guess:(Some skeleton)
+               ~bools
+               ~special_const_prod:false
+               ops
+               args
+               ret_type
         in
-        Either.Second (mk_synthfun xi.vname args ret_type opt_grammar)
-      | `Third -> Either.Second (mk_synthfun xi.vname args ret_type default_grammar)
+        Either.Second (ctx >- mk_synthfun xi.vname args ret_type opt_grammar)
+      | `Third -> Either.Second (ctx >- mk_synthfun xi.vname args ret_type default_grammar)
     in
     let synth_objs = List.map ~f (Set.elements unknowns) in
     if List.for_all ~f:Either.is_first synth_objs && List.length synth_objs > 0
@@ -609,9 +650,11 @@ module Solve = struct
     List.map ~f:eqn_to_constraint detupled_equations
   ;;
 
-  let mk_constant_unknown_eqn_optim (mul : bool) (unknowns : VarSet.t) : equation list =
+  let mk_constant_unknown_eqn_optim ~(ctx : env) (mul : bool) (unknowns : VarSet.t)
+      : equation list
+    =
     let f v =
-      match Variable.vtype_or_new v with
+      match Variable.vtype_or_new ctx.ctx v with
       | RType.TInt ->
         [ { eterm = Terms.(int 0)
           ; eelim = []
@@ -638,7 +681,7 @@ module Solve = struct
   let core_solve
       ?(predict_constants = None)
       ?(use_bools = true)
-      ~(ctx : Context.t)
+      ~(ctx : env)
       ~(gen_only : bool)
       (unknowns : VarSet.t)
       (eqns : equation list)
@@ -647,8 +690,8 @@ module Solve = struct
     let psoln, unknowns, eqns =
       match predict_constants with
       | Some x ->
-        let constant_unknowns_eqn = mk_constant_unknown_eqn_optim x unknowns in
-        solve_constant_eqns unknowns (constant_unknowns_eqn @ eqns)
+        let constant_unknowns_eqn = mk_constant_unknown_eqn_optim ~ctx x unknowns in
+        solve_constant_eqns ~ctx unknowns (constant_unknowns_eqn @ eqns)
       | None -> [], unknowns, eqns
     in
     let free_vars, all_operators, has_ite =
@@ -657,9 +700,12 @@ module Solve = struct
         let set' =
           VarSet.union_list
             Analysis.
-              [ free_variables lhs
-              ; free_variables rhs
-              ; Option.value_map precond ~f:free_variables ~default:VarSet.empty
+              [ ctx >- free_variables lhs
+              ; ctx >- free_variables rhs
+              ; Option.value_map
+                  precond
+                  ~f:(free_variables ~ctx:ctx.ctx)
+                  ~default:VarSet.empty
               ]
         in
         Analysis.(
@@ -688,13 +734,14 @@ module Solve = struct
       let base_logic = logic_of_operators ~nonlinear all_operators in
       let needs_dt =
         List.exists
-          ~f:(fun v -> requires_dt_theory (Variable.vtype_or_new v))
+          ~f:(fun v -> ctx >- requires_dt_theory (Variable.vtype_or_new ctx.ctx v))
           (Set.elements free_vars @ Set.elements unknowns)
       in
       (if needs_dt then dt_extend_base_logic base_logic else base_logic), nonlinear
     in
     match
       synthfuns_of_unknowns
+        ~ctx
         ~nonlinear
         ~bools:(use_bools || has_ite)
         ~eqns
@@ -708,10 +755,12 @@ module Solve = struct
           ( fname
           , List.map
               ~f:(fun v ->
-                Sygus.mk_sorted_var v.vname (sort_of_rtype (Variable.vtype_or_new v)))
+                Sygus.mk_sorted_var
+                  v.vname
+                  (ctx >- sort_of_rtype (Variable.vtype_or_new ctx.ctx v)))
               args
-          , sort_of_rtype body.ttyp
-          , sygus_of_term body )
+          , ctx >- sort_of_rtype body.ttyp
+          , ctx >- sygus_of_term body )
         in
         List.map ~f partial_soln
       in
@@ -728,17 +777,21 @@ module Solve = struct
           make ~extra_defs ()
           |> set_logic logic
           |> synthesize synth_objs
-          |> constrain (constraints_of_eqns eqns))
+          |> (ctx >- constrain (constraints_of_eqns eqns)))
       in
       (* Handling the solver response. *)
       let handle_response (resp : Sygus.solver_response) =
         let parse_synth_fun (fname, fargs, _, fbody) =
           let args =
-            let f (_, varname, sort) = Variable.mk ~t:(rtype_of_sort sort) varname in
+            let f (_, varname, sort) =
+              Variable.mk ctx.ctx ~t:(ctx >- rtype_of_sort sort) varname
+            in
             List.map ~f fargs
           in
           let local_vars = VarSet.of_list args in
-          let body, _ = infer_type (term_of_sygus (VarSet.to_env local_vars) fbody) in
+          let body, _ =
+            infer_type ctx.ctx (ctx >>- term_of_sygus (VarSet.to_env local_vars) fbody)
+          in
           fname, args, body
         in
         match resp with
@@ -752,15 +805,16 @@ module Solve = struct
       if !Config.generate_benchmarks
       then
         (* Assuming gen_only true only for unrealizable problems. *)
-        HLSolver.to_file
-          (Config.new_benchmark_file
-             ~hint:(if gen_only then "unrealizable_" else "")
-             ".sl")
-          solver;
+        ctx
+        >- HLSolver.to_file
+             (Config.new_benchmark_file
+                ~hint:(if gen_only then "unrealizable_" else "")
+                ".sl")
+             solver;
       (* Call the solver on the generated file. *)
       if not gen_only
       then (
-        let t, r = HLSolver.solve solver in
+        let t, r = ctx >- HLSolver.solve solver in
         ( Lwt.map
             (function
               | Some resp -> handle_response resp
@@ -771,7 +825,7 @@ module Solve = struct
   ;;
 
   let check_unrealizable
-      ~(ctx : Context.t)
+      ~(ctx : env)
       (task_counter : int ref)
       (unknowns : VarSet.t)
       (eqns : equation_system)
@@ -779,7 +833,7 @@ module Solve = struct
     if !Config.check_unrealizable
     then
       Some
-        (let t, r = Counterexamples.check_unrealizable unknowns eqns in
+        (let t, r = ctx >>- Counterexamples.check_unrealizable unknowns eqns in
          let task =
            let* ctexs = t in
            match ctexs with
@@ -792,18 +846,18 @@ module Solve = struct
              if !Config.generate_benchmarks
              then ignore (core_solve ~ctx ~gen_only:true unknowns eqns);
              if !Config.check_unrealizable_smt_unsatisfiable
-             then Counterexamples.smt_unsatisfiability_check unknowns eqns;
+             then ctx >- Counterexamples.smt_unsatisfiability_check unknowns eqns;
              Lwt.return (Sygus.RInfeasible, Either.Second ctexs)
          in
          r, task)
     else None
   ;;
 
-  let solve_eqns (ctx : Context.t) (unknowns : VarSet.t) (eqns : equation list)
+  let solve_eqns (ctx : env) (unknowns : VarSet.t) (eqns : equation list)
       : Sygus.solver_response * (partial_soln, unrealizability_ctex list) Either.t
     =
     let opt_cst =
-      Set.exists unknowns ~f:(fun v -> RType.is_base (Variable.vtype_or_new v))
+      Set.exists unknowns ~f:(fun v -> RType.is_base (Variable.vtype_or_new ctx.ctx v))
     in
     let task_counter =
       if !Config.sysfe_opt then ref ((Bool.to_int opt_cst * 2) + 3) else ref 2
@@ -848,7 +902,11 @@ module Solve = struct
     in
     Log.debug_msg
       Fmt.(
-        str "Solving for %a with %i processes." VarSet.pp unknowns (List.length lwt_tasks));
+        str
+          "Solving for %a with %i processes."
+          (VarSet.pp ctx.ctx)
+          unknowns
+          (List.length lwt_tasks));
     Lwt_main.run
       (Lwt.pick
          (List.map
@@ -858,20 +916,20 @@ module Solve = struct
             lwt_tasks))
   ;;
 
-  let solve_eqns_proxy (ctx : Context.t) (unknowns : VarSet.t) (eqns : equation list) =
+  let solve_eqns_proxy (ctx : env) (unknowns : VarSet.t) (eqns : equation list) =
     if !Config.Optims.use_syntactic_definitions
     then (
       let partial_soln, new_unknowns, new_eqns =
-        solve_syntactic_definitions unknowns eqns
+        solve_syntactic_definitions ~ctx unknowns eqns
       in
       if Set.length new_unknowns > 0
-      then combine (Either.First partial_soln) (solve_eqns ctx new_unknowns new_eqns)
+      then combine ~ctx (Either.First partial_soln) (solve_eqns ctx new_unknowns new_eqns)
       else RSuccess [], Either.First partial_soln)
     else solve_eqns ctx unknowns eqns
   ;;
 
   let split_solve
-      (ctx : Context.t)
+      ~(ctx : env)
       (partial_soln : partial_soln)
       (unknowns : VarSet.t)
       (eqns : equation list)
@@ -884,8 +942,8 @@ module Solve = struct
           List.partition_tf e ~f:(fun eqn ->
               let fv =
                 Set.union
-                  (Analysis.free_variables eqn.elhs)
-                  (Analysis.free_variables eqn.erhs)
+                  (ctx >- Analysis.free_variables eqn.elhs)
+                  (ctx >- Analysis.free_variables eqn.erhs)
               in
               Set.mem fv xi)
         in
@@ -893,8 +951,8 @@ module Solve = struct
           List.partition_tf eqn_u ~f:(fun eqn ->
               let fv =
                 Set.union
-                  (Analysis.free_variables eqn.elhs)
-                  (Analysis.free_variables eqn.erhs)
+                  (ctx >- Analysis.free_variables eqn.elhs)
+                  (ctx >- Analysis.free_variables eqn.erhs)
               in
               Set.is_empty (Set.inter fv (Set.diff unknowns (VarSet.singleton xi))))
         in
@@ -916,7 +974,7 @@ module Solve = struct
       List.fold
         l
         ~init:(Sygus.RSuccess [], Either.First partial_soln)
-        ~f:(fun (_, prev_sol) r -> combine prev_sol r)
+        ~f:(fun (_, prev_sol) r -> combine ~ctx prev_sol r)
     in
     List.fold_until
       (List.stable_sort
@@ -927,27 +985,25 @@ module Solve = struct
       ~f:(fun (_, prev_soln) subsystem ->
         match comb_l (solve_eqn_aux subsystem) with
         | resp, Either.First solution ->
-          Continue (combine prev_soln (resp, Either.First solution))
+          Continue (combine ~ctx prev_soln (resp, Either.First solution))
         | resp, Either.Second counterexamples ->
-          Stop (combine prev_soln (resp, Either.Second counterexamples)))
+          Stop (combine ~ctx prev_soln (resp, Either.Second counterexamples)))
   ;;
 
-  let solve_stratified (ctx : Context.t) (unknowns : VarSet.t) (eqns : equation list) =
-    Context.check ctx;
+  let solve_stratified (ctx : env) (unknowns : VarSet.t) (eqns : equation list) =
     let psol, u, e =
       if !Config.Optims.use_syntactic_definitions
       then (
-        let c_soln, no_c_unknowns, no_c_eqns = solve_constant_eqns unknowns eqns in
+        let c_soln, no_c_unknowns, no_c_eqns = solve_constant_eqns ~ctx unknowns eqns in
         let partial_soln', new_unknowns, new_eqns =
-          solve_syntactic_definitions no_c_unknowns no_c_eqns
+          solve_syntactic_definitions ~ctx no_c_unknowns no_c_eqns
         in
         (* (if Set.is_empty new_unknowns then Fmt.(pf stdout "All solved with syntax.@.")); *)
         c_soln @ partial_soln', new_unknowns, new_eqns)
       else [], unknowns, eqns
     in
-    Context.check ctx;
     if !Config.Optims.split_solve_on
-    then split_solve ctx psol u e
+    then split_solve ~ctx psol u e
     else
       Either.(
         match solve_eqns ctx u e with
@@ -977,7 +1033,8 @@ module Preprocess = struct
     }
 
   (** An empty preprocessing action. *)
-  let preprocess_none u eqs =
+  let preprocess_none ~ctx u eqs =
+    let _ = ctx in
     { pre_unknowns = u; pre_equations = eqs; pre_postprocessing = (fun x -> x) }
   ;;
 
@@ -985,18 +1042,18 @@ module Preprocess = struct
   of unknowns and change the equations accordingly.
   Postprocessing consist of rebuilding the tuples.
 *)
-  let preprocess_detuple (unknowns : VarSet.t) (eqns : equation list)
+  let preprocess_detuple ~(ctx : env) (unknowns : VarSet.t) (eqns : equation list)
       : preprocessing_action_result
     =
-    let pre_unknowns, projections = proj_functions unknowns in
-    let pre_equations = proj_and_detuple_eqns projections eqns in
+    let pre_unknowns, projections = ctx >- proj_functions unknowns in
+    let pre_equations = ctx >>- proj_and_detuple_eqns projections eqns in
     let pre_postprocessing (resp, soln) =
       Either.(
         match soln with
         | First soln ->
           let soln =
             if Map.length projections > 0
-            then revert_projs unknowns projections soln
+            then revert_projs ~ctx unknowns projections soln
             else soln
           in
           resp, First soln
@@ -1008,7 +1065,7 @@ module Preprocess = struct
   (** Preprocessing action that transforms constraints with conditionals into sets of constraints
   where conditions have been moved in the precondition of the constraint.
 *)
-  let preprocess_deconstruct_if (unknowns : VarSet.t) (eqns : equation list)
+  let preprocess_deconstruct_if ~(ctx : env) (unknowns : VarSet.t) (eqns : equation list)
       : preprocessing_action_result
     =
     let and_opt precond t =
@@ -1020,13 +1077,13 @@ module Preprocess = struct
       let rec split_if eqn =
         match eqn.erhs.tkind with
         | TIte (rhs_c, rhs_bt, rhs_bf) ->
-          if Set.is_empty (Set.inter (Analysis.free_variables rhs_c) unknowns)
+          if Set.is_empty (Set.inter (ctx >- Analysis.free_variables rhs_c) unknowns)
           then (
             match eqn.elhs.tkind with
             | TIte (lhs_c, lhs_bt, lhs_bf)
               when Terms.equal
-                     (Rewriter.simplify_term rhs_c)
-                     (Rewriter.simplify_term lhs_c) ->
+                     (ctx >- Rewriter.simplify_term rhs_c)
+                     (ctx >- Rewriter.simplify_term lhs_c) ->
               split_if
                 { eqn with
                   eprecond = and_opt eqn.eprecond rhs_c
@@ -1065,9 +1122,13 @@ module Preprocess = struct
   (** For each equation, search within the system of equations whether there is another
     equation that constrains a subexpression.
 *)
-  let preprocess_factor_subexpressions (unknowns : VarSet.t) (eqns : equation list)
+  let preprocess_factor_subexpressions
+      ~(ctx : env)
+      (unknowns : VarSet.t)
+      (eqns : equation list)
       : preprocessing_action_result
     =
+    let _ = ctx in
     let finder sube = List.find ~f:(fun e' -> Terms.equal e'.erhs sube) eqns in
     let precond_compat eqn1 eqn2 = Option.equal Terms.equal eqn1.eprecond eqn2.eprecond in
     let pre_equations =
@@ -1093,7 +1154,7 @@ end
   solution as a list of implementations for the unknowns (a triple of unknown name, arguments of a
   function and body of a function) or a list of unrealizability counterexamples.
 *)
-let solve (ctx : Context.t) ~(p : PsiDef.t) (eqns : equation list)
+let solve (ctx : env) ~(p : PsiDef.t) (eqns : equation list)
     : Sygus.solver_response * (partial_soln, unrealizability_ctex list) Either.t
   =
   let unknowns = p.PsiDef.target.psyntobjs in
@@ -1111,12 +1172,10 @@ let solve (ctx : Context.t) ~(p : PsiDef.t) (eqns : equation list)
         preprocessing_actions
         ~init:(unknowns, eqns, [])
         ~f:(fun (u, e, post_acts) pre_act ->
-          Context.check ctx;
-          let ppact = pre_act u e in
+          let ppact = pre_act ~ctx u e in
           Preprocess.(
             ppact.pre_unknowns, ppact.pre_equations, ppact.pre_postprocessing :: post_acts))
     in
-    Context.check ctx;
     (* Apply the postprocessing after solving. *)
     List.fold
       postprocessing_actions
@@ -1129,7 +1188,11 @@ let solve (ctx : Context.t) ~(p : PsiDef.t) (eqns : equation list)
       Utils.Log.debug
         Fmt.(
           fun fmt () ->
-            pf fmt "@[<hov 2>Solution found: @;%a@]" (box Solve.pp_partial_soln) soln)
+            pf
+              fmt
+              "@[<hov 2>Solution found: @;%a@]"
+              (box (Solve.pp_partial_soln ~ctx))
+              soln)
     | _ -> ());
   resp, Either.map ~first:Solve.pick_only_one_soln ~second:identity soln_final
 ;;
@@ -1139,6 +1202,7 @@ let solve (ctx : Context.t) ~(p : PsiDef.t) (eqns : equation list)
 (* ============================================================================================= *)
 
 let update_assumptions
+    ~(ctx : env)
     ~(p : PsiDef.t)
     (lstate : refinement_loop_state)
     (sol : partial_soln)
@@ -1150,7 +1214,8 @@ let update_assumptions
     let free_vars =
       List.fold
         ~init:VarSet.empty
-        ~f:(fun vs t -> Set.union vs (Analysis.free_variables (compute_rhs p t)))
+        ~f:(fun vs t ->
+          Set.union vs (ctx >- Analysis.free_variables (compute_rhs ~ctx p t)))
         (Set.elements new_ctexs)
     in
     Set.diff p.PsiDef.target.psyntobjs free_vars
@@ -1161,7 +1226,7 @@ let update_assumptions
       | Some fvar ->
         Some
           { elhs = f_body
-          ; erhs = mk_app_v fvar (List.map ~f:mk_var f_args)
+          ; erhs = mk_app_v ctx.ctx fvar (List.map ~f:(mk_var ctx.ctx) f_args)
           ; eprecond = None
           ; esplitter = None
           ; (* Dummy term; this equation forces a syntactic definition. *) eterm = t0
@@ -1174,6 +1239,10 @@ let update_assumptions
   Log.verbose
     Fmt.(
       fun fmt () ->
-        pf fmt "New assumptions:@;%a" (list ~sep:sp (box pp_equation)) assumptions);
+        pf
+          fmt
+          "New assumptions:@;%a"
+          (list ~sep:sp (box (ctx >- pp_equation)))
+          assumptions);
   { lstate with assumptions }
 ;;

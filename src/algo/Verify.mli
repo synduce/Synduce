@@ -13,7 +13,8 @@ open Lang.Term
    not perform bounded checking by expanding unnecessary terms.
 *)
 val check_solution
-  :  p:AState.PsiDef.t
+  :  ctx:Env.env
+  -> p:AState.PsiDef.t
   -> refinement_loop_state
   -> (string * variable list * term) list
   -> [ `Incorrect_assumptions
@@ -30,6 +31,7 @@ val check_solution
 *)
 val bounded_check
   :  ?use_concrete_ctex:bool
+  -> ctx:Env.env
   -> p:AState.PsiDef.t
   -> (string * variable list * term) list
   -> AState.equation option
@@ -39,4 +41,4 @@ val bounded_check
   Returns Some list of terms, one for each input of the function f, if the equation admits a solution.
   Returns None if the equation has no solution.
  *)
-val invert : PMRS.t -> Constant.t -> term list option
+val invert : ctx:Env.env -> PMRS.t -> Constant.t -> term list option

@@ -424,22 +424,22 @@ let id_kind_of_s
             (match
                Option.first_some
                  (PMRS.Functions.find_by_name functions s)
-                 (Context.find_global ctx s)
+                 (Context.find_global_var ctx s)
              with
             | Some v -> IVar v
             | _ -> if Tuples.is_constr_name s then ITupCstr else INotDef)))))
 ;;
 
 let rec term_of_smt
+    ~(fctx : PMRS.Functions.ctx)
     ~(ctx : Context.t)
-    ~(functions : PMRS.Functions.ctx)
     (env : (string, variable, String.comparator_witness) Map.t)
     (st : smtTerm)
     : term
   =
   match st with
   | SmtTQualdId (QIas (Id (SSimple s), _)) | SmtTQualdId (QI (Id (SSimple s))) ->
-    (match id_kind_of_s ~ctx ~functions env s with
+    (match id_kind_of_s ~ctx ~functions:fctx env s with
     | IVar v -> Term.mk_var ctx v
     | IBool true -> mk_const Constant.CTrue
     | IBool false -> mk_const Constant.CFalse
@@ -447,12 +447,12 @@ let rec term_of_smt
     | _ -> failwith Fmt.(str "Smt: undefined variable %s" s))
   | SmtTSpecConst l -> mk_const (constant_of_smtConst l)
   | SmtTApp (QIas (Id (SSimple s), _), args) | SmtTApp (QI (Id (SSimple s)), args) ->
-    let args' = List.map ~f:(term_of_smt ~ctx ~functions env) args in
+    let args' = List.map ~f:(term_of_smt ~ctx ~fctx env) args in
     (* The line below is a hack! Make a real fix *)
     if String.(equal s "mkTuple_int_int")
     then mk_tup ctx args'
     else (
-      match id_kind_of_s ~ctx ~functions env s with
+      match id_kind_of_s ~ctx ~functions:fctx env s with
       | ICstr c -> mk_data ctx c args'
       | ITupCstr -> mk_tup ctx args'
       | IVar v -> mk_app (Term.mk_var ctx v) args'
@@ -489,8 +489,8 @@ let sorted_vars_of_vars ~(ctx : Context.t) (vars : VarSet.t) : smtSortedVar list
 type term_model = (string, term, Base.String.comparator_witness) Base.Map.t
 
 let constmap_of_s_exprs
+    ~(fctx : PMRS.Functions.ctx)
     ~(ctx : Context.t)
-    ~(functions : PMRS.Functions.ctx)
     (starting_map : (string, term, String.comparator_witness) Map.t)
     (s_exprs : Sexp.t list)
   =
@@ -503,7 +503,7 @@ let constmap_of_s_exprs
           | List [] ->
             let t_val_o =
               let%map smt_value = smtTerm_of_sexp value in
-              term_of_smt ~ctx ~functions (Map.empty (module String)) smt_value
+              term_of_smt ~ctx ~fctx (Map.empty (module String)) smt_value
             in
             (match t_val_o with
             | Some t_val -> Map.set map ~key:s ~data:t_val
@@ -527,25 +527,25 @@ let constmap_of_s_exprs
 ;;
 
 let model_to_constmap
+    ~(fctx : PMRS.Functions.ctx)
     ~(ctx : Context.t)
-    ~(functions : PMRS.Functions.ctx)
     (s : solver_response)
   =
   let empty_map = Map.empty (module String) in
   match s with
   | Unsupported | Unknown | Unsat | Sat | Success -> empty_map
-  | SExps s_exprs -> constmap_of_s_exprs ~ctx ~functions empty_map s_exprs
+  | SExps s_exprs -> constmap_of_s_exprs ~ctx ~fctx empty_map s_exprs
   | Error _ -> failwith "Smt solver error"
 ;;
 
 let model_to_varmap
+    ~(fctx : PMRS.Functions.ctx)
     ~(ctx : Context.t)
-    ~(functions : PMRS.Functions.ctx)
     (hctx : VarSet.t)
     (s : solver_response)
     : term VarMap.t
   =
-  let map = Map.to_alist (model_to_constmap ~ctx ~functions s) in
+  let map = Map.to_alist (model_to_constmap ~ctx ~fctx s) in
   let f imap (vname, t) =
     match VarSet.find_by_name hctx vname with
     | Some v -> Map.set imap ~key:v ~data:t
@@ -560,8 +560,8 @@ let model_to_varmap
     call.
 *)
 let request_different_models
+    ~(fctx : PMRS.Functions.ctx)
     ~(ctx : Context.t)
-    ~(functions : PMRS.Functions.ctx)
     (model : term_model)
     (num_models : int)
     (solver : SyncSmt.online_solver)
@@ -579,7 +579,7 @@ let request_different_models
       (match get_model solver with
       | SExps s ->
         (* New model has been found, recursively find new ones. *)
-        let new_model = model_to_constmap ~ctx ~functions (SExps s) in
+        let new_model = model_to_constmap ~ctx ~fctx (SExps s) in
         if i > 0
         then req_loop new_model (i - 1) (new_model :: models)
         else new_model :: models
@@ -590,8 +590,8 @@ let request_different_models
 ;;
 
 let request_different_models_async
+    ~(fctx : PMRS.Functions.ctx)
     ~(ctx : Context.t)
-    ~(functions : PMRS.Functions.ctx)
     (model : term_model Lwt.t)
     (num_models : int)
     (solver : AsyncSmt.solver)
@@ -613,7 +613,7 @@ let request_different_models_async
       (match model with
       | SExps s ->
         (* New model has been found, recursively find new ones. *)
-        let new_model = model_to_constmap ~ctx ~functions (SExps s) in
+        let new_model = model_to_constmap ~ctx ~fctx (SExps s) in
         if i > 0
         then req_loop new_model (i - 1) (Lwt.return (new_model :: models))
         else Lwt.return (new_model :: models)
@@ -894,10 +894,10 @@ let _smt_of_pmrs ~(ctx : Context.t) (pmrs : PMRS.t)
 
 let mk_assert = mk_assert
 
-let smt_of_pmrs ~(ctx : Context.t) ~(functions : PMRS.Functions.ctx) (pmrs : PMRS.t)
+let smt_of_pmrs ~(fctx : PMRS.Functions.ctx) ~(ctx : Context.t) (pmrs : PMRS.t)
     : command list
   =
-  let deps = PMRS.depends ~ctx ~glob:functions pmrs in
+  let deps = PMRS.depends ~ctx ~glob:fctx pmrs in
   let sort_decls_of_deps, decls_of_deps =
     List.unzip (List.map ~f:(_smt_of_pmrs ~ctx) deps)
   in

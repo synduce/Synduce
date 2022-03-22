@@ -21,7 +21,7 @@ open Syguslib.Sygus
     Use the option [--segis] in the executable to use this synthesis algorithm.
 *)
 let rec segis_loop
-    ~(ctx : Context.t)
+    ~(ctx : Env.env)
     ~(t : ThreadContext.t)
     (p : PsiDef.t)
     (t_set : TermSet.t)
@@ -47,6 +47,7 @@ let rec segis_loop
   (* Start of the algorithm. *)
   let eqns, _ =
     Equations.make
+      ~ctx
       ~force_replace_off:true
       ~p
       ~term_state:Lemmas.empty_term_state
@@ -58,7 +59,7 @@ let rec segis_loop
   in
   match s_resp, solution with
   | RSuccess _, First sol ->
-    (match Stats.timed (fun () -> Verify.bounded_check ~p sol) with
+    (match Stats.timed (fun () -> Verify.bounded_check ~ctx ~p sol) with
     (* A symbolic counterexample term is returned. *)
     | verif_time, Some eqn ->
       Stats.log_major_step_end ~synth_time ~verif_time ~t:tsize ~u:0 false;
@@ -67,7 +68,7 @@ let rec segis_loop
             pf
               frmt
               "@[<hov 2><SEGIS> Counterexample term:@;@[<hov 2>%a@]"
-              (pp_term ctx)
+              (pp_term ctx.ctx)
               eqn.eterm));
       segis_loop ~ctx ~t p (Set.add t_set eqn.eterm)
     | verif_time, None ->
@@ -82,7 +83,7 @@ let rec segis_loop
           pf
             frmt
             "@[<hov 2><SEGIS> This problem has no solution. Counterexample set:@;%a@]"
-            (list ~sep:sp (pp_term ctx))
+            (list ~sep:sp (pp_term ctx.ctx))
             (Set.elements t_set));
     Unrealizable ctexs
   | RFail, _ ->
@@ -94,8 +95,8 @@ let rec segis_loop
   | _ -> Failed s_resp
 ;;
 
-let algo_segis ~(ctx : Context.t) ~(t : ThreadContext.t) (p : PsiDef.t) =
-  let t_set = TermSet.of_list (Analysis.terms_of_max_depth ~ctx 1 !AState._theta) in
+let algo_segis ~(ctx : Env.env) ~(t : ThreadContext.t) (p : PsiDef.t) =
+  let t_set = TermSet.of_list Env.(ctx >- Analysis.terms_of_max_depth 1 !AState._theta) in
   refinement_steps := 0;
   segis_loop ~ctx ~t:(ThreadContext.subctx t "segis") p t_set
 ;;
@@ -110,7 +111,7 @@ let algo_segis ~(ctx : Context.t) ~(t : ThreadContext.t) (p : PsiDef.t) =
     Use the option [--cegis] in the executable to use this synthesis algorithm.
 *)
 let rec cegis_loop
-    ~(ctx : Context.t)
+    ~(ctx : Env.env)
     ~(t : ThreadContext.t)
     (p : PsiDef.t)
     (t_set : TermSet.t)
@@ -132,6 +133,7 @@ let rec cegis_loop
   (* Start of the algorithm. *)
   let eqns, _ =
     Equations.make
+      ~ctx
       ~force_replace_off:true
       ~p
       ~term_state:Lemmas.empty_term_state
@@ -144,7 +146,7 @@ let rec cegis_loop
   match s_resp, solution with
   | RSuccess _, First sol ->
     (match
-       Stats.timed (fun () -> Verify.bounded_check ~use_concrete_ctex:true ~p sol)
+       Stats.timed (fun () -> Verify.bounded_check ~ctx ~use_concrete_ctex:true ~p sol)
      with
     (* A concrete conterexample term is returned. *)
     | verif_time, Some eqn ->
@@ -154,7 +156,7 @@ let rec cegis_loop
             pf
               frmt
               "@[<hov 2><CEGIS> Counterexample term:@;@[<hov 2>%a@]"
-              (pp_term ctx)
+              (pp_term ctx.ctx)
               eqn.eterm));
       cegis_loop ~ctx ~t p (Set.add t_set eqn.eterm)
     | verif_time, None ->
@@ -169,7 +171,7 @@ let rec cegis_loop
           pf
             frmt
             "@[<hov 2><CEGIS> This problem has no solution. Counterexample set:@;%a@]"
-            (list ~sep:sp (pp_term ctx))
+            (list ~sep:sp (pp_term ctx.ctx))
             (Set.elements t_set));
     Unrealizable ctexs
   | RFail, _ ->
@@ -181,12 +183,12 @@ let rec cegis_loop
   | _ -> Failed s_resp
 ;;
 
-let algo_cegis ~(ctx : Context.t) ~(t : ThreadContext.t) (p : PsiDef.t) =
+let algo_cegis ~(ctx : Env.env) ~(t : ThreadContext.t) (p : PsiDef.t) =
   let t_set =
     TermSet.of_list
       (List.map
-         ~f:(Analysis.concretize ~ctx)
-         (Analysis.terms_of_max_depth ~ctx 1 !AState._theta))
+         ~f:(Analysis.concretize ~ctx:ctx.ctx)
+         Env.(ctx >- Analysis.terms_of_max_depth 1 !AState._theta))
   in
   refinement_steps := 0;
   cegis_loop ~ctx ~t:(ThreadContext.subctx t "cegis") p t_set

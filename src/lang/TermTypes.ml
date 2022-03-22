@@ -394,9 +394,19 @@ module Context = struct
     }
   ;;
 
-  let find_global (ctx : t) (s : string) : variable option =
+  let add_global
+      (ctx : t)
+      ~(key : string)
+      ~(data : variable * fpattern list * term option * term)
+    =
+    Hashtbl.add ctx.globals ~key ~data
+  ;;
+
+  let find_global_var (ctx : t) (s : string) : variable option =
     match Hashtbl.find ctx.globals s with
     | Some (v, _, _, _) -> Some v
     | None -> None
   ;;
+
+  let find_global (ctx : t) (s : string) = Hashtbl.find ctx.globals s
 end

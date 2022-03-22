@@ -117,8 +117,8 @@ type id_kind =
   | INotDef
 
 val term_of_smt
-  :  ctx:Term.Context.t
-  -> functions:PMRS.Functions.ctx
+  :  fctx:PMRS.Functions.ctx
+  -> ctx:Term.Context.t
   -> (string, Term.variable, Base.String.comparator_witness) Base.Map.t
   -> SmtLib.smtTerm
   -> Term.term
@@ -128,29 +128,29 @@ val sorted_vars_of_vars : ctx:Term.Context.t -> Term.VarSet.t -> SmtLib.smtSorte
 type term_model = (string, Term.term, Base.String.comparator_witness) Base.Map.t
 
 val model_to_constmap
-  :  ctx:Term.Context.t
-  -> functions:PMRS.Functions.ctx
+  :  fctx:PMRS.Functions.ctx
+  -> ctx:Term.Context.t
   -> SyncSmt.solver_response
   -> (string, Term.term, Base.String.comparator_witness) Base.Map.t
 
 val model_to_varmap
-  :  ctx:Term.Context.t
-  -> functions:PMRS.Functions.ctx
+  :  fctx:PMRS.Functions.ctx
+  -> ctx:Term.Context.t
   -> Term.VarSet.t
   -> SyncSmt.solver_response
   -> Term.term Term.VarMap.t
 
 val request_different_models
-  :  ctx:Term.Context.t
-  -> functions:PMRS.Functions.ctx
+  :  fctx:PMRS.Functions.ctx
+  -> ctx:Term.Context.t
   -> term_model
   -> int
   -> Solvers.Synchronous(SmtLog)(Stats).online_solver
   -> (string, Term.term, Base.String.comparator_witness) Base.Map.t list
 
 val request_different_models_async
-  :  ctx:Term.Context.t
-  -> functions:PMRS.Functions.ctx
+  :  fctx:PMRS.Functions.ctx
+  -> ctx:Term.Context.t
   -> term_model Lwt.t
   -> int
   -> Solvers.Asyncs(SmtLog)(Stats).solver
@@ -160,8 +160,8 @@ val smtPattern_of_term : Term.term -> SmtLib.smtPattern option
 val mk_assert : SmtLib.smtTerm -> SmtLib.command
 
 val smt_of_pmrs
-  :  ctx:Term.Context.t
-  -> functions:PMRS.Functions.ctx
+  :  fctx:PMRS.Functions.ctx
+  -> ctx:Term.Context.t
   -> PMRS.t
   -> SmtLib.command list
 
