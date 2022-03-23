@@ -2,8 +2,10 @@ open AState
 open Base
 open Lang
 open Utils
+open Env
 
 let find_and_solve_problem
+    ~(ctx : env)
     (psi_comps : (string * string * string) option)
     (pmrs : (string, PMRS.t, Base.String.comparator_witness) Map.t)
     : (PsiDef.t * Syguslib.Sygus.solver_response segis_response) list
@@ -17,7 +19,8 @@ let find_and_solve_problem
       "target", "spec", "repr"
   in
   let top_userdef_problem =
-    ProblemFinder.find_problem_components (target_fname, spec_fname, repr_fname) pmrs
+    ctx
+    >>- ProblemFinder.find_problem_components (target_fname, spec_fname, repr_fname) pmrs
   in
   let main_algo =
     if !Config.Optims.use_segis (* Symbolic CEGIS. *)
@@ -30,7 +33,7 @@ let find_and_solve_problem
   let problems =
     if !Config.Optims.max_solutions < 0
     then [ top_userdef_problem ]
-    else PEnum.enumerate_p top_userdef_problem
+    else ctx >- PEnum.enumerate_p top_userdef_problem
   in
   let rec f (i, sols, fails) l =
     if List.length sols >= max 1 !Config.Optims.max_solutions
@@ -38,9 +41,9 @@ let find_and_solve_problem
     else (
       match l with
       | low_problem :: tl ->
-        ProblemFinder.update_context low_problem;
-        AlgoLog.show_new_rskel i low_problem;
-        let maybe_solution = main_algo (Context.mk "main") low_problem in
+        ctx >>- ProblemFinder.update_context low_problem;
+        ctx >- AlgoLog.show_new_rskel i low_problem;
+        let maybe_solution = main_algo ~ctx ~t:(ThreadContext.mk "main") low_problem in
         (* Print state and save. *)
         LogJson.save_stats_and_restart low_problem.id;
         (match maybe_solution with

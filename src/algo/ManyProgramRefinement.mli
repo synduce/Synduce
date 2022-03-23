@@ -5,6 +5,7 @@
     unknowns or changing their output domain.
 *)
 val find_and_solve_problem
-  :  (string * string * string) option
+  :  ctx:Env.env
+  -> (string * string * string) option
   -> (string, Lang.PMRS.t, Base.String.comparator_witness) Base.Map.t
   -> (AState.PsiDef.t * Syguslib.Sygus.solver_response AState.segis_response) list

@@ -394,6 +394,15 @@ module Context = struct
     }
   ;;
 
+  let copy (ctx : t) =
+    { names = Alpha.copy ctx.names
+    ; types = RType.copy ctx.types
+    ; globals = Hashtbl.copy ctx.globals
+    ; vartypes = Hashtbl.copy ctx.vartypes
+    ; varnames = Hashtbl.copy ctx.varnames
+    }
+  ;;
+
   let add_global
       (ctx : t)
       ~(key : string)

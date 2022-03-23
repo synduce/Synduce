@@ -175,7 +175,7 @@ let find_problem_components
   problem
 ;;
 
-let update_context ~(ctx : Context.t) ~(fctx : PMRS.Functions.ctx) (p : PsiDef.t) =
+let update_context ~(fctx : PMRS.Functions.ctx) ~(ctx : Context.t) (p : PsiDef.t) =
   let target = PMRS.infer_pmrs_types ~ctx p.PsiDef.target in
   PMRS.Functions.update fctx target;
   AState.refinement_steps := 0

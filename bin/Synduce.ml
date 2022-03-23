@@ -4,6 +4,7 @@ open Lib
 open Lib.Lang
 open Lib.Parsers
 open Lib.Utils
+open Algo.Env
 
 let parse_only = ref false
 
@@ -29,27 +30,31 @@ let main () =
   let prog, psi_comps =
     if is_ocaml_syntax then parse_ocaml !filename else parse_pmrs !filename
   in
+  (* Main context *)
+  let ctx = group (Term.Context.create ()) (PMRS.Functions.create ()) in
   (* Populate types.  *)
-  let _ = seek_types prog in
+  let _ = ctx >- seek_types prog in
   (* Translate the Caml or PRMS file into pmrs representation. *)
   let all_pmrs =
-    try translate prog with
+    try ctx >>- translate prog with
     | e ->
-      if !Config.show_vars then Term.Variable.print_summary stdout ();
+      if !Config.show_vars then Term.Variable.print_summary stdout ctx.ctx;
       raise e
   in
   if !parse_only then Caml.exit 1;
   (* Solve the problem proper. *)
-  let outputs = Many.find_and_solve_problem psi_comps all_pmrs in
+  let outputs = ctx >>> Many.find_and_solve_problem psi_comps all_pmrs in
   let f (pb, soln) =
     Algo.AState.(
       match pb, soln with
       | pb, Realizable soln ->
         ( pb.PsiDef.id
-        , ToolMessages.on_success ~is_ocaml_syntax filename pb (Either.First soln) )
+        , ctx >>> ToolMessages.on_success ~is_ocaml_syntax filename pb (Either.First soln)
+        )
       | pb, Unrealizable ctexs ->
         ( pb.PsiDef.id
-        , ToolMessages.on_success ~is_ocaml_syntax filename pb (Either.Second ctexs) )
+        , ctx
+          >>> ToolMessages.on_success ~is_ocaml_syntax filename pb (Either.Second ctexs) )
       | _, Failed _ ->
         Utils.Log.error_msg "Failed to find a solution or a witness of unrealizability";
         failwith "Solving failure")
@@ -70,7 +75,7 @@ let main () =
       Yojson.to_channel ~std:true Stdio.stdout json_out;
       Stdio.(Out_channel.flush stdout))
     else Fmt.(pf stdout "%a@." (Yojson.pretty_print ~std:false) json_out));
-  if !Config.show_vars then Term.Variable.print_summary stdout ()
+  if !Config.show_vars then Term.Variable.print_summary stdout ctx.ctx
 ;;
 
 main ()

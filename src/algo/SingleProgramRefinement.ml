@@ -186,11 +186,11 @@ let se2gis ~(ctx : env) (tctx : ThreadContext.t) (p : PsiDef.t) =
 (*                                                 MAIN ENTRY POINTS                             *)
 (* ============================================================================================= *)
 
-let solve_problem ~(ctx : env) (tctx : ThreadContext.t) (synthesis_problem : PsiDef.t)
+let solve_problem ~(ctx : env) ~(t : ThreadContext.t) (synthesis_problem : PsiDef.t)
     : solver_response segis_response
   =
   (* Solve the problem using portofolio of techniques. *)
-  try se2gis ~ctx tctx synthesis_problem with
+  try se2gis ~ctx t synthesis_problem with
   | ThreadContext.Escape ->
     Utils.Log.debug_msg "se2gis run was terminated early.";
     Failed RFail
@@ -217,13 +217,12 @@ let find_and_solve_problem
   in
   let main_algo =
     if !Config.Optims.use_segis (* Symbolic CEGIS. *)
-    then fun t -> Baselines.algo_segis ~ctx ~t
+    then Baselines.algo_segis ~ctx
     else if !Config.Optims.use_cegis (* Concrete CEGIS. *)
     then
-      fun t ->
-      Baselines.algo_cegis ~ctx ~t
+      Baselines.algo_cegis ~ctx
       (* Default algorithm: best combination of techniques. *)
     else solve_problem ~ctx
   in
-  [ top_userdef_problem, main_algo tctx top_userdef_problem ]
+  [ top_userdef_problem, main_algo ~t:tctx top_userdef_problem ]
 ;;

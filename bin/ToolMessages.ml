@@ -4,6 +4,7 @@ open Base
 open Fmt
 open Utils
 open Algo.AState
+open Algo.Env
 
 (* ============================================================================================= *)
 (*                              TOOL MESSAGESAND JSON OUTPUT                                     *)
@@ -16,6 +17,7 @@ let cvc_message () =
 
 let prep_final_json
     ~(is_ocaml_syntax : bool)
+    ~(ctx : env)
     (source_filename : string ref)
     (pb : PsiDef.t)
     (soln : (soln, unrealizability_ctex list) Either.t)
@@ -44,7 +46,7 @@ let prep_final_json
         , `String
             (Fmt.str
                "%a"
-               (box (Algo.AState.pp_soln ~use_ocaml_syntax:is_ocaml_syntax))
+               (box (ctx >- Algo.AState.pp_soln ~use_ocaml_syntax:is_ocaml_syntax))
                soln) )
       ; "unrealizable", `Bool false
       ]
@@ -63,6 +65,7 @@ let prep_final_json
 
 let on_success
     ~(is_ocaml_syntax : bool)
+    ~(ctx : env)
     (source_filename : string ref)
     (pb : PsiDef.t)
     (result : (soln, unrealizability_ctex list) Either.t)
@@ -85,28 +88,29 @@ let on_success
           "Solution found in %4.4fs (%3.1f%% verifying):@.%a@]"
           elapsed
           verif_ratio
-          (box (Algo.AState.pp_soln ~use_ocaml_syntax:is_ocaml_syntax))
+          (box (ctx >- Algo.AState.pp_soln ~use_ocaml_syntax:is_ocaml_syntax))
           soln)
   | Either.Second ctexs ->
     Log.(
       info (fun frmt () ->
           pf frmt "No solution: problem is unrealizable (found answer in %4.4fs)." elapsed));
-    ToolExplain.when_unrealizable pb ctexs);
+    ctx >>> ToolExplain.when_unrealizable pb ctexs);
   (* If output specified, write the solution in file. *)
   (match result with
   | Either.First soln ->
     (match Config.get_output_file !source_filename with
     | Some out_file ->
       Utils.Log.to_file out_file (fun frmt () ->
-          (box (Algo.AState.pp_soln ~use_ocaml_syntax:is_ocaml_syntax)) frmt soln)
+          (box (ctx >- Algo.AState.pp_soln ~use_ocaml_syntax:is_ocaml_syntax)) frmt soln)
     | None -> ());
     (* If specified, output a Dafny proof skeleton. *)
     if !Config.generate_proof
     then
       Codegen.(
-        Generation.gen_proof
-          (Commons.problem_descr_of_psi_def pb, Some soln)
-          !Config.proof_generation_file)
+        ctx
+        >>- Generation.gen_proof
+              (ctx >- Commons.problem_descr_of_psi_def pb, Some soln)
+              !Config.proof_generation_file)
     else ()
   | _ -> ());
   (* If no info required, output timing information. *)
@@ -114,7 +118,8 @@ let on_success
   then (
     Fmt.(pf stdout "%i,%.4f,%.4f@." !Algo.AState.refinement_steps verif_time elapsed);
     Fmt.(pf stdout "success@."));
-  prep_final_json ~is_ocaml_syntax source_filename pb result elapsed !Stats.verif_time
+  ctx
+  >>> prep_final_json ~is_ocaml_syntax source_filename pb result elapsed !Stats.verif_time
 ;;
 
 (** Print a summary of the options available. The options are in the Lib.Utils.Config module.  *)

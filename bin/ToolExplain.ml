@@ -7,6 +7,7 @@ open Utils
 open Algo.AState
 open Lang
 open Term
+open Algo.Env
 
 let find_matching_unknown (unknowns : VarSet.t) (v0 : variable) =
   if Set.mem unknowns v0
@@ -27,6 +28,7 @@ let is_shallow_value (t : term) (shallow : term) =
 ;;
 
 let find_missing_argument
+    ~ctx
     (pb : PsiDef.t)
     (diff : (variable * (term * term)) list)
     (c : ctex)
@@ -41,16 +43,16 @@ let find_missing_argument
         pf
           fmt
           "@[On input %a, %a should have access to %a@;%a"
-          pp_term
+          (ctx @>- pp_term)
           c.ctex_eqn.eterm
-          VarSet.pp_var_names
+          (ctx @>- VarSet.pp_var_names)
           u
-          pp_term
+          (ctx @>- pp_term)
           t
           string
           msg)
   in
-  let fv = Analysis.free_variables c.ctex_eqn.erhs in
+  let fv = ctx >- Analysis.free_variables c.ctex_eqn.erhs in
   let rhs_args = Set.diff fv pb.PsiDef.target.psyntobjs in
   let unknowns_in_use =
     VarSet.filter_map fv ~f:(find_matching_unknown pb.PsiDef.target.psyntobjs)
@@ -60,14 +62,14 @@ let find_missing_argument
     then (
       match
         List.find c.ctex_eqn.eelim ~f:(fun (_, tscalar) ->
-            Set.mem (Analysis.free_variables tscalar) v)
+            Set.mem (ctx >- Analysis.free_variables tscalar) v)
       with
       | Some (trec, _) ->
         msg_missing_arg
           true
           unknowns_in_use
-          (mk_app (mk_var pb.PsiDef.target.pmain_symb) [ trec ])
-      | _ -> msg_missing_arg false unknowns_in_use (mk_var v))
+          (mk_app (mk_var ctx.ctx pb.PsiDef.target.pmain_symb) [ trec ])
+      | _ -> msg_missing_arg false unknowns_in_use (mk_var ctx.ctx v))
     else ()
   in
   let pargs_diffs, pnonargs_diff =
@@ -79,40 +81,40 @@ let find_missing_argument
   | _ -> List.iter pnonargs_diff ~f:say_diff
 ;;
 
-let find_missing_delta (pb : PsiDef.t) (ctex : unrealizability_ctex) =
-  let g = mk_var pb.PsiDef.target.pmain_symb in
+let find_missing_delta ~ctx (pb : PsiDef.t) (ctex : unrealizability_ctex) =
+  let g = mk_var ctx.ctx pb.PsiDef.target.pmain_symb in
   let summ c =
-    let f x = Eval.in_model ~no_simplify:x c.ctex_model in
+    let f x = ctx >- Eval.in_model ~no_simplify:x c.ctex_model in
     let cinput = f false c.ctex_eqn.eterm in
     let celim_str =
       let conc_elims =
         List.map c.ctex_eqn.eelim ~f:(fun (trec, telims) ->
-            Terms.(mk_app g [ trec ] == Eval.in_model c.ctex_model telims))
+            Terms.(mk_app g [ trec ] == (ctx >- Eval.in_model c.ctex_model telims)))
       in
       match conc_elims with
       | [] -> ""
-      | _ -> Fmt.str " with %a" (list ~sep:comma pp_term) conc_elims
+      | _ -> Fmt.str " with %a" (list ~sep:comma (ctx @>- pp_term)) conc_elims
     in
     Log.info (fun fmt () ->
         pf
           fmt
           "@[On input %a%s, the constraint@;@[(%a = %a)@]@;states@;@[%a = %a@]@]"
-          (styled `Italic pp_term)
+          (styled `Italic (ctx @>- pp_term))
           cinput
           celim_str
-          pp_term
+          (ctx @>- pp_term)
           (f true c.ctex_eqn.erhs)
-          pp_term
+          (ctx @>- pp_term)
           (f true c.ctex_eqn.elhs)
-          pp_term
+          (ctx @>- pp_term)
           (f false c.ctex_eqn.erhs)
-          pp_term
+          (ctx @>- pp_term)
           (f false c.ctex_eqn.elhs))
   in
   let fv =
     Set.union
-      (Analysis.free_variables ctex.ci.ctex_eqn.erhs)
-      (Analysis.free_variables ctex.cj.ctex_eqn.erhs)
+      (ctx >- Analysis.free_variables ctex.ci.ctex_eqn.erhs)
+      (ctx >- Analysis.free_variables ctex.cj.ctex_eqn.erhs)
   in
   let unknowns_in_use =
     VarSet.filter_map fv ~f:(find_matching_unknown pb.PsiDef.target.psyntobjs)
@@ -123,14 +125,14 @@ let find_missing_delta (pb : PsiDef.t) (ctex : unrealizability_ctex) =
       pf
         fmt
         "There is no function %a that can satisfy these constraints."
-        (styled (`Fg `Blue) (styled `Italic VarSet.pp_var_names))
+        (styled (`Fg `Blue) (styled `Italic (ctx @>- VarSet.pp_var_names)))
         unknowns_in_use)
 ;;
 
 (** When we get a witness of unrealizability, we need to explain why the problem is unrealizable.
   This function contains heuristics to root cause th problem an guide the user.
 *)
-let when_unrealizable pb (ctexs : unrealizability_ctex list) : unit =
+let when_unrealizable ~ctx pb (ctexs : unrealizability_ctex list) : unit =
   Log.(info (wrap "💡 Explanation: "));
   let f ctex =
     let common_vars =
@@ -147,12 +149,14 @@ let when_unrealizable pb (ctexs : unrealizability_ctex list) : unit =
     if Terms.equal ti tj
     then
       (* Case 1: unknown is missing an argument. *)
-      find_missing_argument pb diff ctex.ci
+      find_missing_argument ~ctx pb diff ctex.ci
     else (
       match diff with
-      | [] -> find_missing_delta pb ctex
+      | [] -> find_missing_delta ~ctx pb ctex
       | _ ->
         Log.(
+          let pp_term = ctx @>- pp_term
+          and pp_equation = ctx >- pp_equation in
           info (fun fmt () ->
               pf
                 fmt
@@ -170,7 +174,10 @@ let when_unrealizable pb (ctexs : unrealizability_ctex list) : unit =
                 Fmt.(
                   list
                     (parens
-                       (pair Variable.pp ~sep:colon (pair pp_term ~sep:comma pp_term))))
+                       (pair
+                          (ctx @>- Variable.pp)
+                          ~sep:colon
+                          (pair pp_term ~sep:comma pp_term))))
                 diff)))
   in
   List.iter ~f ctexs

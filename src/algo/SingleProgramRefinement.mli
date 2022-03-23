@@ -8,7 +8,7 @@ the problem is realizable or not.
  *)
 val solve_problem
   :  ctx:Env.env
-  -> ThreadContext.t
+  -> t:ThreadContext.t
   -> PsiDef.t
   -> Sygus.solver_response segis_response
 

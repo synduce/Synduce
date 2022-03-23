@@ -148,6 +148,15 @@ let create () =
   }
 ;;
 
+let copy (ctx : env) =
+  { variant_typenames = Hashtbl.copy ctx.variant_typenames
+  ; typenames_variants = Hashtbl.copy ctx.typenames_variants
+  ; variant_types = Hashtbl.copy ctx.variant_types
+  ; typenames = Hashtbl.copy ctx.typenames
+  ; idx = ref !(ctx.idx)
+  }
+;;
+
 let get_fresh_tvar (env : env) =
   Int.incr env.idx;
   TVar !(env.idx)

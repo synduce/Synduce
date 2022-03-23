@@ -9,4 +9,4 @@ val find_problem_components
   -> (string, PMRS.t, String.comparator_witness) Map.t
   -> PsiDef.t
 
-val update_context : ctx:Term.Context.t -> fctx:PMRS.Functions.ctx -> PsiDef.t -> unit
+val update_context : fctx:PMRS.Functions.ctx -> ctx:Term.Context.t -> PsiDef.t -> unit
