@@ -2,6 +2,7 @@ open Lwt
 open AState
 open Base
 open Counterexamples
+open Env
 open Lang
 open Lang.Term
 open Lwt.Syntax
@@ -41,25 +42,25 @@ let placeholder_ctex (det : term_state_detail) : ctex =
  function is the set of scalar variables that would appear in the term after recursion elimination has
  been applied.
 *)
-let recurs_elim_of_term ~(ctx : Context.t) (term : term) ~(p : PsiDef.t)
+let recurs_elim_of_term ~(ctx : env) (term : term) ~(p : PsiDef.t)
     : (term * term) list * variable list
   =
   Set.fold
     ~init:([], p.PsiDef.reference.pargs)
     ~f:(fun (rec_elim, vars) var ->
-      match Variable.vtype ctx var with
+      match Variable.vtype ctx.ctx var with
       | None -> rec_elim, var :: vars
       | Some t ->
-        if RType.is_recursive ctx.types t
+        if RType.is_recursive ctx.ctx.types t
         then (
           match Expand.mk_recursion_elimination_term ~ctx p with
           | None -> rec_elim, vars
           | Some (a, _) ->
             (* When are a and b different? *)
-            ( (mk_var ctx var, a) :: rec_elim
-            , vars @ Set.elements (Analysis.free_variables ~ctx a) ))
+            ( (mk_var ctx.ctx var, a) :: rec_elim
+            , vars @ Set.elements (ctx >- Analysis.free_variables a) ))
         else rec_elim, var :: vars)
-    (Analysis.free_variables ~ctx term)
+    (ctx >- Analysis.free_variables term)
 ;;
 
 let flatten_rec_elim_tuples ~(ctx : Context.t) (elim : (term * term) list)
@@ -1014,16 +1015,16 @@ let parse_positive_example_solver_model
 
 (** The Interactive module contains function used in interactive mode. *)
 module Interactive = struct
-  let make_term_state_detail ~(ctx : Context.t) ~(p : PsiDef.t) (term : term)
+  let make_term_state_detail ~(ctx : env) ~(p : PsiDef.t) (term : term)
       : term_state_detail
     =
     let recurs_elim, scalar_vars = recurs_elim_of_term ~ctx ~p term in
-    let input_args_t = List.map ~f:(Variable.vtype_or_new ctx) scalar_vars in
+    let input_args_t = List.map ~f:(var_type ctx) scalar_vars in
     let lemma_f =
       Variable.mk
-        ctx
+        ctx.ctx
         ~t:(Some (RType.fun_typ_pack input_args_t TBool))
-        (Alpha.fresh ~s:"lemma" ctx.names)
+        (Alpha.fresh ~s:"lemma" ctx.ctx.names)
     in
     { term
     ; splitter = None
@@ -1053,7 +1054,7 @@ module Interactive = struct
   ;;
 
   let set_term_lemma
-      ~(ctx : Context.t)
+      ~(ctx : env)
       ~(p : PsiDef.t)
       (ts : term_state)
       ~(key : term * term option)
@@ -1069,19 +1070,15 @@ module Interactive = struct
     | Some det -> Map.add_exn ts ~key ~data:{ det with lemmas = [ lemma ] }
   ;;
 
-  let add_lemmas
-      ~(fctx : PMRS.Functions.ctx)
-      ~(ctx : Context.t)
-      ~(p : PsiDef.t)
-      (lstate : refinement_loop_state)
+  let add_lemmas ~(ctx : env) ~(p : PsiDef.t) (lstate : refinement_loop_state)
       : refinement_loop_state
     =
     let env_in_p = VarSet.of_list p.PsiDef.reference.pargs in
     let f existing_lemmas t =
-      let vars = Set.union (Analysis.free_variables ~ctx t) env_in_p in
+      let vars = Set.union (ctx >- Analysis.free_variables t) env_in_p in
       let env = VarSet.to_env vars in
       Log.info (fun frmt () ->
-          Fmt.pf frmt "Please provide a constraint for \"@[%a@]\"." (pp_term ctx) t);
+          Fmt.pf frmt "Please provide a constraint for \"@[%a@]\"." (pp_term ctx.ctx) t);
       Log.verbose (fun frmt () ->
           Fmt.pf
             frmt
@@ -1089,7 +1086,7 @@ module Interactive = struct
             p.PsiDef.reference.pvar.vname
             p.PsiDef.target.pvar.vname
             p.PsiDef.repr.pvar.vname
-            (VarSet.pp ctx)
+            (VarSet.pp ctx.ctx)
             vars);
       match Stdio.In_channel.input_line Stdio.stdin with
       | None | Some "" ->
@@ -1103,9 +1100,9 @@ module Interactive = struct
           with
           | Failure _ -> None
         in
-        let pred_term = term_of_smt ~ctx ~fctx env in
+        let pred_term = ctx >>- term_of_smt env in
         let term x =
-          match get_precise_lemma ~ctx ~p existing_lemmas ~key:(t, None) with
+          match ctx >- get_precise_lemma ~p existing_lemmas ~key:(t, None) with
           | None -> pred_term x
           | Some inv -> mk_bin Binop.And inv (pred_term x)
         in
@@ -1214,20 +1211,16 @@ module Interactive = struct
   ;;
 end
 
-let synthesize_new_lemma
-    ~(fctx : PMRS.Functions.ctx)
-    ~(ctx : Context.t)
-    ~(p : PsiDef.t)
-    (det : term_state_detail)
+let synthesize_new_lemma ~(ctx : env) ~(p : PsiDef.t) (det : term_state_detail)
     : term option
   =
   let with_synth_obj i synth_obj logic =
-    AlgoLog.announce_new_lemma_synthesis ~ctx i det;
+    ctx >- AlgoLog.announce_new_lemma_synthesis i det;
     let neg_constraints =
-      List.map ~f:(constraint_of_neg_ctex ~ctx det) det.negative_ctexs
+      List.map ~f:(ctx >- constraint_of_neg_ctex det) det.negative_ctexs
     in
     let pos_constraints =
-      List.map ~f:(constraint_of_pos_ctex ~ctx det) det.positive_ctexs
+      List.map ~f:(ctx >- constraint_of_pos_ctex det) det.positive_ctexs
     in
     let extra_defs = Semantic.[ max_definition; min_definition ] in
     let commands =
@@ -1239,16 +1232,15 @@ let synthesize_new_lemma
          @ [ Sygus.mk_c_check_synth () ])
     in
     match
-      handle_lemma_synth_response
-        ~fctx
-        ~ctx
-        det
-        (SygusInterface.SygusSolver.solve_commands commands)
+      ctx
+      >>- handle_lemma_synth_response
+            det
+            (SygusInterface.SygusSolver.solve_commands commands)
     with
     | None -> None
     | Some solns -> List.nth solns 0
   in
-  match synthfun_of_det ~fctx ~ctx ~p det with
+  match ctx >>- synthfun_of_det ~p det with
   | [ (synth_obj, logic) ] -> with_synth_obj 0 synth_obj logic
   | obj_choices ->
     let lwt_tasks =
@@ -1269,34 +1261,26 @@ let synthesize_new_lemma
 (*                                  Main entry points                                            *)
 (* ============================================================================================= *)
 
-let rec lemma_refinement_loop
-    ~(fctx : PMRS.Functions.ctx)
-    ~(ctx : Context.t)
-    ~(p : PsiDef.t)
-    (det : term_state_detail)
+let rec lemma_refinement_loop ~(ctx : env) ~(p : PsiDef.t) (det : term_state_detail)
     : term_state_detail option
   =
-  match synthesize_new_lemma ~fctx ~ctx ~p det with
+  match synthesize_new_lemma ~ctx ~p det with
   | None ->
     Log.debug_msg "Lemma synthesis failure.";
     None
   | Some lemma_term ->
     if !Config.interactive_check_lemma
     then
-      Interactive.interactive_check_lemma
-        ~ctx
-        (lemma_refinement_loop ~fctx ~ctx ~p)
-        det.lemma.vname
-        det.scalar_vars
-        lemma_term
-        det
+      ctx
+      >- Interactive.interactive_check_lemma
+           (lemma_refinement_loop ~ctx ~p)
+           det.lemma.vname
+           det.scalar_vars
+           lemma_term
+           det
     else (
       match
-        verify_lemma_candidate
-          ~fctx
-          ~ctx
-          ~p
-          { det with lemma_candidate = Some lemma_term }
+        ctx >>- verify_lemma_candidate ~p { det with lemma_candidate = Some lemma_term }
       with
       | vmethod, Unsat ->
         let lemma =
@@ -1304,20 +1288,19 @@ let rec lemma_refinement_loop
           | None -> lemma_term
           | Some pre -> Terms.(pre => lemma_term)
         in
-        AlgoLog.lemma_proved_correct ~ctx vmethod det lemma;
+        ctx >- AlgoLog.lemma_proved_correct vmethod det lemma;
         Some { det with lemma_candidate = None; lemmas = lemma :: det.lemmas }
       | vmethod, SmtLib.SExps x ->
         AlgoLog.lemma_not_proved_correct vmethod;
         let new_positive_ctexs =
-          parse_positive_example_solver_model ~fctx ~ctx (SmtLib.SExps x) det
+          ctx >>- parse_positive_example_solver_model (SmtLib.SExps x) det
         in
         List.iter
           ~f:(fun ctex ->
             Log.verbose (fun f () ->
-                Fmt.(pf f "Found a positive example: %a" (box (pp_ctex ~ctx)) ctex)))
+                Fmt.(pf f "Found a positive example: %a" (box (ctx >- pp_ctex)) ctex)))
           new_positive_ctexs;
         lemma_refinement_loop
-          ~fctx
           ~ctx
           ~p
           { det with positive_ctexs = det.positive_ctexs @ new_positive_ctexs }
@@ -1359,8 +1342,7 @@ let ctexs_for_ensures_synt ctex =
 ;;
 
 let refine_ensures_predicates
-    ~(fctx : PMRS.Functions.ctx)
-    ~(ctx : Context.t)
+    ~(ctx : env)
     ~(p : PsiDef.t)
     ~(neg_ctexs : ctex list)
     ~(pos_ctexs : ctex list)
@@ -1371,37 +1353,37 @@ let refine_ensures_predicates
     Fmt.(
       fun fmt () ->
         pf fmt "%i counterexamples violate image assumption." (List.length neg_ctexs));
-  let maybe_pred =
-    ImagePredicates.synthesize ~ctx:(Env.group ctx fctx) ~p pos_ctexs neg_ctexs []
-  in
+  let maybe_pred = ImagePredicates.synthesize ~ctx ~p pos_ctexs neg_ctexs [] in
   match maybe_pred with
   | None -> lstate.term_state, `CoarseningFailure
   | Some ensures ->
     (match Specifications.get_ensures p.PsiDef.reference.pvar with
     | None ->
-      AlgoLog.show_new_ensures_predicate ~fctx ~ctx p.PsiDef.reference.pvar ensures;
+      AlgoLog.show_new_ensures_predicate ~ctx p.PsiDef.reference.pvar ensures;
       Specifications.set_ensures p.PsiDef.reference.pvar ensures
     | Some old_ensures ->
       let var : variable =
-        Variable.mk ctx ~t:(Some p.PsiDef.reference.poutput_typ) (Alpha.fresh ctx.names)
+        Variable.mk
+          ctx.ctx
+          ~t:(Some p.PsiDef.reference.poutput_typ)
+          (Alpha.fresh ctx.ctx.names)
       in
       let new_pred =
         mk_fun
-          ctx
+          ctx.ctx
           [ FPatVar var ]
           (mk_bin
              Binop.And
-             (mk_app old_ensures [ mk_var ctx var ])
-             (mk_app ensures [ mk_var ctx var ]))
+             (mk_app old_ensures [ mk_var ctx.ctx var ])
+             (mk_app ensures [ mk_var ctx.ctx var ]))
       in
-      AlgoLog.show_new_ensures_predicate ~fctx ~ctx p.PsiDef.reference.pvar new_pred;
+      AlgoLog.show_new_ensures_predicate ~ctx p.PsiDef.reference.pvar new_pred;
       Specifications.set_ensures p.PsiDef.reference.pvar new_pred);
     lstate.term_state, `CoarseningOk
 ;;
 
 let synthesize_lemmas
-    ~(fctx : PMRS.Functions.ctx)
-    ~(ctx : Context.t)
+    ~(ctx : env)
     ~(p : PsiDef.t)
     synt_failure_info
     (lstate : refinement_loop_state)
@@ -1421,7 +1403,7 @@ let synthesize_lemmas
     List.fold
       ctexs
       ~init:ts
-      ~f:(create_or_update_term_state_with_ctex ~ctx ~is_pos_ctex:is_positive)
+      ~f:(ctx >- create_or_update_term_state_with_ctex ~is_pos_ctex:is_positive)
   in
   (*
     Example: the synt_failure_info should be a list of unrealizability counterexamples, which
@@ -1441,8 +1423,8 @@ let synthesize_lemmas
       let ctexs = List.concat_map unrealizability_ctexs ~f:(fun uc -> [ uc.ci; uc.cj ]) in
       let classified_ctexs =
         if !Config.classify_ctex
-        then Interactive.classify_ctexs_opt ~ctx ctexs
-        else classify_ctexs ~functions:fctx ~ctx ~p ctexs
+        then ctx >- Interactive.classify_ctexs_opt ctexs
+        else classify_ctexs ~ctx ~p ctexs
       in
       (* Positive and negatives for the ensures predicates. *)
       let ensures_positives, ensures_negatives, _ =
@@ -1460,7 +1442,6 @@ let synthesize_lemmas
     match ensures_negatives, lemma_synt_negatives with
     | _ :: _, _ ->
       refine_ensures_predicates
-        ~fctx
         ~ctx
         ~p
         ~neg_ctexs:ensures_negatives
@@ -1479,12 +1460,12 @@ let synthesize_lemmas
           ts
           ~init:(Map.empty (module KeyedTerms), true)
           ~f:(fun ~key ~data:det (acc, status) ->
-            if Analysis.is_bounded ~ctx det.term
+            if ctx >- Analysis.is_bounded det.term
             then acc, status (* Skip lemma synth for bounded terms. *)
             else if not status
             then acc, status
             else (
-              match lemma_refinement_loop ~fctx ~ctx ~p det with
+              match lemma_refinement_loop ~ctx ~p det with
               | None -> acc, false
               | Some det -> Map.add_exn ~key ~data:det acc, status))
       in
@@ -1506,7 +1487,7 @@ let synthesize_lemmas
     | RInfeasible, _ ->
       (* Rare - but the synthesis solver can answer "infeasible", in which case it can give
              counterexamples. *)
-      AlgoLog.print_infeasible_message ~ctx lstate.t_set;
+      ctx >- AlgoLog.print_infeasible_message lstate.t_set;
       Ok (Either.Second unr_ctexs)
     | RUnknown, _ ->
       (* In most cases if the synthesis solver does not find a solution and terminates, it will

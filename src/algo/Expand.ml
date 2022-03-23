@@ -1,8 +1,9 @@
+open AState
 open Base
 open Either
 open Lang
 open Lang.Term
-open AState
+open Env
 open Utils
 
 let identify_rcalls (p : PsiDef.t) (lam : variable) (t : term) : VarSet.t =
@@ -23,35 +24,30 @@ let identify_rcalls (p : PsiDef.t) (lam : variable) (t : term) : VarSet.t =
   reduce ~init:VarSet.empty ~case ~join t
 ;;
 
-let mk_recursion_elimination_term ~(ctx : Context.t) (p : PsiDef.t) : (term * term) option
-  =
-  let _, g_out = RType.fun_typ_unpack (Variable.vtype_or_new ctx p.PsiDef.target.pvar)
-  and f_out = !AState._alpha in
+let mk_recursion_elimination_term ~(ctx : env) (p : PsiDef.t) : (term * term) option =
+  let _, g_out = RType.fun_typ_unpack (Variable.vtype_or_new ctx.ctx p.PsiDef.target.pvar)
+  and f_out = get_alpha ctx in
   if Result.is_ok (RType.unify_one g_out f_out)
   then (
     (* No lifting present. *)
-    let term = mk_composite_base_type ~ctx f_out in
+    let term = ctx >- mk_composite_base_type f_out in
     Some (term, term))
   else (
     (* Lifting present. *)
     match g_out, f_out with
     | TTup tl_lift, TTup tl' ->
-      let args = List.map ~f:(mk_composite_base_type ~ctx ~prefix:"_elim_") tl_lift in
-      let tuple_g = mk_tup ctx args in
-      let tuple_f = mk_tup ctx (List.take args (List.length tl')) in
+      let args = List.map ~f:(ctx >- mk_composite_base_type ~prefix:"_elim_") tl_lift in
+      let tuple_g = mk_tup ctx.ctx args in
+      let tuple_f = mk_tup ctx.ctx (List.take args (List.length tl')) in
       Some (tuple_f, tuple_g)
     | TTup (_ :: _ as tl_lift), _ ->
-      let args = List.map ~f:(mk_composite_base_type ~ctx ~prefix:"_elim_") tl_lift in
-      let tuple_g = mk_tup ctx args in
+      let args = List.map ~f:(ctx >- mk_composite_base_type ~prefix:"_elim_") tl_lift in
+      let tuple_g = mk_tup ctx.ctx args in
       Some (List.hd_exn args, tuple_g)
     | _ -> None)
 ;;
 
-let subst_recursive_calls
-    ~(fctx : PMRS.Functions.ctx)
-    ~(ctx : Context.t)
-    (p : PsiDef.t)
-    (tl : term list)
+let subst_recursive_calls ~(ctx : env) (p : PsiDef.t) (tl : term list)
     : (term * term) list * TermSet.t
   =
   let fsymb = p.PsiDef.reference.pmain_symb
@@ -72,17 +68,14 @@ let subst_recursive_calls
     in
     let invariant =
       Option.map (Specifications.get_ensures p.PsiDef.reference.pvar) ~f:(fun inv ->
-          first
-            (infer_type
-               ctx
-               (Reduce.reduce_term ~ctx ~fctx (mk_app inv [ scalar_term_f ]))))
+          first (infer_type ctx.ctx (ctx_reduce ctx (mk_app inv [ scalar_term_f ]))))
     in
     ( substs
-      @ [ mk_app (mk_var ctx fsymb) [ mk_var ctx var ], scalar_term_f
-        ; mk_app (mk_var ctx gsymb) [ mk_var ctx var ], scalar_term_g
+      @ [ mk_app (mk_var ctx.ctx fsymb) [ mk_var ctx.ctx var ], scalar_term_f
+        ; mk_app (mk_var ctx.ctx gsymb) [ mk_var ctx.ctx var ], scalar_term_g
         ; ( mk_app
-              (mk_var ctx fsymb)
-              [ mk_app (mk_var ctx p.PsiDef.repr.pmain_symb) [ mk_var ctx var ] ]
+              (mk_var ctx.ctx fsymb)
+              [ mk_app (mk_var ctx.ctx p.PsiDef.repr.pmain_symb) [ mk_var ctx.ctx var ] ]
           , scalar_term_f )
         ]
     , match invariant with
@@ -92,17 +85,17 @@ let subst_recursive_calls
   List.fold ~f ~init:([], TermSet.empty) (Set.elements rcalls)
 ;;
 
-let _subst_repr_calls ~(ctx : Context.t) (p : PsiDef.t) (tl : term list)
-    : (term * term) list
-  =
+let _subst_repr_calls ~(ctx : env) (p : PsiDef.t) (tl : term list) : (term * term) list =
   let fsymb = p.PsiDef.repr.pmain_symb in
   let rcalls =
     let fold_f rcalled_vars t = Set.union rcalled_vars (identify_rcalls p fsymb t) in
     List.fold ~init:VarSet.empty ~f:fold_f tl
   in
   let f var =
-    let rtype_var = Variable.mk ctx ~t:(Some !AState._tau) (Alpha.fresh ctx.names) in
-    [ mk_app (mk_var ctx fsymb) [ mk_var ctx var ], mk_var ctx rtype_var ]
+    let rtype_var =
+      Variable.mk ctx.ctx ~t:(Some (get_tau ctx)) (Alpha.fresh ctx.ctx.names)
+    in
+    [ mk_app (mk_var ctx.ctx fsymb) [ mk_var ctx.ctx var ], mk_var ctx.ctx rtype_var ]
   in
   List.concat (List.map ~f (Set.elements rcalls))
 ;;

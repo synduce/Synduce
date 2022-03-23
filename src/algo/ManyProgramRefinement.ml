@@ -19,8 +19,7 @@ let find_and_solve_problem
       "target", "spec", "repr"
   in
   let top_userdef_problem =
-    ctx
-    >>- ProblemFinder.find_problem_components (target_fname, spec_fname, repr_fname) pmrs
+    ProblemFinder.find_problem_components ~ctx (target_fname, spec_fname, repr_fname) pmrs
   in
   let main_algo =
     if !Config.Optims.use_segis (* Symbolic CEGIS. *)
@@ -41,7 +40,7 @@ let find_and_solve_problem
     else (
       match l with
       | low_problem :: tl ->
-        ctx >>- ProblemFinder.update_context low_problem;
+        ProblemFinder.update_context ~ctx low_problem;
         ctx >- AlgoLog.show_new_rskel i low_problem;
         let maybe_solution = main_algo ~ctx ~t:(ThreadContext.mk "main") low_problem in
         (* Print state and save. *)

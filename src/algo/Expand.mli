@@ -3,13 +3,12 @@ open Base
 open SmtInterface
 
 val mk_recursion_elimination_term
-  :  ctx:Term.Context.t
+  :  ctx:Env.env
   -> AState.PsiDef.t
   -> (Term.term * Term.term) option
 
 val subst_recursive_calls
-  :  fctx:PMRS.Functions.ctx
-  -> ctx:Term.Context.t
+  :  ctx:Env.env
   -> AState.PsiDef.t
   -> Term.term list
   -> (Term.term * Term.term) list * Term.TermSet.t

@@ -119,33 +119,6 @@ module PsiDef = struct
   ;;
 end
 
-(** The type τ in the paper, input type of the reference function.  *)
-let _tau = ref RType.TInt
-
-(** The type θ in the paper, input type of the target recursion skeleton.  *)
-let _theta = ref RType.TInt
-
-(** The type D in the paper: the output type of the reference and the target recursion skeleton. The
-    first element is the pure type output type of the functions, and the second element is an
-    optional term that represents the additional predicate on the output of the reference function.
-    The term is assumed to define a function (fun (free variables of term) -> term).
-*)
-let _alpha : RType.t ref = ref RType.TInt
-
-(** Not useful for now. *)
-let _span = ref 1
-
-let refinement_steps = ref 0
-let secondary_refinement_steps = ref 0
-
-let reinit () =
-  _span := 1;
-  refinement_steps := 0;
-  _alpha := RType.TInt;
-  _tau := RType.TInt;
-  _theta := RType.TInt
-;;
-
 (* ============================================================================================= *)
 (*       Types for intermediate representations of solutions, lemmas, counterexamples, etc.      *)
 (* ============================================================================================= *)

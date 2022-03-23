@@ -50,8 +50,8 @@ let compute_lhs ~ctx p t =
 ;;
 
 let remap_rec_calls ~ctx p t =
-  let proj_func = Lifting.proj_to_lifting ~ctx:ctx.ctx p in
-  let lift_func = Lifting.compose_parts ~ctx:ctx.ctx p in
+  let proj_func = Lifting.proj_to_lifting ~ctx p in
+  let lift_func = Lifting.compose_parts ~ctx p in
   let g = p.PsiDef.target in
   let lift_wrapper tx =
     match proj_func, lift_func with
@@ -171,7 +171,7 @@ let make
     (tset : TermSet.t)
     : equation list * lifting
   =
-  let proj_to_non_lifting = Lifting.proj_to_non_lifting ~ctx:ctx.ctx p in
+  let proj_to_non_lifting = Lifting.proj_to_non_lifting ~ctx p in
   (* Compute a first set of constraints E(t) : spec o repr (t) = target (t) *)
   let eqns =
     let fold_f eqns t =
@@ -183,9 +183,8 @@ let make
   in
   (* Compute the recursion eliminations as well as related invariants that need applying. *)
   let all_subs, invariants =
-    (ctx >>- Expand.subst_recursive_calls)
-      p
-      (List.concat (List.map ~f:(fun (_, lhs, rhs) -> [ lhs; rhs ]) eqns))
+    let eqns = List.concat (List.map ~f:(fun (_, lhs, rhs) -> [ lhs; rhs ]) eqns) in
+    Expand.subst_recursive_calls ~ctx p eqns
   in
   (* Substitution function: some substitution opportunities appear after a first pass of subsitution
      followed by a lambda-reduction.
@@ -222,17 +221,12 @@ let make
             | None -> Some im_f)
           | None -> precond
         in
-        (ctx >>- Lifting.deduce_lifting_expressions)
-          ~p
-          lifting
-          eprecond
-          ~lhs:lhs''
-          ~rhs:rhs''
+        Lifting.deduce_lifting_expressions ~ctx ~p lifting eprecond ~lhs:lhs'' ~rhs:rhs''
       in
       (* Replace the boxed expressions of the lifting. *)
       let rhs'' =
         rhs'
-        |> (ctx >- Lifting.replace_boxed_expressions) ~p lifting'
+        |> Lifting.replace_boxed_expressions ~ctx ~p lifting'
         |> ctx_reduce ctx ~unboxing:true
       in
       (* If possible project equation of tuples into tuple of equations. *)
@@ -264,7 +258,7 @@ let make
       let erhs =
         mk_sel ctx.ctx t0_rhs i
         |> ctx_reduce ctx
-        |> (ctx >- Lifting.replace_boxed_expressions) ~p lifting
+        |> Lifting.replace_boxed_expressions ~ctx ~p lifting
         |> ctx_reduce ctx ~unboxing:true
       in
       let precond = compute_preconds ~ctx ~p ~term_state (fun x -> x) t0 in

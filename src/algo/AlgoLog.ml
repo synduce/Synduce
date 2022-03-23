@@ -9,14 +9,15 @@ open Fmt
 open Lang
 open Term
 open Utils
+open Env
 
-let show_stat elapsed tsize usize =
+let show_stat env elapsed tsize usize =
   if !Config.timings
   then
     pf
       stdout
       "%i,%3.3f,%3.3f,%i,%i@."
-      !refinement_steps
+      (get_refinement_steps env)
       !Stats.verif_time
       elapsed
       tsize
@@ -33,7 +34,7 @@ let show_stat elapsed tsize usize =
   else ()
 ;;
 
-let show_steps tsize usize =
+let show_steps env tsize usize =
   Log.info (fun frmt () ->
       (styled
          (`Fg `Black)
@@ -41,7 +42,7 @@ let show_steps tsize usize =
             (`Bg (`Hi `Green))
             (fun frmt (i, j) -> pf frmt "\t\t Refinement step %i:%i " i j)))
         frmt
-        (!refinement_steps, !secondary_refinement_steps));
+        (get_refinement_steps env, get_secondary_refinement_steps env));
   Log.debug_msg
     (str "Start refinement loop with %i terms in T, %i terms in U." tsize usize)
 ;;
@@ -290,21 +291,16 @@ let positives_ensures ~(ctx : Context.t) p positives =
         positives)
 ;;
 
-let show_new_ensures_predicate
-    ~(fctx : PMRS.Functions.ctx)
-    ~(ctx : Context.t)
-    (f : variable)
-    (ensures : term)
-  =
-  let ensures = Reduce.reduce_term ~fctx ~ctx ensures in
+let show_new_ensures_predicate ~(ctx : env) (f : variable) (ensures : term) =
+  let ensures = ctx_reduce ctx ensures in
   Stats.set_lemma_synthesized
     "ensures_lemma"
-    (String.strip (str "%a" (pp_term ctx) ensures));
+    (String.strip (str "%a" (pp_term ctx.ctx) ensures));
   Log.info
     Fmt.(
       fun fmt () ->
         let input_t =
-          let in_t_l, _ = RType.fun_typ_unpack (Variable.vtype_or_new ctx f) in
+          let in_t_l, _ = RType.fun_typ_unpack (var_type ctx f) in
           match in_t_l with
           | [ a ] -> a
           | _ -> RType.TTup in_t_l
@@ -316,7 +312,7 @@ let show_new_ensures_predicate
           input_t
           (styled (`Fg `Blue) string)
           f.vname
-          (box (pp_term ctx))
+          (box (pp_term ctx.ctx))
           ensures)
 ;;
 

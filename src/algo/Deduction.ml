@@ -1,4 +1,5 @@
 open Base
+open Env
 open Lang
 open Lang.Term
 open Lang.Rewriter
@@ -509,15 +510,14 @@ module Solver = struct
     Converts the term equation into a functionalization problem with Expressions.
     *)
   let functional_equation
-      ~(fctx : PMRS.Functions.ctx)
-      ~(ctx : Context.t)
+      ~(ctx : env)
       ~(func_side : term list)
       ~(lemma : term option)
       (res_side : term)
       (boxes : (variable * VarSet.t) list)
       : (variable * term) list * Expression.t option * RContext.t
     =
-    let rctx = RContext.create ctx in
+    let rctx = RContext.create ctx.ctx in
     let flat_args =
       List.concat_map
         ~f:(fun t ->
@@ -556,9 +556,9 @@ module Solver = struct
         Log.error_msg
           (Fmt.str
              "Term {%a} %a is not a function-free expression, cannot deduce."
-             (list ~sep:comma (pp_term ctx))
-             (List.map ~f:(Reduce.reduce_term ~ctx ~fctx) flat_args)
-             (pp_term ctx)
+             (list ~sep:comma (pp_term ctx.ctx))
+             (List.map ~f:(ctx_reduce ctx) flat_args)
+             (pp_term ctx.ctx)
              res_side);
         [], None, rctx)
   ;;

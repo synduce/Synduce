@@ -430,7 +430,7 @@ let infer_pmrs_types ~(ctx : Context.t) (prog : t) =
 ;;
 
 let unify_two_with_vartype_update
-    (ctx : Context.t)
+    ~(ctx : Context.t)
     ((theta, theta') : RType.t * RType.t)
     ((tau, tau') : RType.t * RType.t)
     : RType.substitution
@@ -458,7 +458,7 @@ let unify_two_with_vartype_update
     Log.fatal ()
 ;;
 
-let unify_one_with_update ctx (t, t') =
+let unify_one_with_update ~ctx (t, t') =
   let sb1 = RType.unify_one t t' in
   match sb1 with
   | Ok sb1 ->

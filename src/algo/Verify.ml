@@ -79,12 +79,12 @@ let partial_bounding_checker
         let bt = ctx >- Expand.make_bounded t in
         let lem_t = ctx_reduce ctx (mk_app req [ bt ]) in
         let lem_info =
-          ctx
-          >- Lemmas.Interactive.set_term_lemma
-               ~p
-               acc_lstate.term_state
-               ~key:(bt, None)
-               ~lemma:lem_t
+          Lemmas.Interactive.set_term_lemma
+            ~ctx
+            ~p
+            acc_lstate.term_state
+            ~key:(bt, None)
+            ~lemma:lem_t
         in
         acc_tset @ [ t, bt ], { acc_lstate with term_state = lem_info })
     | None -> acc_tset @ [ t, t ], acc_lstate
@@ -307,7 +307,7 @@ let bounded_check
     List.sort
       ~compare:term_size_compare
       (ctx
-      >- Lang.Analysis.terms_of_max_depth (!Config.Optims.check_depth - 1) !AState._theta
+      >- Lang.Analysis.terms_of_max_depth (!Config.Optims.check_depth - 1) (get_theta ctx)
       )
   in
   Log.debug_msg Fmt.(str "%i terms to check" (List.length tset));

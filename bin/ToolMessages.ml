@@ -107,16 +107,16 @@ let on_success
     if !Config.generate_proof
     then
       Codegen.(
-        ctx
-        >>- Generation.gen_proof
-              (ctx >- Commons.problem_descr_of_psi_def pb, Some soln)
-              !Config.proof_generation_file)
+        Generation.gen_proof
+          ~ctx
+          (ctx >- Commons.problem_descr_of_psi_def pb, Some soln)
+          !Config.proof_generation_file)
     else ()
   | _ -> ());
   (* If no info required, output timing information. *)
   if (not !Config.info) && !Config.timings
   then (
-    Fmt.(pf stdout "%i,%.4f,%.4f@." !Algo.AState.refinement_steps verif_time elapsed);
+    Fmt.(pf stdout "%i,%.4f,%.4f@." (get_refinement_steps ctx) verif_time elapsed);
     Fmt.(pf stdout "success@."));
   ctx
   >>> prep_final_json ~is_ocaml_syntax source_filename pb result elapsed !Stats.verif_time

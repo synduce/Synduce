@@ -3,6 +3,7 @@ open Dafny
 open Lang.Term
 open Lang.RType
 open Algo.AState
+open Algo.Env
 
 let rec convert_tkind (t : type_term) : d_domain_type =
   match t.tkind with
@@ -453,33 +454,33 @@ let get_num_params = function
 (* Uncomment for termination template *)
 
 let add_depth_f ~ctx () =
-  let mkv ?(t = None) s = mk_var ctx (Variable.mk ctx ~t s) in
-  let v = mkv ~t:(Some !Algo.AState._theta) "x" in
-  let expansions = Lang.Analysis.expand_once ~ctx v in
+  let mkv ?(t = None) s = mk_var ctx.ctx (Variable.mk ctx.ctx ~t s) in
+  let v = mkv ~t:(Some (get_theta ctx)) "x" in
+  let expansions = ctx >- Lang.Analysis.expand_once v in
   let case_bodies =
     List.map
       (fun cur ->
-        if is_recur_case ~ctx cur
+        if ctx >- is_recur_case cur
         then (
           let get_recur c =
             let free_v =
               List.map
-                (mk_var ctx)
-                (VarSet.elements (Lang.Analysis.free_variables ~ctx c))
+                (mk_var ctx.ctx)
+                (VarSet.elements (ctx >- Lang.Analysis.free_variables c))
             in
-            List.filter (fun var -> not (Lang.Analysis.is_norec ~ctx var)) free_v
+            List.filter (fun var -> not (ctx >- Lang.Analysis.is_norec var)) free_v
           in
           mk_app
-            (mkv (Lang.Alpha.fresh ~s:"hdepth" ctx.names))
+            (mkv (Lang.Alpha.fresh ~s:"hdepth" ctx.ctx.names))
             (List.map (fun var -> mk_app (mkv "depth") [ var ]) (get_recur cur)))
-        else mkv (Lang.Alpha.fresh ctx.names))
+        else mkv (Lang.Alpha.fresh ctx.ctx.names))
       expansions
   in
   let depth_f =
     let signature =
       mk_func_sig
         ~returns:(None, [ mk_int_type ])
-        [ "x", mk_named_type (get_t_name !Algo.AState._theta) ]
+        [ "x", mk_named_type (get_t_name (get_theta ctx)) ]
     in
     let spec =
       mk_simple_spec
@@ -496,13 +497,13 @@ let add_depth_f ~ctx () =
       let cases =
         List.map2 (fun body case -> pattern_of_term case, body) case_bodies expansions
       in
-      mk_match ctx v cases
+      mk_match ctx.ctx v cases
     in
     let variable_decls : d_body list =
       List.map
         (fun (body, _) -> DStmt (DAssign (body, DTerm (mkv "Fill me in"))))
         (List.filter
-           (fun (_, case) -> not (is_recur_case ~ctx case))
+           (fun (_, case) -> not (ctx >- is_recur_case case))
            (List.combine case_bodies expansions))
     in
     let body = DBlock (variable_decls @ [ DTerm match_theta ]) in
@@ -521,14 +522,16 @@ let add_depth_f ~ctx () =
           let help_sig =
             mk_func_sig
               ~returns:(None, [ mk_int_type ])
-              (List.map (fun _ -> Lang.Alpha.fresh ~s:"i" ctx.names, mk_int_type) args)
+              (List.map
+                 (fun _ -> Lang.Alpha.fresh ~s:"i" ctx.ctx.names, mk_int_type)
+                 args)
           in
           let help_spec = mk_simple_spec ~ensures:[] ~requires:[] DSpecFunction in
           let help_body = Body "Fill me in" in
           mk_toplevel (mk_func name help_sig help_spec help_body)
         | _ -> failwith "Unexpected non-function app")
       (List.filter
-         (fun (_, case) -> is_recur_case ~ctx case)
+         (fun (_, case) -> ctx >- is_recur_case case)
          (List.combine case_bodies expansions))
   in
   List.iter add_toplevel helper_functions;
@@ -598,9 +601,9 @@ let correctness_lemma
   mk_toplevel (mk_lemma "correctness_lemma" signature spec body)
 ;;
 
-let incl_decl ~(theta_decl : d_toplevel) ~(tau_decl : d_toplevel) : d_toplevel list =
+let incl_decl ~ctx ~(theta_decl : d_toplevel) ~(tau_decl : d_toplevel) : d_toplevel list =
   (* If tau and theta are the same type, prioritize one based on the number of parameters *)
-  if get_t_name !Algo.AState._tau = get_t_name !Algo.AState._theta
+  if get_t_name (get_tau ctx) = get_t_name (get_theta ctx)
   then
     if get_num_params tau_decl.dt_kind >= get_num_params theta_decl.dt_kind
     then [ tau_decl ]
@@ -613,17 +616,17 @@ let incl_decl ~(theta_decl : d_toplevel) ~(tau_decl : d_toplevel) : d_toplevel l
 (* ============================================================================================= *)
 
 (**   *)
-let gen_proof ~fctx ~ctx (pd, soln) (out_file : string) =
+let gen_proof ~ctx (pd, soln) (out_file : string) =
   (* Assumption is that the main function is always the first one *)
   let repr_name = (List.hd pd.pd_repr).f_var.vname in
   let spec_name = (List.hd pd.pd_reference).f_var.vname in
   let target_name = (List.hd pd.pd_target).f_var.vname in
-  let tau_decl = get_typ_decl ~ctx !Algo.AState._tau in
-  let theta_decl = get_typ_decl ~ctx !Algo.AState._theta in
+  let tau_decl = ctx >- get_typ_decl (get_tau ctx) in
+  let theta_decl = ctx >- get_typ_decl (get_theta ctx) in
   let toplevel =
     let new_target =
       let aux (t : function_descr) =
-        let fv = Lang.Analysis.free_variables ~ctx t.f_body in
+        let fv = ctx >- Lang.Analysis.free_variables t.f_body in
         let const_subs : (term * term) list =
           match soln with
           | Some soln ->
@@ -631,7 +634,7 @@ let gen_proof ~fctx ~ctx (pd, soln) (out_file : string) =
               (List.map
                  (fun (name, _, body) ->
                    match VarSet.find_by_name fv name with
-                   | Some var -> [ mk_var ctx var, body ]
+                   | Some var -> [ mk_var ctx.ctx var, body ]
                    | None -> [])
                  (List.filter
                     (fun (_, args, _) -> List.length args = 0)
@@ -656,16 +659,16 @@ let gen_proof ~fctx ~ctx (pd, soln) (out_file : string) =
       in
       List.map aux pd.pd_target
     in
-    List.map (gen_func_descr ~ctx) (pd.pd_repr @ pd.pd_reference @ new_target)
+    List.map (ctx >- gen_func_descr) (pd.pd_repr @ pd.pd_reference @ new_target)
   in
   let proof_skeleton =
-    incl_decl ~tau_decl ~theta_decl
+    incl_decl ~ctx ~tau_decl ~theta_decl
     @ toplevel
-    @ gen_target soln ~ctx
+    @ (ctx >- gen_target soln)
     @ !skeleton
-    @ [ correctness_lemma ~fctx ~ctx ~pd ~target_name ~repr_name ~spec_name ]
+    @ [ ctx >>- correctness_lemma ~pd ~target_name ~repr_name ~spec_name ]
   in
   let ref_program : d_program = { dp_includes = []; dp_topdecls = proof_skeleton } in
   Utils.Log.to_file out_file (fun fmt () ->
-      Fmt.pf fmt "%a" (pp_d_program ~ctx) ref_program)
+      Fmt.pf fmt "%a" (ctx >- pp_d_program) ref_program)
 ;;

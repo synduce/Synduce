@@ -9,41 +9,17 @@ let assert_fac_expand e1 e2 =
   let ee1 = expand e1 in
   let b1 = equal e1 fe2 in
   let b2 = equal ee1 e2 in
-  if b1 && b2
-  then ()
-  else (
-    pf stdout "%a@." (styled (`Fg `Red) string) "Assertion failure:";
-    pf stdout "e1 = %a@." pp e1;
-    pf stdout "e2 = %a@." pp e2;
-    if not b1
-    then pf stdout "e1 should be e2 factorized, but (factorize e2)  = %a@." pp fe2;
-    if not b2 then pf stdout "e1 expanded should be e2, but (expand e1)  = %a@." pp ee1;
-    raise (Assert_failure ("assert_fac_expand", 0, 0)))
+  if b1 && b2 then () else raise (Assert_failure ("assert_fac_expand", 0, 0))
 ;;
 
 let assert_eequals e1 e2 =
-  if eequals e1 e2
-  then ()
-  else (
-    pf stdout "%a@." (styled (`Fg `Red) string) "Assertion failure:";
-    pf stdout "e1 = %a@." pp e1;
-    pf stdout "e2 = %a@." pp e2;
-    pf stdout "e1 and e2 should be e-equal, but they are not.@.";
-    pf stdout "After simplification and expansion:@.";
-    pf stdout "e1 = %a@." pp (expand (factorize (simplify e1)));
-    pf stdout "e2 = %a@." pp (expand (factorize (simplify e2)));
-    raise (Assert_failure ("assert_eequals", 0, 0)))
+  if eequals e1 e2 then () else raise (Assert_failure ("assert_eequals", 0, 0))
 ;;
 
 let assert_is_subexpr ?(lemma = None) e1 e2 =
   match match_as_subexpr ~lemma (Position 0) e1 ~of_:e2 with
   | Some _ -> ()
-  | None ->
-    pf stdout "%a@." (styled (`Fg `Red) string) "Assertion failure:";
-    pf stdout "e1 = %a@." pp e1;
-    pf stdout "e2 = %a@." pp e1;
-    pf stdout "e1 was expected to be a subexpression of e2@.";
-    raise (Assert_failure ("assert_is_subexpr", 0, 0))
+  | None -> raise (Assert_failure ("assert_is_subexpr", 0, 0))
 ;;
 
 let test_0 () =

@@ -1,5 +1,6 @@
 open AState
 open Base
+open Env
 open Utils
 open Lang
 open Term
@@ -28,8 +29,7 @@ let sync_args ~(ctx : Context.t) p : PsiDef.t =
 ;;
 
 let find_problem_components
-    ~(fctx : PMRS.Functions.ctx)
-    ~(ctx : Context.t)
+    ~(ctx : env)
     ((target_fname, spec_fname, repr_fname) : string * string * string)
     (pmrs_map : (string, PMRS.t, String.comparator_witness) Map.t)
     : PsiDef.t
@@ -37,19 +37,21 @@ let find_problem_components
   (* Representation function. *)
   let repr, theta_to_tau =
     match Map.find pmrs_map repr_fname with
-    | Some pmrs -> Either.First pmrs, Variable.vtype_or_new ctx pmrs.pmain_symb
+    | Some pmrs -> Either.First pmrs, var_type ctx pmrs.pmain_symb
     | None ->
       let reprs =
-        Hashtbl.filter ~f:(fun (v, _, _, _) -> String.(v.vname = repr_fname)) ctx.globals
+        Hashtbl.filter
+          ~f:(fun (v, _, _, _) -> String.(v.vname = repr_fname))
+          ctx.ctx.globals
       in
       (match Hashtbl.choose reprs with
-      | Some (_, (f, a, _, b)) -> Either.Second (f, a, b), Variable.vtype_or_new ctx f
+      | Some (_, (f, a, _, b)) -> Either.Second (f, a, b), var_type ctx f
       (* No repr specified: assume identity. *)
       | None ->
-        let x = Variable.mk ctx "x" in
-        let xt = Variable.vtype_or_new ctx x in
-        let repr_fun = Variable.mk ctx ~t:(Some (TFun (xt, xt))) repr_fname in
-        Either.Second (repr_fun, [ FPatVar x ], mk_var ctx x), RType.TFun (xt, xt))
+        let x = Variable.mk ctx.ctx "x" in
+        let xt = var_type ctx x in
+        let repr_fun = Variable.mk ctx.ctx ~t:(Some (TFun (xt, xt))) repr_fname in
+        Either.Second (repr_fun, [ FPatVar x ], mk_var ctx.ctx x), RType.TFun (xt, xt))
   in
   (* Reference function. *)
   let reference_f, tau =
@@ -82,21 +84,21 @@ let find_problem_components
   let subtheta =
     match RType.fun_typ_unpack theta_to_tau with
     | [ theta' ], tau' ->
-      PMRS.unify_two_with_vartype_update ctx (theta_0, theta') (tau, tau')
+      ctx >- PMRS.unify_two_with_vartype_update (theta_0, theta') (tau, tau')
     | _ ->
       Log.error_msg "Representation function should be a function.";
       Log.fatal ()
   in
   let theta = RType.(sub_all (mkv subtheta) theta_0) in
   Term.(
-    let reference_out = Variable.vtype_or_new ctx reference_f.pmain_symb in
-    let target_out = Variable.vtype_or_new ctx target_f.pmain_symb in
+    let reference_out = var_type ctx reference_f.pmain_symb in
+    let target_out = var_type ctx target_f.pmain_symb in
     Log.debug_msg
       Fmt.(str "ɑ : unify %a and %a" RType.pp reference_out RType.pp target_out);
     match reference_out, target_out with
     | TFun (_, tout), TFun (_, tout') ->
       (match RType.unify_one tout tout' with
-      | Ok subs -> Variable.update_var_types ctx (RType.mkv subs)
+      | Ok subs -> Variable.update_var_types ctx.ctx (RType.mkv subs)
       | Error e ->
         Log.error_msg Fmt.(str "Error: %a" Sexp.pp_hum e);
         Log.error_msg "Failed to unify output types.";
@@ -107,76 +109,74 @@ let find_problem_components
   (*  Update the type of all the components. *)
   let repr =
     match repr with
-    | Either.First pmrs -> Either.First (PMRS.infer_pmrs_types ~ctx pmrs)
+    | Either.First pmrs -> Either.First (ctx >- PMRS.infer_pmrs_types pmrs)
     | Either.Second (f, a, b) ->
-      let b', _ = Term.infer_type ctx b in
+      let b', _ = Term.infer_type ctx.ctx b in
       Either.Second (f, a, b')
   in
-  let target_f = PMRS.infer_pmrs_types ~ctx target_f in
-  let reference_f = PMRS.infer_pmrs_types ~ctx reference_f in
+  let target_f = ctx >- PMRS.infer_pmrs_types target_f in
+  let reference_f = ctx >- PMRS.infer_pmrs_types reference_f in
   let t_out = reference_f.poutput_typ in
   let repr_pmrs =
     match repr with
     | Either.First p -> p
-    | Either.Second (f, a, b) -> PMRS.func_to_pmrs ~ctx f a b
+    | Either.Second (f, a, b) -> ctx >- PMRS.func_to_pmrs f a b
   in
   let tinv_pmrs =
     let%bind spec = Specifications.get_spec target_f.pvar in
     let%bind t = spec.requires in
     match t.tkind with
-    | TVar func_var -> PMRS.Functions.find_global fctx func_var.vid
+    | TVar func_var -> PMRS.Functions.find_global ctx.functions func_var.vid
     | _ -> None
   in
   let problem =
-    sync_args
-      ~ctx
-      PsiDef.
-        { id = AState.PsiDef.new_psi_id ()
-        ; target = target_f
-        ; reference = reference_f
-        ; repr = repr_pmrs
-        ; tinv = tinv_pmrs
-        ; repr_is_identity = Reduce.is_identity ~fctx ~ctx repr_pmrs
-        ; lifting = []
-        }
+    ctx
+    >- sync_args
+         PsiDef.
+           { id = AState.PsiDef.new_psi_id ()
+           ; target = target_f
+           ; reference = reference_f
+           ; repr = repr_pmrs
+           ; tinv = tinv_pmrs
+           ; repr_is_identity = ctx >>- Reduce.is_identity repr_pmrs
+           ; lifting = []
+           }
   in
   (* Print summary information about the problem, before solving.*)
-  AlgoLog.show_summary ~ctx (spec_fname, repr_fname, target_fname) target_f;
+  ctx >- AlgoLog.show_summary (spec_fname, repr_fname, target_fname) target_f;
   (* Print reference function. *)
-  AlgoLog.show_pmrs ~ctx problem.PsiDef.reference;
+  ctx >- AlgoLog.show_pmrs problem.PsiDef.reference;
   (* Print target recursion skeleton. *)
-  AlgoLog.show_pmrs ~ctx problem.PsiDef.target;
+  ctx >- AlgoLog.show_pmrs problem.PsiDef.target;
   (* Print representation function. *)
   Log.info
     Fmt.(
       fun fmt () ->
         match repr with
-        | Either.First pmrs -> AlgoLog.show_pmrs ~ctx pmrs
+        | Either.First pmrs -> ctx >- AlgoLog.show_pmrs pmrs
         | Either.Second (fv, args, body) ->
           pf
             fmt
             "%s(%a) = %a"
             fv.vname
-            (list ~sep:comma (Term.pp_fpattern ctx))
+            (list ~sep:comma (Term.pp_fpattern ctx.ctx))
             args
-            (Term.pp_term ctx)
+            (Term.pp_term ctx.ctx)
             body);
-  Log.verbose (Specifications.dump_all ~ctx);
+  Log.verbose (ctx >- Specifications.dump_all);
   (* Print the condition on the reference function's input, if there is one. *)
   (match problem.tinv with
-  | Some tinv -> AlgoLog.show_pmrs ~ctx tinv
+  | Some tinv -> ctx >- AlgoLog.show_pmrs tinv
   | None -> ());
   (* Set global information. *)
-  AState._tau := tau;
-  AState._theta := theta;
-  AState._alpha := t_out;
-  AState._span := List.length (Analysis.terms_of_max_depth ~ctx 1 theta);
-  AState.refinement_steps := 0;
+  ctx.tau := tau;
+  ctx.theta := theta;
+  ctx.alpha := t_out;
   problem
 ;;
 
-let update_context ~(fctx : PMRS.Functions.ctx) ~(ctx : Context.t) (p : PsiDef.t) =
-  let target = PMRS.infer_pmrs_types ~ctx p.PsiDef.target in
-  PMRS.Functions.update fctx target;
-  AState.refinement_steps := 0
+let update_context ~(ctx : env) (p : PsiDef.t) =
+  let target = ctx >- PMRS.infer_pmrs_types p.PsiDef.target in
+  PMRS.Functions.update ctx.functions target;
+  ctx.refinement_steps := 0
 ;;

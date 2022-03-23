@@ -142,12 +142,12 @@ val clear_pmrs_types : ctx:Context.t -> t -> t
 val infer_pmrs_types : ctx:Context.t -> t -> t
 
 val unify_two_with_vartype_update
-  :  Context.t
+  :  ctx:Context.t
   -> RType.t * RType.t
   -> RType.t * RType.t
   -> RType.substitution
 
-val unify_one_with_update : Context.t -> RType.t * RType.t -> unit
+val unify_one_with_update : ctx:Context.t -> RType.t * RType.t -> unit
 val extract_rec_input_typ : t -> RType.t
 
 (**{-1 Pretty printing functions.}*)

@@ -1,4 +1,5 @@
 open AState
+open Env
 open Base
 open Lang
 open Lang.Term
@@ -45,17 +46,17 @@ end
 let empty_lifting = { tmap = LiftingMap.empty }
 let is_empty_lifting lifting = LiftingMap.is_empty lifting.tmap
 
-let alpha_component_count () =
-  match !_alpha with
+let alpha_component_count env =
+  match get_alpha env with
   | RType.TTup tl -> List.length tl
   | _ -> 1
 ;;
 
-let decompose_t (p : PsiDef.t) (t : term) : (int * term) option =
+let decompose_t ~(ctx : env) (p : PsiDef.t) (t : term) : (int * term) option =
   let g = p.PsiDef.target.pmain_symb in
   match t.tkind with
   | TSel (t', i) ->
-    let n = alpha_component_count () in
+    let n = alpha_component_count ctx in
     if i >= n
     then (
       match t'.tkind with
@@ -73,27 +74,26 @@ let recompose_t ~(ctx : Context.t) (p : PsiDef.t) (t : term) (i : int) : term =
 (**
   Find the expression of the lifting for an input term.
 *)
-let get_mapped_value ~(ctx : Context.t) ~(p : PsiDef.t) (l : lifting) (t : term) =
-  Option.(decompose_t p t >>= LiftingMap.get ~ctx l.tmap)
+let get_mapped_value ~(ctx : env) ~(p : PsiDef.t) (l : lifting) (t : term) =
+  Option.(decompose_t ~ctx p t >>= (ctx >- LiftingMap.get l.tmap))
 ;;
 
 (**
   Interactively add an expression for the lifting.
 *)
 let interactive_add_lifting_expression
-    ~(fctx : PMRS.Functions.ctx)
-    ~(ctx : Context.t)
+    ~(ctx : env)
     ~(p : PsiDef.t)
     (l : lifting)
     (a : term)
     (i : int)
     : lifting * term option
   =
-  let env = VarSet.to_env (Analysis.free_variables ~ctx a) in
+  let env = VarSet.to_env (ctx >- Analysis.free_variables a) in
   let g = p.PsiDef.target.pmain_symb in
   (* Prompt the user to add lemmas. *)
   Log.info (fun frmt () ->
-      Fmt.(pf frmt "Please provide a value for (%s %a).%i:" g.vname (pp_term ctx) a i));
+      Fmt.(pf frmt "Please provide a value for (%s %a).%i:" g.vname (pp_term ctx.ctx) a i));
   match Stdio.In_channel.input_line Stdio.stdin with
   | None | Some "" ->
     Log.info (fun frmt () -> Fmt.pf frmt "No lifting provided.");
@@ -106,16 +106,16 @@ let interactive_add_lifting_expression
       with
       | Failure _ -> None
     in
-    let l_term = Option.map ~f:(SmtInterface.term_of_smt ~ctx ~fctx env) smtterm in
+    let l_term = Option.map ~f:(ctx >>- SmtInterface.term_of_smt env) smtterm in
     (match l_term with
     | None -> l, None
     | Some x ->
-      (match LiftingMap.get ~ctx l.tmap (i, a) with
+      (match ctx >- LiftingMap.get l.tmap (i, a) with
       | Some _ -> l, Some x
       | None -> { tmap = LiftingMap.set l.tmap (i, a) x }, Some x))
 ;;
 
-let replace_boxed_expressions ~(ctx : Context.t) ~(p : PsiDef.t) (l : lifting) =
+let replace_boxed_expressions ~(ctx : env) ~(p : PsiDef.t) (l : lifting) =
   let case _ t =
     match t.tkind with
     | TBox t' -> get_mapped_value ~ctx ~p l t'
@@ -128,23 +128,21 @@ let replace_boxed_expressions ~(ctx : Context.t) ~(p : PsiDef.t) (l : lifting) =
   is different from the output type of the reference function (which is unchanged
   and stored in AState._alpha)
 *)
-let is_lifted ~(ctx : Context.t) (p : PsiDef.t) : bool =
-  let _, tout = RType.fun_typ_unpack (Variable.vtype_or_new ctx p.PsiDef.target.pvar) in
-  not (Result.is_ok (RType.unify_one tout !_alpha))
+let is_lifted ~(ctx : env) (p : PsiDef.t) : bool =
+  let _, tout = RType.fun_typ_unpack (var_type ctx p.PsiDef.target.pvar) in
+  not (Result.is_ok (RType.unify_one tout (get_alpha ctx)))
 ;;
 
-let lifting_types ~(ctx : Context.t) (p : PsiDef.t) : RType.t list =
-  let _, tout = RType.fun_typ_unpack (Variable.vtype_or_new ctx p.PsiDef.target.pvar) in
+let lifting_types ~(ctx : env) (p : PsiDef.t) : RType.t list =
+  let _, tout = RType.fun_typ_unpack (var_type ctx p.PsiDef.target.pvar) in
   match tout with
   | RType.TTup tl ->
-    let n = alpha_component_count () in
+    let n = alpha_component_count ctx in
     if n > 0 then List.drop tl n else []
   | _ -> []
 ;;
 
-let lifting_count ~(ctx : Context.t) (p : PsiDef.t) : int =
-  List.length (lifting_types ~ctx p)
-;;
+let lifting_count ~(ctx : env) (p : PsiDef.t) : int = List.length (lifting_types ~ctx p)
 
 (* ============================================================================================= *)
 (*                       PROJECTIONS TO AND FROM LIFTING                                         *)
@@ -153,46 +151,46 @@ let lifting_count ~(ctx : Context.t) (p : PsiDef.t) : int =
 (**
   Return a projection function that can be symbolically evaluated.
 *)
-let proj_to_non_lifting ~(ctx : Context.t) (p : PsiDef.t) : term option =
+let proj_to_non_lifting ~(ctx : env) (p : PsiDef.t) : term option =
   if not (is_lifted ~ctx p)
   then None
   else (
-    let _, tout = RType.fun_typ_unpack (Variable.vtype_or_new ctx p.PsiDef.target.pvar) in
-    match tout, !_alpha with
+    let _, tout = RType.fun_typ_unpack (var_type ctx p.PsiDef.target.pvar) in
+    match tout, get_alpha ctx with
     | TTup tl_lift, TTup tl' ->
       let args =
         List.map
-          ~f:(fun t -> Variable.mk ctx (Alpha.fresh ctx.names ~s:"x") ~t:(Some t))
+          ~f:(fun t -> Variable.mk ctx.ctx (Alpha.fresh ctx.ctx.names ~s:"x") ~t:(Some t))
           tl_lift
       in
       let tuple_pattern = FPatTup (List.map ~f:(fun v -> FPatVar v) args) in
       let tup_orig =
-        mk_tup ctx (List.map ~f:(mk_var ctx) (List.take args (List.length tl')))
+        mk_tup ctx.ctx (List.map ~f:(mk_var ctx.ctx) (List.take args (List.length tl')))
       in
-      Some (mk_fun ctx [ tuple_pattern ] tup_orig)
+      Some (mk_fun ctx.ctx [ tuple_pattern ] tup_orig)
     | TTup tl_lift, _ ->
       let args =
         List.map
-          ~f:(fun t -> Variable.mk ctx (Alpha.fresh ctx.names ~s:"x") ~t:(Some t))
+          ~f:(fun t -> Variable.mk ctx.ctx (Alpha.fresh ctx.ctx.names ~s:"x") ~t:(Some t))
           tl_lift
       in
       let tuple_pattern = FPatTup (List.map ~f:(fun v -> FPatVar v) args) in
-      Some (mk_fun ctx [ tuple_pattern ] (mk_var ctx (List.hd_exn args)))
+      Some (mk_fun ctx.ctx [ tuple_pattern ] (mk_var ctx.ctx (List.hd_exn args)))
     | _ ->
       Log.error_msg "Ignoring type difference between ɑ and output of target.";
       None)
 ;;
 
-let is_proj_function ~(ctx : Context.t) (p : PsiDef.t) (t : term) : bool =
+let is_proj_function ~(ctx : env) (p : PsiDef.t) (t : term) : bool =
   match t.tkind with
   | TFun ([ tuple_arg_pattern ], tuple_body) ->
     (match tuple_arg_pattern with
     | FPatTup t ->
-      if List.length t = lifting_count ~ctx p + alpha_component_count ()
+      if List.length t = lifting_count ~ctx p + alpha_component_count ctx
       then (
         match tuple_body.tkind with
-        | TTup tl -> List.length tl = alpha_component_count ()
-        | _ -> alpha_component_count () = 1)
+        | TTup tl -> List.length tl = alpha_component_count ctx
+        | _ -> alpha_component_count ctx = 1)
       else false
     | _ -> false)
   | _ -> false
@@ -202,35 +200,35 @@ let is_proj_function ~(ctx : Context.t) (p : PsiDef.t) (t : term) : bool =
     Return function f such that f(a) = a.i, .. a.i + n if i, .. i+n where
     i, ..., i+n are the components of the lifting.
 *)
-let proj_to_lifting ~(ctx : Context.t) (p : PsiDef.t) : (term -> term) option =
+let proj_to_lifting ~(ctx : env) (p : PsiDef.t) : (term -> term) option =
   if not (is_lifted ~ctx p)
   then None
   else (
-    let _, tout = RType.fun_typ_unpack (Variable.vtype_or_new ctx p.PsiDef.target.pvar) in
-    match tout, !_alpha with
+    let _, tout = RType.fun_typ_unpack (var_type ctx p.PsiDef.target.pvar) in
+    match tout, get_alpha ctx with
     | TTup tl_lift, TTup tl' ->
       let n = List.length tl' in
       Some
         (fun a ->
           match
             List.mapi
-              ~f:(fun i t -> mk_sel ctx ~typ:(Some t) a (n + i))
+              ~f:(fun i t -> mk_sel ctx.ctx ~typ:(Some t) a (n + i))
               (List.drop tl_lift n)
           with
-          | [] -> mk_tup ctx []
+          | [] -> mk_tup ctx.ctx []
           | [ x ] -> x
-          | hd :: tl -> mk_tup ctx (hd :: tl))
+          | hd :: tl -> mk_tup ctx.ctx (hd :: tl))
     | TTup tl_lift, _ ->
       Some
         (fun a ->
           match
             List.mapi
-              ~f:(fun i t -> mk_sel ctx ~typ:(Some t) a (1 + i))
+              ~f:(fun i t -> mk_sel ctx.ctx ~typ:(Some t) a (1 + i))
               (List.drop tl_lift 1)
           with
-          | [] -> mk_tup ctx []
+          | [] -> mk_tup ctx.ctx []
           | [ x ] -> x
-          | hd :: tl -> mk_tup ctx (hd :: tl))
+          | hd :: tl -> mk_tup ctx.ctx (hd :: tl))
     | _ ->
       Log.error_msg "Ignoring type difference between ɑ and output of target.";
       None)
@@ -241,16 +239,16 @@ let proj_to_lifting ~(ctx : Context.t) (p : PsiDef.t) : (term -> term) option =
   computes the tuple that corresponds to the lifted function from the original components
   of the function in [oringal_part] and the components of the lifting only in [lifting_part]
 *)
-let compose_parts ~(ctx : Context.t) (p : PsiDef.t) : term option =
+let compose_parts ~(ctx : env) (p : PsiDef.t) : term option =
   if not (is_lifted ~ctx p)
   then None
   else (
-    let _, tout = RType.fun_typ_unpack (Variable.vtype_or_new ctx p.PsiDef.target.pvar) in
-    match tout, !_alpha with
+    let _, tout = RType.fun_typ_unpack (var_type ctx p.PsiDef.target.pvar) in
+    match tout, get_alpha ctx with
     | TTup tl_lift, TTup tl' ->
       let args =
         List.map
-          ~f:(fun t -> Variable.mk ctx (Alpha.fresh ~s:"x" ctx.names) ~t:(Some t))
+          ~f:(fun t -> Variable.mk ctx.ctx (Alpha.fresh ~s:"x" ctx.ctx.names) ~t:(Some t))
           tl_lift
       in
       let n = List.length tl' in
@@ -263,12 +261,12 @@ let compose_parts ~(ctx : Context.t) (p : PsiDef.t) : term option =
         | _ :: _ as l -> FPatTup (List.map ~f:(fun v -> FPatVar v) l)
         | _ -> failwith "Impossible."
       in
-      let tup_all = mk_tup ctx (List.map ~f:(mk_var ctx) args) in
-      Some (mk_fun ctx [ tuple_pattern_orig; tuple_pattern_lifting ] tup_all)
+      let tup_all = mk_tup ctx.ctx (List.map ~f:(mk_var ctx.ctx) args) in
+      Some (mk_fun ctx.ctx [ tuple_pattern_orig; tuple_pattern_lifting ] tup_all)
     | TTup tl_lift, _ ->
       let args =
         List.map
-          ~f:(fun t -> Variable.mk ctx (Alpha.fresh ~s:"x" ctx.names) ~t:(Some t))
+          ~f:(fun t -> Variable.mk ctx.ctx (Alpha.fresh ~s:"x" ctx.ctx.names) ~t:(Some t))
           tl_lift
       in
       let n = 1 in
@@ -278,8 +276,8 @@ let compose_parts ~(ctx : Context.t) (p : PsiDef.t) : term option =
         | [ a ] -> a
         | _ as l -> FPatTup l
       in
-      let tup_all = mk_tup ctx (List.map ~f:(mk_var ctx) args) in
-      Some (mk_fun ctx [ pattern_orig; tuple_pattern_lifting ] tup_all)
+      let tup_all = mk_tup ctx.ctx (List.map ~f:(mk_var ctx.ctx) args) in
+      Some (mk_fun ctx.ctx [ pattern_orig; tuple_pattern_lifting ] tup_all)
     | _ ->
       Log.error_msg "Ignoring type difference between ɑ and output of target.";
       None)
@@ -322,58 +320,53 @@ let analyze_leftover ~(ctx : Rewriter.RContext.t) (expr : Rewriter.Expression.t)
 (* ============================================================================================= *)
 
 (**
-  [apply_lifting ~p l] lifts [p.PsiDef.target] by extending the output with [l].
+  [apply_lifting ~ctx ~p l] lifts [p.PsiDef.target] by extending the output with [l].
 *)
-let apply_lifting ~(ctx : Context.t) ~(p : PsiDef.t) (new_lifting : RType.t list)
-    : PsiDef.t
-  =
+let apply_lifting ~(ctx : env) ~(p : PsiDef.t) (new_lifting : RType.t list) : PsiDef.t =
   (* Type inference on p.target to update types *)
   let target' =
     let new_out_type =
       let open RType in
-      match
-        snd (fun_typ_unpack (Variable.vtype_or_new ctx p.PsiDef.target.PMRS.pvar))
-      with
+      match snd (fun_typ_unpack (var_type ctx p.PsiDef.target.PMRS.pvar)) with
       | TTup old_ts -> TTup (old_ts @ new_lifting)
       | t_out -> TTup (t_out :: new_lifting)
     in
     let target' =
-      PMRS.infer_pmrs_types ~ctx (PMRS.clear_pmrs_types ~ctx p.PsiDef.target)
+      ctx >- PMRS.infer_pmrs_types (ctx >- PMRS.clear_pmrs_types p.PsiDef.target)
     in
     let free_theta = PMRS.extract_rec_input_typ target' in
     (* Update the input type, w.r.t to the the theta stored. *)
-    PMRS.unify_one_with_update ctx (free_theta, !_theta);
+    ctx >- PMRS.unify_one_with_update (free_theta, get_theta ctx);
     (* Update the output type. *)
     (match
        RType.unify_one
-         (snd (RType.fun_typ_unpack (Variable.vtype_or_new ctx target'.pmain_symb)))
+         (snd (RType.fun_typ_unpack (var_type ctx target'.pmain_symb)))
          new_out_type
      with
-    | Ok subs -> Variable.update_var_types ctx (RType.mkv subs)
+    | Ok subs -> Variable.update_var_types ctx.ctx (RType.mkv subs)
     | Error e ->
       Log.error_msg Fmt.(str "Error: %a" Sexp.pp_hum e);
       Log.error_msg "Failed to unify output types in lifting.");
-    PMRS.infer_pmrs_types ~ctx target'
+    ctx >- PMRS.infer_pmrs_types target'
   in
   (* ⚠️ !TODO! : updates all the "ensures" *)
   Log.debug (fun ft () ->
-      Fmt.(pf ft "@[After lifting:@;%a@]" (box (PMRS.pp ~ctx ~short:true)) target'));
+      Fmt.(pf ft "@[After lifting:@;%a@]" (box (ctx >- PMRS.pp ~short:true)) target'));
   PsiDef.{ p with target = target'; lifting = p.lifting @ new_lifting }
 ;;
 
-let lift_interactive ~(fctx : PMRS.Functions.ctx) ~(ctx : Context.t) ~p lifting boxes =
+let lift_interactive ~(ctx : env) ~p lifting boxes =
   List.fold
     ~init:lifting
     ~f:(fun l (i, t) ->
-      match LiftingMap.get ~ctx l.tmap (i, t) with
+      match ctx >- LiftingMap.get l.tmap (i, t) with
       | Some _ -> l
-      | None -> fst (interactive_add_lifting_expression ~fctx ~ctx ~p l t i))
+      | None -> fst (interactive_add_lifting_expression ~ctx ~p l t i))
     boxes
 ;;
 
 let deduce_lifting_expressions
-    ~(fctx : PMRS.Functions.ctx)
-    ~(ctx : Context.t)
+    ~(ctx : env)
     ~(p : PsiDef.t)
     (lifting : lifting)
     (lemma : term option)
@@ -386,29 +379,30 @@ let deduce_lifting_expressions
     reduce
       ~init:[]
       ~case:(fun _ t ->
-        match decompose_t p t with
+        match decompose_t ~ctx p t with
         | Some (i, a) -> Some [ i, a ]
         | _ -> None)
       ~join:( @ )
       rhs
   in
   if !Config.interactive_lifting
-  then lift_interactive ~p ~ctx ~fctx lifting boxes
+  then lift_interactive ~p ~ctx lifting boxes
   else (
     let subs, boxvar_to_linput =
       (* Create fresh variables for boxes and a map from var id to box argument. *)
       boxes
       |> List.map ~f:(fun (i, box_input) ->
-             match LiftingMap.get ~ctx lifting.tmap (i, box_input) with
-             | Some e -> (recompose_t ~ctx p box_input i, e), None
+             match ctx >- LiftingMap.get lifting.tmap (i, box_input) with
+             | Some e -> (ctx >- recompose_t p box_input i, e), None
              | None ->
                let x =
                  Variable.mk
-                   ctx
-                   (Alpha.fresh ctx.names ~s:(Fmt.str "_L_%i" i))
-                   ~t:(nth_output_type ~ctx p i)
+                   ctx.ctx
+                   (Alpha.fresh ctx.ctx.names ~s:(Fmt.str "_L_%i" i))
+                   ~t:(ctx >- nth_output_type p i)
                in
-               (recompose_t ~ctx p box_input i, mk_var ctx x), Some (x, (i, box_input)))
+               ( (ctx >- recompose_t p box_input i, mk_var ctx.ctx x)
+               , Some (x, (i, box_input)) ))
       |> List.unzip
     in
     let boxvar_to_linput = List.filter_opt boxvar_to_linput in
@@ -425,12 +419,12 @@ let deduce_lifting_expressions
           (* A box completion might also use the parameters of the function. *)
           ( x
           , Set.union
-              (Analysis.free_variables ~ctx t)
+              (ctx >- Analysis.free_variables t)
               (VarSet.of_list p.PsiDef.target.pargs) )
         in
         boxvar_to_linput
         |> List.map ~f
-        |> Deduction.Solver.functional_equation ~fctx ~ctx ~func_side:rhs_args ~lemma lhs
+        |> Deduction.Solver.functional_equation ~ctx ~func_side:rhs_args ~lemma lhs
       in
       let _ = Option.map ~f:(analyze_leftover ~ctx:sol_ctx) maybe_leftover_expr in
       List.fold var_to_lifting_expr ~init:lifting ~f:(fun l (v, t) ->
@@ -447,7 +441,7 @@ let deduce_lifting_expressions
   Perform a scalar lifting.
 *)
 let scalar
-    ~(ctx : Context.t)
+    ~(ctx : env)
     ~(p : PsiDef.t)
     (l : refinement_loop_state)
     ((_s_resp, synt_failure_info) :
@@ -464,11 +458,9 @@ let scalar
           and val_in_j = Map.find uc.cj.ctex_model var in
           match val_in_i, val_in_j with
           | Some vi, Some vj ->
-            if not (Terms.equal vi vj)
-            then Some (Variable.vtype_or_new ctx var)
-            else type_decision
+            if not (Terms.equal vi vj) then Some (var_type ctx var) else type_decision
           | Some _, _ | _, Some _ ->
-            Option.first_some type_decision (Some (Variable.vtype_or_new ctx var))
+            Option.first_some type_decision (Some (var_type ctx var))
           | _ -> type_decision
         in
         Set.fold common_vars ~f ~init:None

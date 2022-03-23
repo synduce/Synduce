@@ -5,6 +5,7 @@
 *)
 
 open Base
+open Env
 open Lang
 open Lang.Term
 open Utils
@@ -20,28 +21,27 @@ open Syguslib.Sygus
     will be taken as counterexamples during the refinement loop.
     Use the option [--segis] in the executable to use this synthesis algorithm.
 *)
-let rec segis_loop
-    ~(ctx : Env.env)
-    ~(t : ThreadContext.t)
-    (p : PsiDef.t)
-    (t_set : TermSet.t)
+let rec segis_loop ~(ctx : env) ~(t : ThreadContext.t) (p : PsiDef.t) (t_set : TermSet.t)
     : solver_response segis_response
   =
-  Int.incr refinement_steps;
-  if !refinement_steps > !Config.refinement_rounds_warning_limit
+  incr_refinement ctx;
+  if get_refinement_steps ctx > !Config.refinement_rounds_warning_limit
      && Config.Optims.some_eager_optim_on ()
   then (
     Log.info (fun frmt () ->
-        Fmt.pf frmt "Turning off eager optimizations after %i rounds." !refinement_steps);
+        Fmt.pf
+          frmt
+          "Turning off eager optimizations after %i rounds."
+          (get_refinement_steps ctx));
     Config.Optims.turn_off_eager_optims ());
   let elapsed = Stats.get_glob_elapsed () in
-  Log.info (fun frmt () -> Fmt.pf frmt "Refinement step %i." !refinement_steps);
+  Log.info (fun frmt () -> Fmt.pf frmt "Refinement step %i." (get_refinement_steps ctx));
   let tsize = Set.length t_set
   and usize = 0 in
   Stats.log_new_major_step ~tsize ~usize ();
   if !Config.info
-  then AlgoLog.show_steps tsize usize
-  else AlgoLog.show_stat elapsed tsize usize;
+  then AlgoLog.show_steps ctx tsize usize
+  else AlgoLog.show_stat ctx elapsed tsize usize;
   Log.debug_msg
     Fmt.(str "<SEGIS> Start refinement loop with %i terms in T." (Set.length t_set));
   (* Start of the algorithm. *)
@@ -95,9 +95,11 @@ let rec segis_loop
   | _ -> Failed s_resp
 ;;
 
-let algo_segis ~(ctx : Env.env) ~(t : ThreadContext.t) (p : PsiDef.t) =
-  let t_set = TermSet.of_list Env.(ctx >- Analysis.terms_of_max_depth 1 !AState._theta) in
-  refinement_steps := 0;
+let algo_segis ~(ctx : env) ~(t : ThreadContext.t) (p : PsiDef.t) =
+  let t_set =
+    TermSet.of_list Env.(ctx >- Analysis.terms_of_max_depth 1 (get_theta ctx))
+  in
+  ctx.refinement_steps := 0;
   segis_loop ~ctx ~t:(ThreadContext.subctx t "segis") p t_set
 ;;
 
@@ -117,17 +119,22 @@ let rec cegis_loop
     (t_set : TermSet.t)
     : solver_response segis_response
   =
-  Int.incr refinement_steps;
-  if !refinement_steps > !Config.refinement_rounds_warning_limit
+  incr_refinement ctx;
+  if get_refinement_steps ctx > !Config.refinement_rounds_warning_limit
   then (
     Log.info (fun frmt () ->
-        Fmt.pf frmt "Turning off eager optimizations after %i rounds." !refinement_steps);
+        Fmt.pf
+          frmt
+          "Turning off eager optimizations after %i rounds."
+          (get_refinement_steps ctx));
     Config.Optims.turn_off_eager_optims ());
   let elapsed = Stats.get_glob_elapsed () in
-  Log.info (fun frmt () -> Fmt.pf frmt "Refinement step %i." !refinement_steps);
+  Log.info (fun frmt () -> Fmt.pf frmt "Refinement step %i." (get_refinement_steps ctx));
   let tsize = Set.length t_set in
   Stats.log_new_major_step ~tsize ~usize:0 ();
-  if !Config.info then AlgoLog.show_steps tsize 0 else AlgoLog.show_stat elapsed tsize 0;
+  if !Config.info
+  then AlgoLog.show_steps ctx tsize 0
+  else AlgoLog.show_stat ctx elapsed tsize 0;
   Log.debug_msg
     Fmt.(str "<CEGIS> Start refinement loop with %i terms in T." (Set.length t_set));
   (* Start of the algorithm. *)
@@ -188,8 +195,8 @@ let algo_cegis ~(ctx : Env.env) ~(t : ThreadContext.t) (p : PsiDef.t) =
     TermSet.of_list
       (List.map
          ~f:(Analysis.concretize ~ctx:ctx.ctx)
-         Env.(ctx >- Analysis.terms_of_max_depth 1 !AState._theta))
+         Env.(ctx >- Analysis.terms_of_max_depth 1 (get_theta ctx)))
   in
-  refinement_steps := 0;
+  ctx.refinement_steps := 0;
   cegis_loop ~ctx ~t:(ThreadContext.subctx t "cegis") p t_set
 ;;

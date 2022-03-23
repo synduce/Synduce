@@ -19,19 +19,19 @@ let rec refinement_loop
   let tsize, usize = Set.length lstate_in.t_set, Set.length lstate_in.u_set in
   if major
   then (
-    Int.incr refinement_steps;
-    secondary_refinement_steps := 0;
+    incr_refinement ctx;
+    ctx.secondary_refinement_steps := 0;
     Stats.log_new_major_step ~tsize ~usize ())
-  else Int.incr secondary_refinement_steps;
+  else incr_secondary_refinement ctx;
   (* Output status information before entering process. *)
   let elapsed = Stats.get_glob_elapsed () in
   if !Config.info
-  then AlgoLog.show_steps tsize usize
-  else AlgoLog.show_stat elapsed tsize usize;
+  then AlgoLog.show_steps ctx tsize usize
+  else AlgoLog.show_stat ctx elapsed tsize usize;
   (* Add lemmas interactively if the option is set. *)
   let lstate =
     if !Config.interactive_lemmas
-    then ctx >>- Lemmas.Interactive.add_lemmas ~p lstate_in
+    then Lemmas.Interactive.add_lemmas ~ctx ~p lstate_in
     else lstate_in
   in
   (* First, generate the set of constraints corresponding to the set of terms t_set. *)
@@ -108,17 +108,16 @@ let rec refinement_loop
   | _ as synt_failure_info ->
     (* On synthesis failure, start by trying to synthesize lemmas. *)
     (match
-       Stats.timed (fun () ->
-           ctx >>- Lemmas.synthesize_lemmas ~p synt_failure_info lstate)
+       Stats.timed (fun () -> Lemmas.synthesize_lemmas ~ctx ~p synt_failure_info lstate)
      with
     | lsynt_time, Ok (First new_lstate) ->
       Stats.log_minor_step ~synth_time ~auxtime:lsynt_time false;
       refinement_loop ~ctx ~major:false tctx p new_lstate
     | lsynt_time, Ok (Second ctexs)
       when !Config.Optims.attempt_lifting
-           && ctx >- Lifting.lifting_count p < !Config.Optims.max_lifting_attempts ->
+           && Lifting.lifting_count ~ctx p < !Config.Optims.max_lifting_attempts ->
       (* If all no counterexample is spurious, lemma synthesis fails, we need lifting. *)
-      (match ctx >- Lifting.scalar ~p lstate synt_failure_info with
+      (match Lifting.scalar ~ctx ~p lstate synt_failure_info with
       | Ok (p', lstate') ->
         Lifting.msg_lifting ();
         Stats.log_minor_step ~synth_time ~auxtime:lsynt_time true;
@@ -147,12 +146,12 @@ let se2gis ~(ctx : env) (tctx : ThreadContext.t) (p : PsiDef.t) =
       let x0 =
         mk_var
           ctx.ctx
-          (Variable.mk ctx.ctx ~t:(Some !AState._theta) (Alpha.fresh ctx.ctx.names))
+          (Variable.mk ctx.ctx ~t:(Some (get_theta ctx)) (Alpha.fresh ctx.ctx.names))
       in
       let s = TermSet.of_list (ctx >- Analysis.expand_once x0) in
       Set.partition_tf ~f:(ctx >>- Expand.is_mr_all p) s)
     else (
-      let init_set = MGT.most_general_terms ctx.functions ctx.ctx p.PsiDef.target in
+      let init_set = MGT.most_general_terms ctx p.PsiDef.target in
       Set.fold init_set ~init:(TermSet.empty, TermSet.empty) ~f:(fun (t, u) mgt ->
           let t', u' = ctx >>- Expand.to_maximally_reducible p mgt in
           Set.union t t', Set.union u u'))
@@ -169,7 +168,7 @@ let se2gis ~(ctx : env) (tctx : ThreadContext.t) (p : PsiDef.t) =
     Log.error_msg "Empty set of terms for equation system.";
     Failed RFail)
   else (
-    refinement_steps := 0;
+    ctx.refinement_steps := 0;
     refinement_loop
       ~ctx
       tctx
@@ -212,8 +211,7 @@ let find_and_solve_problem
       "target", "spec", "repr"
   in
   let top_userdef_problem =
-    ctx
-    >>- ProblemFinder.find_problem_components (target_fname, spec_fname, repr_fname) pmrs
+    ProblemFinder.find_problem_components ~ctx (target_fname, spec_fname, repr_fname) pmrs
   in
   let main_algo =
     if !Config.Optims.use_segis (* Symbolic CEGIS. *)

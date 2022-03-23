@@ -14,10 +14,7 @@ open Env
 (** Use [reinit] to reinitialize all the global variables used in Synduce when solving
   multiple problems.
 *)
-let reinit () =
-  AState.reinit ();
-  Specifications.reinit ()
-;;
+let reinit () = Specifications.reinit ()
 
 let solve_file ?(print_info = false) (filename : string)
     : (problem_descr * (soln option, unrealizability_ctex list) Either.t) list
