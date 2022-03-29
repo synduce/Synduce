@@ -30,9 +30,7 @@ let solve_file ?(print_info = false) (filename : string)
   let pb_env = Env.group (Term.Context.create ()) (PMRS.Functions.create ()) in
   pb_env >- Parsers.seek_types prog;
   let all_pmrs = pb_env >>- Parsers.translate prog in
-  let outputs =
-    Single.find_and_solve_problem ~ctx:pb_env (ThreadContext.mk "main") psi_comps all_pmrs
-  in
+  let outputs = Single.find_and_solve_problem ~ctx:pb_env psi_comps all_pmrs in
   List.map outputs ~f:(fun (problem, result) ->
       let pd = pb_env >- problem_descr_of_psi_def problem in
       match result with

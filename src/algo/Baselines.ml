@@ -21,7 +21,7 @@ open Syguslib.Sygus
     will be taken as counterexamples during the refinement loop.
     Use the option [--segis] in the executable to use this synthesis algorithm.
 *)
-let rec segis_loop ~(ctx : env) ~(t : ThreadContext.t) (p : PsiDef.t) (t_set : TermSet.t)
+let rec segis_loop ~(ctx : env) (p : PsiDef.t) (t_set : TermSet.t)
     : solver_response segis_response
   =
   incr_refinement ctx;
@@ -70,7 +70,7 @@ let rec segis_loop ~(ctx : env) ~(t : ThreadContext.t) (p : PsiDef.t) (t_set : T
               "@[<hov 2><SEGIS> Counterexample term:@;@[<hov 2>%a@]"
               (pp_term ctx.ctx)
               eqn.eterm));
-      segis_loop ~ctx ~t p (Set.add t_set eqn.eterm)
+      segis_loop ~ctx p (Set.add t_set eqn.eterm)
     | verif_time, None ->
       Stats.log_major_step_end ~synth_time ~verif_time ~t:tsize ~u:0 true;
       Log.print_ok ();
@@ -95,12 +95,12 @@ let rec segis_loop ~(ctx : env) ~(t : ThreadContext.t) (p : PsiDef.t) (t_set : T
   | _ -> Failed s_resp
 ;;
 
-let algo_segis ~(ctx : env) ~(t : ThreadContext.t) (p : PsiDef.t) =
+let algo_segis ~(ctx : env) (p : PsiDef.t) =
   let t_set =
     TermSet.of_list Env.(ctx >- Analysis.terms_of_max_depth 1 (get_theta ctx))
   in
   ctx.refinement_steps := 0;
-  segis_loop ~ctx ~t:(ThreadContext.subctx t "segis") p t_set
+  segis_loop ~ctx p t_set
 ;;
 
 (* ============================================================================================= *)
@@ -112,11 +112,7 @@ let algo_segis ~(ctx : env) ~(t : ThreadContext.t) (p : PsiDef.t) =
     will be taken as counterexamples during the refinement loop: this is a concrete CEGIS algorithm.
     Use the option [--cegis] in the executable to use this synthesis algorithm.
 *)
-let rec cegis_loop
-    ~(ctx : Env.env)
-    ~(t : ThreadContext.t)
-    (p : PsiDef.t)
-    (t_set : TermSet.t)
+let rec cegis_loop ~(ctx : Env.env) (p : PsiDef.t) (t_set : TermSet.t)
     : solver_response segis_response
   =
   incr_refinement ctx;
@@ -165,7 +161,7 @@ let rec cegis_loop
               "@[<hov 2><CEGIS> Counterexample term:@;@[<hov 2>%a@]"
               (pp_term ctx.ctx)
               eqn.eterm));
-      cegis_loop ~ctx ~t p (Set.add t_set eqn.eterm)
+      cegis_loop ~ctx p (Set.add t_set eqn.eterm)
     | verif_time, None ->
       Stats.log_major_step_end ~synth_time ~verif_time ~t:tsize ~u:0 true;
       Log.print_ok ();
@@ -190,7 +186,7 @@ let rec cegis_loop
   | _ -> Failed s_resp
 ;;
 
-let algo_cegis ~(ctx : Env.env) ~(t : ThreadContext.t) (p : PsiDef.t) =
+let algo_cegis ~(ctx : Env.env) (p : PsiDef.t) =
   let t_set =
     TermSet.of_list
       (List.map
@@ -198,5 +194,5 @@ let algo_cegis ~(ctx : Env.env) ~(t : ThreadContext.t) (p : PsiDef.t) =
          Env.(ctx >- Analysis.terms_of_max_depth 1 (get_theta ctx)))
   in
   ctx.refinement_steps := 0;
-  cegis_loop ~ctx ~t:(ThreadContext.subctx t "cegis") p t_set
+  cegis_loop ~ctx p t_set
 ;;

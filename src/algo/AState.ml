@@ -3,78 +3,11 @@ open Lang
 open Lang.Term
 open Syguslib.Sygus
 open Utils
-open Domainslib
 
 (**
   AState: This module contains state variables for the synthesis algorithms, as well as type
    definitions and printing functions for displaying solutions.
  *)
-
-module ThreadContext = struct
-  exception Escape
-
-  type t =
-    { c_name : string
-    ; mutable c_alive : bool
-    ; mutable c_pid : int
-    ; mutable c_subctx : t array
-    ; c_chan : int Chan.t
-    ; c_pool : Task.pool
-    }
-
-  let mk name =
-    { c_name = name
-    ; c_alive = true
-    ; c_pid = -1
-    ; c_subctx = [||]
-    ; c_chan = Chan.make_bounded 10
-    ; c_pool = Task.setup_pool ~name ~num_additional_domains:!Config.Optims.num_threads ()
-    }
-  ;;
-
-  let subctx ?(pid = None) (ctx : t) (name : string) : t =
-    let new_ctx =
-      { c_name = name
-      ; c_alive = true
-      ; c_pid = Option.value ~default:ctx.c_pid pid
-      ; c_subctx = [||]
-      ; c_chan = Chan.make_bounded 10
-      ; c_pool = ctx.c_pool
-      }
-    in
-    ctx.c_subctx <- Array.append ctx.c_subctx [| new_ctx |];
-    new_ctx
-  ;;
-
-  let remove_sub (ctx : t) ~(sub : t) =
-    ctx.c_subctx
-      <- Array.filter ctx.c_subctx ~f:(fun sub' ->
-             not (String.equal sub'.c_name sub.c_name))
-  ;;
-
-  let send_termination (ctx : t) = Chan.send ctx.c_chan (-1)
-
-  let rec subkill (ctx : t) : unit =
-    Array.iter
-      ~f:(fun sub ->
-        send_termination sub;
-        subkill sub;
-        remove_sub ctx ~sub)
-      ctx.c_subctx;
-    if ctx.c_pid > 0 then Unix.kill ctx.c_pid Caml.Sys.sigkill
-  ;;
-
-  let check (ctx : t) =
-    match Chan.recv_poll ctx.c_chan with
-    | Some i ->
-      if i < 0
-      then (
-        subkill ctx;
-        raise Escape)
-      else ()
-    | None -> ()
-  ;;
-end
 
 module PsiDef = struct
   (**

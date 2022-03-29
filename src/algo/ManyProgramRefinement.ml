@@ -42,7 +42,7 @@ let find_and_solve_problem
       | low_problem :: tl ->
         ProblemFinder.update_context ~ctx low_problem;
         ctx >- AlgoLog.show_new_rskel i low_problem;
-        let maybe_solution = main_algo ~ctx ~t:(ThreadContext.mk "main") low_problem in
+        let maybe_solution = main_algo ~ctx low_problem in
         (* Print state and save. *)
         LogJson.save_stats_and_restart low_problem.id;
         (match maybe_solution with

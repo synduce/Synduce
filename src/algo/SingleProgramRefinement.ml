@@ -9,13 +9,11 @@ open Env
 let rec refinement_loop
     ?(major = true)
     ~(ctx : env)
-    (tctx : ThreadContext.t)
     (p : PsiDef.t)
     (lstate_in : refinement_loop_state)
     : solver_response segis_response
   =
   (* Check there is no termination order. *)
-  ThreadContext.check tctx;
   let tsize, usize = Set.length lstate_in.t_set, Set.length lstate_in.u_set in
   if major
   then (
@@ -43,8 +41,6 @@ let rec refinement_loop
       ~lifting:lstate.lifting
       lstate.t_set
   in
-  (* Check there is no termination order. *)
-  ThreadContext.check tctx;
   (* The solve the set of constraints with the assumption equations. *)
   let synth_time, (s_resp, solution) =
     Stats.timed (fun () -> Equations.solve ctx ~p (eqns @ lstate.assumptions))
@@ -71,7 +67,7 @@ let rec refinement_loop
            else lstate
          in
          (* Continue looping with the new sets. *)
-         refinement_loop ~ctx ~major:true tctx p { lstate with t_set; u_set; lifting }
+         refinement_loop ~ctx ~major:true p { lstate with t_set; u_set; lifting }
        | `Incorrect_assumptions ->
          if !Config.Optims.use_syntactic_definitions
             || !Config.Optims.make_partial_correctness_assumption
@@ -86,7 +82,7 @@ let rec refinement_loop
              ~u:usize
              false;
            Config.Optims.turn_off_eager_optims ();
-           refinement_loop ~ctx ~major tctx p lstate_in)
+           refinement_loop ~ctx ~major p lstate_in)
          else Failed RFail
        | `Correct ->
          (* This case happens when verification succeeded.
@@ -112,7 +108,7 @@ let rec refinement_loop
      with
     | lsynt_time, Ok (First new_lstate) ->
       Stats.log_minor_step ~synth_time ~auxtime:lsynt_time false;
-      refinement_loop ~ctx ~major:false tctx p new_lstate
+      refinement_loop ~ctx ~major:false p new_lstate
     | lsynt_time, Ok (Second ctexs)
       when !Config.Optims.attempt_lifting
            && Lifting.lifting_count ~ctx p < !Config.Optims.max_lifting_attempts ->
@@ -121,7 +117,7 @@ let rec refinement_loop
       | Ok (p', lstate') ->
         Lifting.msg_lifting ();
         Stats.log_minor_step ~synth_time ~auxtime:lsynt_time true;
-        refinement_loop ~ctx ~major:false tctx p' lstate'
+        refinement_loop ~ctx ~major:false p' lstate'
       | Error r' ->
         (* Infeasible is not a failure! *)
         (match r' with
@@ -138,7 +134,7 @@ let rec refinement_loop
     | _ -> Failed RFail)
 ;;
 
-let se2gis ~(ctx : env) (tctx : ThreadContext.t) (p : PsiDef.t) =
+let se2gis ~(ctx : env) (p : PsiDef.t) =
   (* Initialize sets with the most general terms. *)
   let t_set, u_set =
     if !Config.Optims.simple_init
@@ -171,7 +167,6 @@ let se2gis ~(ctx : env) (tctx : ThreadContext.t) (p : PsiDef.t) =
     ctx.refinement_steps := 0;
     refinement_loop
       ~ctx
-      tctx
       p
       { t_set
       ; u_set
@@ -185,19 +180,15 @@ let se2gis ~(ctx : env) (tctx : ThreadContext.t) (p : PsiDef.t) =
 (*                                                 MAIN ENTRY POINTS                             *)
 (* ============================================================================================= *)
 
-let solve_problem ~(ctx : env) ~(t : ThreadContext.t) (synthesis_problem : PsiDef.t)
+let solve_problem ~(ctx : env) (synthesis_problem : PsiDef.t)
     : solver_response segis_response
   =
   (* Solve the problem using portofolio of techniques. *)
-  try se2gis ~ctx t synthesis_problem with
-  | ThreadContext.Escape ->
-    Utils.Log.debug_msg "se2gis run was terminated early.";
-    Failed RFail
+  se2gis ~ctx synthesis_problem
 ;;
 
 let find_and_solve_problem
     ~(ctx : env)
-    (tctx : ThreadContext.t)
     (psi_comps : (string * string * string) option)
     (pmrs : (string, PMRS.t, Base.String.comparator_witness) Map.t)
     : (PsiDef.t * Syguslib.Sygus.solver_response segis_response) list
@@ -222,5 +213,5 @@ let find_and_solve_problem
       (* Default algorithm: best combination of techniques. *)
     else solve_problem ~ctx
   in
-  [ top_userdef_problem, main_algo ~t:tctx top_userdef_problem ]
+  [ top_userdef_problem, main_algo top_userdef_problem ]
 ;;

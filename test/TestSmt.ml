@@ -16,27 +16,28 @@ let dirty_smt (s : string) =
   | None -> mk_true
 ;;
 
-let test_parallel_solvers () =
-  let f i z3 () =
+let test_parallel_solvers n =
+  let f _ () =
+    let z3 = S.make_z3_solver () in
     S.load_min_max_defs z3;
     match S.exec_command z3 mk_exit with
-    | Success ->
-      Fmt.(pf stdout "PARALLEL TEST: Solver %i exited succesfully.@." i);
-      true
-    | _ -> failwith (Fmt.str "PARALLEL TEST: Solver %i did not exit successfully" i)
+    | Success -> true
+    | _ -> false
   in
   let pool = Task.setup_pool ~num_additional_domains:4 () in
-  let _ =
+  let res =
     Task.run pool (fun () ->
-        let d1 = Task.async pool (f 1 (S.make_z3_solver ())) in
-        let d2 = Task.async pool (f 2 (S.make_cvc_solver ())) in
-        Task.await pool d1 && Task.await pool d2)
+        let ds = List.init n ~f:(fun i -> Task.async pool (f i)) in
+        List.fold ~init:true ~f:(fun acc d -> acc && Task.await pool d) ds)
   in
-  Task.teardown_pool pool
+  Task.teardown_pool pool;
+  res
 ;;
 
 let test_dirty_cancel () =
-  let f i z3 () =
+  let f i zid () =
+    let z3 = S.make_z3_solver () in
+    zid := z3.S.s_pid;
     S.load_min_max_defs z3;
     let commands =
       [ mk_set_logic Logics.ALL
@@ -71,24 +72,30 @@ let test_dirty_cancel () =
       Fmt.(pf stdout "KILL TEST: Solver %i did not exit successfully@." i);
       false
   in
-  let timeout_killer pid () =
+  let timeout_killer flag pid () =
     Unix.sleepf 0.2;
     try
       Fmt.(pf stdout "Kill solver %i@." pid);
-      Unix.kill pid Caml.Sys.sigkill
+      Unix.kill pid Caml.Sys.sigkill;
+      flag := true
     with
-    | _ -> failwith "Fail"
+    | _ -> flag := false
   in
   let pool = Task.setup_pool ~num_additional_domains:4 () in
-  Task.run pool (fun () ->
-      let z1 = S.make_z3_solver () in
-      let z2 = S.make_z3_solver () in
-      let z3 = S.make_z3_solver () in
-      let _ = Task.async pool (f 1 z1) in
-      let d2 = Task.async pool (f 2 z2) in
-      let d3 = Task.async pool (f 3 z3) in
-      let _ = Task.async pool (timeout_killer z1.s_pid) in
-      ignore (Task.await pool d2 && Task.await pool d3))
+  let res =
+    Task.run pool (fun () ->
+        let flag = ref false in
+        let zid1 = ref 0 in
+        let zid2 = ref 0 in
+        let zid3 = ref 0 in
+        let _ = Task.async pool (f 1 zid1) in
+        let d2 = Task.async pool (f 2 zid2) in
+        let d3 = Task.async pool (f 3 zid3) in
+        let _ = Task.async pool (timeout_killer flag !zid1) in
+        Task.await pool d2 && Task.await pool d3 && !flag)
+  in
+  Task.teardown_pool pool;
+  res
 ;;
 
 let test_task_net () =
@@ -148,7 +155,7 @@ let test_task_net () =
       Task.teardown_pool pool)
 ;;
 
-let test_task_net_take_first_sol () =
+let test_task_net_take_first_sol n =
   let f in_c i solver () =
     S.load_min_max_defs solver;
     let commands =
@@ -178,7 +185,7 @@ let test_task_net_take_first_sol () =
     | Success -> Chan.send in_c (resp, i)
     | _ -> Chan.send in_c (Unknown, i)
   in
-  let rec g channels =
+  let rec check_channels channels =
     let check_success (in_c, idx, pid) =
       match Chan.recv_poll in_c with
       | Some (resp, _) ->
@@ -194,30 +201,62 @@ let test_task_net_take_first_sol () =
       terminated_ok)
     else if List.length running > 0
     then (
+      (* Sleep 10ms and check again. *)
+      Fmt.(pf stderr "Checking...@.");
       Unix.sleepf 0.01;
-      g running)
+      check_channels running)
     else []
   in
-  let pool = Task.setup_pool ~num_additional_domains:4 () in
-  Task.run pool (fun () ->
-      let channels =
-        List.init 4 ~f:(fun i ->
-            let in_c = Chan.make_bounded 4 in
-            let solver = S.make_z3_solver () in
-            let _ = Task.async pool (f in_c i (S.make_z3_solver ())) in
-            in_c, i, solver.s_pid)
-      in
-      match g channels with
-      | task_id :: _ ->
-        Fmt.(pf stdout "PARALLEL TAKE FIRST: Terminated with answer %i@." task_id)
-      | _ ->
-        ();
-        Task.teardown_pool pool)
+  let pool = Task.setup_pool ~num_additional_domains:5 () in
+  let res =
+    Task.run pool (fun () ->
+        let channels =
+          List.init n ~f:(fun i ->
+              let in_c = Chan.make_unbounded () in
+              let solver = S.make_z3_solver () in
+              let _ = Task.async pool (f in_c i (S.make_z3_solver ())) in
+              in_c, i, solver.s_pid)
+        in
+        match check_channels channels with
+        | _ :: _ -> "sat"
+        | _ -> "no-answer")
+  in
+  Task.teardown_pool pool;
+  res
 ;;
 
-ignore (test_parallel_solvers ());
-ignore (test_dirty_cancel ());
+(* ignore (test_parallel_solvers ());
 for _ = 1 to 5 do
   ignore (test_task_net ());
   ignore (test_task_net_take_first_sol ())
-done
+done *)
+
+let () =
+  let open Alcotest in
+  run
+    "Solvers"
+    [ (* ( "dirty_cancel"
+      , [ test_case "3-threads" `Quick (fun () ->
+              (check bool) "3-threads" (test_dirty_cancel ()) true)
+        ] ) *)
+      (* ; *)
+      ( "parallel_solvers"
+      , [ test_case "2-threads" `Quick (fun () ->
+              (check bool) "2-threads" (test_parallel_solvers 2) true)
+        ; test_case "3-threads" `Slow (fun () ->
+              (check bool) "3-threads" (test_parallel_solvers 3) true)
+        ; test_case "4-threads" `Slow (fun () ->
+              (check bool) "4-threads" (test_parallel_solvers 4) true)
+        ; test_case "5-threads" `Slow (fun () ->
+              (check bool) "5-threads" (test_parallel_solvers 5) true)
+        ] )
+      (* ; ( "task_net_take_first_sol"
+      , [ test_case "2-threads" `Quick (fun () ->
+              (check string) "2-threads" (test_task_net_take_first_sol 2) "sat")
+        ; test_case "3-threads" `Slow (fun () ->
+              (check string) "3-threads" (test_task_net_take_first_sol 3) "sat")
+        ; test_case "4-threads" `Slow (fun () ->
+              (check string) "4-threads" (test_task_net_take_first_sol 4) "sat")
+        ] ) *)
+    ]
+;;
