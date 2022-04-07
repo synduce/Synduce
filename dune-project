@@ -24,6 +24,8 @@
  (description
   "Executable and libraries for automatic synthesis of recursive functions.")
  (depends
+  (alcotest
+   (>= 1.5))
   (base
    (>= v0.14.0))
   (core
