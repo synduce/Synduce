@@ -59,6 +59,6 @@
   (sexplib
    (>= v0.14.0))
   (syguslib-utils
-   (>= 0.1))
+   (>= 0.2))
   (yojson
    (>= 1.6.0))))
