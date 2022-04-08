@@ -452,10 +452,7 @@ let mk_f_compose_r_orig ~(ctx : Context.t) ~(p : PsiDef.t) (t : term) : term =
   let repr_of_v =
     if p.PsiDef.repr_is_identity then t else mk_app_v ctx p.PsiDef.repr.pvar [ t ]
   in
-  mk_app_v
-    ctx
-    p.PsiDef.reference.pvar
-    (List.map ~f:(mk_var ctx) p.PsiDef.reference.pargs @ [ repr_of_v ])
+  mk_app_v ctx p.PsiDef.reference.pvar [ repr_of_v ]
 ;;
 
 let mk_f_compose_r_main ~(ctx : Context.t) ~(p : PsiDef.t) (t : term) : term =
@@ -601,7 +598,6 @@ let smt_of_lemma_validity ~(ctx : Context.t) ~(p : PsiDef.t) (det : term_state_d
     List.map
       ~f:(fun var -> S.SSimple var.vname, mk_sort (Variable.vtype ctx var))
       (Set.elements (Analysis.free_variables ~ctx det.term)
-      @ p.PsiDef.reference.pargs
       @ List.concat_map
           ~f:(fun (_, b) -> Set.elements (Analysis.free_variables ~ctx b))
           det.recurs_elim)
@@ -617,11 +613,11 @@ let smt_of_lemma_validity ~(ctx : Context.t) ~(p : PsiDef.t) (det : term_state_d
       @ preconds)
   in
   let if_then = smt_of_lemma_app det in
-  [ S.mk_assert (S.mk_not (S.mk_forall quants (S.mk_or (S.mk_not if_condition) if_then)))
+  [ S.mk_assert (S.mk_exists quants (S.mk_not (S.mk_or (S.mk_not if_condition) if_then)))
   ]
 ;;
 
-let set_up_lemma_solver
+let inductive_solver_preamble
     ~(fctx : PMRS.Functions.ctx)
     ~(ctx : Context.t)
     ~(p : PsiDef.t)
@@ -920,7 +916,7 @@ let verify_lemma_unbounded
   =
   let build_task (cvc4_instance, task_start) =
     let%lwt _ = task_start in
-    let%lwt () = set_up_lemma_solver cvc4_instance ~fctx ~ctx ~p det in
+    let%lwt () = inductive_solver_preamble cvc4_instance ~fctx ~ctx ~p det in
     let%lwt () =
       (Lwt_list.iter_p (fun x ->
            let%lwt _ = AsyncSmt.exec_command cvc4_instance x in

@@ -159,6 +159,11 @@ val request_different_models_async
 val smtPattern_of_term : Term.term -> SmtLib.smtPattern option
 val mk_assert : SmtLib.smtTerm -> SmtLib.command
 
+(**
+  Generate a set of definitions that define a PMRS. This can consist of datatype declarations
+  and recursive definitions. If the PMRS uses parameters, then the definitions for the parameters
+  are included in the set of definitions.
+*)
 val smt_of_pmrs
   :  fctx:PMRS.Functions.ctx
   -> ctx:Term.Context.t

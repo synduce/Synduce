@@ -246,7 +246,7 @@ let check_unrealizable
     (* Main part of the check, applied to each equation in eqns. *)
     let check_eqn_accum (ctexs : unrealizability_ctex list Lwt.t) ((i, eqn_i), (j, eqn_j))
       =
-      let* ctexs = ctexs in
+      let* ctexs in
       let vseti, vsetj, vsetj', sub, var_subst = gen_info ~ctx (eqn_i, eqn_j) unknowns in
       (* Extract the arguments of the rhs, if it is a proper skeleton. *)
       match components_of_unrealizability ~ctx ~unknowns eqn_i eqn_j with
@@ -452,10 +452,7 @@ let check_image_unsat ~(ctx : env) ~(p : PsiDef.t) ctex
     let repr_of_v =
       if p.PsiDef.repr_is_identity then t else mk_app_v ctx.ctx p.PsiDef.repr.pvar [ t ]
     in
-    mk_app_v
-      ctx.ctx
-      p.PsiDef.reference.pvar
-      (List.map ~f:(mk_var ctx.ctx) p.PsiDef.reference.pargs @ [ repr_of_v ])
+    mk_app_v ctx.ctx p.PsiDef.reference.pvar [ repr_of_v ]
   in
   let build_task (solver, task_start) =
     let* _ = task_start in
@@ -508,7 +505,6 @@ let check_image_unsat ~(ctx : env) ~(p : PsiDef.t) ctex
         SmtLib.mk_assoc_and (List.map ~f:(ctx >- smt_of_term) eqns) )
     in
     let* _ =
-      let fv = Set.union fv (VarSet.of_list p.PsiDef.reference.pargs) in
       AsyncSmt.smt_assert
         solver
         (SmtLib.mk_exists (ctx >- sorted_vars_of_vars fv) formula)
@@ -628,10 +624,8 @@ let check_tinv_unsat ~(ctx : env) ~(p : PsiDef.t) (tinv : PMRS.t) (ctex : ctex)
       let repr_of_v =
         if p.PsiDef.repr_is_identity then t else mk_app_v ctx.ctx p.PsiDef.repr.pvar [ t ]
       in
-      mk_app_v
-        ctx.ctx
-        p.PsiDef.reference.pvar
-        (List.map ~f:(mk_var ctx.ctx) p.PsiDef.reference.pargs @ [ repr_of_v ])
+      (* Don't add the PMRS pargs in the application, they are declared "globally" in the problem. *)
+      mk_app_v ctx.ctx p.PsiDef.reference.pvar [ repr_of_v ]
     in
     (* Create the formula. *)
     let formula =

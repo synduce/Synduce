@@ -128,6 +128,7 @@ let print_usage () =
   pf
     stdout
     "Options:\n\
+    \  Output and input options:\n\
     \    -d --debug                     Print debugging info.\n\
     \    -h --help                      Print this message.\n\
     \    -i --info-off                  Print timing information only.\n\
@@ -139,8 +140,11 @@ let print_usage () =
     \    -v --verbose                   Print verbose.\n\
     \       --fuzzing=NUM               Fuzz SMT solutions on some problems.(Default=0, \
      no fuzzing).\n\
-    \  Optimizations off/on:\n\
-    \    -s --no-splitting              Do not split systems into subsystems.\n\
+    \  Features off/on:\n\
+    \    -s --max-solutions             Set maximum number of solutions\n\
+    \                                   must be > 0 (no option means solve sketch \
+     directly)\n\
+    \       --no-splitting              Do not split systems into subsystems.\n\
     \       --no-syndef                 Do not use syntactic definitions.\n\
     \       --no-rew                    Do not use rewrite solver.\n\
     \    -t --no-detupling              Turn off detupling.\n\

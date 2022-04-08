@@ -295,7 +295,7 @@ let set_up_ensures_solver
   return ()
 ;;
 
-let verify_ensures_unbounded
+let verify_ensures_inductive
     ~(fctx : PMRS.Functions.ctx)
     ~(ctx : Context.t)
     ~(p : PsiDef.t)
@@ -475,7 +475,7 @@ let verify_ensures_candidate
       try
         Lwt_main.run
           (let pr1, resolver1 = verify_ensures_bounded ~fctx ~ctx ~p ensures var in
-           let pr2, resolver2 = verify_ensures_unbounded ~fctx ~ctx ~p ensures in
+           let pr2, resolver2 = verify_ensures_inductive ~fctx ~ctx ~p ensures in
            Lwt.wakeup resolver2 1;
            Lwt.wakeup resolver1 1;
            (* The first call to return is kept, the other one is ignored. *)

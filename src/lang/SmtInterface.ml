@@ -599,7 +599,7 @@ let request_different_models_async
     (solver : AsyncSmt.solver)
   =
   let rec req_loop model i models =
-    let* models = models in
+    let* models in
     (* Assert all variables different. *)
     let* _ =
       Lwt_list.iter_s
@@ -732,9 +732,8 @@ let build_match_cases
         | Some p -> Some (smtPattern_of_pattern ~ctx p)
         | None -> None
       in
-      let non_pattern_matched_args = pmrs.PMRS.pargs @ var_args in
+      let non_pattern_matched_args = var_args in
       let case_body =
-        let extra_param_args = List.map ~f:(Term.mk_var ctx) pmrs.pargs in
         let body' =
           (* Tranform the function applications that do not have the extra parameters. *)
           let case f t =
@@ -742,13 +741,13 @@ let build_match_cases
             | TApp ({ tkind = TVar fv; _ }, args) ->
               if Set.mem pmrs.pnon_terminals fv
               then (
-                let args' = List.map ~f args in
+                let all_args = List.map ~f args in
                 Some
                   Term.(
                     mk_app
                       (* Only use the variable name of the nonterminal *)
                       (mk_var ctx (Variable.mk ctx fv.vname))
-                      (extra_param_args @ args')))
+                      all_args))
               else None
             | _ -> None
           in
@@ -780,14 +779,12 @@ let build_match_cases
 let single_rule_case ~(ctx : Context.t) (pmrs : PMRS.t) nont vars (args, body) : smtTerm =
   let _, tout = RType.fun_typ_unpack (Variable.vtype_or_new ctx nont) in
   let body' =
-    let extra_param_args = List.map ~f:(Term.mk_var ctx) pmrs.pargs in
     let case f t =
       match t.tkind with
       | TApp ({ tkind = TVar fv; _ }, args) ->
         if Set.mem pmrs.pnon_terminals fv
         then (
-          let args' = List.map ~f args in
-          let all_args = extra_param_args @ args' in
+          let all_args = List.map ~f args in
           Some
             (mk_app
                ~typ:(Some tout)
@@ -799,12 +796,7 @@ let single_rule_case ~(ctx : Context.t) (pmrs : PMRS.t) nont vars (args, body) :
     Term.transform ~case body
   in
   let sub =
-    match
-      List.map2
-        ~f:(fun v x -> Term.mk_var ctx v, Term.mk_var ctx x)
-        (pmrs.pargs @ args)
-        vars
-    with
+    match List.map2 ~f:(fun v x -> Term.mk_var ctx v, Term.mk_var ctx x) args vars with
     | Ok zipped -> zipped
     | Unequal_lengths ->
       Log.error_msg "single_rule_case";
@@ -813,7 +805,7 @@ let single_rule_case ~(ctx : Context.t) (pmrs : PMRS.t) nont vars (args, body) :
   smt_of_term ~ctx (substitution sub body')
 ;;
 
-let vars_and_formals ~(ctx : Context.t) (pmrs : PMRS.t) (fvar : variable) =
+let vars_and_formals ~(ctx : Context.t) (fvar : variable) =
   let args_t, out_t = RType.fun_typ_unpack (Variable.vtype_or_new ctx fvar) in
   let all_args =
     List.map
@@ -825,7 +817,7 @@ let vars_and_formals ~(ctx : Context.t) (pmrs : PMRS.t) (fvar : variable) =
             (Alpha.fresh ~s:("x" ^ String.prefix fvar.vname 2) ctx.names)
         in
         v, (mk_symb v.vname, sort_of_rtype rt))
-      (List.map ~f:(fun v -> Variable.vtype_or_new ctx v) pmrs.pargs @ args_t)
+      args_t
   in
   let vars, formals = List.unzip all_args in
   out_t, vars, formals
@@ -847,7 +839,7 @@ let smt_recdefs_of_pmrs ~(ctx : Context.t) (pmrs : PMRS.t)
   in
   (* Define recursive functions. *)
   let fun_of_nont (nont : variable) : (func_dec * smtTerm) option =
-    let out_t, vars, formals = vars_and_formals ~ctx pmrs nont in
+    let out_t, vars, formals = vars_and_formals ~ctx nont in
     let maybe_body =
       let relevant_rules =
         Map.data (Map.filter ~f:(fun (k, _, _, _) -> k.vid = nont.vid) pmrs.prules)
@@ -881,7 +873,7 @@ let smt_recdefs_of_pmrs ~(ctx : Context.t) (pmrs : PMRS.t)
       (* When PMRS is parametric, main symbol might be different from function symbol.  *)
       if not Variable.(pmrs.pvar = pmrs.pmain_symb)
       then (
-        let out_t, vars, formals = vars_and_formals ~ctx pmrs pmrs.pvar in
+        let out_t, vars, formals = vars_and_formals ~ctx pmrs.pvar in
         let body =
           Term.mk_app_v ctx pmrs.pmain_symb (List.map ~f:(Term.mk_var ctx) vars)
         in
@@ -910,6 +902,11 @@ let smt_of_pmrs ~(fctx : PMRS.Functions.ctx) ~(ctx : Context.t) (pmrs : PMRS.t)
       Log.error_msg "Failed to translate PMRS to SMT definitions.";
       failwith s
   in
+  let parameter_decls =
+    List.map
+      ~f:(fun v -> mk_fun_decl v.vname [] (sort_of_rtype (Variable.vtype_or_new ctx v)))
+      pmrs.pargs
+  in
   let datatype_decls = List.map ~f:snd (List.concat sort_decls_of_deps @ sort_decls) in
-  datatype_decls @ List.concat decls_of_deps @ main_decl
+  datatype_decls @ parameter_decls @ List.concat decls_of_deps @ main_decl
 ;;
