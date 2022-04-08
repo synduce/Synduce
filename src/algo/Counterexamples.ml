@@ -610,11 +610,7 @@ let check_tinv_unsat ~(ctx : env) ~(p : PsiDef.t) (tinv : PMRS.t) (ctex : ctex)
   let build_task (cvc4_instance, task_start) =
     let* _ = task_start in
     (* Problem components. *)
-    let fv =
-      Set.union
-        (ctx >- Analysis.free_variables ctex.ctex_eqn.eterm)
-        (VarSet.of_list p.PsiDef.reference.pargs)
-    in
+    let existential_vars = ctx >- Analysis.free_variables ctex.ctex_eqn.eterm in
     let pmrs_decls =
       (ctx >>- smt_of_pmrs tinv)
       @ (ctx >>- smt_of_pmrs p.PsiDef.reference)
@@ -655,7 +651,7 @@ let check_tinv_unsat ~(ctx : env) ~(p : PsiDef.t) (tinv : PMRS.t) (ctex : ctex)
           (List.map ~f:(ctx >- smt_of_term) (term_sat_tinv :: preconds)
           @ (ctx >>- model_sat))
       in
-      SmtLib.mk_exists (ctx >- sorted_vars_of_vars fv) formula_body
+      SmtLib.mk_exists (ctx >- sorted_vars_of_vars existential_vars) formula_body
     in
     (* Start solving... *)
     let preamble =
