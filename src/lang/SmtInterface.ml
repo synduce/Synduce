@@ -599,7 +599,7 @@ let request_different_models_async
     (solver : AsyncSmt.solver)
   =
   let rec req_loop model i models =
-    let* models in
+    let* models = models in
     (* Assert all variables different. *)
     let* _ =
       Lwt_list.iter_s

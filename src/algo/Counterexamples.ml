@@ -246,7 +246,7 @@ let check_unrealizable
     (* Main part of the check, applied to each equation in eqns. *)
     let check_eqn_accum (ctexs : unrealizability_ctex list Lwt.t) ((i, eqn_i), (j, eqn_j))
       =
-      let* ctexs in
+      let* ctexs = ctexs in
       let vseti, vsetj, vsetj', sub, var_subst = gen_info ~ctx (eqn_i, eqn_j) unknowns in
       (* Extract the arguments of the rhs, if it is a proper skeleton. *)
       match components_of_unrealizability ~ctx ~unknowns eqn_i eqn_j with
