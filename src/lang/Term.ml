@@ -394,6 +394,10 @@ module VarMap = struct
   let of_alist (al : (variable * 'a) list) = Map.of_alist (module Variable) al
   let of_alist_exn (al : (variable * 'a) list) = Map.of_alist_exn (module Variable) al
 
+  let init_from_varset ~(init : variable -> 'a) (vs : VarSet.t) : 'a t =
+    Set.fold ~init:empty ~f:(fun m v -> Map.set m ~key:v ~data:(init v)) vs
+  ;;
+
   let to_subst (ctx : Context.t) (map : term t) =
     List.map ~f:(fun (v, t) -> mk_var ctx v, t) (Map.to_alist map)
   ;;

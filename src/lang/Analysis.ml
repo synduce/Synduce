@@ -43,6 +43,23 @@ let free_variables ?(include_functions = true) ~(ctx : Context.t) (t : term) : V
   f t
 ;;
 
+(**
+Given a hashtable where keys are variables ids, count the occurrences of those
+variables in a term, and update the hashtable to contain those counts.
+  *)
+let count_occurrences (m : (int, int) Hashtbl.t) (t : term) =
+  let case _ t =
+    match t.tkind with
+    | TVar v ->
+      Hashtbl.change m v.vid ~f:(function
+          | Some x -> Some (x + 1)
+          | None -> None);
+      Some ()
+    | _ -> None
+  in
+  reduce ~init:() ~case ~join:(fun _ _ -> ()) t
+;;
+
 let has_ite (t : term) : bool =
   reduce t ~init:false ~join:( || ) ~case:(fun _ t ->
       match t.tkind with
