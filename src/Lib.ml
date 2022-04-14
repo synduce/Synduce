@@ -1,12 +1,12 @@
 (* Expose part of the functionality of the executable in the Lib.  *)
 module Parsers = Frontend.Parsers
 module Utils = Utils
-module Single = Algo.SingleProgramRefinement
-module Many = Algo.ManyProgramRefinement
+module Single = Se2gis.Main
+module Many = Confsearch.Main
 module Lang = Lang
-open Algo
-open AState
 open Base
+open Common
+open ProblemDefs
 open Lang
 open Codegen.Commons
 open Env
@@ -45,7 +45,7 @@ let solve_file ?(print_info = false) (filename : string)
 *)
 let get_lemma_hints () =
   let eqns =
-    match !AState.solved_eqn_system with
+    match !Common.ProblemDefs.solved_eqn_system with
     | Some eqns -> eqns
     | None -> []
   in

@@ -21,7 +21,7 @@ let pp_problem_descr ~ctx (fmt : Formatter.t) (prob : problem_descr) =
   pf fmt "@[<v>%a@]@." (list ~sep:cut (box (Term.pp_function_descr ctx))) prob.pd_repr
 ;;
 
-let problem_descr_of_psi_def ~ctx (problem : Algo.AState.PsiDef.t) =
+let problem_descr_of_psi_def ~ctx (problem : Common.ProblemDefs.PsiDef.t) =
   { pd_target = PMRS.func_of_pmrs ~ctx problem.target
   ; pd_reference = PMRS.func_of_pmrs ~ctx problem.reference
   ; pd_repr = PMRS.func_of_pmrs ~ctx problem.repr

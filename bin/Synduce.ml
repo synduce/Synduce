@@ -4,7 +4,7 @@ open Lib
 open Lib.Lang
 open Lib.Parsers
 open Lib.Utils
-open Algo.Env
+open Common.Env
 
 let parse_only = ref false
 
@@ -45,7 +45,7 @@ let main () =
   (* Solve the problem proper. *)
   let outputs = ctx >>> Many.find_and_solve_problem psi_comps all_pmrs in
   let f (pb, soln) =
-    Algo.AState.(
+    Common.ProblemDefs.(
       match pb, soln with
       | pb, Realizable soln ->
         ( pb.PsiDef.id

@@ -3,11 +3,12 @@ open Lib
 
 open Base
 open Fmt
-open Utils
-open Algo.AState
+open Common
+open Env
+open ProblemDefs
 open Lang
 open Term
-open Algo.Env
+open Utils
 
 let find_matching_unknown (unknowns : VarSet.t) (v0 : variable) =
   if Set.mem unknowns v0

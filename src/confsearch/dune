@@ -1,0 +1,6 @@
+(library
+ (name confsearch)
+ (public_name Synduce.Lib.Confsearch)
+ (libraries base common fmt lang lwt ocamlgraph se2gis utils)
+ (preprocess
+  (pps ppx_let lwt_ppx)))

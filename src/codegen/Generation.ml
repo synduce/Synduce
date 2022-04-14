@@ -1,9 +1,9 @@
-open Commons
 open Dafny
 open Lang.Term
 open Lang.RType
-open Algo.AState
-open Algo.Env
+open Common.ProblemDefs
+open Common.Env
+open Commons
 
 let rec convert_tkind (t : type_term) : d_domain_type =
   match t.tkind with
@@ -222,7 +222,7 @@ let gen_func_descr ~ctx (desc : function_descr) =
   gen_func_decl ~ctx name func
 ;;
 
-let gen_target ~(ctx : Context.t) (s : Algo.AState.soln option) =
+let gen_target ~(ctx : Context.t) (s : Common.ProblemDefs.soln option) =
   match s with
   | Some sol ->
     let aux ((name, args, body) : string * variable list * term) =
