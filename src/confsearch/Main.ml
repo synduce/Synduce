@@ -16,13 +16,13 @@ let find_and_solve_problem
     match psi_comps with
     | Some names -> names
     | None ->
-      Utils.Log.debug_msg "Using default names.";
+      Utils.Log.debug_msg "Looking for the default names.";
       "target", "spec", "repr"
   in
   let top_userdef_problem =
     ProblemFinder.find_problem_components ~ctx (target_fname, spec_fname, repr_fname) pmrs
   in
-  let main_algo =
+  let single_configuration_solver =
     if !Config.Optims.use_segis (* Symbolic CEGIS. *)
     then Se2gis.Baselines.algo_segis
     else if !Config.Optims.use_cegis (* Concrete CEGIS. *)
@@ -33,24 +33,29 @@ let find_and_solve_problem
   in
   (* Solve the problem. *)
   let problems =
-    if !Config.Optims.max_solutions < 0
-    then [ top_userdef_problem ]
-    else ctx >- PEnum.enumerate_p top_userdef_problem
+    (* Check that the user want more than one solution, and that the problem defined
+        is well-formed. Otherwise, just try to solve the user-defined configuration.
+     *)
+    if !Config.Optims.max_solutions >= 0
+       || Configuration.check_pmrs top_userdef_problem.target
+    then ctx >- PEnum.enumerate_p top_userdef_problem
+    else [ top_userdef_problem ]
   in
-  let rec f (i, sols, fails) l =
+  let rec f (conf_no, sols, fails) l =
     if List.length sols >= max 1 !Config.Optims.max_solutions
     then sols, fails
     else (
       match l with
       | low_problem :: tl ->
+        ctx >- AlgoLog.show_new_rskel conf_no low_problem;
         ProblemFinder.update_context ~ctx low_problem;
-        ctx >- AlgoLog.show_new_rskel i low_problem;
-        let maybe_solution = main_algo ~ctx low_problem in
+        let maybe_solution = single_configuration_solver ~ctx low_problem in
         (* Print state and save. *)
         LogJson.save_stats_and_restart low_problem.id;
         (match maybe_solution with
-        | Realizable soln -> f (i + 1, (low_problem, Realizable soln) :: sols, fails) tl
-        | _ as res -> f (i + 1, sols, (low_problem, res) :: fails) tl)
+        | Realizable soln ->
+          f (conf_no + 1, (low_problem, Realizable soln) :: sols, fails) tl
+        | _ as res -> f (conf_no + 1, sols, (low_problem, res) :: fails) tl)
       | _ -> sols, fails)
   in
   let solutions, unrealized_or_failed = f (1, [], []) problems in

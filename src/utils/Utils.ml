@@ -110,7 +110,8 @@ let list_map_snd (l : ('a * 'b) list) ~(f : 'b -> 'c) : ('a * 'c) list =
 
 let cartesian_nary_product (elts : 'a list list) : 'a list list =
   let f acc l =
-    List.concat (List.map l ~f:(fun elt -> List.map acc ~f:(fun acc_l -> elt :: acc_l)))
+    List.concat
+      (List.map l ~f:(fun elt -> List.map acc ~f:(fun acc_l -> acc_l @ [ elt ])))
   in
   match elts with
   | hd :: tl -> List.fold ~f ~init:(List.map ~f:(fun x -> [ x ]) hd) tl

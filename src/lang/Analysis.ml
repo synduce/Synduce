@@ -44,8 +44,8 @@ let free_variables ?(include_functions = true) ~(ctx : Context.t) (t : term) : V
 ;;
 
 (**
-Given a hashtable where keys are variables ids, count the occurrences of those
-variables in a term, and update the hashtable to contain those counts.
+  Given a hashtable where keys are variables ids, count the occurrences of those
+  variables in a term, and update the hashtable to contain those counts.
   *)
 let count_occurrences (m : (int, int) Hashtbl.t) (t : term) =
   let case _ t =

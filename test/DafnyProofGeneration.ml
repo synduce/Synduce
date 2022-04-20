@@ -1,6 +1,6 @@
 open Codegen.Dafny
 open Lang.Term
-open Algo.Env
+open Common.Env
 
 let test () =
   let ctx = env_create () in
