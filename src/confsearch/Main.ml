@@ -38,7 +38,19 @@ let find_and_solve_problem
      *)
     if !Config.Optims.max_solutions >= 0
        || Configuration.check_pmrs top_userdef_problem.target
-    then ctx >- PEnum.enumerate_p top_userdef_problem
+    then (
+      let max_configuration = Configuration.build_argmap ctx top_userdef_problem.target in
+      Utils.Log.verbose (fun fmt () ->
+          Fmt.pf fmt "Max configuration:@;%a" (Configuration.ppm ctx) max_configuration);
+      let subconf_count =
+        Map.fold
+          ~init:1
+          ~f:(fun ~key:_ ~data:l c -> c * (2 ** List.length l))
+          max_configuration
+      in
+      Utils.Log.info (fun fmt () ->
+          Fmt.pf fmt "%i configurations possible." subconf_count);
+      ctx >- PEnum.enumerate_p top_userdef_problem)
     else [ top_userdef_problem ]
   in
   let rec f (conf_no, sols, fails) l =

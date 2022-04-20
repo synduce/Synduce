@@ -5,11 +5,26 @@ open Common
 open Env
 open Lang
 open Term
+open Utils
 
 (**
   A configuration is a map from variables (the unknown functions) to a list of arguments.
 *)
 type t = term list VarMap.t
+
+let ppm (ctx : env) (fmt : Formatter.t) (conf : t) =
+  Fmt.(
+    brackets
+      (list
+         ~sep:semi
+         (parens
+            (pair
+               ~sep:rightarrow
+               (ctx @>- Variable.pp)
+               (list ~sep:vbar (ctx @>- pp_term))))))
+    fmt
+    (Map.to_alist conf)
+;;
 
 (** Create an empty configuration of a set of variables.  *)
 let of_varset = VarMap.init_from_varset ~init:(fun _ -> [])
@@ -22,47 +37,106 @@ let check_pmrs (p : PMRS.t) =
   Hashtbl.for_all ~f:(fun o -> o < 2) counts
 ;;
 
+(** Generate the base type arguments given a set of variables and
+  a PMRS that defines a set of recursive functions (nonterminals).
+*)
 let base_type_args (ctx : env) (p : PMRS.t) (vs : VarSet.t) =
   let base_type_vars =
-    Set.filter vs ~f:(fun v ->
-        RType.is_recursive ctx.ctx.types ((ctx @>- Variable.vtype_or_new) v))
+    let on_var v =
+      if RType.is_recursive ctx.ctx.types ((ctx @>- Variable.vtype_or_new) v)
+      then []
+      else [ (ctx @>- mk_var) v ]
+    in
+    List.concat_map (Set.elements vs) ~f:on_var
   in
   let rec_function_applications =
-    List.map (VarSet.elements p.pnon_terminals) ~f:(fun f_var ->
-        let argtypes, _ = RType.fun_typ_unpack ((ctx @>- Variable.vtype_or_new) f_var) in
-        let argsets =
-          Utils.cartesian_nary_product
-            (List.map argtypes ~f:(fun t ->
-                 Set.elements ((ctx @>- VarSet.filter_by_type) vs t)))
-        in
-        Utils.cartesian_nary_product argsets)
+    let on_nonterminal f_var =
+      let argtypes, _ = RType.fun_typ_unpack ((ctx @>- Variable.vtype_or_new) f_var) in
+      let arg_combinations =
+        Utils.cartesian_nary_product
+          (List.map argtypes ~f:(fun t ->
+               Set.elements ((ctx @>- VarSet.filter_by_type) vs t)))
+      in
+      List.map arg_combinations ~f:(fun args ->
+          (ctx @>- mk_app_v) f_var (List.map ~f:(ctx @>- mk_var) args))
+    in
+    List.concat_map (VarSet.elements p.pnon_terminals) ~f:on_nonterminal
   in
-  let _ = base_type_vars, rec_function_applications in
-  ()
+  TermSet.of_list (base_type_vars @ rec_function_applications)
 ;;
 
 (** Build the argument map of the PMRS.
-  The argument map is effectively the largest configuration: it is a map from each unknown to
-  all the arguments available to the unknown.
+  The argument map is effectively the largest configuration: it is a map from each unknown
+  to all the arguments available to the unknown.
 *)
-let build_argmap (ctx : env) (p : PMRS.t) =
+let build_argmap (ctx : env) (p : PMRS.t) : t =
   let empty_conf = of_varset p.psyntobjs in
-  let f ~key:_ruleid ~data:(_, lhs_args, lhs_pat, rhs) accum =
+  let set_args_in_rule ~key:_ruleid ~data:(_, lhs_args, lhs_pat, rhs) vmap =
     let lhs_argset =
       Set.union
         (VarSet.of_list lhs_args)
         (Option.value_map lhs_pat ~default:VarSet.empty ~f:(fun p ->
              ctx >- Analysis.free_variables (Term.term_of_pattern ctx.ctx p)))
     in
-    let _ = rhs, lhs_argset in
-    accum
+    (* TODO: collect let-bound variables? Technically cannot provide more info,
+      but has subexpression elim. simplification advantage.
+    *)
+    let args = base_type_args ctx p (Set.union lhs_argset (VarSet.of_list p.pargs)) in
+    Set.fold
+      (* The local unknowns *)
+      (Set.inter (ctx >- Analysis.free_variables rhs) p.psyntobjs)
+      ~init:vmap
+        (* Unknown should appear for the first time if PMRS well formed for configuration. *)
+      ~f:(fun m v -> Map.set m ~key:v ~data:(Set.elements args))
   in
-  Map.fold p.prules ~init:empty_conf ~f
+  Map.fold p.prules ~init:empty_conf ~f:set_args_in_rule
 ;;
 
 (** Return the configuration of a PMRS, assuming it has been checked. *)
 let configuration_of (p : PMRS.t) : t =
   let init = of_varset p.psyntobjs in
-  (* TODO: collect configuration in the rules. *)
-  init
+  let join m1 m2 =
+    Map.merge m1 m2 ~f:(fun ~key:_ m ->
+        match m with
+        | `Both (v1, _) -> Some v1
+        | `Left v1 -> Some v1
+        | `Right v1 -> Some v1)
+  in
+  let from_rhs =
+    let case _ t =
+      match t.tkind with
+      | TApp ({ tkind = TVar f_var; _ }, args) ->
+        if Set.mem p.psyntobjs f_var then Some (VarMap.singleton f_var args) else None
+      | _ -> None
+    in
+    reduce ~init:VarMap.empty ~join ~case
+  in
+  Map.fold p.prules ~init ~f:(fun ~key:_ ~data:(_, _, _, rhs) accum ->
+      join accum (from_rhs rhs))
+;;
+
+(** Apply a configuration to a given PMRS. The environment is copied before the type
+  information for the unknowns is changed. The copied environment is then returned.
+*)
+let apply_configuration (ctx : env) (config : t) (p : PMRS.t) : PMRS.t * env =
+  let ctx = env_copy ctx in
+  Set.iter p.psyntobjs ~f:(fun u -> (ctx @>- Variable.clear_type) u);
+  let repl_in_rhs =
+    let case _ t =
+      match t.tkind with
+      | TApp ({ tkind = TVar v; _ }, _) when Set.mem p.psyntobjs v ->
+        Option.map (Map.find config v) ~f:(fun args -> (ctx @>- mk_app_v) v args)
+      | _ -> None
+    in
+    transform ~case
+  in
+  ( PMRS.(
+      ctx
+      >- infer_pmrs_types
+           { p with
+             prules =
+               Map.map p.prules ~f:(fun (nt, args, pat, rhs) ->
+                   nt, args, pat, repl_in_rhs rhs)
+           })
+  , ctx )
 ;;

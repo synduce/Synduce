@@ -1091,6 +1091,8 @@ let infer_type (ctx : Context.t) (t : term) : term * RType.substitution =
     Log.loc_fatal_errmsg t'.tpos "Could not infer type."
 ;;
 
+(** Erase the types stored in the term AST (replaced them by a fresh
+    type variable in the environment).*)
 let erase_term_type (ctx : Context.t) (t : term) =
   let f t = { t with ttyp = RType.get_fresh_tvar ctx.types } in
   transform_info ~f t
