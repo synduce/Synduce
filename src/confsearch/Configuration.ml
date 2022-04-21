@@ -10,9 +10,66 @@ open Utils
 (**
   A configuration is a map from variables (the unknown functions) to a list of arguments.
 *)
-type t = term list VarMap.t
+type conf = term list VarMap.t
 
-let ppm (ctx : env) (fmt : Formatter.t) (conf : t) =
+module Subconf = struct
+  (**
+  A subconfiguration (relative to some configuration) is a map from an unknown's variable
+  id to a list of integer representing the index of the argument in the super-configuration
+  argument list of that unknown.
+*)
+  type t = int list IntMap.t
+
+  let sexp_of_t (m : t) : Sexp.t =
+    List.sexp_of_t
+      (fun (a, b) -> Sexp.(List [ Int.sexp_of_t a; List.sexp_of_t Int.sexp_of_t b ]))
+      (Map.to_alist m)
+  ;;
+
+  let equal : t -> t -> bool = Map.equal (List.equal Int.equal)
+  let compare (a : t) (b : t) = Map.compare_direct (List.compare Int.compare) a b
+
+  let hash : t -> int =
+    Hash.of_fold (Map.hash_fold_direct Int.hash_fold_t (List.hash_fold_t Int.hash_fold_t))
+  ;;
+
+  (** Return the configuration as a subconf. *)
+  let of_conf (conf : conf) : t =
+    Map.fold
+      conf
+      ~init:(Map.empty (module Int))
+      ~f:(fun ~key ~data m ->
+        Map.set m ~key:key.vid ~data:(List.mapi ~f:(fun i _ -> i) data))
+  ;;
+
+  (** Return the subconf as a configuration, given the configuration it refines. *)
+  let to_conf (conf : conf) (sub : t) : conf =
+    Map.mapi conf ~f:(fun ~key:v ~data:args ->
+        match Map.find sub v.vid with
+        | Some indexes -> sub_list args indexes
+        | None -> failwith "supconf should only be used on a proper subconfiguration.")
+  ;;
+
+  (**
+  Create as many subconfigurations as possible from dropping an argument for an unknown.
+ *)
+  let drop_arg (conf : t) : t list =
+    let drop_one (unknown, args) =
+      match args with
+      | [] -> []
+      | [ _ ] -> [ Map.set ~key:unknown ~data:[] conf ]
+      | _ ->
+        (* Configurations with all possible ways to drop one argument *)
+        List.mapi args ~f:(fun i _ ->
+            (* new args is current args without ith element *)
+            let data = List.filteri ~f:(fun j _ -> not (j = i)) args in
+            Map.set ~key:unknown ~data conf)
+    in
+    List.concat_map (Map.to_alist conf) ~f:drop_one
+  ;;
+end
+
+let ppm (ctx : env) (fmt : Formatter.t) (conf : conf) =
   Fmt.(
     brackets
       (list
@@ -69,7 +126,7 @@ let base_type_args (ctx : env) (p : PMRS.t) (vs : VarSet.t) =
   The argument map is effectively the largest configuration: it is a map from each unknown
   to all the arguments available to the unknown.
 *)
-let build_argmap (ctx : env) (p : PMRS.t) : t =
+let max_configuration (ctx : env) (p : PMRS.t) : conf =
   let empty_conf = of_varset p.psyntobjs in
   let set_args_in_rule ~key:_ruleid ~data:(_, lhs_args, lhs_pat, rhs) vmap =
     let lhs_argset =
@@ -92,8 +149,13 @@ let build_argmap (ctx : env) (p : PMRS.t) : t =
   Map.fold p.prules ~init:empty_conf ~f:set_args_in_rule
 ;;
 
+(** Count the number of subconfigurations of a given configuration. *)
+let subconf_count (c : conf) =
+  Map.fold ~init:1 ~f:(fun ~key:_ ~data:l c -> c * (2 ** List.length l)) c
+;;
+
 (** Return the configuration of a PMRS, assuming it has been checked. *)
-let configuration_of (p : PMRS.t) : t =
+let configuration_of (p : PMRS.t) : conf =
   let init = of_varset p.psyntobjs in
   let join m1 m2 =
     Map.merge m1 m2 ~f:(fun ~key:_ m ->
@@ -118,7 +180,7 @@ let configuration_of (p : PMRS.t) : t =
 (** Apply a configuration to a given PMRS. The environment is copied before the type
   information for the unknowns is changed. The copied environment is then returned.
 *)
-let apply_configuration (ctx : env) (config : t) (p : PMRS.t) : PMRS.t * env =
+let apply_configuration (ctx : env) (config : conf) (p : PMRS.t) : PMRS.t * env =
   let ctx = env_copy ctx in
   Set.iter p.psyntobjs ~f:(fun u -> (ctx @>- Variable.clear_type) u);
   let repl_in_rhs =
@@ -140,3 +202,78 @@ let apply_configuration (ctx : env) (config : t) (p : PMRS.t) : PMRS.t * env =
            })
   , ctx )
 ;;
+
+(** Building graph of configurations. *)
+
+module ConfGraph = struct
+  module G = Graph.Imperative.Digraph.Concrete (Subconf)
+  include G
+  module Bfs = Graph.Traverse.Bfs (G)
+
+  type marks = int Hashtbl.M(Subconf).t
+
+  (** A type to represent the state of the configuration graph exploration.
+    We need to remember the graph and mark configurations as solved or not.
+  *)
+  type state =
+    { graph : t (** The graph of configurations. *)
+    ; marks : marks
+          (**
+          A negative mark means unrealizable.
+          A positive mark means a solution has been found.
+      Otherwise, a mark of 0 means it has not been solved.
+    *)
+    }
+
+  let mark_unrealizable (s : state) (conf : Subconf.t) =
+    Hashtbl.set s.marks ~key:conf ~data:(-1)
+  ;;
+
+  let mark_realizable (s : state) (conf : Subconf.t) =
+    Hashtbl.set s.marks ~key:conf ~data:1
+  ;;
+
+  (** `expand g conf` adds the edges from `conf` to all its refinements in `g`. *)
+  let expand (s : state) (conf : Subconf.t) : unit =
+    match Hashtbl.find s.marks conf with
+    (* The configuration is unrealizable. No subconfiguration can be realizable. *)
+    | Some x when x < 0 -> ()
+    | _ ->
+      List.iter (Subconf.drop_arg conf) ~f:(fun c ->
+          match Hashtbl.find s.marks c with
+          (* Already solved: no need to add new edge. *)
+          | Some x when not (x = 0) -> ()
+          | Some _ -> add_edge s.graph conf c
+          | None ->
+            Hashtbl.set s.marks ~key:c ~data:0;
+            add_edge s.graph conf c)
+  ;;
+
+  (**
+    Find the next 0-marked configuration in the graph.
+    Return None if there is no such configuration.
+  *)
+  let next (s : state) : Subconf.t option =
+    let rec aux iterator =
+      try
+        let subconf = Bfs.get iterator in
+        match Hashtbl.find s.marks subconf with
+        | Some 0 -> Some subconf
+        | Some _ -> aux (Bfs.step iterator)
+        | None -> None
+      with
+      | Caml.Exit -> None
+    in
+    aux (Bfs.start s.graph)
+  ;;
+
+  (** Generate the inital graph of configurations of a PMRS with unknowns. *)
+  let generate_configurations (ctx : env) (p : PMRS.t) : state =
+    let mc = max_configuration ctx p in
+    let root = Subconf.of_conf mc in
+    let size = subconf_count mc in
+    let g = create ~size () in
+    add_vertex g root;
+    { graph = g; marks = Hashtbl.create (module Subconf) ~size }
+  ;;
+end

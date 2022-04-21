@@ -49,6 +49,21 @@ let slist a = Sexp.List a
 let blast x = Result.map_error ~f:List.concat (Result.combine_errors x)
 let pair a b = a, b
 let index_list = List.mapi ~f:pair
+
+let sub_list (l : 'a list) (il : int list) =
+  let rec aux l il a n =
+    match l, il with
+    | [], _ | _ :: _, [] -> a
+    | l_hd :: l_tl, il_hd :: il_tl ->
+      if il_hd < 0
+      then aux l_tl il_tl a (n + 1)
+      else if il_hd = n
+      then aux l_tl il_tl (a @ [ l_hd ]) (n + 1)
+      else aux l_tl il a (n + 1)
+  in
+  aux l (List.sort ~compare il) [] 0
+;;
+
 let trim (s : string) = Str.global_replace (Str.regexp "[\r\n\t ]") "" s
 
 (* ============================================================================================= *)

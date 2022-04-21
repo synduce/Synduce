@@ -28,32 +28,59 @@ let find_and_solve_problem
     else if !Config.Optims.use_cegis (* Concrete CEGIS. *)
     then
       Se2gis.Baselines.algo_cegis
-      (* Default algorithm: best combination of techniques. *)
+      (* Default algorithm: best combination of techniques (TODO) *)
     else Se2gis.Main.solve_problem
   in
-  (* Solve the problem. *)
-  let problems =
-    (* Check that the user want more than one solution, and that the problem defined
+  let find_multiple_solutions ctx top_userdef_problem mc =
+    let open Configuration in
+    let rstate =
+      ConfGraph.generate_configurations ctx top_userdef_problem.PsiDef.target
+    in
+    let rec find_sols a =
+      match ConfGraph.next rstate with
+      | Some sub_conf ->
+        let conf = Subconf.to_conf mc sub_conf in
+        let new_target, new_ctx =
+          apply_configuration ctx conf top_userdef_problem.target
+        in
+        let new_pdef = { top_userdef_problem with target = new_target } in
+        (match single_configuration_solver ~ctx:new_ctx new_pdef with
+        | Realizable s ->
+          ConfGraph.mark_realizable rstate sub_conf;
+          ConfGraph.expand rstate sub_conf;
+          find_sols ((new_pdef, Realizable s) :: a)
+        | Unrealizable _u ->
+          ConfGraph.mark_unrealizable rstate sub_conf;
+          find_sols a
+        | Failed _ ->
+          ConfGraph.mark_unrealizable rstate sub_conf;
+          find_sols a)
+      | None -> a
+    in
+    find_sols []
+  in
+  (* Check that the user want more than one solution, and that the problem defined
         is well-formed. Otherwise, just try to solve the user-defined configuration.
      *)
-    if !Config.Optims.max_solutions >= 0
-       || Configuration.check_pmrs top_userdef_problem.target
-    then (
-      let max_configuration = Configuration.build_argmap ctx top_userdef_problem.target in
-      Utils.Log.verbose (fun fmt () ->
-          Fmt.pf fmt "Max configuration:@;%a" (Configuration.ppm ctx) max_configuration);
-      let subconf_count =
-        Map.fold
-          ~init:1
-          ~f:(fun ~key:_ ~data:l c -> c * (2 ** List.length l))
-          max_configuration
-      in
-      Utils.Log.info (fun fmt () ->
-          Fmt.pf fmt "%i configurations possible." subconf_count);
-      ctx >- PEnum.enumerate_p top_userdef_problem)
-    else [ top_userdef_problem ]
-  in
-  let rec f (conf_no, sols, fails) l =
+  if !Config.Optims.max_solutions >= 0
+     || Configuration.check_pmrs top_userdef_problem.target
+  then (
+    let max_configuration =
+      Configuration.max_configuration ctx top_userdef_problem.target
+    in
+    Utils.Log.verbose (fun fmt () ->
+        Fmt.pf fmt "Max configuration:@;%a" (Configuration.ppm ctx) max_configuration);
+    let subconf_count =
+      Map.fold
+        ~init:1
+        ~f:(fun ~key:_ ~data:l c -> c * (2 ** List.length l))
+        max_configuration
+    in
+    Utils.Log.info (fun fmt () -> Fmt.pf fmt "%i configurations possible." subconf_count);
+    find_multiple_solutions ctx top_userdef_problem max_configuration)
+  else [ top_userdef_problem, single_configuration_solver ~ctx top_userdef_problem ]
+;;
+(* let rec f (conf_no, sols, fails) l =
     if List.length sols >= max 1 !Config.Optims.max_solutions
     then sols, fails
     else (
@@ -71,5 +98,4 @@ let find_and_solve_problem
       | _ -> sols, fails)
   in
   let solutions, unrealized_or_failed = f (1, [], []) problems in
-  List.rev solutions @ List.rev unrealized_or_failed
-;;
+  List.rev solutions @ List.rev unrealized_or_failed *)
