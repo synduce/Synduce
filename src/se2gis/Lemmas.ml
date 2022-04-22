@@ -1,20 +1,19 @@
 open Lwt
 open Common
-open ProblemDefs
 open Base
 open Counterexamples
 open Env
 open Lang
-open Lang.Term
 open Lwt.Syntax
+open Term
+open ProblemDefs
 open Rewriter
-open Syguslib
+open SmtInterface
 open SygusInterface
 open Utils
-open Smtlib
-open SmtInterface
 module S = Smtlib.SmtLib
-module T = Term
+module Sy = Syguslib.Sygus
+module Sm = Syguslib.Semantic
 
 let empty_term_state : term_state = Map.empty (module KeyedTerms)
 
@@ -244,7 +243,7 @@ let synthfun_of_det
     ~(ctx : Context.t)
     ~(p : PsiDef.t)
     (det : term_state_detail)
-    : (Sygus.command * string) list
+    : (Sy.command * string) list
   =
   let opset =
     List.fold
@@ -362,9 +361,9 @@ let ctex_model_to_args
     ~(ctx : Context.t)
     ~(p : PsiDef.t)
     (det : term_state_detail)
-    (params : (string * Sygus.sygus_sort) list)
+    (params : (string * Sy.sygus_sort) list)
     ctex
-    : Sygus.sygus_term list
+    : Sy.sygus_term list
   =
   List.map params ~f:(fun (param_name, _) ->
       match
@@ -397,12 +396,12 @@ let constraint_of_neg_ctex ~ctx (det : term_state_detail) ctex =
   let neg_constraint =
     mk_un Not (mk_app (mk_var ctx det.lemma) (Map.data ctex.ctex_model))
   in
-  Sygus.mk_c_constraint (sygus_of_term ~ctx neg_constraint)
+  Sy.mk_c_constraint (sygus_of_term ~ctx neg_constraint)
 ;;
 
 let constraint_of_pos_ctex ~ctx (det : term_state_detail) ctex =
   let pos_constraint = mk_app (mk_var ctx det.lemma) (Map.data ctex.ctex_model) in
-  Sygus.mk_c_constraint (sygus_of_term ~ctx pos_constraint)
+  Sy.mk_c_constraint (sygus_of_term ~ctx pos_constraint)
 ;;
 
 let log_soln ~ctx s vs t =
@@ -420,7 +419,7 @@ let handle_lemma_synth_response
     ~(fctx : PMRS.Functions.ctx)
     ~(ctx : Context.t)
     (det : term_state_detail)
-    ((task, resolver) : Sygus.solver_response option Lwt.t * int Lwt.u)
+    ((task, resolver) : Sy.solver_response option Lwt.t * int Lwt.u)
     : term list option
   =
   let parse_synth_fun (_, _, _, fbody) =
@@ -481,7 +480,7 @@ let get_precise_lemma
         det.recurs_elim
     in
     let f lem = Term.substitution subst lem in
-    Option.map ~f:(simplify_term ~ctx) (T.mk_assoc Binop.And (List.map ~f det.lemmas))
+    Option.map ~f:(simplify_term ~ctx) (mk_assoc Binop.And (List.map ~f det.lemmas))
   in
   match Map.find ts key with
   | None -> None
@@ -502,7 +501,7 @@ let get_lemma ~(ctx : Context.t) ~(p : PsiDef.t) (ts : term_state) ~(key : term)
         det.recurs_elim
     in
     let f lem = Term.substitution subst lem in
-    Option.map ~f:(simplify_term ~ctx) (T.mk_assoc Binop.And (List.map ~f det.lemmas))
+    Option.map ~f:(simplify_term ~ctx) (mk_assoc Binop.And (List.map ~f det.lemmas))
   in
   match
     List.unzip (Map.to_alist (Map.filter_keys ~f:(fun (k, _) -> Terms.equal k key) ts))
@@ -757,7 +756,7 @@ let mk_model_sat_asserts
         Log.error_msg
           Fmt.(
             str "Warning: skipped instantiating %a." (pp_term ctx) original_recursion_var);
-        SmtLib.mk_true)
+        S.mk_true)
     | None -> smt_of_term ~ctx Terms.(mk_var ctx v == v_val)
   in
   List.map ~f det.scalar_vars
@@ -835,7 +834,7 @@ let verify_lemma_bounded
         let%lwt () =
           AsyncSmt.smt_assert
             solver
-            (SmtLib.mk_assoc_and (List.map ~f:(smt_of_term ~ctx) preconds @ model_sat))
+            (S.mk_assoc_and (List.map ~f:(smt_of_term ~ctx) preconds @ model_sat))
         in
         (* Assert that TInv is true for this concrete term t *)
         let%lwt _ =
@@ -864,7 +863,7 @@ let verify_lemma_bounded
         (* Note that I am getting a model after check-sat unknown response. This may not halt.  *)
         let%lwt result =
           match resp with
-          | SmtLib.Sat | SmtLib.Unknown ->
+          | S.Sat | S.Unknown ->
             let%lwt model = AsyncSmt.get_model solver in
             return (Some model)
           | _ -> return None
@@ -885,7 +884,7 @@ let verify_lemma_bounded
       | Some t0, true ->
         let tset, u' = Expand.simple ~ctx t0 in
         let%lwt check_result =
-          check_bounded_sol (return (SmtLib.Unknown, None)) (Set.elements tset)
+          check_bounded_sol (return (S.Unknown, None)) (Set.elements tset)
         in
         steps := !steps + Set.length tset;
         (match check_result with
@@ -897,11 +896,11 @@ let verify_lemma_bounded
         | _ -> expand_loop (Set.union (Set.remove u t0) u'))
       | None, true ->
         (* All expansions have been checked. *)
-        return SmtLib.Unsat
+        return S.Unsat
       | _, false ->
         (* Check reached limit. *)
         Log.debug_msg "Bounded lemma verification has reached limit.";
-        if !Config.bounded_lemma_check then return SmtLib.Unsat else return SmtLib.Unknown
+        if !Config.bounded_lemma_check then return S.Unsat else return S.Unknown
     in
     let* res = expand_loop (TermSet.singleton det.term) in
     let* () = AsyncSmt.close_solver solver in
@@ -972,7 +971,7 @@ let verify_lemma_candidate
       | End_of_file ->
         Log.error_msg "Solvers terminated unexpectedly  ⚠️ .";
         Log.error_msg "Please inspect logs.";
-        BoundedChecking, SmtLib.Unknown
+        BoundedChecking, S.Unknown
     in
     resp
 ;;
@@ -984,7 +983,7 @@ let parse_positive_example_solver_model
     (det : term_state_detail)
   =
   match response with
-  | SmtLib.SExps s ->
+  | S.SExps s ->
     let model = model_to_constmap ~ctx ~fctx (SExps s) in
     let m, _ =
       Map.partitioni_tf
@@ -1221,14 +1220,14 @@ let synthesize_new_lemma ~(ctx : env) ~(p : PsiDef.t) (det : term_state_detail)
     let pos_constraints =
       List.map ~f:(ctx >- constraint_of_pos_ctex det) det.positive_ctexs
     in
-    let extra_defs = Semantic.[ max_definition; min_definition ] in
+    let extra_defs = Sm.[ max_definition; min_definition ] in
     let commands =
-      Sygus.mk_c_set_logic logic
+      Sy.mk_c_set_logic logic
       :: (extra_defs
          @ [ synth_obj ]
          @ neg_constraints
          @ pos_constraints
-         @ [ Sygus.mk_c_check_synth () ])
+         @ [ Sy.mk_c_check_synth () ])
     in
     match
       ctx
@@ -1289,10 +1288,10 @@ let rec lemma_refinement_loop ~(ctx : env) ~(p : PsiDef.t) (det : term_state_det
         in
         ctx >- AlgoLog.lemma_proved_correct vmethod det lemma;
         Some { det with lemma_candidate = None; lemmas = lemma :: det.lemmas }
-      | vmethod, SmtLib.SExps x ->
+      | vmethod, S.SExps x ->
         AlgoLog.lemma_not_proved_correct vmethod;
         let new_positive_ctexs =
-          ctx >>- parse_positive_example_solver_model (SmtLib.SExps x) det
+          ctx >>- parse_positive_example_solver_model (S.SExps x) det
         in
         List.iter
           ~f:(fun ctex ->
@@ -1386,7 +1385,7 @@ let synthesize_lemmas
     ~(p : PsiDef.t)
     synt_failure_info
     (lstate : refinement_loop_state)
-    : ( (refinement_loop_state, unrealizability_ctex list) Either.t, Sygus.solver_response
+    : ( (refinement_loop_state, unrealizability_ctex list) Either.t, Sy.solver_response
     ) Result.t
   =
   let _interactive_synthesis () =
@@ -1480,7 +1479,7 @@ let synthesize_lemmas
   | `Unrealizable -> Ok (Either.Second unr_ctexs)
   | `CoarseningFailure ->
     (match synt_failure_info with
-    | Sygus.RFail, _ ->
+    | Sy.RFail, _ ->
       Log.error_msg "SyGuS solver failed to find a solution.";
       Error RFail
     | RInfeasible, _ ->
