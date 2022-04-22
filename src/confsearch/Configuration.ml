@@ -186,6 +186,8 @@ let apply_configuration (ctx : env) (config : conf) (p : PMRS.t) : PMRS.t * env 
   let repl_in_rhs =
     let case _ t =
       match t.tkind with
+      | TVar v when Set.mem p.psyntobjs v ->
+        Option.map (Map.find config v) ~f:(fun args -> (ctx @>- mk_app_v) v args)
       | TApp ({ tkind = TVar v; _ }, _) when Set.mem p.psyntobjs v ->
         Option.map (Map.find config v) ~f:(fun args -> (ctx @>- mk_app_v) v args)
       | _ -> None
@@ -223,6 +225,11 @@ module ConfGraph = struct
           A positive mark means a solution has been found.
       Otherwise, a mark of 0 means it has not been solved.
     *)
+    ; root : Subconf.t (**
+    The maximum configuration of the graph.
+        *)
+    ; super : conf
+    ; ctx : env
     }
 
   let mark_unrealizable (s : state) (conf : Subconf.t) =
@@ -231,6 +238,12 @@ module ConfGraph = struct
 
   let mark_realizable (s : state) (conf : Subconf.t) =
     Hashtbl.set s.marks ~key:conf ~data:1
+  ;;
+
+  let is_unmarked (s : state) (conf : Subconf.t) =
+    match Hashtbl.find s.marks conf with
+    | Some 0 | None -> true
+    | _ -> false
   ;;
 
   (** `expand g conf` adds the edges from `conf` to all its refinements in `g`. *)
@@ -254,26 +267,32 @@ module ConfGraph = struct
     Return None if there is no such configuration.
   *)
   let next (s : state) : Subconf.t option =
-    let rec aux iterator =
-      try
-        let subconf = Bfs.get iterator in
-        match Hashtbl.find s.marks subconf with
-        | Some 0 -> Some subconf
-        | Some _ -> aux (Bfs.step iterator)
-        | None -> None
-      with
-      | Caml.Exit -> None
+    let q = Queue.create () in
+    Queue.enqueue q s.root;
+    let rec loop () =
+      Option.bind (Queue.dequeue q) ~f:(fun curr ->
+          match Hashtbl.find s.marks curr with
+          | Some 0 -> Some curr
+          | None ->
+            Hashtbl.set s.marks ~key:curr ~data:0;
+            Some curr
+          | Some x when x < 0 -> loop ()
+          | Some _ ->
+            Queue.enqueue_all q (List.filter ~f:(is_unmarked s) (succ s.graph curr));
+            loop ())
     in
-    aux (Bfs.start s.graph)
+    loop ()
   ;;
 
   (** Generate the inital graph of configurations of a PMRS with unknowns. *)
   let generate_configurations (ctx : env) (p : PMRS.t) : state =
-    let mc = max_configuration ctx p in
-    let root = Subconf.of_conf mc in
-    let size = subconf_count mc in
-    let g = create ~size () in
-    add_vertex g root;
-    { graph = g; marks = Hashtbl.create (module Subconf) ~size }
+    let super = max_configuration ctx p in
+    let root = Subconf.of_conf super in
+    let size = subconf_count super in
+    let graph = create ~size () in
+    add_vertex graph root;
+    let marks = Hashtbl.create (module Subconf) ~size in
+    Hashtbl.set marks ~key:root ~data:0;
+    { graph; marks; root; super; ctx }
   ;;
 end

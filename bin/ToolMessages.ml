@@ -94,6 +94,7 @@ let on_success
     Log.(
       info (fun frmt () ->
           pf frmt "No solution: problem is unrealizable (found answer in %4.4fs)." elapsed));
+    Log.(info (fun frmt () -> pf frmt "%a" (ctx >- Lang.PMRS.pp ~short:false) pb.target));
     ctx >>> ToolExplain.when_unrealizable pb ctexs);
   (* If output specified, write the solution in file. *)
   (match result with

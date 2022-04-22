@@ -9,7 +9,7 @@ let find_and_solve_problem
     ~(ctx : env)
     (psi_comps : (string * string * string) option)
     (pmrs : (string, PMRS.t, Base.String.comparator_witness) Map.t)
-    : (PsiDef.t * Syguslib.Sygus.solver_response segis_response) list
+    : (env * PsiDef.t * Syguslib.Sygus.solver_response segis_response) list
   =
   (*  Find problem components *)
   let target_fname, spec_fname, repr_fname =
@@ -48,10 +48,10 @@ let find_and_solve_problem
         | Realizable s ->
           ConfGraph.mark_realizable rstate sub_conf;
           ConfGraph.expand rstate sub_conf;
-          find_sols ((new_pdef, Realizable s) :: a)
-        | Unrealizable _u ->
+          find_sols ((new_ctx, new_pdef, Realizable s) :: a)
+        | Unrealizable u ->
           ConfGraph.mark_unrealizable rstate sub_conf;
-          find_sols a
+          find_sols (a @ [ new_ctx, new_pdef, Unrealizable u ])
         | Failed _ ->
           ConfGraph.mark_unrealizable rstate sub_conf;
           find_sols a)
@@ -63,7 +63,7 @@ let find_and_solve_problem
         is well-formed. Otherwise, just try to solve the user-defined configuration.
      *)
   if !Config.Optims.max_solutions >= 0
-     || Configuration.check_pmrs top_userdef_problem.target
+     && Configuration.check_pmrs top_userdef_problem.target
   then (
     let max_configuration =
       Configuration.max_configuration ctx top_userdef_problem.target
@@ -78,24 +78,5 @@ let find_and_solve_problem
     in
     Utils.Log.info (fun fmt () -> Fmt.pf fmt "%i configurations possible." subconf_count);
     find_multiple_solutions ctx top_userdef_problem max_configuration)
-  else [ top_userdef_problem, single_configuration_solver ~ctx top_userdef_problem ]
+  else [ ctx, top_userdef_problem, single_configuration_solver ~ctx top_userdef_problem ]
 ;;
-(* let rec f (conf_no, sols, fails) l =
-    if List.length sols >= max 1 !Config.Optims.max_solutions
-    then sols, fails
-    else (
-      match l with
-      | low_problem :: tl ->
-        ctx >- AlgoLog.show_new_rskel conf_no low_problem;
-        ProblemFinder.update_context ~ctx low_problem;
-        let maybe_solution = single_configuration_solver ~ctx low_problem in
-        (* Print state and save. *)
-        LogJson.save_stats_and_restart low_problem.id;
-        (match maybe_solution with
-        | Realizable soln ->
-          f (conf_no + 1, (low_problem, Realizable soln) :: sols, fails) tl
-        | _ as res -> f (conf_no + 1, sols, (low_problem, res) :: fails) tl)
-      | _ -> sols, fails)
-  in
-  let solutions, unrealized_or_failed = f (1, [], []) problems in
-  List.rev solutions @ List.rev unrealized_or_failed *)

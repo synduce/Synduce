@@ -1,3 +1,5 @@
+open Common
+
 (** [find_and_solver_problem (target,spec,repr) globals] finds the PMRS
     components in the top-level functions [globals] with names [target], [spec]
     and [repr], and solves the synthesis problem associated with it. In oder to
@@ -5,9 +7,10 @@
     unknowns or changing their output domain.
 *)
 val find_and_solve_problem
-  :  ctx:Common.Env.env
+  :  ctx:Env.env
   -> (string * string * string) option
   -> (string, Lang.PMRS.t, Base.String.comparator_witness) Base.Map.t
-  -> (Common.ProblemDefs.PsiDef.t
-     * Syguslib.Sygus.solver_response Common.ProblemDefs.segis_response)
+  -> (Env.env
+     * ProblemDefs.PsiDef.t
+     * Syguslib.Sygus.solver_response ProblemDefs.segis_response)
      list

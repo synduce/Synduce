@@ -44,7 +44,7 @@ let main () =
   if !parse_only then Caml.exit 1;
   (* Solve the problem proper. *)
   let outputs = ctx >>> Many.find_and_solve_problem psi_comps all_pmrs in
-  let f (pb, soln) =
+  let check_output (ctx, pb, soln) =
     Common.ProblemDefs.(
       match pb, soln with
       | pb, Realizable soln ->
@@ -61,9 +61,9 @@ let main () =
   in
   let json_out =
     match outputs with
-    | [ a ] -> snd (f a)
+    | [ a ] -> snd (check_output a)
     | _ ->
-      let subproblem_jsons = List.map ~f outputs in
+      let subproblem_jsons = List.map ~f:check_output outputs in
       `Assoc
         (List.map subproblem_jsons ~f:(fun (psi_id, json) ->
              Fmt.(str "problem_%i" psi_id), json))
