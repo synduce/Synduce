@@ -32,6 +32,7 @@ let find_and_solve_problem
     else Se2gis.Main.solve_problem
   in
   let find_multiple_solutions ctx top_userdef_problem mc =
+    let num_attempts = ref 0 in
     let open Configuration in
     let rstate =
       ConfGraph.generate_configurations ctx top_userdef_problem.PsiDef.target
@@ -39,11 +40,26 @@ let find_and_solve_problem
     let rec find_sols a =
       match ConfGraph.next rstate with
       | Some sub_conf ->
+        Int.incr num_attempts;
         let conf = Subconf.to_conf mc sub_conf in
         let new_target, new_ctx =
           apply_configuration ctx conf top_userdef_problem.target
         in
+        Utils.Log.sep ~i:(Some !num_attempts) ();
         let new_pdef = { top_userdef_problem with target = new_target } in
+        (* TODO just for testing *)
+        let rstar_t, rstar_u =
+          get_rstar new_ctx new_pdef !Utils.Config.Optims.rstar_limit
+        in
+        Fmt.(
+          pf
+            stdout
+            "@.RStar:@;@[T=%a@;U=%a@]@."
+            (Term.TermSet.pp new_ctx.ctx)
+            rstar_t
+            (Term.TermSet.pp new_ctx.ctx)
+            rstar_u);
+        (* --- *)
         (match single_configuration_solver ~ctx:new_ctx new_pdef with
         | Realizable s ->
           ConfGraph.mark_realizable rstate sub_conf;

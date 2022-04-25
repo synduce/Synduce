@@ -15,6 +15,19 @@ let cvc_message () =
     (if Config.using_cvc5 () then "Using CVC5 ✔" else "Using CVC4. Please install CVC5.")
 ;;
 
+let start_message filename is_ocaml_syntax =
+  Utils.Log.info
+    Fmt.(
+      fun frmt () ->
+        pf
+          frmt
+          "🟨 Solving problem in file %a with %a syntax."
+          ((styled (`Fg `Cyan)) string)
+          filename
+          ((styled (`Fg `Cyan)) string)
+          (if is_ocaml_syntax then "Caml" else "pmrs"))
+;;
+
 let prep_final_json
     ~(is_ocaml_syntax : bool)
     ~(ctx : env)
@@ -191,6 +204,7 @@ let print_usage () =
     \       --interactive-check-lemma   Manually set if a lemma is true and, if not, \
      give counterexample.\n\
     \       --parse-only                Just parse the input.\n\
+    \       --rstar-limit               Set the rstar limit.\n\
     \       --show-vars                 Print variables and their types at the end.\n\
     \       --generate-benchmarks=DIR   Save SyGuS problems in DIR, including problems \
      that are provably unrealizable.\n\

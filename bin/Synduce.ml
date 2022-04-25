@@ -27,6 +27,7 @@ let main () =
   Lib.Utils.Stats.glob_start ();
   (* Parse input file. *)
   let is_ocaml_syntax = Caml.Filename.check_suffix !filename ".ml" in
+  ToolMessages.start_message !filename is_ocaml_syntax;
   let prog, psi_comps =
     if is_ocaml_syntax then parse_ocaml !filename else parse_pmrs !filename
   in

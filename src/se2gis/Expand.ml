@@ -497,6 +497,22 @@ let to_maximally_reducible
   TermSet.of_list l1, TermSet.of_list l2
 ;;
 
+(**
+  `expand_all ~fctx ~ctx p (t,u)` expands all terms in `u` to at least one MR-term according to
+    `p`. If the pair (t,u) is a boundary then the pair of sets returned will also be a boundary.
+*)
+let expand_all
+    ~(fctx : PMRS.Functions.ctx)
+    ~(ctx : Context.t)
+    (p : PsiDef.t)
+    ((t, u) : TermSet.t * TermSet.t)
+    : TermSet.t * TermSet.t
+  =
+  List.fold (VarSet.elements u) ~init:(t, TermSet.empty) ~f:(fun (t', u') t0 ->
+      let t'', u'' = to_maximally_reducible ~fctx ~ctx p t0 in
+      Set.union t' t'', Set.union u' u'')
+;;
+
 (* ============================================================================================= *)
 (*                                   EXPAND TERM UTILS                                           *)
 (* ============================================================================================= *)

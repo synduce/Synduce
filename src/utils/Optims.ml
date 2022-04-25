@@ -192,6 +192,20 @@ let set_max_solutions (s : string) =
   | _ -> ()
 ;;
 
+(** The number of expansions an algorithm goes through to identify an algorithm run.
+*)
+let rstar_limit = ref 3
+
+(** Set the number of expansions the algorithm uses to identify an algorithm run.
+*)
+let set_rstar_limit (s : string) =
+  try
+    let i = Int.of_string s in
+    if i > 0 && i <= 32 then rstar_limit := i
+  with
+  | _ -> ()
+;;
+
 let some_eager_optim_on () =
   !simplify_eqns || !use_syntactic_definitions || !make_partial_correctness_assumption
 ;;

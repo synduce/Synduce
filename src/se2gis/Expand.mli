@@ -89,6 +89,17 @@ val to_maximally_reducible
   -> Term.term
   -> Term.TermSet.t * Term.TermSet.t
 
+(**
+  `expand_all ~fctx ~ctx p (t,u)` expands all terms in `u` to at least one MR-term according to
+    `p`. If the pair (t,u) is a boundary then the pair of sets returned will also be a boundary.
+*)
+val expand_all
+  :  fctx:PMRS.Functions.ctx
+  -> ctx:Term.Context.t
+  -> Common.ProblemDefs.PsiDef.t
+  -> Term.TermSet.t * Term.TermSet.t
+  -> Term.TermSet.t * Term.TermSet.t
+
 (** [expand_loop] provides basic functionality for bounded checking.
     [expand_loop steps f start] will run a bounded checking loop, starting with the term
     set [start] and performing [!Lib.Config.num_expansions_check] steps, applying the

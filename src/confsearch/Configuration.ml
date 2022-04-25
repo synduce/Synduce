@@ -205,6 +205,21 @@ let apply_configuration (ctx : env) (config : conf) (p : PMRS.t) : PMRS.t * env 
   , ctx )
 ;;
 
+let get_rstar (ctx : env) (p : ProblemDefs.PsiDef.t) (k : int) =
+  let open Se2gis in
+  let x0 =
+    mk_var
+      ctx.ctx
+      (Variable.mk ctx.ctx ~t:(Some (get_theta ctx)) (Alpha.fresh ctx.ctx.names))
+  in
+  let s = TermSet.of_list (ctx >- Analysis.expand_once x0) in
+  let set_t0, set_u0 = Set.partition_tf ~f:(ctx >>- Expand.is_mr_all p) s in
+  let rec aux k (t, u) =
+    if k <= 0 then t, u else aux (k - 1) (ctx >>- Expand.expand_all p (t, u))
+  in
+  aux k (set_t0, set_u0)
+;;
+
 (** Building graph of configurations. *)
 
 module ConfGraph = struct

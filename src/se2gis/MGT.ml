@@ -36,9 +36,10 @@ let mgt (env : env) (prog : PMRS.t) : TermSet.t =
       | [] -> Some mgts)
   in
   let x0 = Variable.mk env.ctx ~t:(Some (get_theta env)) "x0" in
-  match aux (TermSet.empty, xi) [ mk_var env.ctx x0 ] with
+  let v0 = mk_var env.ctx x0 in
+  match aux (TermSet.empty, xi) [ v0 ] with
   | Some mgts -> mgts
-  | None -> TermSet.singleton (mk_var env.ctx x0)
+  | None -> TermSet.singleton v0
 ;;
 
 (* Start the algorith from a variable. *)

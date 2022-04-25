@@ -285,7 +285,7 @@ let bounded_check
         | SExps _, _ | Unsat, _ -> search_ctex tl
         | Unknown, _ ->
           Log.error_msg
-            Fmt.(str "SMT solver returned unkown. The solution might be incorrect.");
+            Fmt.(str "SMT solver returned unknown. The solution might be incorrect.");
           search_ctex tl
         | Unsupported, _ ->
           Log.error_msg Fmt.(str "SMT solver returned unsupported, which is unexpected.");

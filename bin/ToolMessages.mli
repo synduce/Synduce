@@ -1,4 +1,5 @@
 val cvc_message : unit -> unit
+val start_message : string -> bool -> unit
 
 val prep_final_json
   :  is_ocaml_syntax:bool

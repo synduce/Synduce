@@ -285,6 +285,7 @@ let options print_usage parse_only =
   ; '\000', "no-simplify", set simplify_eqns false, None
   ; '\000', "no-syndef", set use_syntactic_definitions false, None
   ; '\000', "parse-only", set parse_only true, None
+  ; '\000', "rstar-limit", None, Some set_rstar_limit
   ; '\000', "show-vars", set show_vars true, None
   ; '\000', "sysfe-opt-off", set sysfe_opt false, None
   ; '\000', "use-bmc", set use_bmc true, None
