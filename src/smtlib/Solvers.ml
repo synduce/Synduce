@@ -26,7 +26,7 @@ module EmptyLog : Logger = struct
   let error _ = ()
   let debug _ = ()
   let verb _ = ()
-  let log_file = Filename.temp_file "tmp" ".log"
+  let log_file = Caml.Filename.temp_file "tmp" ".log"
   let verbose = false
   let log_queries = false
 end
@@ -228,19 +228,19 @@ module Synchronous (Log : Logger) (Stats : Statistics) = struct
 
   let handle_sigchild (_ : int) : unit =
     if List.length !online_solvers = 0
-    then ignore @@ Caml.Unix.wait ()
+    then ignore @@ Caml_unix.wait ()
     else (
       let pid =
-        let pid, msg = Caml.Unix.wait () in
+        let pid, msg = Caml_unix.wait () in
         if Log.verbose
         then Log.debug (fun fmt () -> Fmt.pf fmt "Solver (pid %d) exited!" pid);
         (match msg with
-        | Caml.Unix.WEXITED i ->
+        | Caml_unix.WEXITED i ->
           if not (i = 0)
           then Log.debug Fmt.(fun fmt () -> pf fmt "%i returned non-zero error: %i" pid i)
-        | Caml.Unix.WSIGNALED s ->
+        | Caml_unix.WSIGNALED s ->
           Log.debug Fmt.(fun fmt () -> pf fmt "%i signalled with: %i" pid s)
-        | Caml.Unix.WSTOPPED s ->
+        | Caml_unix.WSTOPPED s ->
           Log.debug Fmt.(fun fmt () -> pf fmt "%i stopped with code: %i" pid s));
         pid
       in
@@ -263,7 +263,7 @@ module Synchronous (Log : Logger) (Stats : Statistics) = struct
 
   let make_solver ~(name : string) (path : string) (options : string list) : online_solver
     =
-    let open Unix in
+    let open Core_unix in
     let pinfo = create_process ~prog:path ~args:options in
     (* If the ocaml ends of the pipes aren't marked close-on-exec, they
        will remain open in the fork/exec'd solver process, and the solver won't exit
