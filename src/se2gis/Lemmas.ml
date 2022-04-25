@@ -532,7 +532,7 @@ let smt_of_aux_ensures ~(fctx : PMRS.Functions.ctx) ~(ctx : Context.t) ~(p : Psi
   let mk_sort maybe_rtype =
     match maybe_rtype with
     | None -> S.mk_int_sort
-    | Some rtype -> sort_of_rtype rtype
+    | Some rtype -> SmtInterface.sort_of_rtype rtype
   in
   let pmrss : PMRS.t list =
     [ p.PsiDef.reference; p.PsiDef.target; p.PsiDef.reference ]
@@ -592,7 +592,7 @@ let smt_of_lemma_validity ~(ctx : Context.t) ~(p : PsiDef.t) (det : term_state_d
   let mk_sort maybe_rtype =
     match maybe_rtype with
     | None -> S.mk_int_sort
-    | Some rtype -> sort_of_rtype rtype
+    | Some rtype -> SmtInterface.sort_of_rtype rtype
   in
   let quants =
     List.map
