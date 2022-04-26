@@ -123,7 +123,7 @@ let find_problem_components
     | Either.Second (f, a, b) -> ctx >- PMRS.func_to_pmrs f a b
   in
   let tinv_pmrs =
-    let%bind spec = Specifications.get_spec target_f.pvar in
+    let%bind spec = ctx >- Specifications.get_spec target_f.pvar in
     let%bind t = spec.requires in
     match t.tkind with
     | TVar func_var -> PMRS.Functions.find_global ctx.functions func_var.vid

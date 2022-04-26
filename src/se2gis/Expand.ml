@@ -70,7 +70,9 @@ let subst_recursive_calls ~(ctx : env) (p : PsiDef.t) (tl : term list)
       | None -> failwith "Cannot make recursion elimination for this problem."
     in
     let invariant =
-      Option.map (Specifications.get_ensures p.PsiDef.reference.pvar) ~f:(fun inv ->
+      Option.map
+        (ctx >- Specifications.get_ensures p.PsiDef.reference.pvar)
+        ~f:(fun inv ->
           first (infer_type ctx.ctx (ctx_reduce ctx (mk_app inv [ scalar_term_f ]))))
     in
     ( substs

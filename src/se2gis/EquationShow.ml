@@ -1,4 +1,4 @@
-open Common.ProblemDefs
+open Common
 open Base
 open Lang
 open Term
@@ -23,7 +23,9 @@ let show_equations ~(ctx : Context.t) tset eqns =
       let print_less = List.take eqns !Config.pp_eqn_count in
       Fmt.(
         pf f "Equations (%i) @." (Set.length tset);
-        List.iter ~f:(fun eqn -> Fmt.pf f "@[%a@]@." (pp_equation ~ctx) eqn) print_less))
+        List.iter
+          ~f:(fun eqn -> Fmt.pf f "@[%a@]@." (Pretty.pp_equation ~ctx) eqn)
+          print_less))
 ;;
 
 let show_lifting_constraints ~(ctx : Context.t) lifting_eqns =
@@ -31,7 +33,9 @@ let show_lifting_constraints ~(ctx : Context.t) lifting_eqns =
       let print_less = List.take lifting_eqns !Config.pp_eqn_count in
       Fmt.(
         pf f "Lifting constraints (%i) @." (List.length lifting_eqns);
-        List.iter ~f:(fun eqn -> Fmt.pf f "@[%a@]@." (pp_equation ~ctx) eqn) print_less))
+        List.iter
+          ~f:(fun eqn -> Fmt.pf f "@[%a@]@." (Pretty.pp_equation ~ctx) eqn)
+          print_less))
 ;;
 
 let error_msg_comp_not_found s soln =

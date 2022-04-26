@@ -59,7 +59,7 @@ let prep_final_json
         , `String
             (Fmt.str
                "%a"
-               (box (ctx >- Common.ProblemDefs.pp_soln ~use_ocaml_syntax:is_ocaml_syntax))
+               (box (ctx >- Common.Pretty.pp_soln ~use_ocaml_syntax:is_ocaml_syntax))
                soln) )
       ; "unrealizable", `Bool false
       ]
@@ -101,7 +101,7 @@ let on_success
           "Solution found in %4.4fs (%3.1f%% verifying):@.%a@]"
           elapsed
           verif_ratio
-          (box (ctx >- Common.ProblemDefs.pp_soln ~use_ocaml_syntax:is_ocaml_syntax))
+          (box (ctx >- Common.Pretty.pp_soln ~use_ocaml_syntax:is_ocaml_syntax))
           soln)
   | Either.Second ctexs ->
     Log.(
@@ -115,9 +115,7 @@ let on_success
     (match Config.get_output_file !source_filename with
     | Some out_file ->
       Utils.Log.to_file out_file (fun frmt () ->
-          (box (ctx >- Common.ProblemDefs.pp_soln ~use_ocaml_syntax:is_ocaml_syntax))
-            frmt
-            soln)
+          (box (ctx >- Common.Pretty.pp_soln ~use_ocaml_syntax:is_ocaml_syntax)) frmt soln)
     | None -> ());
     (* If specified, output a Dafny proof skeleton. *)
     if !Config.generate_proof

@@ -177,7 +177,7 @@ let pp ~(ctx : Context.t) (frmt : Formatter.t) ?(short = false) (pmrs : t) : uni
       RType.pp
       pmrs.poutput_typ
       (option (box (pp_spec ~ctx)))
-      (Specifications.get_spec pmrs.pvar)
+      (Specifications.get_spec ~ctx pmrs.pvar)
       (if short then fun _ _ -> () else braces pp_rules)
       ())
 ;;
@@ -383,15 +383,15 @@ let infer_pmrs_types ~(ctx : Context.t) (prog : t) =
     (* Change types in the specification. *)
     (* Ensures. *)
     let _ =
-      let%bind spec = get_spec prog.pvar in
+      let%bind spec = get_spec ~ctx prog.pvar in
       let%map invariant =
         Option.map ~f:(fun ens -> first (infer_type ctx ens)) spec.ensures
       in
-      Specifications.set_spec prog.pvar { spec with ensures = Some invariant }
+      Specifications.set_spec ~ctx prog.pvar { spec with ensures = Some invariant }
     in
     (* Requires *)
     let _ =
-      let%bind spec = get_spec prog.pvar in
+      let%bind spec = get_spec ~ctx prog.pvar in
       let%map invariant =
         Option.map ~f:(fun ens -> first (infer_type ctx ens)) spec.requires
       in
@@ -412,7 +412,7 @@ let infer_pmrs_types ~(ctx : Context.t) (prog : t) =
       | List.Or_unequal_lengths.Ok t ->
         (match RType.unify t with
         | Ok _ ->
-          Specifications.set_spec prog.pvar { spec with requires = Some invariant }
+          Specifications.set_spec ~ctx prog.pvar { spec with requires = Some invariant }
         | Error e ->
           Log.error_msg (Sexp.to_string_hum e);
           Log.error_msg err_msg;

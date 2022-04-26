@@ -157,7 +157,7 @@ let when_unrealizable ~ctx pb (ctexs : unrealizability_ctex list) : unit =
       | _ ->
         Log.(
           let pp_term = ctx @>- pp_term
-          and pp_equation = ctx >- pp_equation in
+          and pp_equation = ctx >- Pretty.pp_equation in
           info (fun fmt () ->
               pf
                 fmt

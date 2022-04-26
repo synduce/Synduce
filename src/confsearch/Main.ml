@@ -5,6 +5,16 @@ open ProblemDefs
 open Lang
 open Utils
 
+let single_configuration_solver =
+  if !Config.Optims.use_segis (* Symbolic CEGIS. *)
+  then Se2gis.Baselines.algo_segis
+  else if !Config.Optims.use_cegis (* Concrete CEGIS. *)
+  then
+    Se2gis.Baselines.algo_cegis
+    (* Default algorithm: best combination of techniques (TODO) *)
+  else Se2gis.Main.solve_problem
+;;
+
 let find_and_solve_problem
     ~(ctx : env)
     (psi_comps : (string * string * string) option)
@@ -22,19 +32,10 @@ let find_and_solve_problem
   let top_userdef_problem =
     ProblemFinder.find_problem_components ~ctx (target_fname, spec_fname, repr_fname) pmrs
   in
-  let single_configuration_solver =
-    if !Config.Optims.use_segis (* Symbolic CEGIS. *)
-    then Se2gis.Baselines.algo_segis
-    else if !Config.Optims.use_cegis (* Concrete CEGIS. *)
-    then
-      Se2gis.Baselines.algo_cegis
-      (* Default algorithm: best combination of techniques (TODO) *)
-    else Se2gis.Main.solve_problem
-  in
   let find_multiple_solutions ctx top_userdef_problem mc =
     let num_attempts = ref 0 in
     let open Configuration in
-    let rstate =
+    let rstate : ConfGraph.state =
       ConfGraph.generate_configurations ctx top_userdef_problem.PsiDef.target
     in
     let rec find_sols a =
@@ -51,14 +52,24 @@ let find_and_solve_problem
         let rstar_t, rstar_u =
           get_rstar new_ctx new_pdef !Utils.Config.Optims.rstar_limit
         in
+        let eqns, _ =
+          Se2gis.Equations.make
+            ~ctx:new_ctx
+            ~p:new_pdef
+            ~term_state:Se2gis.Lemmas.empty_term_state
+            ~lifting:Se2gis.Lifting.empty_lifting
+            rstar_t
+        in
         Fmt.(
           pf
             stdout
-            "@.RStar:@;@[T=%a@;U=%a@]@."
+            "@.RStar:@;@[T=%a@;U=%a@]@.@[Equations:@;%a@]@."
             (Term.TermSet.pp new_ctx.ctx)
             rstar_t
             (Term.TermSet.pp new_ctx.ctx)
-            rstar_u);
+            rstar_u
+            (list ~sep:semi (new_ctx >- Pretty.pp_equation))
+            eqns);
         (* --- *)
         (match single_configuration_solver ~ctx:new_ctx new_pdef with
         | Realizable s ->

@@ -137,15 +137,13 @@ let compute_preconds ~ctx ~p ~term_state subst eterm =
     (* If the term is bounded and there is a invariant, add a precondition.
          This will avoid calls to the lemma synthesis.
       *)
-    if Analysis.is_bounded ~ctx:ctx.ctx eterm
+    if ctx >- Analysis.is_bounded eterm
     then
       Option.map
         ~f:(fun req ->
-          let t =
-            Reduce.reduce_term ~ctx:ctx.ctx ~fctx:ctx.functions (mk_app req [ eterm ])
-          in
+          let t = ctx >>- Reduce.reduce_term (mk_app req [ eterm ]) in
           t)
-        (Specifications.get_requires p.PsiDef.target.PMRS.pvar)
+        (ctx >- Specifications.get_requires p.PsiDef.target.PMRS.pvar)
     else None
 ;;
 
@@ -281,7 +279,7 @@ let make
     List.find ~f:(fun eq -> not (check_equation ~p eq)) (pure_eqns @ lifting_eqns)
   with
   | Some not_pure ->
-    Log.error_msg Fmt.(str "Not pure: %a" (ctx >- pp_equation) not_pure);
+    Log.error_msg Fmt.(str "Not pure: %a" (ctx >- Pretty.pp_equation) not_pure);
     failwith "Equation not pure."
   | None -> pure_eqns @ lifting_eqns, lifting
 ;;
@@ -1237,7 +1235,7 @@ let update_assumptions
         pf
           fmt
           "New assumptions:@;%a"
-          (list ~sep:sp (box (ctx >- pp_equation)))
+          (list ~sep:sp (box (ctx >- Pretty.pp_equation)))
           assumptions);
   { lstate with assumptions }
 ;;

@@ -57,6 +57,9 @@ let ( >>> ) (c : env) f = f ~ctx:c
 (** Execute a function with a term context from a full context.  *)
 let ( >- ) (c : env) f = f ~ctx:c.ctx
 
+(** Execute a function with a function context from a full context.  *)
+let ( -< ) (c : env) f = f ~fctx:c.ctx
+
 (** Execute a function with a term context from a full context, without a labelled argument. *)
 let ( @>- ) c f = f c.ctx
 

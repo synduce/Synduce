@@ -244,7 +244,7 @@ let pmrs_of_rules
     let f x = fterm_to_term ~ctx allv globs Term.VarSet.empty x in
     Option.map requires ~f, Option.map ~f ensures
   in
-  Specifications.set_spec pvar { ensures = ensures_func; requires = requires_func };
+  Specifications.set_spec ~ctx pvar { ensures = ensures_func; requires = requires_func };
   let pmrs0 =
     PMRS.
       { pvar
@@ -337,10 +337,10 @@ let translate ~(fctx : PMRS.Functions.ctx) ~(ctx : Term.Context.t) (prog : progr
       | EnsuresDef (_, ident, ensures) ->
         let t = fterm_to_term ~ctx Term.VarSet.empty globals Term.VarSet.empty ensures in
         (match Term.Context.find_global ctx ident with
-        | Some (func, _, _, _) -> Specifications.set_ensures func t
+        | Some (func, _, _, _) -> Specifications.set_ensures ~ctx func t
         | None ->
           (match PMRS.Functions.find_nonterminal_by_name fctx ident with
-          | Some x -> Specifications.set_ensures x t
+          | Some x -> Specifications.set_ensures ~ctx x t
           | None -> ()))
       | _ -> ());
   pmrses

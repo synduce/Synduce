@@ -4,6 +4,7 @@
 *)
 
 open ProblemDefs
+open Pretty
 open Base
 open Fmt
 open Lang
@@ -186,11 +187,7 @@ let announce_new_term_state ~(ctx : Context.t) ctex =
         ctex.ctex_eqn.esplitter)
 ;;
 
-let announce_new_lemma_synthesis
-    ~(ctx : Context.t)
-    (thread_no : int)
-    (det : term_state_detail)
-  =
+let announce_new_lemma_synthesis ~(ctx : Context.t) (thread_no : int) (det : term_info) =
   Log.debug (fun f () ->
       match det.current_preconds with
       | None ->
@@ -229,7 +226,7 @@ let lemma_not_proved_correct (m : Stats.verif_method) =
 let lemma_proved_correct
     ~(ctx : Context.t)
     (proof_method : Stats.verif_method)
-    (det : term_state_detail)
+    (det : term_info)
     (lemma_term : term)
   =
   let lemma_term = Eval.simplify lemma_term in

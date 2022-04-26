@@ -11,11 +11,6 @@ open Lang
 open Codegen.Commons
 open Env
 
-(** Use [reinit] to reinitialize all the global variables used in Synduce when solving
-  multiple problems.
-*)
-let reinit () = Specifications.reinit ()
-
 let solve_file ?(print_info = false) (filename : string)
     : (problem_descr * (soln option, unrealizability_ctex list) Either.t) list
   =

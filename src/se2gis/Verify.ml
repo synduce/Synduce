@@ -69,7 +69,7 @@ let partial_bounding_checker
     : (term * term) list * refinement_loop_state
   =
   let f (acc_tset, acc_lstate) t =
-    match Specifications.get_requires p.PsiDef.target.pvar with
+    match ctx >- Specifications.get_requires p.PsiDef.target.pvar with
     | Some req ->
       (match ctx >- Lemmas.get_lemma ~p acc_lstate.term_state ~key:t with
       | Some _ ->

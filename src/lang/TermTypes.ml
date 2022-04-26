@@ -376,6 +376,13 @@ type function_descr =
   ; f_body : term
   }
 
+type spec =
+  { ensures : term option
+  ; requires : term option
+  }
+
+type specs = (int, spec) Hashtbl.t
+
 module Context = struct
   type t =
     { names : Alpha.t
@@ -383,6 +390,7 @@ module Context = struct
     ; globals : (string, variable * fpattern list * term option * term) Hashtbl.t
     ; vartypes : (int, RType.t) Hashtbl.t
     ; varnames : (int, string) Hashtbl.t
+    ; specs : specs
     }
 
   let create () =
@@ -391,6 +399,7 @@ module Context = struct
     ; globals = Hashtbl.create (module String)
     ; vartypes = Hashtbl.create (module Int)
     ; varnames = Hashtbl.create (module Int)
+    ; specs = Hashtbl.create (module Int)
     }
   ;;
 
@@ -400,6 +409,7 @@ module Context = struct
     ; globals = Hashtbl.copy ctx.globals
     ; vartypes = Hashtbl.copy ctx.vartypes
     ; varnames = Hashtbl.copy ctx.varnames
+    ; specs = Hashtbl.copy ctx.specs
     }
   ;;
 

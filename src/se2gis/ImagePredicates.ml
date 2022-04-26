@@ -129,7 +129,7 @@ let smt_of_aux_ensures ~(fctx : PMRS.Functions.ctx) ~(ctx : Context.t) ~(p : Psi
   List.fold
     ~init:[]
     ~f:(fun acc v ->
-      let maybe_ens = Specifications.get_ensures v in
+      let maybe_ens = Specifications.get_ensures ~ctx v in
       match maybe_ens with
       | None -> acc
       | Some t ->
