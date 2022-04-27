@@ -126,7 +126,7 @@ type refinement_loop_state =
   ; assumptions : equation list
   }
 
-(** The algorithm may answere with realizable, in which case it provides a solution, unrealizable,
+(** The algorithm may answer with realizable, in which case it provides a solution, unrealizable,
 in which case it provides a list of counterexamples, or failure.
 *)
 type 'a segis_response =

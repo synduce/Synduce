@@ -23,7 +23,7 @@ val make
   -> p:PsiDef.t
   -> term_state:Common.ProblemDefs.term_state
   -> lifting:Common.ProblemDefs.lifting
-  -> Term.TermSet.t
+  -> TermSet.t
   -> Common.ProblemDefs.equation list * Common.ProblemDefs.lifting
 
 val revert_projs
@@ -58,5 +58,5 @@ val update_assumptions
   -> p:PsiDef.t
   -> Common.ProblemDefs.refinement_loop_state
   -> partial_soln
-  -> Term.TermSet.t
+  -> TermSet.t
   -> Common.ProblemDefs.refinement_loop_state

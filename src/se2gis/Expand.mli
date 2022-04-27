@@ -12,7 +12,7 @@ val subst_recursive_calls
   :  ctx:Env.env
   -> Common.ProblemDefs.PsiDef.t
   -> Term.term list
-  -> (Term.term * Term.term) list * Term.TermSet.t
+  -> (Term.term * Term.term) list * TermSet.t
 
 val maximally_reduced_app
   :  Common.ProblemDefs.PsiDef.t
@@ -87,7 +87,7 @@ val to_maximally_reducible
   -> ctx:Term.Context.t
   -> Common.ProblemDefs.PsiDef.t
   -> Term.term
-  -> Term.TermSet.t * Term.TermSet.t
+  -> TermSet.t * TermSet.t
 
 (**
   `expand_all ~fctx ~ctx p (t,u)` expands all terms in `u` to at least one MR-term according to
@@ -97,8 +97,8 @@ val expand_all
   :  fctx:PMRS.Functions.ctx
   -> ctx:Term.Context.t
   -> Common.ProblemDefs.PsiDef.t
-  -> Term.TermSet.t * Term.TermSet.t
-  -> Term.TermSet.t * Term.TermSet.t
+  -> TermSet.t * TermSet.t
+  -> TermSet.t * TermSet.t
 
 (** [expand_loop] provides basic functionality for bounded checking.
     [expand_loop steps f start] will run a bounded checking loop, starting with the term
@@ -127,7 +127,7 @@ val expand_loop
   -> ?r_stop:(SyncSmt.solver_response -> bool)
   -> ?r_complete:SyncSmt.solver_response
   -> ctx:Term.Context.t
-  -> Term.TermSet.t
+  -> TermSet.t
   -> SyncSmt.solver_response
 
 (** [lwt_expand_loop] provides the same functionality as [expand_loop], but the solver
@@ -140,5 +140,5 @@ val lwt_expand_loop
   -> ?r_stop:(Smtlib.SmtLib.solver_response -> bool)
   -> ?r_complete:Smtlib.SmtLib.solver_response
   -> ctx:Term.Context.t
-  -> Term.TermSet.t Lwt.t
+  -> TermSet.t Lwt.t
   -> AsyncSmt.response

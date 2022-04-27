@@ -7,6 +7,7 @@ open Base
 open Configuration
 open Common
 open Env
+open ProblemDefs
 open Lang
 module G = Graph.Imperative.Digraph.Concrete (Subconf)
 include G
@@ -26,7 +27,10 @@ type state =
   The maximum configuration of the graph.
       *)
   ; super : conf
-  ; ctx : env
+        (** A configuration with more information that must
+      be larger than any configuration in the graph. *)
+  ; ctx : env (** The orginal environment of the super configuration. *)
+  ; cache : ECache.t
   }
 
 let mark_unrealizable (s : state) (conf : Subconf.t) =
@@ -40,6 +44,8 @@ let is_unmarked (s : state) (conf : Subconf.t) =
   | Some 0 | None -> true
   | _ -> false
 ;;
+
+let cache (_s : state) (_u : unrealizability_ctex list) = ()
 
 (** `expand g conf` adds the edges from `conf` to all its refinements in `g`.
   If `~use_po` is set to false, then the expand algorithm does not check whether
@@ -96,5 +102,6 @@ let generate_configurations (ctx : env) (p : PMRS.t) : state =
   add_vertex graph root;
   let marks = Hashtbl.create (module Subconf) ~size in
   Hashtbl.set marks ~key:root ~data:0;
-  { graph; marks; root; super; ctx }
+  let cache = ECache.create () in
+  { graph; marks; root; super; ctx; cache }
 ;;

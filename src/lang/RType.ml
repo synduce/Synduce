@@ -47,7 +47,7 @@ type t =
   | TFun of t * t
   | TParam of t list * t
   | TVar of int
-[@@deriving sexp]
+[@@deriving sexp, hash]
 
 let rec pp (frmt : Formatter.t) (typ : t) =
   match typ with

@@ -1103,9 +1103,12 @@ let type_of (t : term) = t.ttyp
 (* ============================================================================================= *)
 (*                                  SETS OF TERMS                                                *)
 (* ============================================================================================= *)
+
+(** This module aggregates operations on terms useful to build data structures and small terms.
+*)
 module Terms = struct
   module E = struct
-    type t = term
+    type t = term [@@deriving hash]
 
     let compare t1 t2 =
       let c = compare (term_size t1) (term_size t2) in
@@ -1210,24 +1213,3 @@ module KeyedTerms = struct
   module C = Comparator.Make (E)
   include C
 end
-
-module TermSet = struct
-  module S = Set.M (Terms)
-  include S
-
-  let empty = Set.empty (module Terms)
-  let map (s : S.t) = Set.map (module Terms) s
-  let singleton = Set.singleton (module Terms)
-  let of_list = Set.of_list (module Terms)
-  let of_varset : VarSet.t -> t = Set.map (module Terms) ~f:mk_var_no_ctx
-  let union_list = Set.union_list (module Terms)
-  let filter_by_type t typ = Set.filter ~f:(fun t -> RType.t_equals (type_of t) typ) t
-
-  let pp (ctx : Context.t) (f : Formatter.t) (s : t) =
-    Fmt.(pf f "@[{%a}@]" (list ~sep:comma (pp_term ctx)) (Set.elements s))
-  ;;
-end
-
-let pp_term_set (ctx : Context.t) (f : Formatter.t) (s : TermSet.t) =
-  (braces (list ~sep:comma (box (pp_term ctx)))) f (Set.elements s)
-;;

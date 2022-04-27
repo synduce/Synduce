@@ -16,11 +16,10 @@ module Attributes = struct
         | Builtin
         | Terminal
         | NonTerminal of int
-      [@@deriving sexp]
+      [@@deriving sexp, hash]
 
       let equal (a : t) (b : t) = Poly.equal a b
       let compare (a : t) (b : t) = Poly.compare a b
-      let hash = Hashtbl.hash
     end
 
     include T
@@ -40,6 +39,7 @@ module Attributes = struct
 
   let singleton = Set.singleton (module Elt)
   let empty = Set.empty (module Elt)
+  let hash_fold_t : t Hash.folder = Set.hash_fold_m__t (module Elt)
 end
 
 type variable =
@@ -47,6 +47,11 @@ type variable =
   ; vid : int
   ; vattrs : Attributes.t
   }
+[@@deriving hash]
+
+let hash_fold_position (s : Hash.state) (p : position) =
+  Hash.(fold_int (fold_int (fold_string s p.pos_fname) p.pos_lnum) p.pos_cnum)
+;;
 
 let dummy_loc : position * position = dummy_pos, dummy_pos
 let pp_nice = ref true
@@ -73,6 +78,7 @@ module Binop = struct
     | And
     | Or
     | Implies
+  [@@deriving hash]
 
   let compare = Poly.compare
   let equal = Poly.equal
@@ -166,6 +172,7 @@ module Unop = struct
     | Neg
     | Not
     | Abs
+  [@@deriving hash]
 
   let compare = Poly.compare
   let equal = Poly.equal
@@ -288,6 +295,7 @@ module Constant = struct
     | CChar of char
     | CTrue
     | CFalse
+  [@@deriving hash]
 
   let compare c1 c2 =
     match c1, c2 with
@@ -335,6 +343,7 @@ type fpattern =
   | FPatAny
   | FPatVar of variable
   | FPatTup of fpattern list
+[@@deriving hash]
 
 (** More complex patterns are used in match-cases.
   In the current implementation, this is only used as a way to translate a PMRS back to
@@ -346,6 +355,7 @@ type pattern =
   | PatConstant of Constant.t
   | PatTuple of pattern list
   | PatConstr of string * pattern list
+[@@deriving hash]
 
 type termkind =
   | TApp of term * term list (** A function application. *)
@@ -369,6 +379,7 @@ and term =
   ; tkind : termkind
   ; ttyp : RType.t
   }
+[@@deriving hash]
 
 type function_descr =
   { f_var : variable

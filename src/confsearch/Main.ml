@@ -6,7 +6,9 @@ open Lang
 open Utils
 module G = ConfGraph
 
-let single_configuration_solver =
+let single_configuration_solver
+    : ctx:env -> PsiDef.t -> Syguslib.Sygus.solver_response segis_response
+  =
   if !Config.Optims.use_segis (* Symbolic CEGIS. *)
   then Se2gis.Baselines.algo_segis
   else if !Config.Optims.use_cegis (* Concrete CEGIS. *)
@@ -63,9 +65,9 @@ let find_and_solve_problem
           pf
             stdout
             "@.RStar:@;@[T=%a@;U=%a@]@.@[Equations:@;%a@]@."
-            (Term.TermSet.pp new_ctx.ctx)
+            (TermSet.pp new_ctx.ctx)
             rstar_t
-            (Term.TermSet.pp new_ctx.ctx)
+            (TermSet.pp new_ctx.ctx)
             rstar_u
             (list ~sep:semi (new_ctx >- Pretty.pp_equation))
             eqns);
@@ -77,6 +79,7 @@ let find_and_solve_problem
           find_sols ((new_ctx, new_pdef, Realizable s) :: a)
         | Unrealizable u ->
           G.mark_unrealizable rstate sub_conf;
+          G.cache rstate u;
           find_sols (a @ [ new_ctx, new_pdef, Unrealizable u ])
         | Failed _ ->
           G.mark_unrealizable rstate sub_conf;

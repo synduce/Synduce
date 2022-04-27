@@ -1,6 +1,9 @@
-(** A configuration is a set of argument for unknowns in a recursion skeleton.  *)
-open Base
+(** A configuration is a set of argument for unknowns in a recursion skeleton.
+    This module contains operations on configurations, notable a submodule  `Subconf`
+    for representing configuration refinements.
+*)
 
+open Base
 open Common
 open Env
 open Lang
