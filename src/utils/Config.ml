@@ -138,14 +138,19 @@ let cvc5_binary_path =
   | _ -> None
 ;;
 
-let using_cvc5 () = Option.is_some cvc5_binary_path && not !use_cvc4
+let using_cvc5 () =
+  (Option.is_some cvc5_binary_path && not !use_cvc4) || Option.is_none cvc4_binary_path
+;;
 
 let cvc_binary_path () =
   if !use_cvc4
   then (
     match cvc4_binary_path with
     | Some p -> p
-    | None -> failwith "CVC4 not found using 'which cvc4').")
+    | None ->
+      (match cvc5_binary_path with
+      | Some p -> p
+      | None -> failwith "CVC4 and CVC5 not found."))
   else (
     match cvc5_binary_path with
     | Some p -> p
