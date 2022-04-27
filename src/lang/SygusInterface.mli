@@ -66,7 +66,7 @@ val term_of_sygus
 
 (** Returns a list of terms that corresponds to the Skeleton interpreted as a grammar. *)
 val grammar_production_of_skeleton
-  :  Rewriter.Skeleton.t
+  :  Skeleton.t
   -> ints:Sygus.sygus_term
   -> bools:Sygus.sygus_term
   -> (Sygus.sygus_term * Sygus.sygus_sort) list

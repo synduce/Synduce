@@ -300,11 +300,10 @@ let nth_output_type ~(ctx : Context.t) (p : PsiDef.t) (i : int) : RType.t option
 (* ============================================================================================= *)
 (*                     HELPERS                                                                   *)
 (* ============================================================================================= *)
-let analyze_leftover ~(ctx : Rewriter.RContext.t) (expr : Rewriter.Expression.t) : unit =
+let analyze_leftover ~(ctx : EProps.RContext.t) (expr : Expression.t) : unit =
   Log.verbose Fmt.(fun fmt () -> pf fmt "Analyzing leftover expression...@.");
   let expr' = Rewriter.factorize expr in
-  Log.verbose
-    Fmt.(fun fmt () -> pf fmt "-> Expr %a@." (Rewriter.Expression.pp ~ctx) expr');
+  Log.verbose Fmt.(fun fmt () -> pf fmt "-> Expr %a@." (Expression.pp ~ctx) expr');
   let need_to_compute = Deduction.subexpressions_without_boxes expr' in
   Log.verbose
     Fmt.(
@@ -312,7 +311,7 @@ let analyze_leftover ~(ctx : Rewriter.RContext.t) (expr : Rewriter.Expression.t)
         pf
           fmt
           "-> Lifting may also need to compute %a@."
-          (list ~sep:comma (parens (Rewriter.Expression.pp ~ctx)))
+          (list ~sep:comma (parens (Expression.pp ~ctx)))
           (Set.to_list need_to_compute))
 ;;
 

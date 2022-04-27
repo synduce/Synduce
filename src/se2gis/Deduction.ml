@@ -1,8 +1,9 @@
 open Base
 open Common.Env
 open Lang
-open Lang.Term
-open Lang.Rewriter
+open EProps
+open Term
+open Rewriter
 open Utils
 open Fmt
 open Option.Let_syntax

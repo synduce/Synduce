@@ -1,5 +1,4 @@
 open Lang
-open Rewriter
 
 val as_unknown_app
   :  ?match_functions:(Term.term -> bool)
@@ -14,7 +13,7 @@ val subexpressions_without_boxes
 module Solver : sig
   val presolve_equations
     :  orig_ctx:Term.Context.t
-    -> ?ctx:RContext.t
+    -> ?ctx:EProps.RContext.t
     -> xi:Term.variable
     -> (Term.term * Term.term option * Term.term * Term.term) list
     -> [> `First of string * Term.variable list * Term.term
@@ -28,5 +27,5 @@ module Solver : sig
     -> lemma:Term.term option
     -> Term.term
     -> (Term.variable * Term.VarSet.t) list
-    -> (Term.variable * Term.term) list * Expression.t option * RContext.t
+    -> (Term.variable * Term.term) list * Expression.t option * EProps.RContext.t
 end

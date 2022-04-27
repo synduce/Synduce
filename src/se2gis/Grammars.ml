@@ -1,7 +1,6 @@
 open Base
 open Lang
 open Lang.Term
-open Lang.Rewriter
 open Syguslib.Sygus
 open Lang.SygusInterface
 open Utils

@@ -221,6 +221,7 @@ module Operator = struct
     type t =
       | Unary of Unop.t
       | Binary of Binop.t
+    [@@deriving hash]
 
     let compare op1 op2 = Poly.compare op1 op2
     let equal op1 op2 = compare op1 op2 = 0

@@ -45,7 +45,46 @@ let is_unmarked (s : state) (conf : Subconf.t) =
   | _ -> false
 ;;
 
-let cache (_s : state) (_u : unrealizability_ctex list) = ()
+let cache (s : state) (u : unrealizability_ctex list) =
+  let add_as_eset uc =
+    let conv ctex = ECache.norm ctex.ctex_eqn in
+    match conv uc.ci, conv uc.cj with
+    | Some ei, Some ej ->
+      let eset = ExpressionSet.of_list [ ei; ej ] in
+      Utils.Log.verbose
+        Fmt.(
+          fun fmt () ->
+            pf
+              fmt
+              "CACHE: unrealizable sample {%a}"
+              (list ~sep:semi Expression.pp)
+              (Set.elements eset));
+      ECache.add s.cache eset
+    | _ ->
+      Utils.Log.verbose_msg "CACHE: failed.";
+      (* If failure to convert, do nothing; we cannot cache just one expression. *)
+      ()
+  in
+  List.iter ~f:add_as_eset u
+;;
+
+let check_unrealizable_from_cache (ctx : env) (p : PsiDef.t) (s : state) =
+  (* Fmt.(pf stdout "@.== > CACHE:@;%a@." ECache.dump s.cache); *)
+  let rstar_t, _ = get_rstar ctx p !Utils.Config.Optims.rstar_limit in
+  let eset =
+    let eqns, _ =
+      Se2gis.Equations.make
+        ~ctx
+        ~p
+        ~term_state:Se2gis.Lemmas.empty_term_state
+        ~lifting:Se2gis.Lifting.empty_lifting
+        rstar_t
+    in
+    ExpressionSet.of_list (List.filter_opt (List.map ~f:ECache.norm eqns))
+  in
+  (* Fmt.(pf stdout "@.== > EXPRS:@;%a@." ExpressionSet.pp eset); *)
+  ECache.check_subset eset s.cache
+;;
 
 (** `expand g conf` adds the edges from `conf` to all its refinements in `g`.
   If `~use_po` is set to false, then the expand algorithm does not check whether
@@ -102,6 +141,6 @@ let generate_configurations (ctx : env) (p : PMRS.t) : state =
   add_vertex graph root;
   let marks = Hashtbl.create (module Subconf) ~size in
   Hashtbl.set marks ~key:root ~data:0;
-  let cache = ECache.create () in
+  let cache = ctx >- ECache.create () in
   { graph; marks; root; super; ctx; cache }
 ;;

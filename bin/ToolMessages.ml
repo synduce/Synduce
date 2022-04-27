@@ -16,16 +16,17 @@ let cvc_message () =
 ;;
 
 let start_message filename is_ocaml_syntax =
-  Utils.Log.info
+  if !Utils.Config.info
+  then (
     Fmt.(
-      fun frmt () ->
-        pf
-          frmt
-          "🟨 Solving problem in file %a with %a syntax."
-          ((styled (`Fg `Cyan)) string)
-          filename
-          ((styled (`Fg `Cyan)) string)
-          (if is_ocaml_syntax then "Caml" else "pmrs"))
+      pf
+        stdout
+        "@.📢 Solving problem in file %a with %a syntax.@."
+        ((styled (`Fg `Cyan)) string)
+        filename
+        ((styled (`Fg `Cyan)) string)
+        (if is_ocaml_syntax then "Caml" else "pmrs"));
+    Log.sep ())
 ;;
 
 let prep_final_json

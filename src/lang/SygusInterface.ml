@@ -1,6 +1,5 @@
 open Base
 open Option.Let_syntax
-open Rewriter
 open Syguslib
 open Sygus
 open Term

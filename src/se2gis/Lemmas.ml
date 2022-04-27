@@ -216,13 +216,13 @@ let skeleton_of_tinv
       (transform ~case tinv_of_t')
   in
   (* ep_term tinv_of_t''); *)
-  let rc = RContext.create ctx in
+  let rc = EProps.RContext.create ctx in
   let expr = Expression.of_term ~ctx:rc tinv_of_t'' in
   let expr_transform _ e =
     match e with
     | Expression.EVar v ->
       Option.(
-        RContext.get_var rc v
+        EProps.RContext.get_var rc v
         >>= arg_num
         >>| fun i -> Expression.EBox (Expression.Position i))
     | _ -> None

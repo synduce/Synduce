@@ -50,18 +50,18 @@ let find_and_solve_problem
         Utils.Log.sep ~i:(Some !num_attempts) ();
         let new_pdef = { top_userdef_problem with target = new_target } in
         (* TODO just for testing *)
-        let rstar_t, rstar_u =
+        (* let rstar_t, rstar_u =
           get_rstar new_ctx new_pdef !Utils.Config.Optims.rstar_limit
-        in
-        let eqns, _ =
+        in *)
+        (* let eqns, _ =
           Se2gis.Equations.make
             ~ctx:new_ctx
             ~p:new_pdef
             ~term_state:Se2gis.Lemmas.empty_term_state
             ~lifting:Se2gis.Lifting.empty_lifting
             rstar_t
-        in
-        Fmt.(
+        in *)
+        (* Fmt.(
           pf
             stdout
             "@.RStar:@;@[T=%a@;U=%a@]@.@[Equations:@;%a@]@."
@@ -70,20 +70,28 @@ let find_and_solve_problem
             (TermSet.pp new_ctx.ctx)
             rstar_u
             (list ~sep:semi (new_ctx >- Pretty.pp_equation))
-            eqns);
+            eqns); *)
         (* --- *)
-        (match single_configuration_solver ~ctx:new_ctx new_pdef with
-        | Realizable s ->
-          G.mark_realizable rstate sub_conf;
-          G.expand rstate sub_conf;
-          find_sols ((new_ctx, new_pdef, Realizable s) :: a)
-        | Unrealizable u ->
+        if G.check_unrealizable_from_cache new_ctx new_pdef rstate
+        then (
+          Log.info
+            Fmt.(
+              fun fmt () -> pf fmt "Configuraration is unrealizable according to cache.");
           G.mark_unrealizable rstate sub_conf;
-          G.cache rstate u;
-          find_sols (a @ [ new_ctx, new_pdef, Unrealizable u ])
-        | Failed _ ->
-          G.mark_unrealizable rstate sub_conf;
-          find_sols a)
+          find_sols (a @ [ new_ctx, new_pdef, Unrealizable [] ]))
+        else (
+          match single_configuration_solver ~ctx:new_ctx new_pdef with
+          | Realizable s ->
+            G.mark_realizable rstate sub_conf;
+            G.expand rstate sub_conf;
+            find_sols ((new_ctx, new_pdef, Realizable s) :: a)
+          | Unrealizable u ->
+            G.mark_unrealizable rstate sub_conf;
+            G.cache rstate u;
+            find_sols (a @ [ new_ctx, new_pdef, Unrealizable u ])
+          | Failed _ ->
+            G.mark_unrealizable rstate sub_conf;
+            find_sols a)
       | None -> a
     in
     find_sols []
