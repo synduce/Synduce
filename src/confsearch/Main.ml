@@ -4,6 +4,7 @@ open Env
 open ProblemDefs
 open Lang
 open Utils
+module G = ConfGraph
 
 let single_configuration_solver =
   if !Config.Optims.use_segis (* Symbolic CEGIS. *)
@@ -35,11 +36,9 @@ let find_and_solve_problem
   let find_multiple_solutions ctx top_userdef_problem mc =
     let num_attempts = ref 0 in
     let open Configuration in
-    let rstate : ConfGraph.state =
-      ConfGraph.generate_configurations ctx top_userdef_problem.PsiDef.target
-    in
+    let rstate = G.generate_configurations ctx top_userdef_problem.PsiDef.target in
     let rec find_sols a =
-      match ConfGraph.next rstate with
+      match G.next rstate with
       | Some sub_conf ->
         Int.incr num_attempts;
         let conf = Subconf.to_conf mc sub_conf in
@@ -73,14 +72,14 @@ let find_and_solve_problem
         (* --- *)
         (match single_configuration_solver ~ctx:new_ctx new_pdef with
         | Realizable s ->
-          ConfGraph.mark_realizable rstate sub_conf;
-          ConfGraph.expand rstate sub_conf;
+          G.mark_realizable rstate sub_conf;
+          G.expand rstate sub_conf;
           find_sols ((new_ctx, new_pdef, Realizable s) :: a)
         | Unrealizable u ->
-          ConfGraph.mark_unrealizable rstate sub_conf;
+          G.mark_unrealizable rstate sub_conf;
           find_sols (a @ [ new_ctx, new_pdef, Unrealizable u ])
         | Failed _ ->
-          ConfGraph.mark_unrealizable rstate sub_conf;
+          G.mark_unrealizable rstate sub_conf;
           find_sols a)
       | None -> a
     in

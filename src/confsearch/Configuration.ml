@@ -12,6 +12,20 @@ open Utils
 *)
 type conf = term list VarMap.t
 
+let ppm (ctx : env) (fmt : Formatter.t) (conf : conf) =
+  Fmt.(
+    brackets
+      (list
+         ~sep:semi
+         (parens
+            (pair
+               ~sep:rightarrow
+               (ctx @>- Variable.pp)
+               (list ~sep:vbar (ctx @>- pp_term))))))
+    fmt
+    (Map.to_alist conf)
+;;
+
 module Subconf = struct
   (**
   A subconfiguration (relative to some configuration) is a map from an unknown's variable
@@ -68,20 +82,6 @@ module Subconf = struct
     List.concat_map (Map.to_alist conf) ~f:drop_one
   ;;
 end
-
-let ppm (ctx : env) (fmt : Formatter.t) (conf : conf) =
-  Fmt.(
-    brackets
-      (list
-         ~sep:semi
-         (parens
-            (pair
-               ~sep:rightarrow
-               (ctx @>- Variable.pp)
-               (list ~sep:vbar (ctx @>- pp_term))))))
-    fmt
-    (Map.to_alist conf)
-;;
 
 (** Create an empty configuration of a set of variables.  *)
 let of_varset = VarMap.init_from_varset ~init:(fun _ -> [])
@@ -219,95 +219,3 @@ let get_rstar (ctx : env) (p : ProblemDefs.PsiDef.t) (k : int) =
   in
   aux k (set_t0, set_u0)
 ;;
-
-(** Building graph of configurations. *)
-
-module ConfGraph = struct
-  module G = Graph.Imperative.Digraph.Concrete (Subconf)
-  include G
-  module Bfs = Graph.Traverse.Bfs (G)
-
-  type marks = int Hashtbl.M(Subconf).t
-
-  (** A type to represent the state of the configuration graph exploration.
-    We need to remember the graph and mark configurations as solved or not.
-  *)
-  type state =
-    { graph : t (** The graph of configurations. *)
-    ; marks : marks
-          (**
-          A negative mark means unrealizable.
-          A positive mark means a solution has been found.
-      Otherwise, a mark of 0 means it has not been solved.
-    *)
-    ; root : Subconf.t (**
-    The maximum configuration of the graph.
-        *)
-    ; super : conf
-    ; ctx : env
-    }
-
-  let mark_unrealizable (s : state) (conf : Subconf.t) =
-    Hashtbl.set s.marks ~key:conf ~data:(-1)
-  ;;
-
-  let mark_realizable (s : state) (conf : Subconf.t) =
-    Hashtbl.set s.marks ~key:conf ~data:1
-  ;;
-
-  let is_unmarked (s : state) (conf : Subconf.t) =
-    match Hashtbl.find s.marks conf with
-    | Some 0 | None -> true
-    | _ -> false
-  ;;
-
-  (** `expand g conf` adds the edges from `conf` to all its refinements in `g`. *)
-  let expand (s : state) (conf : Subconf.t) : unit =
-    match Hashtbl.find s.marks conf with
-    (* The configuration is unrealizable. No subconfiguration can be realizable. *)
-    | Some x when x < 0 -> ()
-    | _ ->
-      List.iter (Subconf.drop_arg conf) ~f:(fun c ->
-          match Hashtbl.find s.marks c with
-          (* Already solved: no need to add new edge. *)
-          | Some x when not (x = 0) -> ()
-          | Some _ -> add_edge s.graph conf c
-          | None ->
-            Hashtbl.set s.marks ~key:c ~data:0;
-            add_edge s.graph conf c)
-  ;;
-
-  (**
-    Find the next 0-marked configuration in the graph.
-    Return None if there is no such configuration.
-  *)
-  let next (s : state) : Subconf.t option =
-    let q = Queue.create () in
-    Queue.enqueue q s.root;
-    let rec loop () =
-      Option.bind (Queue.dequeue q) ~f:(fun curr ->
-          match Hashtbl.find s.marks curr with
-          | Some 0 -> Some curr
-          | None ->
-            Hashtbl.set s.marks ~key:curr ~data:0;
-            Some curr
-          | Some x when x < 0 -> loop ()
-          | Some _ ->
-            Queue.enqueue_all q (List.filter ~f:(is_unmarked s) (succ s.graph curr));
-            loop ())
-    in
-    loop ()
-  ;;
-
-  (** Generate the inital graph of configurations of a PMRS with unknowns. *)
-  let generate_configurations (ctx : env) (p : PMRS.t) : state =
-    let super = max_configuration ctx p in
-    let root = Subconf.of_conf super in
-    let size = subconf_count super in
-    let graph = create ~size () in
-    add_vertex graph root;
-    let marks = Hashtbl.create (module Subconf) ~size in
-    Hashtbl.set marks ~key:root ~data:0;
-    { graph; marks; root; super; ctx }
-  ;;
-end
