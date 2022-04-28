@@ -56,22 +56,37 @@ let set_term_lemma
     (ts : lemmas)
     ~(key : term * term option)
     ~(lemma : term)
-    : lemmas
+    : unit
   =
-  match Map.find ts key with
+  let term_key, splitter_key = key in
+  match Hashtbl.find ts term_key with
   | None ->
-    Map.add_exn
+    Hashtbl.add_multi
       ts
-      ~key
+      ~key:term_key
       ~data:{ (make_term_info ~ctx ~p (fst key)) with lemmas = [ lemma ] }
-  | Some det -> Map.add_exn ts ~key ~data:{ det with lemmas = [ lemma ] }
+  | Some term_infos ->
+    let repl = ref false in
+    let nl =
+      List.map
+        ~f:(fun ti ->
+          if Option.equal Terms.equal ti.splitter splitter_key
+          then (
+            repl := true;
+            { ti with lemmas = [ lemma ] })
+          else ti)
+        term_infos
+    in
+    if !repl
+    then Hashtbl.set ts ~key:term_key ~data:nl
+    else (
+      let new_elt = { (make_term_info ~ctx ~p (fst key)) with lemmas = [ lemma ] } in
+      Hashtbl.set ts ~key:term_key ~data:(new_elt :: nl))
 ;;
 
-let add_lemmas ~(ctx : env) ~(p : PsiDef.t) (lstate : refinement_loop_state)
-    : refinement_loop_state
-  =
+let add_lemmas ~(ctx : env) ~(p : PsiDef.t) (lstate : refinement_loop_state) : unit =
   let env_in_p = VarSet.of_list p.PsiDef.reference.pargs in
-  let f existing_lemmas t =
+  let f t =
     let vars = Set.union (ctx >- Analysis.free_variables t) env_in_p in
     let env = VarSet.to_env vars in
     Log.info (fun frmt () ->
@@ -88,7 +103,7 @@ let add_lemmas ~(ctx : env) ~(p : PsiDef.t) (lstate : refinement_loop_state)
     match Stdio.In_channel.input_line Stdio.stdin with
     | None | Some "" ->
       Log.info (fun frmt () -> Fmt.pf frmt "No additional constraint provided.");
-      existing_lemmas
+      ()
     | Some x ->
       let smtterm =
         try
@@ -99,15 +114,15 @@ let add_lemmas ~(ctx : env) ~(p : PsiDef.t) (lstate : refinement_loop_state)
       in
       let pred_term = ctx >>- term_of_smt env in
       let term x =
-        match ctx >- get_precise_lemma ~p existing_lemmas ~key:(t, None) with
+        match ctx >- get_precise_lemma ~p lstate.lemmas ~key:(t, None) with
         | None -> pred_term x
         | Some inv -> mk_bin Binop.And inv (pred_term x)
       in
       (match smtterm with
-      | None -> existing_lemmas
-      | Some x -> set_term_lemma ~ctx ~p existing_lemmas ~key:(t, None) ~lemma:(term x))
+      | None -> ()
+      | Some x -> set_term_lemma ~ctx ~p lstate.lemmas ~key:(t, None) ~lemma:(term x))
   in
-  { lstate with lemmas = Set.fold ~f ~init:lstate.lemmas lstate.t_set }
+  Set.iter ~f lstate.t_set
 ;;
 
 let parse_interactive_positive_example (det : term_info) (input : string) : ctex option =

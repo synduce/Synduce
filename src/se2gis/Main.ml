@@ -28,18 +28,23 @@ let rec refinement_loop
   then AlgoLog.show_steps ctx tsize usize
   else AlgoLog.show_stat ctx elapsed tsize usize;
   (* Add lemmas interactively if the option is set. *)
-  let lstate =
+  let () =
     if !Config.interactive_lemmas
     then LemmasInteractive.add_lemmas ~ctx ~p lstate_in
-    else lstate_in
+    else ()
   in
   (* First, generate the set of constraints corresponding to the set of terms t_set. *)
   let eqns, lifting =
-    Equations.make ~ctx ~p ~lemmas:lstate.lemmas ~lifting:lstate.lifting lstate.t_set
+    Equations.make
+      ~ctx
+      ~p
+      ~lemmas:lstate_in.lemmas
+      ~lifting:lstate_in.lifting
+      lstate_in.t_set
   in
   (* The solve the set of constraints with the assumption equations. *)
   let synth_time, (s_resp, solution) =
-    Stats.timed (fun () -> Equations.solve ctx ~p (eqns @ lstate.assumptions))
+    Stats.timed (fun () -> Equations.solve ctx ~p (eqns @ lstate_in.assumptions))
   in
   match s_resp, solution with
   | RSuccess _, First sol ->
@@ -47,7 +52,7 @@ let rec refinement_loop
     (try
        (* The solution is verified with a bounded check.  *)
        let verif_time, check_r =
-         Stats.timed (fun () -> Verify.check_solution ~ctx ~p lstate sol)
+         Stats.timed (fun () -> Verify.check_solution ~ctx ~p lstate_in sol)
        in
        match check_r with
        | `Ctexs (t_set, u_set) ->
@@ -55,12 +60,12 @@ let rec refinement_loop
                verification failed. The generalized counterexamples have been added to new_t_set,
                which is also a superset of t_set.
             *)
-         ctx >- AlgoLog.show_counterexamples lstate t_set;
+         ctx >- AlgoLog.show_counterexamples lstate_in t_set;
          Stats.log_major_step_end ~synth_time ~verif_time ~t:tsize ~u:usize false;
          let lstate =
            if !Config.Optims.make_partial_correctness_assumption
-           then Equations.update_assumptions ~ctx ~p lstate sol t_set
-           else lstate
+           then Equations.update_assumptions ~ctx ~p lstate_in sol t_set
+           else lstate_in
          in
          (* Continue looping with the new sets. *)
          refinement_loop ~ctx ~major:true p { lstate with t_set; u_set; lifting }
@@ -100,7 +105,8 @@ let rec refinement_loop
   | _ as synt_failure_info ->
     (* On synthesis failure, start by trying to synthesize lemmas. *)
     (match
-       Stats.timed (fun () -> Lemmas.synthesize_lemmas ~ctx ~p synt_failure_info lstate)
+       Stats.timed (fun () ->
+           Lemmas.synthesize_lemmas ~ctx ~p synt_failure_info lstate_in)
      with
     | lsynt_time, Ok (First new_lstate) ->
       Stats.log_minor_step ~synth_time ~auxtime:lsynt_time false;
@@ -109,7 +115,7 @@ let rec refinement_loop
       when !Config.Optims.attempt_lifting
            && Lifting.lifting_count ~ctx p < !Config.Optims.max_lifting_attempts ->
       (* If all no counterexample is spurious, lemma synthesis fails, we need lifting. *)
-      (match Lifting.scalar ~ctx ~p lstate synt_failure_info with
+      (match Lifting.scalar ~ctx ~p lstate_in synt_failure_info with
       | Ok (p', lstate') ->
         Lifting.msg_lifting ();
         Stats.log_minor_step ~synth_time ~auxtime:lsynt_time true;

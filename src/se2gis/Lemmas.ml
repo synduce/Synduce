@@ -15,7 +15,7 @@ module S = Smtlib.SmtLib
 module Sy = Syguslib.Sygus
 module Sm = Syguslib.Semantic
 
-let empty_lemmas : lemmas = Map.empty (module KeyedTerms)
+let empty_lemmas : lemmas = Hashtbl.create (module Terms)
 
 (* ============================================================================================= *)
 (*                                  Creating and updating term states                            *)
@@ -52,37 +52,37 @@ let create_or_update_lemmas_with_ctex
     ~(is_pos_ctex : bool)
     (ts : lemmas)
     (ctex : ctex)
-    : lemmas
+    : unit
   =
-  match Map.find ts (ctex.ctex_eqn.eterm, ctex.ctex_eqn.esplitter) with
+  match find_lemma ts (ctex.ctex_eqn.eterm, ctex.ctex_eqn.esplitter) with
   | None ->
     AlgoLog.announce_new_lemmas ~ctx ctex;
-    Map.add_exn
-      ~key:(ctex.ctex_eqn.eterm, ctex.ctex_eqn.esplitter)
-      ~data:(lemmas_of_context ~ctx ~is_pos_ctex ctex)
-      ts
+    add_lemma ts ~key:ctex.ctex_eqn.eterm ~data:(lemmas_of_context ~ctx ~is_pos_ctex ctex)
   | Some _ ->
-    Map.update ts (ctex.ctex_eqn.eterm, ctex.ctex_eqn.esplitter) ~f:(fun maybe_det ->
-        match maybe_det with
-        | None -> failwith "Term detail does not exist."
-        | Some det ->
-          if is_pos_ctex
-          then { det with positive_ctexs = ctex :: det.positive_ctexs }
-          else
-            { det with
-              current_preconds =
-                (match ctex.ctex_eqn.eprecond with
-                | None -> None
-                | Some pre ->
-                  let pre' =
-                    substitution
-                      (subs_from_elim_to_elim ~ctx det.recurs_elim ctex.ctex_eqn.eelim)
-                      pre
-                  in
-                  Some pre')
-            ; negative_ctexs = ctex :: det.negative_ctexs
-            ; positive_ctexs = det.positive_ctexs
-            })
+    let change_ti det =
+      if is_pos_ctex
+      then { det with positive_ctexs = ctex :: det.positive_ctexs }
+      else
+        { det with
+          current_preconds =
+            (match ctex.ctex_eqn.eprecond with
+            | None -> None
+            | Some pre ->
+              let pre' =
+                substitution
+                  (subs_from_elim_to_elim ~ctx det.recurs_elim ctex.ctex_eqn.eelim)
+                  pre
+              in
+              Some pre')
+        ; negative_ctexs = ctex :: det.negative_ctexs
+        ; positive_ctexs = det.positive_ctexs
+        }
+    in
+    change_lemma
+      ts
+      ~key:ctex.ctex_eqn.eterm
+      ~split:ctex.ctex_eqn.esplitter
+      ~data:change_ti
 ;;
 
 (* ============================================================================================= *)
@@ -385,12 +385,10 @@ let get_lemma ~(ctx : Context.t) ~(p : PsiDef.t) ~(key : term) (ts : lemmas) : t
     let f lem = Term.substitution subst lem in
     Option.map ~f:(simplify_term ~ctx) (mk_assoc Binop.And (List.map ~f det.lemmas))
   in
-  match
-    List.unzip (Map.to_alist (Map.filter_keys ~f:(fun (k, _) -> Terms.equal k key) ts))
-  with
-  | _, [] -> None
-  | _, dets ->
-    (match List.filter_opt (List.map ~f:term_info_to_lemma dets) with
+  match Hashtbl.find_multi ts key with
+  | [] -> None
+  | tis ->
+    (match List.filter_opt (List.map ~f:term_info_to_lemma tis) with
     | [] -> None
     | [ a ] -> Some a
     | _ as conds -> mk_assoc Binop.And conds)
@@ -565,8 +563,7 @@ let refine_ensures_predicates
     ~(p : PsiDef.t)
     ~(neg_ctexs : ctex list)
     ~(pos_ctexs : ctex list)
-    (lstate : refinement_loop_state)
-    : lemmas * [ `CoarseningOk | `CoarseningFailure | `Unrealizable ]
+    : [ `CoarseningOk | `CoarseningFailure | `Unrealizable ]
   =
   Log.info
     Fmt.(
@@ -574,7 +571,7 @@ let refine_ensures_predicates
         pf fmt "%i counterexamples violate image assumption." (List.length neg_ctexs));
   let maybe_pred = ImagePredicates.synthesize ~ctx ~p pos_ctexs neg_ctexs [] in
   match maybe_pred with
-  | None -> lstate.lemmas, `CoarseningFailure
+  | None -> `CoarseningFailure
   | Some ensures ->
     (match ctx >- Specifications.get_ensures p.PsiDef.reference.pvar with
     | None ->
@@ -598,7 +595,7 @@ let refine_ensures_predicates
       in
       AlgoLog.show_new_ensures_predicate ~ctx p.PsiDef.reference.pvar new_pred;
       ctx >- Specifications.set_ensures p.PsiDef.reference.pvar new_pred);
-    lstate.lemmas, `CoarseningOk
+    `CoarseningOk
 ;;
 
 let synthesize_lemmas
@@ -619,10 +616,9 @@ let synthesize_lemmas
      | _ -> false)
   in
   let update is_positive ctexs ts =
-    List.fold
+    List.iter
       ctexs
-      ~init:ts
-      ~f:(ctx >- create_or_update_lemmas_with_ctex ~is_pos_ctex:is_positive)
+      ~f:(ctx >- create_or_update_lemmas_with_ctex ~is_pos_ctex:is_positive ts)
   in
   (*
     Example: the synt_failure_info should be a list of unrealizability counterexamples, which
@@ -657,7 +653,7 @@ let synthesize_lemmas
       , (lemma_synt_positives, lemma_synt_negatives)
       , unrealizability_ctexs )
   in
-  let new_state, lemma_synthesis_success =
+  let lemma_synthesis_success =
     match ensures_negatives, lemma_synt_negatives with
     | _ :: _, _ ->
       refine_ensures_predicates
@@ -665,38 +661,34 @@ let synthesize_lemmas
         ~p
         ~neg_ctexs:ensures_negatives
         ~pos_ctexs:ensures_positives
-        lstate
     | _, _ :: _ ->
       (* Update the term state by adding the positive and negative counterexamples to it. *)
-      let ts : lemmas =
-        lstate.lemmas
-        |> update false lemma_synt_negatives
-        |> update true lemma_synt_positives
-      in
+      update false lemma_synt_negatives lstate.lemmas;
+      update true lemma_synt_positives lstate.lemmas;
       AlgoLog.spurious_violates_requires (List.length lemma_synt_negatives);
-      let new_ts, success =
-        Map.fold
-          ts
-          ~init:(Map.empty (module KeyedTerms), true)
-          ~f:(fun ~key ~data:det (acc, status) ->
-            if ctx >- Analysis.is_bounded det.term
-            then acc, status (* Skip lemma synth for bounded terms. *)
-            else if not status
-            then acc, status
-            else (
-              match lemma_refinement_loop ~ctx ~p det with
-              | None -> acc, false
-              | Some det -> Map.add_exn ~key ~data:det acc, status))
+      let success =
+        Hashtbl.fold lstate.lemmas ~init:true ~f:(fun ~key ~data status ->
+            List.fold data ~init:status ~f:(fun status det ->
+                if ctx >- Analysis.is_bounded det.term
+                then status (* Skip lemma synth for bounded terms. *)
+                else if not status
+                then status
+                else (
+                  match lemma_refinement_loop ~ctx ~p det with
+                  | None -> false
+                  | Some det ->
+                    add_lemma lstate.lemmas ~key ~data:det;
+                    status)))
       in
-      new_ts, if success then `CoarseningOk else `CoarseningFailure
+      if success then `CoarseningOk else `CoarseningFailure
     | [], [] ->
-      let ts = lstate.lemmas |> update true lemma_synt_positives in
+      update true lemma_synt_positives lstate.lemmas;
       (* lemma_synt_negatives and ensures_negatives are empty; all ctexs non spurious! *)
       AlgoLog.no_spurious_ctex ();
-      ts, `Unrealizable
+      `Unrealizable
   in
   match lemma_synthesis_success with
-  | `CoarseningOk -> Ok (Either.First { lstate with lemmas = new_state })
+  | `CoarseningOk -> Ok (Either.First lstate)
   | `Unrealizable -> Ok (Either.Second unr_ctexs)
   | `CoarseningFailure ->
     (match synt_failure_info with

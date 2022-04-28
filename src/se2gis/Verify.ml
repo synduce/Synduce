@@ -79,7 +79,7 @@ let partial_bounding_checker
         (* There is a requires and no lemma, the term has to be bounded. *)
         let bt = ctx >- Expand.make_bounded t in
         let lem_t = ctx_reduce ctx (mk_app req [ bt ]) in
-        let lem_info =
+        let () =
           LemmasInteractive.set_term_lemma
             ~ctx
             ~p
@@ -87,7 +87,7 @@ let partial_bounding_checker
             ~key:(bt, None)
             ~lemma:lem_t
         in
-        acc_tset @ [ t, bt ], { acc_lstate with lemmas = lem_info })
+        acc_tset @ [ t, bt ], acc_lstate)
     | None -> acc_tset @ [ t, t ], acc_lstate
   in
   List.fold ~init:([], lstate) ~f (Set.elements t_set)

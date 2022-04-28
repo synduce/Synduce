@@ -27,6 +27,43 @@ let placeholder_ctex (det : term_info) : ctex =
   }
 ;;
 
+let find_lemma (lemmas : lemmas) ((term, splitter) : term * term option) =
+  match Hashtbl.find lemmas term with
+  | Some term_infos ->
+    List.find ~f:(fun ti -> Option.equal Terms.equal ti.splitter splitter) term_infos
+  | None -> None
+;;
+
+let add_lemma (lemmas : lemmas) ~(key : term) ~(data : term_info) : unit =
+  match Hashtbl.find lemmas key with
+  | Some term_infos -> Hashtbl.set lemmas ~key ~data:(data :: term_infos)
+  | None -> Hashtbl.add_multi lemmas ~key ~data
+;;
+
+let change_lemma
+    (lemmas : lemmas)
+    ~(key : term)
+    ~(split : term option)
+    ~(data : term_info -> term_info)
+    : unit
+  =
+  match Hashtbl.find lemmas key with
+  | Some tis ->
+    let flag = ref false in
+    let tis' =
+      List.map
+        ~f:(fun ti ->
+          if Option.equal Terms.equal ti.splitter split
+          then (
+            flag := true;
+            data ti)
+          else ti)
+        tis
+    in
+    if !flag then Hashtbl.set ~key ~data:tis' lemmas
+  | None -> ()
+;;
+
 let get_precise_lemma
     ~(ctx : Context.t)
     ~(p : PsiDef.t)
@@ -49,9 +86,7 @@ let get_precise_lemma
       ~f:(Rewriter.simplify_term ~ctx)
       (mk_assoc Binop.And (List.map ~f det.lemmas))
   in
-  match Map.find ts key with
-  | None -> None
-  | Some det -> term_detail_to_lemma det
+  Option.bind ~f:term_detail_to_lemma (find_lemma ts key)
 ;;
 
 (** Generates a set of smt equations that correspond to the recursion elimination. *)

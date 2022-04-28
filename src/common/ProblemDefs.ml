@@ -100,14 +100,13 @@ type term_info =
 
 (**
   A type for lemmas.
-  For now, it only contains a map from terms to terms.
   It is used during the generation of constraints from a set of terms.
   If a term t used to generate a constraint appears in the lemma map, then the lemmas lem_map(t)
   are added to the precondition of the constraint, and every subterm of the form
   (f(r(x)) or (target(x)) is replaced by a scalar (matching the substitution happenning
   during the constraint generation).
  *)
-type lemmas = (term * term option, term_info, KeyedTerms.comparator_witness) Map.t
+type lemmas = (term, term_info list) Hashtbl.t
 
 (**
   The type to describe liftings.
