@@ -107,7 +107,7 @@ type term_info =
   (f(r(x)) or (target(x)) is replaced by a scalar (matching the substitution happenning
   during the constraint generation).
  *)
-type term_state = (term * term option, term_info, KeyedTerms.comparator_witness) Map.t
+type lemmas = (term * term option, term_info, KeyedTerms.comparator_witness) Map.t
 
 (**
   The type to describe liftings.
@@ -121,7 +121,7 @@ type lifting = { tmap : ((int * term) * term) list }
 type refinement_loop_state =
   { t_set : TermSet.t
   ; u_set : TermSet.t
-  ; term_state : term_state
+  ; lemmas : lemmas
   ; lifting : lifting
   ; assumptions : equation list
   }

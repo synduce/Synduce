@@ -71,7 +71,7 @@ let partial_bounding_checker
   let f (acc_tset, acc_lstate) t =
     match ctx >- Specifications.get_requires p.PsiDef.target.pvar with
     | Some req ->
-      (match ctx >- Lemmas.get_lemma ~p acc_lstate.term_state ~key:t with
+      (match ctx >- Lemmas.get_lemma ~p acc_lstate.lemmas ~key:t with
       | Some _ ->
         (* Everything ok, a lemma has been computed *)
         acc_tset @ [ t, t ], acc_lstate
@@ -83,11 +83,11 @@ let partial_bounding_checker
           Lemmas.Interactive.set_term_lemma
             ~ctx
             ~p
-            acc_lstate.term_state
+            acc_lstate.lemmas
             ~key:(bt, None)
             ~lemma:lem_t
         in
-        acc_tset @ [ t, bt ], { acc_lstate with term_state = lem_info })
+        acc_tset @ [ t, bt ], { acc_lstate with lemmas = lem_info })
     | None -> acc_tset @ [ t, t ], acc_lstate
   in
   List.fold ~init:([], lstate) ~f (Set.elements t_set)
@@ -140,7 +140,7 @@ let check_solution
           ~ctx
           ~force_replace_off:true
           ~p:{ p with target = target_inst }
-          ~term_state:tmp_lstate.term_state
+          ~lemmas:tmp_lstate.lemmas
           ~lifting:lstate.lifting
           (TermSet.of_list (List.map ~f:snd t_set))
       in
@@ -244,7 +244,7 @@ let bounded_check
         ~ctx
         ~force_replace_off:true
         ~p:{ p with target = target_inst }
-        ~term_state:Lemmas.empty_term_state
+        ~lemmas:Lemmas.empty_lemmas
         ~lifting:Lifting.empty_lifting
         (TermSet.singleton term)
     in

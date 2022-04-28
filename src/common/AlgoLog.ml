@@ -176,7 +176,7 @@ let print_infeasible_message ~ctx t_set =
         (Set.elements t_set))
 ;;
 
-let announce_new_term_state ~(ctx : Context.t) ctex =
+let announce_new_lemmas ~(ctx : Context.t) ctex =
   Log.debug (fun fmt () ->
       pf
         fmt

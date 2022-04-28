@@ -24,6 +24,7 @@ depends: [
   "odoc" {>= "1.5.0"}
   "ocamlgraph" {>= "2.0.0"}
   "parsexp" {>= "v0.14.0"}
+  "ppx_hash" {>= "v0.14.0"}
   "ppx_let" {>= "v0.14.0"}
   "stdio" {>= "v0.14.0"}
   "ppx_sexp_conv" {>= "v0.14.0"}

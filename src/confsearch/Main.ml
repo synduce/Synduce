@@ -57,7 +57,7 @@ let find_and_solve_problem
           Se2gis.Equations.make
             ~ctx:new_ctx
             ~p:new_pdef
-            ~term_state:Se2gis.Lemmas.empty_term_state
+            ~lemmas:Se2gis.Lemmas.empty_lemmas
             ~lifting:Se2gis.Lifting.empty_lifting
             rstar_t
         in *)

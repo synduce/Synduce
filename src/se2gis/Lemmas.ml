@@ -15,7 +15,7 @@ module S = Smtlib.SmtLib
 module Sy = Syguslib.Sygus
 module Sm = Syguslib.Semantic
 
-let empty_term_state : term_state = Map.empty (module KeyedTerms)
+let empty_lemmas : lemmas = Map.empty (module KeyedTerms)
 
 let placeholder_ctex (det : term_info) : ctex =
   { ctex_eqn =
@@ -92,9 +92,7 @@ let subs_from_elim_to_elim ~ctx elim1 elim2 : (term * term) list =
     (flatten_rec_elim_tuples ~ctx elim1)
 ;;
 
-let term_state_of_context ~(ctx : Context.t) ~(is_pos_ctex : bool) (ctex : ctex)
-    : term_info
-  =
+let lemmas_of_context ~(ctx : Context.t) ~(is_pos_ctex : bool) (ctex : ctex) : term_info =
   let scalar_vars = Map.keys ctex.ctex_model in
   let input_args_t = List.map ~f:(Variable.vtype_or_new ctx) scalar_vars in
   let lemma_f =
@@ -120,19 +118,19 @@ let term_state_of_context ~(ctx : Context.t) ~(is_pos_ctex : bool) (ctex : ctex)
   or if a term state exists for the term associated with that counterexample,
   update the term state by adding the counterexample's models.
 *)
-let create_or_update_term_state_with_ctex
+let create_or_update_lemmas_with_ctex
     ~(ctx : Context.t)
     ~(is_pos_ctex : bool)
-    (ts : term_state)
+    (ts : lemmas)
     (ctex : ctex)
-    : term_state
+    : lemmas
   =
   match Map.find ts (ctex.ctex_eqn.eterm, ctex.ctex_eqn.esplitter) with
   | None ->
-    AlgoLog.announce_new_term_state ~ctx ctex;
+    AlgoLog.announce_new_lemmas ~ctx ctex;
     Map.add_exn
       ~key:(ctex.ctex_eqn.eterm, ctex.ctex_eqn.esplitter)
-      ~data:(term_state_of_context ~ctx ~is_pos_ctex ctex)
+      ~data:(lemmas_of_context ~ctx ~is_pos_ctex ctex)
       ts
   | Some _ ->
     Map.update ts (ctex.ctex_eqn.eterm, ctex.ctex_eqn.esplitter) ~f:(fun maybe_det ->
@@ -465,7 +463,7 @@ let mk_f_compose_r_main ~(ctx : Context.t) ~(p : PsiDef.t) (t : term) : term =
 let get_precise_lemma
     ~(ctx : Context.t)
     ~(p : PsiDef.t)
-    (ts : term_state)
+    (ts : lemmas)
     ~(key : term * term option)
     : term option
   =
@@ -487,8 +485,7 @@ let get_precise_lemma
   | Some det -> term_detail_to_lemma det
 ;;
 
-let get_lemma ~(ctx : Context.t) ~(p : PsiDef.t) ~(key : term) (ts : term_state)
-    : term option
+let get_lemma ~(ctx : Context.t) ~(p : PsiDef.t) ~(key : term) (ts : lemmas) : term option
   =
   let term_info_to_lemma det =
     let subst =
@@ -1054,10 +1051,10 @@ module Interactive = struct
   let set_term_lemma
       ~(ctx : env)
       ~(p : PsiDef.t)
-      (ts : term_state)
+      (ts : lemmas)
       ~(key : term * term option)
       ~(lemma : term)
-      : term_state
+      : lemmas
     =
     match Map.find ts key with
     | None ->
@@ -1108,7 +1105,7 @@ module Interactive = struct
         | None -> existing_lemmas
         | Some x -> set_term_lemma ~ctx ~p existing_lemmas ~key:(t, None) ~lemma:(term x))
     in
-    { lstate with term_state = Set.fold ~f ~init:lstate.term_state lstate.t_set }
+    { lstate with lemmas = Set.fold ~f ~init:lstate.lemmas lstate.t_set }
   ;;
 
   let parse_interactive_positive_example (det : term_info) (input : string) : ctex option =
@@ -1342,7 +1339,7 @@ let refine_ensures_predicates
     ~(neg_ctexs : ctex list)
     ~(pos_ctexs : ctex list)
     (lstate : refinement_loop_state)
-    : term_state * [ `CoarseningOk | `CoarseningFailure | `Unrealizable ]
+    : lemmas * [ `CoarseningOk | `CoarseningFailure | `Unrealizable ]
   =
   Log.info
     Fmt.(
@@ -1350,7 +1347,7 @@ let refine_ensures_predicates
         pf fmt "%i counterexamples violate image assumption." (List.length neg_ctexs));
   let maybe_pred = ImagePredicates.synthesize ~ctx ~p pos_ctexs neg_ctexs [] in
   match maybe_pred with
-  | None -> lstate.term_state, `CoarseningFailure
+  | None -> lstate.lemmas, `CoarseningFailure
   | Some ensures ->
     (match ctx >- Specifications.get_ensures p.PsiDef.reference.pvar with
     | None ->
@@ -1374,7 +1371,7 @@ let refine_ensures_predicates
       in
       AlgoLog.show_new_ensures_predicate ~ctx p.PsiDef.reference.pvar new_pred;
       ctx >- Specifications.set_ensures p.PsiDef.reference.pvar new_pred);
-    lstate.term_state, `CoarseningOk
+    lstate.lemmas, `CoarseningOk
 ;;
 
 let synthesize_lemmas
@@ -1398,7 +1395,7 @@ let synthesize_lemmas
     List.fold
       ctexs
       ~init:ts
-      ~f:(ctx >- create_or_update_term_state_with_ctex ~is_pos_ctex:is_positive)
+      ~f:(ctx >- create_or_update_lemmas_with_ctex ~is_pos_ctex:is_positive)
   in
   (*
     Example: the synt_failure_info should be a list of unrealizability counterexamples, which
@@ -1444,8 +1441,8 @@ let synthesize_lemmas
         lstate
     | _, _ :: _ ->
       (* Update the term state by adding the positive and negative counterexamples to it. *)
-      let ts : term_state =
-        lstate.term_state
+      let ts : lemmas =
+        lstate.lemmas
         |> update false lemma_synt_negatives
         |> update true lemma_synt_positives
       in
@@ -1466,13 +1463,13 @@ let synthesize_lemmas
       in
       new_ts, if success then `CoarseningOk else `CoarseningFailure
     | [], [] ->
-      let ts = lstate.term_state |> update true lemma_synt_positives in
+      let ts = lstate.lemmas |> update true lemma_synt_positives in
       (* lemma_synt_negatives and ensures_negatives are empty; all ctexs non spurious! *)
       AlgoLog.no_spurious_ctex ();
       ts, `Unrealizable
   in
   match lemma_synthesis_success with
-  | `CoarseningOk -> Ok (Either.First { lstate with term_state = new_state })
+  | `CoarseningOk -> Ok (Either.First { lstate with lemmas = new_state })
   | `Unrealizable -> Ok (Either.Second unr_ctexs)
   | `CoarseningFailure ->
     (match synt_failure_info with

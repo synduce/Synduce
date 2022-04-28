@@ -51,7 +51,7 @@ let rec segis_loop ~(ctx : env) (p : PsiDef.t) (t_set : TermSet.t)
       ~ctx
       ~force_replace_off:true
       ~p
-      ~term_state:Lemmas.empty_term_state
+      ~lemmas:Lemmas.empty_lemmas
       ~lifting:Lifting.empty_lifting
       t_set
   in
@@ -140,7 +140,7 @@ let rec cegis_loop ~(ctx : Env.env) (p : PsiDef.t) (t_set : TermSet.t)
       ~ctx
       ~force_replace_off:true
       ~p
-      ~term_state:Lemmas.empty_term_state
+      ~lemmas:Lemmas.empty_lemmas
       ~lifting:Lifting.empty_lifting
       t_set
   in

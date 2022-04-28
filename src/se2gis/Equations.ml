@@ -128,8 +128,15 @@ let compute_rhs ?(force_replace_off = false) ~ctx p t =
     res)
 ;;
 
-let compute_preconds ~ctx ~p ~term_state subst eterm =
-  match Lemmas.get_lemma ~ctx:ctx.ctx ~p term_state ~key:eterm with
+(**
+  `compute_preconds ~ctx ~p ~lemmas subst eterm`
+  Compute the precondition corresponding to the term `eterm` in the configuration given
+  by the other parameters, assuming `subst` is the recursion that performs recursion
+  elimination. The lemmas should be stored in terms that do not have recursion elimination
+  applied.
+*)
+let compute_preconds ~ctx ~p ~lemmas subst eterm =
+  match Lemmas.get_lemma ~ctx:ctx.ctx ~p lemmas ~key:eterm with
   | Some lemma_for_eterm ->
     let t = Reduce.reduce_term ~ctx:ctx.ctx ~fctx:ctx.functions (subst lemma_for_eterm) in
     Some t
@@ -165,7 +172,7 @@ let make
     ?(force_replace_off = false)
     ~(ctx : env)
     ~(p : PsiDef.t)
-    ~(term_state : term_state)
+    ~(lemmas : lemmas)
     ~(lifting : lifting)
     (tset : TermSet.t)
     : equation list * lifting
@@ -210,7 +217,7 @@ let make
       *)
       let eelim = (ctx >- filter_elims) all_subs eterm in
       (* Get the precondition, from the lemmas in the term state, *)
-      let precond = compute_preconds ~ctx ~p ~term_state applic eterm in
+      let precond = compute_preconds ~ctx ~p ~lemmas applic eterm in
       let lifting' =
         let eprecond =
           match (ctx >- invar) invariants lhs'' rhs'' with
@@ -260,7 +267,7 @@ let make
         |> Lifting.replace_boxed_expressions ~ctx ~p lifting
         |> ctx_reduce ctx ~unboxing:true
       in
-      let precond = compute_preconds ~ctx ~p ~term_state (fun x -> x) t0 in
+      let precond = compute_preconds ~ctx ~p ~lemmas (fun x -> x) t0 in
       let eprecond =
         match ctx >- invar invariants elhs erhs with
         | Some im_f ->

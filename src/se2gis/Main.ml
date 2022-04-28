@@ -35,12 +35,7 @@ let rec refinement_loop
   in
   (* First, generate the set of constraints corresponding to the set of terms t_set. *)
   let eqns, lifting =
-    Equations.make
-      ~ctx
-      ~p
-      ~term_state:lstate.term_state
-      ~lifting:lstate.lifting
-      lstate.t_set
+    Equations.make ~ctx ~p ~lemmas:lstate.lemmas ~lifting:lstate.lifting lstate.t_set
   in
   (* The solve the set of constraints with the assumption equations. *)
   let synth_time, (s_resp, solution) =
@@ -171,7 +166,7 @@ let se2gis ~(ctx : env) (p : PsiDef.t) =
       p
       { t_set
       ; u_set
-      ; term_state = Lemmas.empty_term_state
+      ; lemmas = Lemmas.empty_lemmas
       ; lifting = Lifting.empty_lifting
       ; assumptions = []
       })
