@@ -80,7 +80,7 @@ let partial_bounding_checker
         let bt = ctx >- Expand.make_bounded t in
         let lem_t = ctx_reduce ctx (mk_app req [ bt ]) in
         let lem_info =
-          Lemmas.Interactive.set_term_lemma
+          LemmasInteractive.set_term_lemma
             ~ctx
             ~p
             acc_lstate.lemmas

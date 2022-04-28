@@ -1,10 +1,10 @@
-open Lwt
-open Common
 open Base
+open Common
 open Counterexamples
 open Env
+open Elim
 open Lang
-open Lwt.Syntax
+open LemmaVerif
 open Term
 open ProblemDefs
 open Rewriter
@@ -17,80 +17,9 @@ module Sm = Syguslib.Semantic
 
 let empty_lemmas : lemmas = Map.empty (module KeyedTerms)
 
-let placeholder_ctex (det : term_info) : ctex =
-  { ctex_eqn =
-      { eterm = det.term
-      ; eprecond = det.current_preconds
-      ; esplitter = None
-      ; eelim = det.recurs_elim
-      ; (* Placeholder values for elhs, erhs, these don't matter for us *)
-        elhs = det.term
-      ; erhs = det.term
-      }
-  ; ctex_vars = VarSet.of_list det.scalar_vars
-  ; ctex_model = VarMap.empty
-  ; ctex_stat = Unknown
-  }
-;;
-
 (* ============================================================================================= *)
 (*                                  Creating and updating term states                            *)
 (* ============================================================================================= *)
-
-(** Given a term and a problem definition, output a recursion elimination map (a list associating some
- terms of recursive type to terms of bounded type). The second element of the pair returned by this
- function is the set of scalar variables that would appear in the term after recursion elimination has
- been applied.
-*)
-let recurs_elim_of_term ~(ctx : env) (term : term) ~(p : PsiDef.t)
-    : (term * term) list * variable list
-  =
-  Set.fold
-    ~init:([], p.PsiDef.reference.pargs)
-    ~f:(fun (rec_elim, vars) var ->
-      match Variable.vtype ctx.ctx var with
-      | None -> rec_elim, var :: vars
-      | Some t ->
-        if RType.is_recursive ctx.ctx.types t
-        then (
-          match Expand.mk_recursion_elimination_term ~ctx p with
-          | None -> rec_elim, vars
-          | Some (a, _) ->
-            (* When are a and b different? *)
-            ( (mk_var ctx.ctx var, a) :: rec_elim
-            , vars @ Set.elements (ctx >- Analysis.free_variables a) ))
-        else rec_elim, var :: vars)
-    (ctx >- Analysis.free_variables term)
-;;
-
-let flatten_rec_elim_tuples ~(ctx : Context.t) (elim : (term * term) list)
-    : (term * term) list
-  =
-  List.concat_map
-    ~f:(fun (a, b) ->
-      match b.tkind with
-      | TTup comps -> List.mapi comps ~f:(fun i t -> mk_sel ctx a i, t)
-      | _ -> [ a, b ])
-    elim
-;;
-
-let subs_from_elim_to_elim ~ctx elim1 elim2 : (term * term) list =
-  List.concat_map
-    ~f:(fun (a, b) ->
-      let rec f lst =
-        match lst with
-        | [] ->
-          Log.debug_msg
-            (Fmt.str
-               "Failed to get subs from ctex to term elims when matching %a."
-               (pp_term ctx)
-               a);
-          []
-        | (a', b') :: tl -> if Terms.(equal a a') then [ b', b ] else f tl
-      in
-      f (flatten_rec_elim_tuples ~ctx elim2))
-    (flatten_rec_elim_tuples ~ctx elim1)
-;;
 
 let lemmas_of_context ~(ctx : Context.t) ~(is_pos_ctex : bool) (ctex : ctex) : term_info =
   let scalar_vars = Map.keys ctex.ctex_model in
@@ -160,7 +89,7 @@ let create_or_update_lemmas_with_ctex
 (*                                  Lemma synthesis    functions                                 *)
 (* ============================================================================================= *)
 
-(** Applying tinv to the term of a term detail can help in findiing a good lemma.
+(** Applying tinv to the term of a term info can help in findiing a good lemma.
   This function extract a skeleton for the lemma when the input is the application of
   tinv to the term of the term detail.
  *)
@@ -416,7 +345,7 @@ let log_soln ~ctx s vs t =
 let handle_lemma_synth_response
     ~(fctx : PMRS.Functions.ctx)
     ~(ctx : Context.t)
-    (det : term_info)
+    (ti : term_info)
     ((task, resolver) : Sy.solver_response option Lwt.t * int Lwt.u)
     : term list option
   =
@@ -424,7 +353,7 @@ let handle_lemma_synth_response
     let body, _ =
       infer_type
         ctx
-        (term_of_sygus ~fctx ~ctx (VarSet.to_env (VarSet.of_list det.scalar_vars)) fbody)
+        (term_of_sygus ~fctx ~ctx (VarSet.to_env (VarSet.of_list ti.scalar_vars)) fbody)
     in
     body
   in
@@ -435,59 +364,15 @@ let handle_lemma_synth_response
   with
   | Some (RSuccess resps) ->
     let soln = List.map ~f:parse_synth_fun resps in
-    let _ =
-      List.iter ~f:(fun t -> log_soln ~ctx det.lemma.vname det.scalar_vars t) soln
-    in
+    let _ = List.iter ~f:(fun t -> log_soln ~ctx ti.lemma.vname ti.scalar_vars t) soln in
     Some soln
   | Some RInfeasible | Some RFail | Some RUnknown | None -> None
-;;
-
-(* ============================================================================================= *)
-(*                                  Lemma verification functions                                 *)
-(* ============================================================================================= *)
-
-let mk_f_compose_r_orig ~(ctx : Context.t) ~(p : PsiDef.t) (t : term) : term =
-  let repr_of_v =
-    if p.PsiDef.repr_is_identity then t else mk_app_v ctx p.PsiDef.repr.pvar [ t ]
-  in
-  mk_app_v ctx p.PsiDef.reference.pvar [ repr_of_v ]
-;;
-
-let mk_f_compose_r_main ~(ctx : Context.t) ~(p : PsiDef.t) (t : term) : term =
-  let repr_of_v =
-    if p.PsiDef.repr_is_identity then t else mk_app_v ctx p.PsiDef.repr.pmain_symb [ t ]
-  in
-  mk_app_v ctx p.PsiDef.reference.pmain_symb [ repr_of_v ]
-;;
-
-let get_precise_lemma
-    ~(ctx : Context.t)
-    ~(p : PsiDef.t)
-    (ts : lemmas)
-    ~(key : term * term option)
-    : term option
-  =
-  let term_detail_to_lemma det =
-    let subst =
-      List.concat_map
-        ~f:(fun (t1, t2) ->
-          let frt1 = mk_f_compose_r_main ~ctx ~p t1 in
-          match t2.tkind with
-          | TTup t2s -> List.mapi t2s ~f:(fun i t2_i -> t2_i, mk_sel ctx frt1 i)
-          | _ -> [ t2, frt1 ])
-        det.recurs_elim
-    in
-    let f lem = Term.substitution subst lem in
-    Option.map ~f:(simplify_term ~ctx) (mk_assoc Binop.And (List.map ~f det.lemmas))
-  in
-  match Map.find ts key with
-  | None -> None
-  | Some det -> term_detail_to_lemma det
 ;;
 
 let get_lemma ~(ctx : Context.t) ~(p : PsiDef.t) ~(key : term) (ts : lemmas) : term option
   =
   let term_info_to_lemma det =
+    (* Recursion elimination substitutions *)
     let subst =
       List.concat_map
         ~f:(fun (t1, t2) ->
@@ -509,466 +394,6 @@ let get_lemma ~(ctx : Context.t) ~(p : PsiDef.t) ~(key : term) (ts : lemmas) : t
     | [] -> None
     | [ a ] -> Some a
     | _ as conds -> mk_assoc Binop.And conds)
-;;
-
-(** Generates a set of smt equations that correspond to the recursion elimination. *)
-let smt_of_recurs_elim_eqns ~(ctx : Context.t) (elim : (term * term) list) ~(p : PsiDef.t)
-    : S.smtTerm
-  =
-  let lst =
-    List.map
-      ~f:(fun (t1, t2) ->
-        S.mk_eq (smt_of_term ~ctx (mk_f_compose_r_orig ~ctx ~p t1)) (smt_of_term ~ctx t2))
-      elim
-  in
-  if equal (List.length lst) 0 then S.mk_true else S.mk_assoc_and lst
-;;
-
-(** Returns a set of smt constraints that assert the know invariants on the functions in
-    the problem. *)
-let smt_of_ensures ~(fctx : PMRS.Functions.ctx) ~(ctx : Context.t) ~(p : PsiDef.t)
-    : S.smtTerm list
-  =
-  let mk_sort maybe_rtype =
-    match maybe_rtype with
-    | None -> S.mk_int_sort
-    | Some rtype -> SmtInterface.sort_of_rtype rtype
-  in
-  let pmrss : PMRS.t list =
-    [ p.PsiDef.reference; p.PsiDef.target; p.PsiDef.reference ]
-    @
-    match p.tinv with
-    | None -> []
-    | Some tinv -> [ tinv ]
-  in
-  let vars : variable list =
-    List.concat
-      (List.map
-         ~f:(fun (pmrs : PMRS.t) ->
-           List.filter
-             ~f:(fun v ->
-               (not Variable.(v = pmrs.pmain_symb)) && not Variable.(v = pmrs.pvar))
-             (Set.elements pmrs.pnon_terminals))
-         pmrss)
-  in
-  List.fold
-    ~init:[]
-    ~f:(fun acc v ->
-      let maybe_ens = Specifications.get_ensures ~ctx v in
-      match maybe_ens with
-      | None -> acc
-      | Some t ->
-        let arg_types = fst (RType.fun_typ_unpack (Variable.vtype_or_new ctx v)) in
-        let arg_vs =
-          List.map
-            ~f:(fun t -> Variable.mk ctx ~t:(Some t) (Alpha.fresh ctx.names))
-            arg_types
-        in
-        let args = List.map ~f:(mk_var ctx) arg_vs in
-        let quants =
-          List.map
-            ~f:(fun var -> S.SSimple var.vname, mk_sort (Variable.vtype ctx var))
-            arg_vs
-        in
-        let ens = Reduce.reduce_term ~fctx ~ctx (mk_app t [ mk_app_v ctx v args ]) in
-        let smt = S.mk_forall quants (smt_of_term ~ctx ens) in
-        smt :: acc)
-    vars
-;;
-
-let smt_of_tinv_app ~(ctx : Context.t) ~(p : PsiDef.t) (det : term_info) =
-  match p.tinv with
-  | None -> failwith "No TInv has been specified. Cannot make smt of tinv app."
-  | Some pmrs -> S.mk_simple_app pmrs.pvar.vname [ smt_of_term ~ctx det.term ]
-;;
-
-let smt_of_lemma_app (det : term_info) =
-  S.mk_simple_app
-    det.lemma.vname
-    (List.map ~f:(fun var -> S.mk_var var.vname) det.scalar_vars)
-;;
-
-let smt_of_lemma_validity ~(ctx : Context.t) ~(p : PsiDef.t) (det : term_info) =
-  let mk_sort maybe_rtype =
-    match maybe_rtype with
-    | None -> S.mk_int_sort
-    | Some rtype -> SmtInterface.sort_of_rtype rtype
-  in
-  let quants =
-    List.map
-      ~f:(fun var -> S.SSimple var.vname, mk_sort (Variable.vtype ctx var))
-      (Set.elements (Analysis.free_variables ~ctx det.term)
-      @ List.concat_map
-          ~f:(fun (_, b) -> Set.elements (Analysis.free_variables ~ctx b))
-          det.recurs_elim)
-  in
-  let preconds =
-    match det.current_preconds with
-    | None -> []
-    | Some pre -> [ smt_of_term ~ctx pre ]
-  in
-  let if_condition =
-    S.mk_assoc_and
-      ([ smt_of_tinv_app ~ctx ~p det; smt_of_recurs_elim_eqns ~ctx det.recurs_elim ~p ]
-      @ preconds)
-  in
-  let if_then = smt_of_lemma_app det in
-  [ S.mk_assert (S.mk_exists quants (S.mk_not (S.mk_or (S.mk_not if_condition) if_then)))
-  ]
-;;
-
-let inductive_solver_preamble
-    ~(fctx : PMRS.Functions.ctx)
-    ~(ctx : Context.t)
-    ~(p : PsiDef.t)
-    solver
-    (det : term_info)
-  =
-  let loc_smt_ = smt_of_pmrs ~fctx ~ctx in
-  let preamble =
-    Commands.mk_preamble
-      ~logic:
-        (SmtLogic.infer_logic
-           ~ctx
-           ~quantifier_free:false
-           ~with_uninterpreted_functions:true
-           ~for_induction:true
-           ~logic_infos:(Common.ProblemDefs.PsiDef.logics p)
-           [])
-      ~incremental:false
-      ~induction:true
-      ~models:true
-      ()
-  in
-  let lemma_body = det.lemma_candidate in
-  match lemma_body with
-  | Some lemma_body ->
-    let%lwt () = AsyncSmt.exec_all solver preamble in
-    let%lwt () =
-      Lwt_list.iter_p
-        (fun x ->
-          let%lwt _ = AsyncSmt.exec_command solver x in
-          return ())
-        ((* Start by defining tinv. *)
-         Option.(map ~f:loc_smt_ p.tinv |> value ~default:[])
-        (* PMRS definitions.*)
-        (* Reference function. *)
-        @ loc_smt_ p.PsiDef.reference
-        (* Representation function. *)
-        @ (if p.PsiDef.repr_is_identity then [] else loc_smt_ p.PsiDef.repr)
-        (* Assert invariants on functions *)
-        @ List.map ~f:S.mk_assert (smt_of_ensures ~fctx ~ctx ~p)
-        (* Declare lemmas. *)
-        @ [ Commands.mk_def_fun
-              ~ctx
-              det.lemma.vname
-              (List.map
-                 ~f:(fun v -> v.vname, Variable.vtype_or_new ctx v)
-                 det.scalar_vars)
-              RType.TBool
-              lemma_body
-          ])
-    in
-    return ()
-  | None ->
-    (* Nothing to do! *)
-    return ()
-;;
-
-let smt_of_disallow_ctex_values ~(ctx : Context.t) (det : term_info) : S.smtTerm =
-  let ctexs = det.positive_ctexs in
-  let of_one_ctex ctex =
-    Map.fold
-      ~f:(fun ~key ~data acc ->
-        let var =
-          let subs = subs_from_elim_to_elim ~ctx det.recurs_elim ctex.ctex_eqn.eelim in
-          Term.substitution subs (mk_var ctx key)
-        in
-        smt_of_term ~ctx Terms.(var == data) :: acc)
-      ~init:[]
-      ctex.ctex_model
-  in
-  S.mk_assoc_and
-    (List.map ~f:(fun ctex -> S.mk_not (S.mk_assoc_and (of_one_ctex ctex))) ctexs)
-;;
-
-let set_up_to_get_model ~(ctx : Context.t) ~(p : PsiDef.t) solver (det : term_info) =
-  (* Step 1. Declare vars for term, and assert that term satisfies tinv. *)
-  let%lwt () =
-    AsyncSmt.exec_all
-      solver
-      (Commands.decls_of_vars ~ctx (Analysis.free_variables ~ctx det.term))
-  in
-  let%lwt _ = AsyncSmt.smt_assert solver (smt_of_tinv_app ~ctx ~p det) in
-  (* Step 2. Declare scalars (vars for recursion elimination & spec param) and their constraints (preconds & recurs elim eqns) *)
-  let%lwt () =
-    AsyncSmt.exec_all
-      solver
-      (Commands.decls_of_vars ~ctx (VarSet.of_list det.scalar_vars))
-  in
-  let%lwt _ =
-    AsyncSmt.exec_command
-      solver
-      (S.mk_assert (smt_of_recurs_elim_eqns ~ctx det.recurs_elim ~p))
-  in
-  let%lwt () =
-    match det.current_preconds with
-    | None -> return ()
-    | Some pre -> AsyncSmt.smt_assert solver (smt_of_term ~ctx pre)
-  in
-  (* Step 3. Disallow repeated positive examples. *)
-  let%lwt () =
-    if List.length det.positive_ctexs > 0
-    then AsyncSmt.smt_assert solver (smt_of_disallow_ctex_values ~ctx det)
-    else return ()
-  in
-  (* Step 4. Assert that lemma candidate is false. *)
-  AsyncSmt.smt_assert solver (S.mk_not (smt_of_lemma_app det))
-;;
-
-let mk_model_sat_asserts
-    ~(fctx : PMRS.Functions.ctx)
-    ~(ctx : Context.t)
-    det
-    f_o_r
-    instantiate
-  =
-  let f v =
-    let v_val =
-      mk_var ctx (List.find_exn ~f:(fun x -> equal v.vid x.vid) det.scalar_vars)
-    in
-    match List.find_map ~f:(find_original_var_and_proj v) det.recurs_elim with
-    | Some (original_recursion_var, proj) ->
-      (match original_recursion_var.tkind with
-      | TVar ov when Option.is_some (instantiate ov) ->
-        let instantiation = Option.value_exn (instantiate ov) in
-        if proj >= 0
-        then (
-          let t = Reduce.reduce_term ~fctx ~ctx (mk_sel ctx (f_o_r instantiation) proj) in
-          smt_of_term ~ctx Terms.(t == v_val))
-        else smt_of_term ~ctx Terms.(f_o_r instantiation == v_val)
-      | _ ->
-        Log.error_msg
-          Fmt.(
-            str "Warning: skipped instantiating %a." (pp_term ctx) original_recursion_var);
-        S.mk_true)
-    | None -> smt_of_term ~ctx Terms.(mk_var ctx v == v_val)
-  in
-  List.map ~f det.scalar_vars
-;;
-
-let verify_lemma_bounded
-    ~(fctx : PMRS.Functions.ctx)
-    ~(ctx : Context.t)
-    ~(p : PsiDef.t)
-    (det : term_info)
-    : (Utils.Stats.verif_method * S.solver_response) Lwt.t * int Lwt.u
-  =
-  let logic =
-    SmtLogic.infer_logic ~ctx ~logic_infos:(Common.ProblemDefs.PsiDef.logics p) []
-  in
-  let task (solver, starter) =
-    let%lwt _ = starter in
-    let%lwt () =
-      AsyncSmt.exec_all
-        solver
-        Commands.(
-          mk_preamble
-            ~incremental:(String.is_prefix ~prefix:"CVC" solver.s_name)
-            ~logic
-            ()
-          @ decls_of_vars ~ctx (VarSet.of_list det.scalar_vars))
-    in
-    let steps = ref 0 in
-    let rec check_bounded_sol accum terms =
-      let f accum t =
-        let rec_instantation =
-          Option.value ~default:VarMap.empty (Matching.matches ~ctx t ~pattern:det.term)
-        in
-        let%lwt _ = accum in
-        let f_compose_r t =
-          let repr_of_v =
-            if p.PsiDef.repr_is_identity
-            then t
-            else Reduce.reduce_pmrs ~fctx ~ctx p.PsiDef.repr t
-          in
-          Reduce.reduce_term
-            ~fctx
-            ~ctx
-            (Reduce.reduce_pmrs ~fctx ~ctx p.PsiDef.reference repr_of_v)
-        in
-        let subs =
-          List.map
-            ~f:(fun (orig_rec_var, elimv) ->
-              match orig_rec_var.tkind with
-              | TVar rec_var when Map.mem rec_instantation rec_var ->
-                elimv, f_compose_r (Map.find_exn rec_instantation rec_var)
-              | _ -> failwith "all elimination variables should be substituted.")
-            det.recurs_elim
-          (* Map.fold ~init:[] ~f:(fun ~key ~data acc -> (mk_var key, data) :: acc) rec_instantation *)
-        in
-        let preconds =
-          Option.to_list
-            (Option.map ~f:(fun t -> substitution subs t) det.current_preconds)
-        in
-        let model_sat =
-          mk_model_sat_asserts ~fctx ~ctx det f_compose_r (Map.find rec_instantation)
-        in
-        let%lwt () = AsyncSmt.spush solver in
-        (* Assert that preconditions hold and map original term's recurs elim variables to the variables that they reduce to for this concrete term. *)
-        let%lwt _ =
-          AsyncSmt.exec_all
-            solver
-            (Commands.decls_of_vars
-               ~ctx
-               (List.fold
-                  ~init:VarSet.empty
-                  ~f:(fun acc t -> Set.union acc (Analysis.free_variables ~ctx t))
-                  (preconds @ Map.data rec_instantation)))
-        in
-        let%lwt () =
-          AsyncSmt.smt_assert
-            solver
-            (S.mk_assoc_and (List.map ~f:(smt_of_term ~ctx) preconds @ model_sat))
-        in
-        (* Assert that TInv is true for this concrete term t *)
-        let%lwt _ =
-          match p.tinv with
-          | None -> return ()
-          | Some tinv ->
-            let tinv_t = Reduce.reduce_pmrs ~fctx ~ctx tinv t in
-            let%lwt _ =
-              AsyncSmt.exec_all
-                solver
-                (Commands.decls_of_vars ~ctx (Analysis.free_variables ~ctx tinv_t))
-            in
-            let%lwt _ = AsyncSmt.smt_assert solver (smt_of_term ~ctx tinv_t) in
-            return ()
-        in
-        (* Assert that lemma is false for this concrete term t  *)
-        let%lwt _ =
-          match det.lemma_candidate with
-          | Some lemma ->
-            AsyncSmt.exec_command
-              solver
-              (S.mk_assert (S.mk_not (smt_of_term ~ctx (substitution subs lemma))))
-          | _ -> return S.Unknown
-        in
-        let%lwt resp = AsyncSmt.check_sat solver in
-        (* Note that I am getting a model after check-sat unknown response. This may not halt.  *)
-        let%lwt result =
-          match resp with
-          | S.Sat | S.Unknown ->
-            let%lwt model = AsyncSmt.get_model solver in
-            return (Some model)
-          | _ -> return None
-        in
-        let%lwt () = AsyncSmt.spop solver in
-        return (resp, result)
-      in
-      match terms with
-      | [] -> accum
-      | t0 :: tl ->
-        let%lwt accum' = f accum t0 in
-        (match accum' with
-        | status, Some model -> return (status, Some model)
-        | _ -> check_bounded_sol (return accum') tl)
-    in
-    let rec expand_loop u =
-      match Set.min_elt u, !steps < !Config.Optims.num_expansions_check with
-      | Some t0, true ->
-        let tset, u' = Expand.simple ~ctx t0 in
-        let%lwt check_result =
-          check_bounded_sol (return (S.Unknown, None)) (Set.elements tset)
-        in
-        steps := !steps + Set.length tset;
-        (match check_result with
-        | _, Some model ->
-          Log.debug_msg
-            "Bounded lemma verification has found a counterexample to the lemma \
-             candidate.";
-          return model
-        | _ -> expand_loop (Set.union (Set.remove u t0) u'))
-      | None, true ->
-        (* All expansions have been checked. *)
-        return S.Unsat
-      | _, false ->
-        (* Check reached limit. *)
-        Log.debug_msg "Bounded lemma verification has reached limit.";
-        if !Config.bounded_lemma_check then return S.Unsat else return S.Unknown
-    in
-    let* res = expand_loop (TermSet.singleton det.term) in
-    let* () = AsyncSmt.close_solver solver in
-    return (Utils.Stats.BoundedChecking, res)
-  in
-  AsyncSmt.(cancellable_task (make_solver "z3") task)
-;;
-
-let verify_lemma_unbounded
-    ~(fctx : PMRS.Functions.ctx)
-    ~(ctx : Context.t)
-    ~(p : PsiDef.t)
-    (det : term_info)
-    : (Utils.Stats.verif_method * S.solver_response) Lwt.t * int Lwt.u
-  =
-  let build_task (cvc4_instance, task_start) =
-    let%lwt _ = task_start in
-    let%lwt () = inductive_solver_preamble cvc4_instance ~fctx ~ctx ~p det in
-    let%lwt () =
-      (Lwt_list.iter_p (fun x ->
-           let%lwt _ = AsyncSmt.exec_command cvc4_instance x in
-           return ()))
-        (smt_of_lemma_validity ~ctx ~p det)
-    in
-    let%lwt resp = AsyncSmt.check_sat cvc4_instance in
-    let%lwt final_response =
-      match resp with
-      | Sat | Unknown ->
-        let%lwt _ = set_up_to_get_model cvc4_instance ~ctx ~p det in
-        let%lwt resp' = AsyncSmt.check_sat cvc4_instance in
-        (match resp' with
-        | Sat | Unknown -> AsyncSmt.get_model cvc4_instance
-        | _ -> return resp')
-      | _ -> return resp
-    in
-    let%lwt () = AsyncSmt.close_solver cvc4_instance in
-    Log.debug_msg "Unbounded lemma verification is complete.";
-    return (Utils.Stats.Induction, final_response)
-  in
-  AsyncSmt.(cancellable_task (AsyncSmt.make_solver "cvc") build_task)
-;;
-
-(** Verify a lemma candidate with two parallel calls: one call to an induction solver,
-  another call to a SMT solver. The induction solver attempts to prove that the solution
-  is correct while the smt solver attempt to find a counterexample.
-*)
-let verify_lemma_candidate
-    ~(fctx : PMRS.Functions.ctx)
-    ~(ctx : Context.t)
-    ~(p : PsiDef.t)
-    (det : term_info)
-    : Utils.Stats.verif_method * SyncSmt.solver_response
-  =
-  match det.lemma_candidate with
-  | None -> failwith "Cannot verify lemma candidate; there is none."
-  | Some _ ->
-    Log.verbose (fun f () -> Fmt.(pf f "Checking lemma candidate..."));
-    let resp =
-      try
-        Lwt_main.run
-          (let pr1, resolver1 = verify_lemma_bounded ~fctx ~ctx ~p det in
-           let pr2, resolver2 = verify_lemma_unbounded ~fctx ~ctx ~p det in
-           Lwt.wakeup resolver2 1;
-           Lwt.wakeup resolver1 1;
-           (* The first call to return is kept, the other one is ignored. *)
-           Lwt.pick [ pr1; pr2 ])
-      with
-      | End_of_file ->
-        Log.error_msg "Solvers terminated unexpectedly  ⚠️ .";
-        Log.error_msg "Please inspect logs.";
-        BoundedChecking, S.Unknown
-    in
-    resp
 ;;
 
 let parse_positive_example_solver_model
@@ -1005,204 +430,6 @@ let parse_positive_example_solver_model
     failwith
       "Parse model failure: Positive example cannot be found during lemma refinement."
 ;;
-
-(** The Interactive module contains function used in interactive mode. *)
-module Interactive = struct
-  let make_term_info ~(ctx : env) ~(p : PsiDef.t) (term : term) : term_info =
-    let recurs_elim, scalar_vars = recurs_elim_of_term ~ctx ~p term in
-    let input_args_t = List.map ~f:(var_type ctx) scalar_vars in
-    let lemma_f =
-      Variable.mk
-        ctx.ctx
-        ~t:(Some (RType.fun_typ_pack input_args_t TBool))
-        (Alpha.fresh ~s:"lemma" ctx.ctx.names)
-    in
-    { term
-    ; splitter = None
-    ; lemmas = []
-    ; lemma = lemma_f
-    ; lemma_candidate = None
-    ; negative_ctexs = []
-    ; positive_ctexs = []
-    ; recurs_elim
-    ; scalar_vars
-    ; current_preconds = None
-    }
-  ;;
-
-  let classify_ctexs_opt ~ctx ctexs : ctex list =
-    let f ctex =
-      Log.info (fun frmt () ->
-          Fmt.(
-            pf
-              frmt
-              "Classify this counterexample: %a (P/N/U)"
-              (box (Pretty.pp_ctex ~ctx))
-              ctex));
-      match Stdio.In_channel.input_line Stdio.stdin with
-      | Some "N" ->
-        { ctex with ctex_stat = add_cause ctex.ctex_stat ViolatesTargetRequires }
-      | Some "P" -> { ctex with ctex_stat = Valid }
-      | _ -> ctex
-    in
-    List.map ~f ctexs
-  ;;
-
-  let set_term_lemma
-      ~(ctx : env)
-      ~(p : PsiDef.t)
-      (ts : lemmas)
-      ~(key : term * term option)
-      ~(lemma : term)
-      : lemmas
-    =
-    match Map.find ts key with
-    | None ->
-      Map.add_exn
-        ts
-        ~key
-        ~data:{ (make_term_info ~ctx ~p (fst key)) with lemmas = [ lemma ] }
-    | Some det -> Map.add_exn ts ~key ~data:{ det with lemmas = [ lemma ] }
-  ;;
-
-  let add_lemmas ~(ctx : env) ~(p : PsiDef.t) (lstate : refinement_loop_state)
-      : refinement_loop_state
-    =
-    let env_in_p = VarSet.of_list p.PsiDef.reference.pargs in
-    let f existing_lemmas t =
-      let vars = Set.union (ctx >- Analysis.free_variables t) env_in_p in
-      let env = VarSet.to_env vars in
-      Log.info (fun frmt () ->
-          Fmt.pf frmt "Please provide a constraint for \"@[%a@]\"." (pp_term ctx.ctx) t);
-      Log.verbose (fun frmt () ->
-          Fmt.pf
-            frmt
-            "Environment:@;@[functions %s, %s and %s@]@;and @[%a@]."
-            p.PsiDef.reference.pvar.vname
-            p.PsiDef.target.pvar.vname
-            p.PsiDef.repr.pvar.vname
-            (VarSet.pp ctx.ctx)
-            vars);
-      match Stdio.In_channel.input_line Stdio.stdin with
-      | None | Some "" ->
-        Log.info (fun frmt () -> Fmt.pf frmt "No additional constraint provided.");
-        existing_lemmas
-      | Some x ->
-        let smtterm =
-          try
-            let sexpr = Sexplib.Sexp.of_string x in
-            Smtlib.SmtLib.smtTerm_of_sexp sexpr
-          with
-          | Failure _ -> None
-        in
-        let pred_term = ctx >>- term_of_smt env in
-        let term x =
-          match ctx >- get_precise_lemma ~p existing_lemmas ~key:(t, None) with
-          | None -> pred_term x
-          | Some inv -> mk_bin Binop.And inv (pred_term x)
-        in
-        (match smtterm with
-        | None -> existing_lemmas
-        | Some x -> set_term_lemma ~ctx ~p existing_lemmas ~key:(t, None) ~lemma:(term x))
-    in
-    { lstate with lemmas = Set.fold ~f ~init:lstate.lemmas lstate.t_set }
-  ;;
-
-  let parse_interactive_positive_example (det : term_info) (input : string) : ctex option =
-    Some
-      { (placeholder_ctex det) with
-        ctex_model =
-          List.fold
-            ~init:VarMap.empty
-            ~f:(fun acc s_ ->
-              let s = Str.split (Str.regexp " *= *") s_ in
-              if not (equal (List.length s) 2)
-              then acc
-              else (
-                let key = trim (List.nth_exn s 0) in
-                let data = mk_const (CInt (Int.of_string (trim (List.nth_exn s 1)))) in
-                match VarSet.find_by_name (VarSet.of_list det.scalar_vars) key with
-                | None -> acc
-                | Some var -> Map.set ~data acc ~key:var))
-            (Str.split (Str.regexp " *, *") input)
-      }
-  ;;
-
-  let interactive_get_positive_examples ~(ctx : Context.t) (det : term_info) =
-    let vars =
-      Set.filter
-        ~f:(fun var ->
-          match Variable.vtype ctx var with
-          | None -> false
-          | Some t -> not (RType.is_recursive ctx.types t))
-        (Analysis.free_variables ~ctx det.term)
-    in
-    Log.info (fun f () ->
-        Fmt.(
-          pf
-            f
-            "Enter an example as \"%s\""
-            (String.concat
-               ~sep:", "
-               (List.map
-                  ~f:(fun var ->
-                    var.vname
-                    ^ "=<"
-                    ^ (match Variable.vtype ctx var with
-                      | None -> ""
-                      | Some t ->
-                        (match RType.base_name t with
-                        | None -> ""
-                        | Some tname -> tname))
-                    ^ ">")
-                  (Set.elements vars)))));
-    match Stdio.In_channel.input_line Stdio.stdin with
-    | None -> []
-    | Some s ->
-      (match parse_interactive_positive_example det s with
-      | None -> []
-      | Some ctex -> [ ctex ])
-  ;;
-
-  let interactive_check_lemma ~ctx lemma_refinement_loop name vars lemma_term det =
-    Log.info (fun f () ->
-        Fmt.(
-          pf
-            f
-            "Is the lemma \"%s %s = @[%a@]\" for term %a[%a] correct? [Y/N]"
-            name
-            (String.concat ~sep:" " (List.map ~f:(fun v -> v.vname) vars))
-            (pp_term ctx)
-            lemma_term
-            (pp_term ctx)
-            det.term
-            (pp_subs ctx)
-            det.recurs_elim));
-    match Stdio.In_channel.input_line Stdio.stdin with
-    | Some "Y" ->
-      let lemma =
-        match det.current_preconds with
-        | None -> lemma_term
-        | Some pre -> mk_bin Binop.Or (mk_un Unop.Not pre) lemma_term
-      in
-      Some { det with lemma_candidate = None; lemmas = lemma :: det.lemmas }
-    | _ ->
-      Log.info (fun f () ->
-          Fmt.(
-            pf
-              f
-              "Would you like to provide a non-spurious example in which the lemma is \
-               false? [Y/N]"));
-      (match Stdio.In_channel.input_line Stdio.stdin with
-      | Some "Y" ->
-        lemma_refinement_loop
-          { det with
-            positive_ctexs =
-              det.positive_ctexs @ interactive_get_positive_examples ~ctx det
-          }
-      | _ -> None)
-  ;;
-end
 
 let synthesize_new_lemma ~(ctx : env) ~(p : PsiDef.t) (det : term_info) : term option =
   let with_synth_obj i synth_obj logic =
@@ -1263,7 +490,7 @@ let rec lemma_refinement_loop ~(ctx : env) ~(p : PsiDef.t) (det : term_info)
     if !Config.interactive_check_lemma
     then
       ctx
-      >- Interactive.interactive_check_lemma
+      >- LemmasInteractive.interactive_check_lemma
            (lemma_refinement_loop ~ctx ~p)
            det.lemma.vname
            det.scalar_vars
@@ -1415,7 +642,7 @@ let synthesize_lemmas
       let ctexs = List.concat_map unrealizability_ctexs ~f:(fun uc -> [ uc.ci; uc.cj ]) in
       let classified_ctexs =
         if !Config.classify_ctex
-        then ctx >- Interactive.classify_ctexs_opt ctexs
+        then ctx >- LemmasInteractive.classify_ctexs_opt ctexs
         else classify_ctexs ~ctx ~p ctexs
       in
       (* Positive and negatives for the ensures predicates. *)

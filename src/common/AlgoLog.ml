@@ -180,7 +180,7 @@ let announce_new_lemmas ~(ctx : Context.t) ctex =
   Log.debug (fun fmt () ->
       pf
         fmt
-        "Creating new term state for term@;%a@;under condition %a@;"
+        "Creating new lemma for term@;%a@;under condition %a@;"
         (pp_term ctx)
         ctex.ctex_eqn.eterm
         (option (pp_term ctx))

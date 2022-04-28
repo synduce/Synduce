@@ -30,7 +30,7 @@ let rec refinement_loop
   (* Add lemmas interactively if the option is set. *)
   let lstate =
     if !Config.interactive_lemmas
-    then Lemmas.Interactive.add_lemmas ~ctx ~p lstate_in
+    then LemmasInteractive.add_lemmas ~ctx ~p lstate_in
     else lstate_in
   in
   (* First, generate the set of constraints corresponding to the set of terms t_set. *)
