@@ -871,6 +871,8 @@ module Solve = struct
            r, wait_on_failure task_counter t)
       else None
     in
+    (* TODO: heursitic for multiplicative constants. *)
+    let multiplicative_constants = false in
     let lwt_tasks =
       List.concat_map
         ~f:Option.to_list
@@ -884,18 +886,16 @@ module Solve = struct
                 to decide what to do!
              *)
              r, wait_on_failure task_counter t)
-        ; (* Task 3,4, 5: solving system of equations, optimizations / grammar choices.
+        ; (* Task 3,4: solving system of equations, optimizations / grammar choices.
               If answer is Fail, must stall.
           *)
           on_opt opt_cst (fun () ->
               core_solve
                 ~ctx
-                ~predict_constants:(Some false)
+                ~predict_constants:(Some multiplicative_constants)
                 ~gen_only:false
                 unknowns
                 eqns)
-        ; on_opt opt_cst (fun () ->
-              core_solve ~ctx ~predict_constants:(Some true) ~gen_only:false unknowns eqns)
         ; on_opt true (fun () ->
               core_solve ~ctx ~use_bools:false ~gen_only:false unknowns eqns)
         ]

@@ -641,20 +641,19 @@ let synthesize_lemmas
       update false lemma_synt_negatives lstate.lemmas;
       update true lemma_synt_positives lstate.lemmas;
       AlgoLog.spurious_violates_requires (List.length lemma_synt_negatives);
-      let success =
-        Hashtbl.fold lstate.lemmas ~init:true ~f:(fun ~key ~data status ->
-            List.fold data ~init:status ~f:(fun status det ->
-                if ctx >- Analysis.is_bounded det.term
-                then status (* Skip lemma synth for bounded terms. *)
-                else if not status
-                then status
+      let success, lemmas_to_add =
+        Hashtbl.fold lstate.lemmas ~init:(true, []) ~f:(fun ~key ~data status ->
+            List.fold data ~init:status ~f:(fun (status, additions) det ->
+                (* Skip lemma synth for bounded terms and when status is false *)
+                if ctx >- Analysis.is_bounded det.term || not status
+                then status, additions
                 else (
                   match lemma_refinement_loop ~ctx ~p det with
-                  | None -> false
-                  | Some det ->
-                    Lemmas.add_term_info lstate.lemmas ~key ~data:det;
-                    status)))
+                  | None -> false, additions
+                  | Some det -> status, (key, det) :: additions)))
       in
+      List.iter lemmas_to_add ~f:(fun (key, data) ->
+          Lemmas.add_term_info lstate.lemmas ~key ~data);
       if success then `CoarseningOk else `CoarseningFailure
     | [], [] ->
       update true lemma_synt_positives lstate.lemmas;

@@ -6,16 +6,23 @@ open Lang
 open Utils
 module G = ConfGraph
 
-let single_configuration_solver ?(lemmas = Se2gis.Lemmas.empty_lemmas ())
-    : ctx:env -> PsiDef.t -> Syguslib.Sygus.solver_response segis_response
+let single_configuration_solver
+    ?(lemmas = Se2gis.Lemmas.empty_lemmas ())
+    ~(ctx : env)
+    (p : PsiDef.t)
+    : Syguslib.Sygus.solver_response segis_response
   =
-  if !Config.Optims.use_segis (* Symbolic CEGIS. *)
-  then Se2gis.Baselines.algo_segis
-  else if !Config.Optims.use_cegis (* Concrete CEGIS. *)
-  then
-    Se2gis.Baselines.algo_cegis
-    (* Default algorithm: best combination of techniques (TODO) *)
-  else Se2gis.Main.solve_problem ~lemmas
+  let resp =
+    if !Config.Optims.use_segis (* Symbolic CEGIS. *)
+    then Se2gis.Baselines.algo_segis ~ctx p
+    else if !Config.Optims.use_cegis (* Concrete CEGIS. *)
+    then
+      Se2gis.Baselines.algo_cegis ~ctx p
+      (* Default algorithm: best combination of techniques (TODO) *)
+    else Se2gis.Main.solve_problem ~lemmas ~ctx p
+  in
+  LogJson.save_stats_and_restart p.id;
+  resp
 ;;
 
 let find_and_solve_problem
@@ -48,12 +55,13 @@ let find_and_solve_problem
           apply_configuration ctx conf top_userdef_problem.target
         in
         Utils.Log.sep ~i:(Some !num_attempts) ();
-        let new_pdef = { top_userdef_problem with target = new_target } in
+        let new_pdef =
+          { top_userdef_problem with target = new_target; id = !num_attempts }
+        in
         if G.check_unrealizable_from_cache new_ctx new_pdef rstate
         then (
           Log.info
-            Fmt.(
-              fun fmt () -> pf fmt "Configuraration is unrealizable according to cache.");
+            Fmt.(fun fmt () -> pf fmt "Configuration is unrealizable according to cache.");
           G.mark_unrealizable rstate sub_conf;
           find_sols (a @ [ new_ctx, new_pdef, Unrealizable [] ]))
         else (
@@ -79,6 +87,7 @@ let find_and_solve_problem
   if !Config.Optims.max_solutions >= 0
      && Configuration.check_pmrs top_userdef_problem.target
   then (
+    (* Find multiple solutions to the problem. *)
     let max_configuration =
       Configuration.max_configuration ctx top_userdef_problem.target
     in
@@ -92,5 +101,7 @@ let find_and_solve_problem
     in
     Utils.Log.info (fun fmt () -> Fmt.pf fmt "%i configurations possible." subconf_count);
     find_multiple_solutions ctx top_userdef_problem max_configuration)
-  else [ ctx, top_userdef_problem, single_configuration_solver ~ctx top_userdef_problem ]
+  else
+    (* Only solve the top-level skeleton, i.e. the problem specified by the user. *)
+    [ ctx, top_userdef_problem, single_configuration_solver ~ctx top_userdef_problem ]
 ;;
