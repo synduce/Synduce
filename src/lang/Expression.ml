@@ -158,6 +158,8 @@ module Op = struct
   let ( >= ) = mk_e_bin Binop.Ge
   let ( <= ) = mk_e_bin Binop.Le
   let ( => ) = mk_e_bin Binop.Implies
+  let ( <: ) c a = mk_e_data c a
+  let ( @: ) a i = mk_e_sel a i
   let max = mk_e_bin Binop.Max
   let min = mk_e_bin Binop.Min
   let not e1 = mk_e_un Unop.Not e1
@@ -346,7 +348,7 @@ let of_term ?(ctx = RContext.empty ()) t0 : t option =
   | _ -> None
 ;;
 
-let to_term ~(ctx : RContext.t) e : term option =
+let to_term ~(ctx : RContext.t) (e : t) : term option =
   let rec f e =
     match e with
     | ETrue -> Some (Terms.bool true)
@@ -408,6 +410,49 @@ let to_term ~(ctx : RContext.t) e : term option =
   in
   f e
 ;;
+
+(**
+  `matches x y` checks if `y` matches expression `x`.  If it does, returns `Some s` where
+   `s` is a map from `y`'s variables ids to `x`'s. Otherwise, returns `None`.
+*)
+let matches (e1 : t) (e2 : t) =
+  let join l1 l2 =
+    match l1, l2 with
+    | Some l1, Some l2 ->
+      (try
+         Some
+           (List.fold l2 ~init:l1 ~f:(fun acc (vid, vid') ->
+                match List.Assoc.find ~equal:Int.equal acc vid with
+                | Some id2' -> if Int.(not (id2' = vid')) then failwith "Dup" else acc
+                | None -> (vid, vid') :: acc))
+       with
+      | _ -> None)
+    | _ -> None
+  in
+  let rec aux e1 e2 =
+    match e1, e2 with
+    | _ when equal e1 e2 -> Some []
+    | EVar i1, EVar i2 -> Some [ i2, i1 ]
+    | ETup args1, ETup args2 -> aux_l args1 args2
+    | ESel (e1', i1), ESel (e2', i2) -> if Int.equal i1 i2 then aux e1' e2' else None
+    | EIte (a1, b1, c1), EIte (a2, b2, c2) ->
+      join (join (aux a1 a2) (aux b1 b2)) (aux c1 c2)
+    | EData (c1, a1), EData (c2, a2) -> if String.equal c1 c2 then aux_l a1 a2 else None
+    | EOp (op1, args1), EOp (op2, args2) ->
+      if Operator.equal op1 op2 then aux_l args1 args2 else None
+    | _ -> None
+  and aux_l l1 l2 =
+    match List.zip l1 l2 with
+    | Unequal_lengths -> None
+    | Ok l ->
+      List.fold l ~init:(Some []) ~f:(fun acc (e1', e2') -> join acc (aux e1' e2'))
+  in
+  aux e1 e2
+;;
+
+(* ============================================================================================= *)
+(*                           REWRITING AND SIMPLIFICATION                                        *)
+(* ============================================================================================= *)
 
 let has_impl a tl =
   List.exists

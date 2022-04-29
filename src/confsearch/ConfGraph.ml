@@ -76,7 +76,7 @@ let check_unrealizable_from_cache (ctx : env) (p : PsiDef.t) (s : state) =
       Se2gis.Equations.make
         ~ctx
         ~p
-        ~lemmas:Se2gis.Lemmas.empty_lemmas
+        ~lemmas:(Se2gis.Lemmas.empty_lemmas ())
         ~lifting:Se2gis.Lifting.empty_lifting
         rstar_t
     in

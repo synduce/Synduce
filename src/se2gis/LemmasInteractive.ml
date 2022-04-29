@@ -114,7 +114,7 @@ let add_lemmas ~(ctx : env) ~(p : PsiDef.t) (lstate : refinement_loop_state) : u
       in
       let pred_term = ctx >>- term_of_smt env in
       let term x =
-        match ctx >- get_precise_lemma ~p lstate.lemmas ~key:(t, None) with
+        match ctx >- Lemmas.get_precise_lemma ~p lstate.lemmas ~key:(t, None) with
         | None -> pred_term x
         | Some inv -> mk_bin Binop.And inv (pred_term x)
       in

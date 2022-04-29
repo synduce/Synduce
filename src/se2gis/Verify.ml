@@ -244,7 +244,7 @@ let bounded_check
         ~ctx
         ~force_replace_off:true
         ~p:{ p with target = target_inst }
-        ~lemmas:Lemmas.empty_lemmas
+        ~lemmas:(Lemmas.empty_lemmas ())
         ~lifting:Lifting.empty_lifting
         (TermSet.singleton term)
     in

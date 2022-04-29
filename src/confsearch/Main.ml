@@ -6,7 +6,7 @@ open Lang
 open Utils
 module G = ConfGraph
 
-let single_configuration_solver
+let single_configuration_solver ?(lemmas = Se2gis.Lemmas.empty_lemmas ())
     : ctx:env -> PsiDef.t -> Syguslib.Sygus.solver_response segis_response
   =
   if !Config.Optims.use_segis (* Symbolic CEGIS. *)
@@ -15,7 +15,7 @@ let single_configuration_solver
   then
     Se2gis.Baselines.algo_cegis
     (* Default algorithm: best combination of techniques (TODO) *)
-  else Se2gis.Main.solve_problem
+  else Se2gis.Main.solve_problem ~lemmas
 ;;
 
 let find_and_solve_problem
@@ -49,29 +49,6 @@ let find_and_solve_problem
         in
         Utils.Log.sep ~i:(Some !num_attempts) ();
         let new_pdef = { top_userdef_problem with target = new_target } in
-        (* TODO just for testing *)
-        (* let rstar_t, rstar_u =
-          get_rstar new_ctx new_pdef !Utils.Config.Optims.rstar_limit
-        in *)
-        (* let eqns, _ =
-          Se2gis.Equations.make
-            ~ctx:new_ctx
-            ~p:new_pdef
-            ~lemmas:Se2gis.Lemmas.empty_lemmas
-            ~lifting:Se2gis.Lifting.empty_lifting
-            rstar_t
-        in *)
-        (* Fmt.(
-          pf
-            stdout
-            "@.RStar:@;@[T=%a@;U=%a@]@.@[Equations:@;%a@]@."
-            (TermSet.pp new_ctx.ctx)
-            rstar_t
-            (TermSet.pp new_ctx.ctx)
-            rstar_u
-            (list ~sep:semi (new_ctx >- Pretty.pp_equation))
-            eqns); *)
-        (* --- *)
         if G.check_unrealizable_from_cache new_ctx new_pdef rstate
         then (
           Log.info

@@ -18,6 +18,18 @@ let assert_is_subexpr ?(lemma = None) e1 e2 =
   Alcotest.(check bool) "subexpr" b true
 ;;
 
+let test_matches ?(b = true) s e1 e2 =
+  let assert_matches e1 e2 =
+    let b' =
+      match matches e1 e2 with
+      | Some _ -> true
+      | None -> false
+    in
+    Alcotest.(check bool) "matches" b b'
+  in
+  Alcotest.(test_case s `Quick (fun () -> assert_matches e1 e2))
+;;
+
 let () =
   let a, b, c, u, v, w, x, y, z =
     let open Op in
@@ -123,6 +135,23 @@ let () =
               assert_is_subexpr
                 Op.(max (max (x + int 0) (int 0) + y) (int 0))
                 Op.(max (x + y + z) (max (x + y) (max y (int 0)))))
+        ] )
+    ; ( "matches"
+      , [ test_matches "(a + b) matches (x + y)" Op.(a + b) Op.(x + y)
+        ; test_matches
+            "Cons(a,b) matches Cons(x,y)"
+            Op.("Cons" <: [ a; b ])
+            Op.("Cons" <: [ x; y ])
+        ; test_matches "a[0] matches x[0]" Op.(a @: 0) Op.(x @: 0)
+        ; test_matches
+            "Cons(a[0],b) matches Cons(x[0],y)"
+            Op.("Cons" <: [ a @: 0; b ])
+            Op.("Cons" <: [ x @: 0; y ])
+        ; test_matches
+            ~b:false
+            "Cons(a,b) not matches Cons(x,x)"
+            Op.("Cons" <: [ a; b ])
+            Op.("Cons" <: [ x; x ])
         ] )
     ; ( "fac-expand"
       , [ test_case "u*(v+w) -> u*v + u*w" `Quick (fun () ->

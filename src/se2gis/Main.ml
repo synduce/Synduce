@@ -106,7 +106,7 @@ let rec refinement_loop
     (* On synthesis failure, start by trying to synthesize lemmas. *)
     (match
        Stats.timed (fun () ->
-           Lemmas.synthesize_lemmas ~ctx ~p synt_failure_info lstate_in)
+           LemmaSynthesis.synthesize_lemmas ~ctx ~p synt_failure_info lstate_in)
      with
     | lsynt_time, Ok (First new_lstate) ->
       Stats.log_minor_step ~synth_time ~auxtime:lsynt_time false;
@@ -136,7 +136,7 @@ let rec refinement_loop
     | _ -> Failed RFail)
 ;;
 
-let se2gis ~(ctx : env) (p : PsiDef.t) =
+let se2gis ?(lemmas = Lemmas.empty_lemmas ()) ~(ctx : env) (p : PsiDef.t) =
   (* Initialize sets with the most general terms. *)
   let t_set, u_set =
     if !Config.Optims.simple_init
@@ -170,26 +170,25 @@ let se2gis ~(ctx : env) (p : PsiDef.t) =
     refinement_loop
       ~ctx
       p
-      { t_set
-      ; u_set
-      ; lemmas = Lemmas.empty_lemmas
-      ; lifting = Lifting.empty_lifting
-      ; assumptions = []
-      })
+      { t_set; u_set; lemmas; lifting = Lifting.empty_lifting; assumptions = [] })
 ;;
 
 (* ============================================================================================= *)
 (*                                                 MAIN ENTRY POINTS                             *)
 (* ============================================================================================= *)
 
-let solve_problem ~(ctx : env) (synthesis_problem : PsiDef.t)
+let solve_problem
+    ?(lemmas = Lemmas.empty_lemmas ())
+    ~(ctx : env)
+    (synthesis_problem : PsiDef.t)
     : solver_response segis_response
   =
   (* Solve the problem using portofolio of techniques. *)
-  se2gis ~ctx synthesis_problem
+  se2gis ~lemmas ~ctx synthesis_problem
 ;;
 
 let find_and_solve_problem
+    ?(lemmas = Lemmas.empty_lemmas ())
     ~(ctx : env)
     (psi_comps : (string * string * string) option)
     (pmrs : (string, PMRS.t, Base.String.comparator_witness) Map.t)
@@ -216,7 +215,7 @@ let find_and_solve_problem
     then
       Baselines.algo_cegis ~ctx
       (* Default algorithm: best combination of techniques. *)
-    else solve_problem ~ctx
+    else solve_problem ~lemmas ~ctx
   in
   [ top_userdef_problem, main_algo top_userdef_problem ]
 ;;
