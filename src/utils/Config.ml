@@ -6,6 +6,9 @@ let problem_name = ref "unknown"
 (** Toggle debugging. *)
 let debug = ref false
 
+(** Print messages in compact form, non human readable.*)
+let compact = ref false
+
 (** Limit the size of debugging messages. *)
 let debug_msg_max_chars = ref 400
 
@@ -274,6 +277,7 @@ let options print_usage parse_only =
   ; '\000', "cegis", set use_cegis true, None
   ; '\000', "cvc4", set use_cvc4 true, None
   ; '\000', "cvc5", set use_cvc4 false, None
+  ; '\000', "compact", set compact true, None
   ; '\000', "const-grammars", set no_grammar_for_constants false, None
   ; '\000', "eusolver", set use_eusolver true, None
   ; '\000', "fuzzing", None, Some set_fuzzing_count

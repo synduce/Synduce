@@ -104,7 +104,7 @@ let main () =
   in
   (if !Config.json_out
   then
-    if !Config.json_progressive
+    if !Config.json_progressive || !Config.compact
     then (
       Yojson.to_channel ~std:true Stdio.stdout json_out;
       Stdio.(Out_channel.flush stdout))
