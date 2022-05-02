@@ -1,20 +1,17 @@
-type spec =
-  { ensures : Term.term option
-  ; requires : Term.term option
-  }
+open Term
 
 (** Reinitialize the state of the specifiications. *)
-val reinit : unit -> unit
+val reinit : ctx:Context.t -> unit -> unit
 
 (** An empty spec with no ensures clause and no requires clause. *)
 val empty_spec : spec
 
-val get_ensures : Term.variable -> Term.term option
-val get_requires : Term.variable -> Term.term option
-val get_spec : Term.variable -> spec option
-val set_spec : Term.variable -> spec -> unit
-val set_ensures : Term.variable -> Term.term -> unit
-val set_requires : Term.variable -> Term.term -> unit
+val get_ensures : ctx:Context.t -> variable -> term option
+val get_requires : ctx:Context.t -> variable -> term option
+val get_spec : ctx:Context.t -> variable -> spec option
+val set_spec : ctx:Context.t -> variable -> spec -> unit
+val set_ensures : ctx:Context.t -> variable -> term -> unit
+val set_requires : ctx:Context.t -> variable -> term -> unit
 val is_not_empty : spec -> bool
-val pp_spec : Format.formatter -> spec -> unit
-val dump_all : Format.formatter -> unit -> unit
+val pp_spec : ctx:Context.t -> Format.formatter -> spec -> unit
+val dump_all : ctx:Context.t -> Format.formatter -> unit -> unit

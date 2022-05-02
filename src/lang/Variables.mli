@@ -1,57 +1,8 @@
-module Attributes : sig
-  module Elt : sig
-    module T : sig
-      type t =
-        | Anonymous
-        | Builtin
-        | Terminal
-        | NonTerminal of int
-
-      val t_of_sexp : Ppx_sexp_conv_lib.Sexp.t -> t
-      val sexp_of_t : t -> Ppx_sexp_conv_lib.Sexp.t
-      val equal : t -> t -> bool
-      val compare : t -> t -> int
-      val hash : 'a -> int
-    end
-
-    type t = T.t =
-      | Anonymous
-      | Builtin
-      | Terminal
-      | NonTerminal of int
-
-    val t_of_sexp : Ppx_sexp_conv_lib.Sexp.t -> t
-    val sexp_of_t : t -> Ppx_sexp_conv_lib.Sexp.t
-    val equal : t -> t -> bool
-    val compare : t -> t -> int
-    val hash : 'a -> int
-
-    type comparator_witness = Base.Comparator.Make(T).comparator_witness
-
-    val comparator : (t, comparator_witness) Base.Comparator.t
-    val is_non_terminal : t -> bool
-  end
-
-  module AS : sig
-    type nonrec t = (Elt.t, Elt.comparator_witness) Base.Set.t
-  end
-
-  type nonrec t = (Elt.t, Elt.comparator_witness) Base.Set.t
-  type elt = Elt.t
-
-  val singleton : elt -> (elt, Elt.comparator_witness) Base.Set.t
-  val empty : (elt, Elt.comparator_witness) Base.Set.t
-end
-
-type variable =
-  { vname : string
-  ; vid : int
-  ; vattrs : Attributes.t
-  }
+open TermTypes
 
 module Variable : sig
   module T : sig
-    type t = variable
+    type t = TermTypes.variable
 
     val sexp_of_t : t -> Ppx_sexp_conv_lib.Sexp.t
     val compare : t -> t -> int
@@ -72,32 +23,29 @@ module Variable : sig
 
   val comparator : (t, comparator_witness) Base.Comparator.t
 
-  (** Clear the global information about variables: types and known ids. *)
-  val clear : unit -> unit
-
   (** Assign a type to a variable. *)
-  val vtype_assign : t -> RType.t -> unit
+  val vtype_assign : Context.t -> t -> RType.t -> unit
 
   (** Return the type of the variable, or [None] if it has no assigned types. *)
-  val vtype : t -> RType.t option
+  val vtype : Context.t -> t -> RType.t option
 
   (** Return the id of the variable (function for [v.vid])  *)
   val id : t -> int
 
   (** Get the name of a variable identified by its integer id, and return [None] is there is no such
     variable. *)
-  val get_name : int -> string option
+  val get_name : Context.t -> int -> string option
 
   (** Forget the global type of the variable. *)
-  val clear_type : t -> unit
+  val clear_type : Context.t -> t -> unit
 
   (** Return the type of a variable, or create a new type and return it if the variable doesn't have
       a type. That new type becomes the type of the variable.
     *)
-  val vtype_or_new : t -> RType.t
+  val vtype_or_new : Context.t -> t -> RType.t
 
   (** Apply a type substitution to all the knownn variables. *)
-  val update_var_types : (RType.t * RType.t) list -> unit
+  val update_var_types : Context.t -> (RType.t * RType.t) list -> unit
 
   (** Create variable. [mk ~attrs ~t:(Some typ) name] creates a variable with name [name] ,type
       [typ] and attributes [attrs]. The variable is registered as well as its type if some type is
@@ -106,6 +54,7 @@ module Variable : sig
   val mk
     :  ?attrs:(Attributes.elt, Attributes.Elt.comparator_witness) Base.Set.t
     -> ?t:RType.t option
+    -> Context.t
     -> string
     -> t
 
@@ -132,11 +81,11 @@ module Variable : sig
   (** [same_name v1 v2] eturns true if [v1] and [v2] have the same name. *)
   val same_name : t -> t -> bool
 
-  val pp : Format.formatter -> t -> unit
+  val pp : Context.t -> Format.formatter -> t -> unit
   val pp_id : Format.formatter -> t -> unit
-  val pp_typed : Format.formatter -> t -> unit
-  val free : t -> unit
-  val print_summary : Format.formatter -> unit -> unit
+  val pp_typed : Context.t -> Format.formatter -> t -> unit
+  val free : Context.t -> t -> unit
+  val print_summary : Format.formatter -> Context.t -> unit
 end
 
 module VarSet : sig
@@ -190,11 +139,11 @@ module VarSet : sig
   val names : t -> string list
 
   (** Filter a set with a type. *)
-  val filter_by_type : t -> RType.t -> t
+  val filter_by_type : Context.t -> t -> RType.t -> t
 
   (** Create a record type from a set of variables (an association list where keys are the variable
       names and data is the variable type). *)
-  val record : t -> (string * RType.t) list
+  val record : Context.t -> t -> (string * RType.t) list
 
   (** Create an environment (a map from names to variables) from a variable set. *)
   val to_env : t -> (string, elt, Base.String.comparator_witness) Base.Map.t
@@ -202,7 +151,7 @@ module VarSet : sig
   (** Given a set of variables, return a list of pairs such that for each element [v] in the set,
     there is a pair [v,v'] in the list where [v'] is a fresh variable (with a name similar to [v])
    *)
-  val prime : t -> (elt * elt) list
+  val prime : Context.t -> t -> (elt * elt) list
 
   (** Change the names of the variables in the set by adding a string prefix. The variables are
       still equal to the input variable, in the sense that they have the same id, but different
@@ -214,11 +163,11 @@ module VarSet : sig
   val iset : t -> int list -> t
 
   (** Pretty-print a set just by printing variable names.  *)
-  val pp_var_names : Format.formatter -> (elt, 'a) Base.Set.t -> unit
+  val pp_var_names : Context.t -> Format.formatter -> (elt, 'a) Base.Set.t -> unit
 
   (** Pretty print a set by printing variable names with their type. Seee [pp_var_names] for
     alternative.  *)
-  val pp : Format.formatter -> (elt, 'a) Base.Set.t -> unit
+  val pp : Context.t -> Format.formatter -> (elt, 'a) Base.Set.t -> unit
 
   (** Print the variable set in a non-human readable format.  *)
   val dump : Format.formatter -> (elt, 'a) Base.Set.t -> unit

@@ -19,7 +19,7 @@ let unify (terms : term list) : term option =
    During the matching process the variables in [boundvars] cannot be substituted in the
    pattern.
 *)
-let matches ?(boundvars = VarSet.empty) (t : term) ~(pattern : term)
+let matches ?(boundvars = VarSet.empty) ~(ctx : Context.t) (t : term) ~(pattern : term)
     : term VarMap.t option
   =
   let rec aux pat t =
@@ -28,7 +28,7 @@ let matches ?(boundvars = VarSet.empty) (t : term) ~(pattern : term)
       if Set.mem boundvars vpat
       then if Terms.equal pat t then Ok [] else Error [ pat, t ]
       else (
-        let pat_ty = Variable.vtype_or_new vpat in
+        let pat_ty = Variable.vtype_or_new ctx vpat in
         match RType.unify_one pat_ty t.ttyp with
         | Ok _ -> Ok [ vpat, t ]
         | Error _ -> Error [ pat, t ])
@@ -97,14 +97,20 @@ let matches ?(boundvars = VarSet.empty) (t : term) ~(pattern : term)
 (** [matches_subpattern ~boundvars t ~pattern] returns some triple [t', subs, vs]
     when some sub-pattern of [pattern] matches [t].
 *)
-let matches_subpattern ?(boundvars = VarSet.empty) (t : term) ~(pattern : term)
+let matches_subpattern
+    ?(boundvars = VarSet.empty)
+    ~(ctx : Context.t)
+    (t : term)
+    ~(pattern : term)
     : (term * (term * term) list * VarSet.t) option
   =
   let match_locations = ref [] in
   let rrule (pat : term) =
-    match matches ~boundvars t ~pattern:pat with
+    match matches ~ctx ~boundvars t ~pattern:pat with
     | Some substmap ->
-      let match_loc_place = Variable.mk ~t:(Some pat.ttyp) (Alpha.fresh ~s:"*_" ()) in
+      let match_loc_place =
+        Variable.mk ctx ~t:(Some pat.ttyp) (Alpha.fresh ctx.names ~s:"*_")
+      in
       match_locations := (match_loc_place, substmap) :: !match_locations;
       Some { pat with tkind = TVar match_loc_place }
     | None -> None
@@ -123,7 +129,7 @@ let matches_subpattern ?(boundvars = VarSet.empty) (t : term) ~(pattern : term)
         Map.merge ~f:merger subst_map loc_substs, Set.add loc_set loc)
       !match_locations
   in
-  let substs = List.map ~f:(fun (a, b) -> mk_var a, b) (Map.to_alist unified_map) in
+  let substs = List.map ~f:(fun (a, b) -> mk_var ctx a, b) (Map.to_alist unified_map) in
   if Set.is_empty loc_set then None else Some (pat_skel, substs, loc_set)
 ;;
 
@@ -191,23 +197,24 @@ let matches_pattern (t : term) (p : pattern) : term VarMap.t option =
   Returns a pair of a boxed var-substitution list and the term with the boxes replacing the
   subexpressions.
 *)
-let skeletize ~(functions : VarSet.t) (t : term) : term VarMap.t * term =
+let skeletize ~(functions : VarSet.t) ~(ctx : Context.t) (t : term) : term VarMap.t * term
+  =
   let skel_id = ref 0 in
   let boxes = ref (Map.empty (module Terms)) in
   let case _ t0 =
-    if has_calls ~_to:functions t0
+    if has_calls ~ctx ~_to:functions t0
     then None
     else (
       let boxv =
         match Map.find !boxes t0 with
         | Some boxv -> boxv
         | None ->
-          let boxv = Variable.mk ~t:(Some t0.ttyp) (Fmt.str "?%i" !skel_id) in
+          let boxv = Variable.mk ctx ~t:(Some t0.ttyp) (Fmt.str "?%i" !skel_id) in
           Int.incr skel_id;
           boxes := Map.set !boxes ~key:t0 ~data:boxv;
           boxv
       in
-      Some (mk_var boxv))
+      Some (mk_var ctx boxv))
   in
   let boxed_ts = transform ~case t in
   let varmap =

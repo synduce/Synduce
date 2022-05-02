@@ -47,12 +47,7 @@ type t =
   | TFun of t * t
   | TParam of t list * t
   | TVar of int
-[@@deriving sexp]
-
-let get_fresh_tvar () =
-  Int.incr _tvar_idx;
-  TVar !_tvar_idx
-;;
+[@@deriving sexp, hash]
 
 let rec pp (frmt : Formatter.t) (typ : t) =
   match typ with
@@ -130,40 +125,60 @@ let rec smt_name (typ : t) : string option =
 let _unsafe_pair_t_ t = Option.value_exn (base_name t), t
 
 (**
-   This hashtable maps type names to the type term of their declaration.
-   It is initialized with the builtin types int, bool, char and string.
+   Type environment module
 *)
-let _types : (ident, t) Hashtbl.t =
-  Hashtbl.of_alist_exn
-    (module String)
-    (List.map ~f:_unsafe_pair_t_ [ TInt; TBool; TChar; TString ])
+
+type env =
+  { variant_typenames : (string, string) Hashtbl.t
+  ; typenames_variants : (string, string list) Hashtbl.t
+  ; variant_types : (string, t * t list) Hashtbl.t
+  ; typenames : (string, t) Hashtbl.t
+  ; idx : int ref
+  }
+
+let create () =
+  { variant_typenames = Hashtbl.create (module String)
+  ; typenames_variants = Hashtbl.create (module String)
+  ; variant_types = Hashtbl.create (module String)
+  ; typenames =
+      Hashtbl.of_alist_exn
+        (module String)
+        (List.map ~f:_unsafe_pair_t_ [ TInt; TBool; TChar; TString ])
+  ; idx = ref 0
+  }
 ;;
 
-(**
-   This hashtable maps variant names to the type name.
-   Variant names must be unique!
-*)
-let _variant_to_tname : (string, string) Hashtbl.t = Hashtbl.create (module String)
+let copy (ctx : env) =
+  { variant_typenames = Hashtbl.copy ctx.variant_typenames
+  ; typenames_variants = Hashtbl.copy ctx.typenames_variants
+  ; variant_types = Hashtbl.copy ctx.variant_types
+  ; typenames = Hashtbl.copy ctx.typenames
+  ; idx = ref !(ctx.idx)
+  }
+;;
 
-let _tname_to_variants : (string, string list) Hashtbl.t = Hashtbl.create (module String)
-let _variants : (string, t * t list) Hashtbl.t = Hashtbl.create (module String)
-let get_type (typename : string) = Hashtbl.find _types typename
+let get_fresh_tvar (env : env) =
+  Int.incr env.idx;
+  TVar !(env.idx)
+;;
 
-let dump_types (frmt : Formatter.t) () =
+let get_type (env : env) (typename : string) = Hashtbl.find env.typenames typename
+
+let dump_types (frmt : Formatter.t) (env : env) =
   let f ~key ~data = Fmt.(pf frmt "@[? %s : %a@]@." key pp data) in
-  Hashtbl.iteri _types ~f;
+  Hashtbl.iteri env.typenames ~f;
   let f_v ~key ~data =
     let t, tl = data in
     Fmt.(pf frmt "@[ %s : %a -> %a @]@." key pp t (list ~sep:comma pp) tl)
   in
   Fmt.(pf frmt "@[Variants:@]@.");
-  Hashtbl.iteri _variants ~f:f_v
+  Hashtbl.iteri env.variant_types ~f:f_v
 ;;
 
-let reinit () =
-  Hashtbl.clear _variant_to_tname;
-  Hashtbl.clear _tname_to_variants;
-  Hashtbl.clear _variants;
+let reinit (env : env) =
+  Hashtbl.clear env.variant_types;
+  Hashtbl.clear env.variant_typenames;
+  Hashtbl.clear env.typenames_variants;
   _tid := 0;
   _tvar_idx := 0
 ;;
@@ -291,8 +306,8 @@ let t_equals a b =
 (*                      VARIANT TYPES                                                            *)
 (* ============================================================================================= *)
 
-let type_of_variant (variant : string) : (t * t list) option =
-  Hashtbl.find _variants variant
+let type_of_variant (env : env) (variant : string) : (t * t list) option =
+  Hashtbl.find env.variant_types variant
 ;;
 
 let instantiate_variant (vargs : type_term list) (instantiator : (ident * int) list) =
@@ -316,13 +331,14 @@ let instantiate_variant (vargs : type_term list) (instantiator : (ident * int) l
 ;;
 
 (* Add the builtin types *)
-let add_variant ~(variant : string) ~(typename : string) (vdec : t * t list) =
-  Hashtbl.add_exn _variants ~key:variant ~data:vdec;
-  Hashtbl.add_multi _tname_to_variants ~key:typename ~data:variant;
-  Hashtbl.add_exn _variant_to_tname ~key:variant ~data:typename
+let add_variant (env : env) ~(variant : string) ~(typename : string) (vdec : t * t list) =
+  Hashtbl.add_exn env.variant_types ~key:variant ~data:vdec;
+  Hashtbl.add_multi env.typenames_variants ~key:typename ~data:variant;
+  Hashtbl.add_exn env.variant_typenames ~key:variant ~data:typename
 ;;
 
 let add_all_variants
+    (env : env)
     ~(params : (ident * int) list)
     ~(main_type : t)
     ~(typename : ident)
@@ -333,7 +349,7 @@ let add_all_variants
     match m_variant.tkind with
     | TyVariant (vname, vdef) ->
       let vargs = instantiate_variant vdef params in
-      add_variant ~variant:vname ~typename (main_type, vargs)
+      add_variant env ~variant:vname ~typename (main_type, vargs)
     | _ -> failwith "Unexpected variant form."
   in
   List.iter ~f:add_one_variant tl
@@ -345,11 +361,11 @@ let add_all_variants
    of constructors, list of the types of the arguments of the constructor.
    If the type has no variant, the list is empty.
 *)
-let get_variants (typ : t) : (string * t list) list =
+let get_variants (env : env) (typ : t) : (string * t list) list =
   let variantnames in_params tname =
     let f variant_name =
       let var_args =
-        match type_of_variant variant_name with
+        match type_of_variant env variant_name with
         | Some (typ', tl') ->
           (match typ' with
           | TParam (params', _) when List.length params' > 0 ->
@@ -371,7 +387,7 @@ let get_variants (typ : t) : (string * t list) list =
       in
       variant_name, var_args
     in
-    match Hashtbl.find _tname_to_variants tname with
+    match Hashtbl.find env.typenames_variants tname with
     | Some variants -> List.map ~f variants
     | None -> []
   in
@@ -384,9 +400,9 @@ let get_variants (typ : t) : (string * t list) list =
   | _ -> []
 ;;
 
-let is_recursive_variant ((_, types) : string * t list) =
+let is_recursive_variant (env : env) ((_, types) : string * t list) =
   let f t =
-    match get_variants t with
+    match get_variants env t with
     | [] -> false
     | _ -> true
   in
@@ -397,11 +413,16 @@ let is_recursive_variant ((_, types) : string * t list) =
    `add_type ?params ~typename tterm` adds a type with name typename and parameters
    params (default empty list) and type term tterm to the global store.
 *)
-let add_type ?(params : ident list = []) ~(typename : string) (tterm : type_term) =
+let add_type
+    (env : env)
+    ?(params : ident list = [])
+    ~(typename : string)
+    (tterm : type_term)
+  =
   let ty_params_inst =
     List.map
       ~f:(fun s ->
-        match get_fresh_tvar () with
+        match get_fresh_tvar env with
         | TVar i -> s, i
         | _ -> failwith "unexpected")
       params
@@ -412,14 +433,14 @@ let add_type ?(params : ident list = []) ~(typename : string) (tterm : type_term
     | _ -> TParam (List.map ~f:(fun (_, b) -> TVar b) ty_params_inst, TNamed typename)
   in
   let add_only () =
-    match Hashtbl.add _types ~key:typename ~data:main_type with
+    match Hashtbl.add env.typenames ~key:typename ~data:main_type with
     | `Ok -> Ok ()
     | `Duplicate ->
       Error Log.(satom (Fmt.str "Type %s already declared" typename) @! tterm.pos)
   in
   match tterm.tkind with
   | TySum variants ->
-    add_all_variants ~params:ty_params_inst ~typename ~main_type variants;
+    add_all_variants env ~params:ty_params_inst ~typename ~main_type variants;
     add_only ()
   | _ -> add_only ()
 ;;
@@ -458,16 +479,16 @@ let is_function t =
   | _ -> false
 ;;
 
-let is_recursive =
+let is_recursive (env : env) =
   let case _ t =
-    match get_variants t with
+    match get_variants env t with
     | [] -> None
-    | l -> if List.exists l ~f:is_recursive_variant then Some true else None
+    | l -> if List.exists l ~f:(is_recursive_variant env) then Some true else None
   in
   reduce ~case ~init:false ~join:( || )
 ;;
 
-let is_datatype t = List.length (get_variants t) > 0
+let is_datatype (env : env) t = List.length (get_variants env t) > 0
 
 let rec is_user_defined t =
   match t with
@@ -476,8 +497,8 @@ let rec is_user_defined t =
   | TFun (a, b) -> is_user_defined a || is_user_defined b
 ;;
 
-let get_datatype_depends (t : t) =
+let get_datatype_depends (env : env) (t : t) =
   List.filter
     ~f:(fun t' -> is_user_defined t' && not (subtype_of t' t))
-    (List.concat_map ~f:snd (get_variants t))
+    (List.concat_map ~f:snd (get_variants env t))
 ;;

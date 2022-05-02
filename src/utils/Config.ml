@@ -138,14 +138,19 @@ let cvc5_binary_path =
   | _ -> None
 ;;
 
-let using_cvc5 () = Option.is_some cvc5_binary_path && not !use_cvc4
+let using_cvc5 () =
+  (Option.is_some cvc5_binary_path && not !use_cvc4) || Option.is_none cvc4_binary_path
+;;
 
 let cvc_binary_path () =
   if !use_cvc4
   then (
     match cvc4_binary_path with
     | Some p -> p
-    | None -> failwith "CVC4 not found using 'which cvc4').")
+    | None ->
+      (match cvc5_binary_path with
+      | Some p -> p
+      | None -> failwith "CVC4 and CVC5 not found."))
   else (
     match cvc5_binary_path with
     | Some p -> p
@@ -240,6 +245,7 @@ open Optims
 
 let options print_usage parse_only =
   [ 'b', "bmc", None, Some set_check_depth
+  ; 'B', "bounded-lemma-check", set bounded_lemma_check true, None
   ; 'c', "simple-init", set simple_init true, None
   ; 'C', "check-smt-unrealizable", set check_unrealizable_smt_unsatisfiable true, None
   ; 'u', "no-check-unrealizable", set check_unrealizable false, None
@@ -256,8 +262,8 @@ let options print_usage parse_only =
   ; 'm', "style-math", set math_display true, None
   ; 'n', "verification", None, Some set_num_expansions_check
   ; 'N', "no-sat-as-unsat", set no_bounded_sat_as_unsat true, None
-  ; 'B', "bounded-lemma-check", set bounded_lemma_check true, None
   ; 'o', "output", None, Some set_output_folder
+  ; 'p', "num-threads", None, Some set_num_threads
   ; 's', "max-solutions", None, Some set_max_solutions
   ; 't', "no-detupling", set detupling_on false, None
   ; 'v', "verbose", set verbose true, None
@@ -284,6 +290,7 @@ let options print_usage parse_only =
   ; '\000', "no-simplify", set simplify_eqns false, None
   ; '\000', "no-syndef", set use_syntactic_definitions false, None
   ; '\000', "parse-only", set parse_only true, None
+  ; '\000', "rstar-limit", None, Some set_rstar_limit
   ; '\000', "show-vars", set show_vars true, None
   ; '\000', "sysfe-opt-off", set sysfe_opt false, None
   ; '\000', "use-bmc", set use_bmc true, None

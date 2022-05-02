@@ -32,13 +32,13 @@ let logic_info_join (linfo1 : logic_info) (linfo2 : logic_info) : logic_info =
 
 let base_logic_info = { theory = Logics.Core; linearity = true; datatypes = false }
 
-let term_requires_datatype (t : term) =
+let term_requires_datatype ~(ctx : Context.t) (t : term) =
   List.exists
     ~f:(fun x ->
-      match Variable.vtype_or_new x with
+      match Variable.vtype_or_new ctx x with
       | RType.TTup _ -> true
       | _ -> false)
-    (Set.elements (Analysis.free_variables ~include_functions:false t))
+    (Set.elements (Analysis.free_variables ~ctx ~include_functions:false t))
 ;;
 
 (** Infer the logic to use in calls using terms.
@@ -56,6 +56,7 @@ let infer_logic
     ?(for_induction = false)
     ?(hint = None)
     ?(logic_infos = [])
+    ~(ctx : Context.t)
     (terms : term list)
     : Logics.logic
   =
@@ -64,7 +65,7 @@ let infer_logic
     let f linfo_accum t =
       let linearity = Set.for_all ~f:Operator.is_lia (Analysis.operators_of t) in
       let theory = theory_of (type_of t) in
-      let datatypes = term_requires_datatype t in
+      let datatypes = term_requires_datatype ~ctx t in
       logic_info_join linfo_accum { theory; linearity; datatypes }
     in
     List.fold ~f ~init:linfo terms

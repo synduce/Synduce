@@ -54,6 +54,7 @@ module Synchronous : functor (Log : Logger) (Stats : Statistics) -> sig
     ; s_pid : int
     ; s_inputc : out_channel
     ; s_outputc : in_channel
+    ; mutable s_online : bool
     ; mutable s_scope_level : int
     ; s_declared : (string, int) Base.Hashtbl.t
     ; s_log_file : string
@@ -62,13 +63,9 @@ module Synchronous : functor (Log : Logger) (Stats : Statistics) -> sig
 
   val open_log : unit -> unit
   val log : ?solver:online_solver option -> SmtLib.command -> unit
-  val solver_write : online_solver -> SmtLib.command -> unit
-  val solver_read : online_solver -> solver_response
   val already_declared : online_solver -> SmtLib.smtSymbol -> bool
   val solver_declare : online_solver -> SmtLib.smtSymbol -> unit
   val exec_command : online_solver -> SmtLib.command -> solver_response
-  val online_solvers : (int * online_solver) list ref
-  val handle_sigchild : int -> unit
   val make_solver : name:string -> string -> string list -> online_solver
   val close_solver : online_solver -> unit
   val call_solver : online_solver -> SmtLib.command list -> solver_response

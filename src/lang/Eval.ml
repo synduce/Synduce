@@ -132,12 +132,12 @@ let simplify t =
   until_stable 0 t
 ;;
 
-let in_model ?(no_simplify = false) (vmap : term VarMap.t) (t : term) =
+let in_model ?(no_simplify = false) ~(ctx : Context.t) (vmap : term VarMap.t) (t : term) =
   let simplify = if no_simplify then identity else simplify in
   let remap _ t =
     match t.tkind with
     | TVar v -> Map.find vmap v
     | _ -> None
   in
-  fst (Term.infer_type (simplify (transform ~case:remap t)))
+  fst (Term.infer_type ctx (simplify (transform ~case:remap t)))
 ;;
