@@ -11,6 +11,8 @@ COPY --chown=ocaml:ocaml . /home/opam/synduce
 RUN cd /home/opam/synduce && opam switch create . --deps ocaml-system
 # Build and run an example.
 RUN cd /home/opam/synduce && \
+    opem pin syguslib-utils -y
+    opam install . --deps-only -y
     eval $(opam env) && \
     dune build bin/Synduce.exe && \
     ./_build/default/bin/Synduce.exe benchmarks/list/sum.ml
