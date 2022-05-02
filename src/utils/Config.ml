@@ -18,6 +18,8 @@ let json_out = ref false
 (** When Json output is on, set true to get partial updates in Json format. *)
 let json_progressive = ref false
 
+let print_unrealizable_configs = ref false
+
 (** Toggle printing timing info when info is off. Set to true by default. *)
 let timings = ref true
 

@@ -78,6 +78,7 @@ let prep_final_json
 ;;
 
 let on_success
+    ?(print_unrealizable = false)
     ~(is_ocaml_syntax : bool)
     ~(ctx : env)
     (source_filename : string ref)
@@ -91,25 +92,35 @@ let on_success
       (LogJson.get_simple_stats pb.id)
   in
   let verif_ratio = 100.0 *. (verif_time /. elapsed) in
-  Log.sep ();
-  Log.(info (print_solvers_summary pb.id));
   (* Print the solution. *)
   (match result with
   | Either.First soln ->
-    Log.info (fun frmt () ->
-        pf
-          frmt
-          "Solution found in %4.4fs (%3.1f%% verifying):@.%a@]"
-          elapsed
-          verif_ratio
-          (box (ctx >- Common.Pretty.pp_soln ~use_ocaml_syntax:is_ocaml_syntax))
-          soln)
-  | Either.Second ctexs ->
     Log.(
+      sep ();
+      info (print_solvers_summary pb.id);
       info (fun frmt () ->
-          pf frmt "No solution: problem is unrealizable (found answer in %4.4fs)." elapsed));
-    Log.(info (fun frmt () -> pf frmt "%a" (ctx >- Lang.PMRS.pp ~short:false) pb.target));
-    ctx >>> ToolExplain.when_unrealizable pb ctexs);
+          pf
+            frmt
+            "Solution found in %4.4fs (%3.1f%% verifying):@.%a@]"
+            elapsed
+            verif_ratio
+            (box (ctx >- Common.Pretty.pp_soln ~use_ocaml_syntax:is_ocaml_syntax))
+            soln))
+  | Either.Second ctexs ->
+    if print_unrealizable
+    then (
+      Log.(
+        sep ();
+        info (print_solvers_summary pb.id);
+        info (fun frmt () ->
+            pf
+              frmt
+              "No solution: problem is unrealizable (found answer in %4.4fs)."
+              elapsed));
+      Log.(
+        info (fun frmt () -> pf frmt "%a" (ctx >- Lang.PMRS.pp ~short:false) pb.target));
+      ctx >>> ToolExplain.when_unrealizable pb ctexs)
+    else ());
   (* If output specified, write the solution in file. *)
   (match result with
   | Either.First soln ->

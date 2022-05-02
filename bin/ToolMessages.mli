@@ -12,7 +12,8 @@ val prep_final_json
   -> Yojson.t
 
 val on_success
-  :  is_ocaml_syntax:bool
+  :  ?print_unrealizable:bool
+  -> is_ocaml_syntax:bool
   -> ctx:Common.Env.env
   -> string ref
   -> Common.ProblemDefs.PsiDef.t
