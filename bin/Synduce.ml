@@ -78,13 +78,13 @@ let main () =
                 (Either.Second ctexs) )
       | _, Failed _ ->
         Log.error_msg "Failed to find a solution or a witness of unrealizability";
-        failwith "Solving failure")
+        pb.PsiDef.id, ctx >>> ToolMessages.on_failure pb)
   in
   let json_out =
     let u_count = ref 0 in
     let json =
       match outputs with
-      | [ a ] -> snd (check_output u_count a)
+      | [ a ] when !Config.Optims.max_solutions <= 0 -> snd (check_output u_count a)
       | _ ->
         let subproblem_jsons = List.map ~f:(check_output u_count) outputs in
         let results =
@@ -108,7 +108,7 @@ let main () =
   in
   (if !Config.json_out
   then
-    if !Config.json_progressive || !Config.compact
+    if !Config.compact
     then (
       Yojson.to_channel ~std:true Stdio.stdout json_out;
       Stdio.(Out_channel.flush stdout))

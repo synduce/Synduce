@@ -12,7 +12,7 @@ open Term
 open Utils
 open Env
 
-let show_stat env elapsed tsize usize =
+let show_stat_refinement_step env elapsed tsize usize =
   if !Config.timings
   then
     pf
@@ -29,6 +29,76 @@ let show_stat env elapsed tsize usize =
       `Assoc
         [ "progress", LogJson.refinement_steps_summary ()
         ; "verif_elapsed", `Float !Stats.verif_time
+        ]
+    in
+    pf stdout "%s@." (Yojson.to_string ~std:false json))
+  else ()
+;;
+
+let single_configuration_json
+    ~(is_ocaml_syntax : bool)
+    ~(ctx : env)
+    (pb : PsiDef.t)
+    (soln : (soln, unrealizability_ctex list) Either.t option)
+    (elapsed : float)
+    (verif : float)
+    : Yojson.t
+  =
+  let solvers =
+    Option.value ~default:(`String "unknown") (Utils.LogJson.get_solver_stats pb.id)
+  in
+  let refinement_steps =
+    Option.value ~default:(`String "unknown") (Utils.LogJson.get_summary pb.id)
+  in
+  let algo =
+    if !Config.Optims.use_segis
+    then "SEGIS"
+    else if !Config.Optims.use_cegis
+    then "CEGIS"
+    else "SE2GIS"
+  in
+  let soln_or_refutation =
+    match soln with
+    | Some (Either.First soln) ->
+      [ ( "solution"
+        , `String
+            (Fmt.str
+               "%a"
+               (box (ctx >- Pretty.pp_soln ~use_ocaml_syntax:is_ocaml_syntax))
+               soln) )
+      ; "unrealizable", `Bool false
+      ]
+    | Some (Either.Second _) -> [ "unrealizable", `Bool true ]
+    | None -> [ "failure", `Bool true ]
+  in
+  `Assoc
+    ([ "algorithm", `String algo
+     ; "total_elapsed", `Float elapsed
+     ; "verif_elapsed", `Float verif
+     ; "solver-usage", solvers
+     ; "refinement-steps", refinement_steps
+     ; "id", `Int pb.id
+     ]
+    @ soln_or_refutation)
+;;
+
+let show_stat_intermediate_solution
+    ~(ctx : env)
+    (pb : PsiDef.t)
+    (soln : (soln, unrealizability_ctex list) Either.t option)
+    (elapsed : float)
+    (verif : float)
+    (total_configurations : int)
+    : unit
+  =
+  if !Config.json_progressive && !Config.json_out
+  then (
+    let json =
+      `Assoc
+        [ ( "intermediate_result"
+          , single_configuration_json ~is_ocaml_syntax:true ~ctx pb soln elapsed verif )
+        ; "id", `Int pb.id
+        ; "total_configurations", `Int total_configurations
         ]
     in
     pf stdout "%s@." (Yojson.to_string ~std:false json))

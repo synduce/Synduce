@@ -6,6 +6,8 @@ open Lang
 open Utils
 module G = ConfGraph
 
+let total_configurations = ref 0
+
 let single_configuration_solver
     ?(lemmas = Se2gis.Lemmas.empty_lemmas ())
     ~(ctx : env)
@@ -21,6 +23,37 @@ let single_configuration_solver
       (* Default algorithm: best combination of techniques (TODO) *)
     else Se2gis.Main.solve_problem ~lemmas ~ctx p
   in
+  (* Print intermediate result if we are looking for more than one solution *)
+  if !Config.Optims.max_solutions > 0
+  then (
+    let elapsed = Stats.get_glob_elapsed ()
+    and verif = !Stats.verif_time in
+    match resp with
+    | Realizable s ->
+      AlgoLog.show_stat_intermediate_solution
+        ~ctx
+        p
+        (Some (Either.first s))
+        elapsed
+        verif
+        !total_configurations
+    | Unrealizable u ->
+      AlgoLog.show_stat_intermediate_solution
+        ~ctx
+        p
+        (Some (Either.second u))
+        elapsed
+        verif
+        !total_configurations
+    | Failed _ ->
+      AlgoLog.show_stat_intermediate_solution
+        ~ctx
+        p
+        None
+        elapsed
+        verif
+        !total_configurations);
+  (* Save stats an restart counters. *)
   LogJson.save_stats_and_restart p.id;
   resp
 ;;
@@ -74,9 +107,9 @@ let find_and_solve_problem
             G.mark_unrealizable rstate sub_conf;
             G.cache rstate u;
             find_sols (a @ [ new_ctx, new_pdef, Unrealizable u ])
-          | Failed _ ->
+          | Failed f ->
             G.mark_unrealizable rstate sub_conf;
-            find_sols a)
+            find_sols (a @ [ new_ctx, new_pdef, Failed f ]))
       | None -> a
     in
     find_sols []
@@ -99,6 +132,7 @@ let find_and_solve_problem
         ~f:(fun ~key:_ ~data:l c -> c * (2 ** List.length l))
         max_configuration
     in
+    total_configurations := subconf_count;
     Utils.Log.info (fun fmt () -> Fmt.pf fmt "%i configurations possible." subconf_count);
     subconf_count, find_multiple_solutions ctx top_userdef_problem max_configuration)
   else

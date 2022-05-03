@@ -3,11 +3,11 @@ let join x8 x9 = x8 + x9
 
 let j2 x10 x11 = x10 + x11
 
- target⟨join, j2⟩(): int ptree -> int  = 
+ target⟨join, j2⟩(): int ptree -> int  =
 {
   ‣ main  PNil  ⟹  0
   ‣ main  PNode(a, l)  ⟹  join a (sum l)
     sum  LNil  ⟹  0
     sum  Cons(hd, tl)  ⟹  j2 (main hd) (sum tl)
-  
+
   }

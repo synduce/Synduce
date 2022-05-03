@@ -426,7 +426,9 @@ let synthesize_new_lemma ~(ctx : env) ~(p : PsiDef.t) (det : term_info) : term o
       ctx
       >>- handle_lemma_synth_response
             det
-            (SygusInterface.SygusSolver.solve_commands commands)
+            (SygusInterface.SygusSolver.solve_commands
+               ~timeout:(Some !Config.Optims.wait_parallel_tlimit)
+               commands)
     with
     | None -> None
     | Some solns -> List.nth solns 0
@@ -670,10 +672,8 @@ let synthesize_lemmas
       Log.error_msg "SyGuS solver failed to find a solution.";
       Error RFail
     | RInfeasible, _ ->
-      (* Rare - but the synthesis solver can answer "infeasible", in which case it can give
-             counterexamples. *)
-      ctx >- AlgoLog.print_infeasible_message lstate.t_set;
-      Ok (Either.Second unr_ctexs)
+      (* The synthesis solver had answered infeasible but we couln not generate a predicate. *)
+      Error RFail
     | RUnknown, _ ->
       (* In most cases if the synthesis solver does not find a solution and terminates, it will
              answer unknowns. We interpret it as "no solution can be found". *)

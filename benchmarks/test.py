@@ -27,10 +27,8 @@ def run_benchmarks(input_files, algos, optims, num_runs=1, csv_output=None, exit
 
         if len(filename_with_opt) >= 4:
             expect_many = int(filename_with_opt[3]) > 0
-            progress_opt = ""
         else:
             expect_many = False
-            progress_opt = "--json-progress"
 
         csvline_all_algos = []
         for algo in algos:
@@ -54,11 +52,12 @@ def run_benchmarks(input_files, algos, optims, num_runs=1, csv_output=None, exit
                 # Print benchmark name, algorithm used and optimization options.
                 bench_id = "%s,%s+%s" % (filename, algo[0], optim[0])
                 progress = f"({benchmark_cnt} / {benchmark_total})"
-                command = ("%s %s %s --compact -j %s %s %s %s %s %s" %
-                           (timeout, exec_path, algo[1], progress_opt, optim[1], extra_opt,
+                command = ("%s %s %s --compact -j --json-progress %s %s %s %s %s" %
+                           (timeout, exec_path, algo[1], optim[1], extra_opt,
                             os.path.realpath(os.path.join(
                                 "benchmarks", filename)),
                             soln_file_opt, gen_opt))
+                # print(command)
                 bench_cat = "->".join(bench_id.split(".")[0].split("/")[:-1])
                 if not bench_cat == prev_bench_cat:
                     print(f"\n⏺ Category: {bench_cat}")
@@ -140,6 +139,9 @@ if __name__ == "__main__":
 
     aparser.add_argument(
         "-T", "--timeout", help="Set the timeout in seconds.", type=int, default=600)
+    aparser.add_argument(
+        "-Z", "--solve-timeout", help="Set the single instance solver timeout in seconds.",
+        type=float, default=-1.0)
     args = aparser.parse_args()
 
     if args.summary:
@@ -193,7 +195,7 @@ if __name__ == "__main__":
         cvc = " --cvc5"
 
     other_alg = []
-    print(args.compare)
+
     if args.compare is not None:
         if "segis" in args.compare:
             other_alg += [["segis", "--segis " + cvc]]
@@ -206,7 +208,10 @@ if __name__ == "__main__":
     if args.single and args.single != "":
         print("Running single file")
         algos = [["se2gis", cvc]] + other_alg
-        optims = [["all", ""]]
+        if args.solve_timeout > 0:
+            optims = [["all", f"--solve-timeout={args.solve_timeout}"]]
+        else:
+            optims = [["all", ""]]
         binfo = str(args.single).split("+")
         extra_args = str(binfo[1]).strip() if len(binfo) > 1 else ""
         binfo = [str(binfo[0]), extra_args, args.unrealizable]
@@ -249,7 +254,12 @@ if __name__ == "__main__":
             bench_set += unrealizable_benchmarks
 
         if run_incomplete:
-            optims = [["all", ""]]
+            if args.solve_timeout > 0:
+                solve_timeout = args.solve_timeout
+            else:
+                solve_timeout = 10.0
+            optims = [
+                ["all", f"-s 2 --no-lifting -NB --solve-timeout={solve_timeout}"]]
             bench_set += incomplete_benchmarks
 
         run_benchmarks(bench_set, algos,

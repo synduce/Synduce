@@ -26,7 +26,8 @@ let rec refinement_loop
   let elapsed = Stats.get_glob_elapsed () in
   if !Config.info
   then AlgoLog.show_steps ctx tsize usize
-  else AlgoLog.show_stat ctx elapsed tsize usize;
+  else if !Config.Optims.max_solutions <= 0
+  then AlgoLog.show_stat_refinement_step ctx elapsed tsize usize;
   (* Add lemmas interactively if the option is set. *)
   let () =
     if !Config.interactive_lemmas

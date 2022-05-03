@@ -390,7 +390,7 @@ let check_image_sat ~(ctx : env) ~(p : PsiDef.t) ctex
     let steps = ref 0 in
     (* A single check for a bounded term. *)
     let t_check accum t =
-      (* Build equations of the form (f t) != (value of elimination var in model) *)
+      (* Build equations of the form (f(r(t)) != (value of elimination var in model) *)
       let term_eqs =
         List.map ctex.ctex_eqn.eelim ~f:(fun (_, elimv) ->
             Terms.(f_compose_r t == (ctx >- Eval.in_model ctex.ctex_model elimv)))
@@ -434,11 +434,12 @@ let check_image_sat ~(ctx : env) ~(p : PsiDef.t) ctex
     let* () = AsyncSmt.exec_all solver_instance t_decl in
     (* Run the bounded checking loop. *)
     let* res =
-      ctx
-      >- Expand.lwt_expand_loop
-           steps
-           t_check
-           (return (TermSet.singleton ctex.ctex_eqn.eterm))
+      let x =
+        mk_var
+          ctx.ctx
+          (Variable.mk ~t:(Some (List.hd_exn p.target.pinput_typ)) ctx.ctx "_x")
+      in
+      ctx >- Expand.lwt_expand_loop steps t_check (return (TermSet.singleton x))
     in
     let* () = AsyncSmt.close_solver solver_instance in
     return (Stats.BoundedChecking, res)

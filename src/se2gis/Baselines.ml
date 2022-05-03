@@ -40,9 +40,11 @@ let rec segis_loop ~(ctx : env) (p : PsiDef.t) (t_set : TermSet.t)
   let tsize = Set.length t_set
   and usize = 0 in
   Stats.log_new_major_step ~tsize ~usize ();
+  (* Show intemediate refinement step information depending on mode. *)
   if !Config.info
   then AlgoLog.show_steps ctx tsize usize
-  else AlgoLog.show_stat ctx elapsed tsize usize;
+  else if !Config.Optims.max_solutions <= 0
+  then AlgoLog.show_stat_refinement_step ctx elapsed tsize usize;
   Log.debug_msg
     Fmt.(str "<SEGIS> Start refinement loop with %i terms in T." (Set.length t_set));
   (* Start of the algorithm. *)
@@ -131,7 +133,8 @@ let rec cegis_loop ~(ctx : Env.env) (p : PsiDef.t) (t_set : TermSet.t)
   Stats.log_new_major_step ~tsize ~usize:0 ();
   if !Config.info
   then AlgoLog.show_steps ctx tsize 0
-  else AlgoLog.show_stat ctx elapsed tsize 0;
+  else if !Config.Optims.max_solutions <= 0
+  then AlgoLog.show_stat_refinement_step ctx elapsed tsize 0;
   Log.debug_msg
     Fmt.(str "<CEGIS> Start refinement loop with %i terms in T." (Set.length t_set));
   (* Start of the algorithm. *)

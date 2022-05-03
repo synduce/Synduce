@@ -220,6 +220,7 @@ let handle_ensures_synth_response
     ~(ctx : Context.t)
     ((task, resolver) : Sygus.solver_response option Lwt.t * int Lwt.u)
     (var : variable)
+    : [ `Solution of (string * string list * term) list | `Infeasible | `Failure ]
   =
   let parse_synth_fun (fname, _fargs, _, fbody) =
     let body, _ =
@@ -236,8 +237,9 @@ let handle_ensures_synth_response
   with
   | Some (RSuccess resps) ->
     let soln = List.map ~f:parse_synth_fun resps in
-    Some soln
-  | Some RInfeasible | Some RFail | Some RUnknown | None -> None
+    `Solution soln
+  | Some RInfeasible -> `Infeasible
+  | Some RFail | Some RUnknown | None -> `Failure
 ;;
 
 let make_ensures_name (id : int) = "ensures_" ^ Int.to_string id
@@ -558,9 +560,18 @@ let rec synthesize
               (List.map ~f:(ctx >- constraint_of_neg id ~p) negatives
               @ List.map ~f:(ctx >- constraint_of_pos id) new_positives)))
   in
-  match ctx >>- handle_ensures_synth_response (ctx >- HLSolver.solve solver) var with
-  | None -> None
-  | Some solns ->
+  match
+    ctx
+    >>- handle_ensures_synth_response
+          (ctx
+          >- HLSolver.solve ~timeout:(Some !Config.Optims.wait_parallel_tlimit) solver)
+          var
+  with
+  | `Infeasible ->
+    (* TODO check logic *)
+    Some (Terms.bool true)
+  | `Failure -> None
+  | `Solution solns ->
     let _, _, body = List.nth_exn solns 0 in
     let ensures = mk_fun ctx.ctx [ FPatVar var ] (Eval.simplify body) in
     Log.debug_msg Fmt.(str "Ensures candidate is %a." (pp_term ctx.ctx) ensures);

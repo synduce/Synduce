@@ -16,14 +16,30 @@ def run_one(progress, bench_id, command, algo, optim, filename, extra_opt, expec
     last_verif_time = 0.0
     last_elapsed = 0.0
     last_info = None
+    # Intermediate solutions counts
+    count_solns = 0
+    count_unr = 0
+    count_fails = 0
+    interm_elapsed = 0.0
+    interm_verif = 0.0
     # Poll process for new output until finished
     while True:
         try:
             line = process.stdout.readline()
             data = json.loads(line)
             info = MultiDataObj(data)
-            last_verif_time = info.verif_elapsed
-            last_elapsed = info.elapsed
+            if info.is_intermediate:
+                interm_elapsed += info.elapsed
+                interm_verif += info.verif_elapsed
+                if info.failed:
+                    count_fails += 1
+                elif info.is_unrealizable:
+                    count_unr += 1
+                else:
+                    count_solns += 1
+            else:
+                last_verif_time = info.verif_elapsed
+                last_elapsed = info.elapsed
             last_info = info
         except Exception as e:
             info = MultiDataObj({})
@@ -34,11 +50,20 @@ def run_one(progress, bench_id, command, algo, optim, filename, extra_opt, expec
 
         if process.poll() is not None or info.is_successful:
             break
-        print(
-            f"{progress : >11s}.. benchmarks/{filename} {extra_opt} {algo[1]} {optim[1]} 🏃 at step {info.major_step_count(0)}:{info.minor_step_count(0)}", end="\r")
+        if info.is_progress:
+            print(
+                f"{progress : >11s}.. benchmarks/{filename} {extra_opt} {algo[1]} {optim[1]} 🏃 at step {info.major_step_count(0)}:{info.minor_step_count(0)}", end="\r")
 
     if info is not None and last_info is None:
         last_info = info
+
+    # Save intermediate solution counts in info
+    if last_info.is_intermediate:
+        last_info.is_successful = True
+        last_info.elapsed = interm_elapsed
+        last_info.verif_elapsed = interm_verif
+        last_info.set_counts(count_solns, count_unr, count_fails)
+
     return last_info
 
 
@@ -101,17 +126,26 @@ class BenchmarkResult(object):
         num_total_confs = self.info.count_total_configurations()
         num_solutions = self.info.count_solutions()
         num_unrealizable = self.info.count_unrealizable_configurations()
+        num_failures = self.info.count_failures()
 
-        msg = f"{self.progress : >11s} ✅"
+        msg = f"{self.progress : >11s}"
+        if self.info.is_intermediate:
+            msg += " ❔ "
+        else:
+            msg += " ✅ "
         msg += f"{current_algo: <6s}: {self.benchmark_name: <33s} ×{self.num_runs} runs,"
-        msg += f" {self.timing(): <30s}"
-        cnt = f"{num_solved_confs}/{num_total_confs} S:{num_solutions}, U:{num_unrealizable}"
-        msg += f" {cnt : <10s}"
+        msg += f" {self.timing(): <25s}"
+        ratio = f"{num_solved_confs}/{num_total_confs}"
+        cnt = f"{ratio: <15s} S:{str(num_solutions) : <6s}"
+        cnt += f"U:{str(num_unrealizable): <6s}"
+        cnt += f"F:{str(num_failures): <6s}"
+        msg += f" {cnt : <24s}"
         print(msg)
 
         csv = f"{self.elapsed: 4.3f},"
         csv += "N/A,"
         csv += f"{self.delta : .0f},"
+        csv += f"{not self.info.is_intermediate}"
         csv += f"{num_solved_confs},"
         csv += f"{num_total_confs},"
         csv += f"{num_solutions},"
@@ -146,10 +180,10 @@ def run_n(progress, bench_id, command, filename, realizable=True, expect_many=Fa
             info = MultiDataObj({})
             info.is_successful = False
 
-        if (info is not None and
-            info.is_successful and
-            ((realizable and not info.is_unrealizable) or
-                (not realizable and info.is_unrealizable))):
+        matches_expected_realizability = ((realizable and not info.is_unrealizable) or
+                                          (not realizable and info.is_unrealizable)) if info is not None else False
+
+        if matches_expected_realizability and info.is_successful:
             total_elapsed += info.elapsed
             verif_elapsed += info.verif_elapsed
             max_e = max(info.elapsed, max_e)
@@ -161,16 +195,22 @@ def run_n(progress, bench_id, command, filename, realizable=True, expect_many=Fa
             sys.stdout.flush()
         else:
             break
-
+    if info.is_intermediate:
+        print
     result = BenchmarkResult(info, progress, total_elapsed / num_runs)
     result.verif_elapsed = verif_elapsed / num_runs
-    delta = 1000 * max(abs(max_e - result.elapsed), abs(min_e-result.elapsed))
+    result.benchmark_name = bench_name
     sp = " "
     csvline = "?,?,?,?,?,?"
 
-    if info is not None and info.is_successful and ((realizable and not info.is_unrealizable) or (not realizable and info.is_unrealizable)):
-        result.delta = delta
-        result.timing
+    matches_expected_realizability = ((realizable and not info.is_unrealizable) or
+                                      (not realizable and info.is_unrealizable)) if info is not None else False
+
+    if matches_expected_realizability and info.is_successful:
+        if num_runs > 1:
+            result.delta = 1000 * \
+                max(abs(max_e - result.elapsed), abs(min_e-result.elapsed))
+
         if expect_many:
             csvline = result.success_msg_multi()
         else:
@@ -186,6 +226,3 @@ def run_n(progress, bench_id, command, filename, realizable=True, expect_many=Fa
     sys.stdout.flush()
 
     return errors, result.elapsed, csvline
-
-
-# def run_multi_configuration(progress, bench_id, command, filename, )

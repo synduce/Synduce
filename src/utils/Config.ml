@@ -18,7 +18,12 @@ let info = ref true
 (** Json output toggle.  *)
 let json_out = ref false
 
-(** When Json output is on, set true to get partial updates in Json format. *)
+(**
+  When Json output is on, set true to get partial updates in Json format.
+  When the tool searches for a single solution, print intermediate refinement steps.
+  When the tool searches for multiples ones, print intermediate results (unrealizable,
+  failures and solutions).
+*)
 let json_progressive = ref false
 
 let print_unrealizable_configs = ref false
@@ -298,6 +303,7 @@ let options print_usage parse_only =
   ; '\000', "parse-only", set parse_only true, None
   ; '\000', "rstar-limit", None, Some set_rstar_limit
   ; '\000', "show-vars", set show_vars true, None
+  ; '\000', "solve-timeout", None, Some set_wait_parallel_tlimit
   ; '\000', "sysfe-opt-off", set sysfe_opt false, None
   ; '\000', "use-bmc", set use_bmc true, None
   ; '\000', "verif-with", None, Some set_verification_solver

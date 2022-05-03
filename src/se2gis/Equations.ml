@@ -814,7 +814,9 @@ module Solve = struct
       (* Call the solver on the generated file. *)
       if not gen_only
       then (
-        let t, r = ctx >- HLSolver.solve solver in
+        let t, r =
+          ctx >- HLSolver.solve ~timeout:(Some !Config.Optims.wait_parallel_tlimit) solver
+        in
         ( Lwt.map
             (function
               | Some resp -> handle_response resp

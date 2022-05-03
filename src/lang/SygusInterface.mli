@@ -13,7 +13,8 @@ module SygusSolver : sig
   end
 
   val solve_commands
-    :  ?solver_kind:CoreSolver.t
+    :  ?timeout:float option
+    -> ?solver_kind:CoreSolver.t
     -> Sygus.program
     -> Sygus.solver_response option Lwt.t * int Lwt.u
 end
@@ -125,6 +126,12 @@ module HLSolver : sig
   val synthesize : Sygus.command list -> t -> t
   val constrain : ctx:Context.t -> term list -> t -> t
   val set_logic : string -> t -> t
-  val solve : ctx:Context.t -> t -> Sygus.solver_response option Lwt.t * int Lwt.u
+
+  val solve
+    :  ?timeout:float option
+    -> ctx:Context.t
+    -> t
+    -> Sygus.solver_response option Lwt.t * int Lwt.u
+
   val to_file : ctx:Context.t -> string -> t -> unit
 end

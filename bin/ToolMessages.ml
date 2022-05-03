@@ -29,54 +29,6 @@ let start_message filename is_ocaml_syntax =
     Log.sep ())
 ;;
 
-let prep_final_json
-    ~(is_ocaml_syntax : bool)
-    ~(ctx : env)
-    (source_filename : string ref)
-    (pb : PsiDef.t)
-    (soln : (soln, unrealizability_ctex list) Either.t)
-    (elapsed : float)
-    (verif : float)
-    : Yojson.t
-  =
-  let _ = is_ocaml_syntax, source_filename, pb, soln in
-  let solvers =
-    Option.value ~default:(`String "unknown") (Utils.LogJson.get_solver_stats pb.id)
-  in
-  let refinement_steps =
-    Option.value ~default:(`String "unknown") (Utils.LogJson.get_summary pb.id)
-  in
-  let algo =
-    if !Config.Optims.use_segis
-    then "SEGIS"
-    else if !Config.Optims.use_cegis
-    then "CEGIS"
-    else "SE2GIS"
-  in
-  let soln_or_refutation =
-    match soln with
-    | Either.First soln ->
-      [ ( "solution"
-        , `String
-            (Fmt.str
-               "%a"
-               (box (ctx >- Common.Pretty.pp_soln ~use_ocaml_syntax:is_ocaml_syntax))
-               soln) )
-      ; "unrealizable", `Bool false
-      ]
-    | Either.Second _ -> [ "unrealizable", `Bool true ]
-  in
-  `Assoc
-    ([ "algorithm", `String algo
-     ; "total_elapsed", `Float elapsed
-     ; "verif_elapsed", `Float verif
-     ; "solver-usage", solvers
-     ; "refinement-steps", refinement_steps
-     ; "id", `Int pb.id
-     ]
-    @ soln_or_refutation)
-;;
-
 let on_success
     ?(print_unrealizable = false)
     ~(is_ocaml_syntax : bool)
@@ -145,7 +97,43 @@ let on_success
     Fmt.(pf stdout "%i,%.4f,%.4f@." (get_refinement_steps ctx) verif_time elapsed);
     Fmt.(pf stdout "success@."));
   ctx
-  >>> prep_final_json ~is_ocaml_syntax source_filename pb result elapsed !Stats.verif_time
+  >>> Common.AlgoLog.single_configuration_json
+        ~is_ocaml_syntax
+        pb
+        (Some result)
+        elapsed
+        !Stats.verif_time
+;;
+
+let on_failure ?(is_ocaml_syntax = true) ~(ctx : env) (pb : PsiDef.t) : Yojson.t =
+  let elapsed, verif_time =
+    Option.value
+      ~default:(Stats.get_glob_elapsed (), !Stats.verif_time)
+      (LogJson.get_simple_stats pb.id)
+  in
+  let verif_ratio = 100.0 *. (verif_time /. elapsed) in
+  (* Print the solution. *)
+  Log.(
+    info (fun frmt () ->
+        pf
+          frmt
+          "Filed to find solution %4.4fs (%3.1f%% verifying):@.%a@]"
+          elapsed
+          verif_ratio
+          (box (ctx >- Lang.PMRS.pp_ocaml ~short:false))
+          pb.target));
+  (* If no info required, output timing information. *)
+  if (not !Config.info) && !Config.timings
+  then (
+    Fmt.(pf stdout "%i,%.4f,%.4f@." (get_refinement_steps ctx) verif_time elapsed);
+    Fmt.(pf stdout "success@."));
+  ctx
+  >>> Common.AlgoLog.single_configuration_json
+        ~is_ocaml_syntax
+        pb
+        None
+        elapsed
+        !Stats.verif_time
 ;;
 
 (** Print a summary of the options available. The options are in the Lib.Utils.Config module.  *)
