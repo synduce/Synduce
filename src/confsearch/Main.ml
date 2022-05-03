@@ -29,7 +29,7 @@ let find_and_solve_problem
     ~(ctx : env)
     (psi_comps : (string * string * string) option)
     (pmrs : (string, PMRS.t, Base.String.comparator_witness) Map.t)
-    : (env * PsiDef.t * Syguslib.Sygus.solver_response segis_response) list
+    : int * (env * PsiDef.t * Syguslib.Sygus.solver_response segis_response) list
   =
   (*  Find problem components *)
   let target_fname, spec_fname, repr_fname =
@@ -100,8 +100,8 @@ let find_and_solve_problem
         max_configuration
     in
     Utils.Log.info (fun fmt () -> Fmt.pf fmt "%i configurations possible." subconf_count);
-    find_multiple_solutions ctx top_userdef_problem max_configuration)
+    subconf_count, find_multiple_solutions ctx top_userdef_problem max_configuration)
   else
     (* Only solve the top-level skeleton, i.e. the problem specified by the user. *)
-    [ ctx, top_userdef_problem, single_configuration_solver ~ctx top_userdef_problem ]
+    1, [ ctx, top_userdef_problem, single_configuration_solver ~ctx top_userdef_problem ]
 ;;

@@ -27,10 +27,10 @@ def run_benchmarks(input_files, algos, optims, num_runs=1, csv_output=None, exit
 
         if len(filename_with_opt) >= 4:
             expect_many = int(filename_with_opt[3]) > 0
-            progress_opt = " "
+            progress_opt = ""
         else:
             expect_many = False
-            progress_opt = " --json-progress"
+            progress_opt = "--json-progress"
 
         csvline_all_algos = []
         for algo in algos:
@@ -65,9 +65,14 @@ def run_benchmarks(input_files, algos, optims, num_runs=1, csv_output=None, exit
                     prev_bench_cat = bench_cat
 
                 # Run the benchmark n times.
-                errors, elapsed, csvline = run_n(progress, bench_id, command, filename, realizable=realizable,
-                                                 algo=algo, expect_many=expect_many, optim=optim, extra_opt=extra_opt,
-                                                 errors=errors, num_runs=num_runs,
+                errors, elapsed, csvline = run_n(progress, bench_id, command, filename,
+                                                 realizable=realizable,
+                                                 algo=algo,
+                                                 expect_many=expect_many,
+                                                 optim=optim,
+                                                 extra_opt=extra_opt,
+                                                 errors=errors,
+                                                 num_runs=num_runs,
                                                  csv_output=csv_output)
 
                 csvline_all_algos += [f"{algo[0]}:{optim[0]}", csvline]
@@ -203,8 +208,8 @@ if __name__ == "__main__":
         algos = [["se2gis", cvc]] + other_alg
         optims = [["all", ""]]
         binfo = str(args.single).split("+")
-
-        binfo = [str(binfo[0]), "", args.unrealizable]
+        extra_args = str(binfo[1]).strip() if len(binfo) > 1 else ""
+        binfo = [str(binfo[0]), extra_args, args.unrealizable]
 
         if args.multi:
             binfo += [1]

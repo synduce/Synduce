@@ -54,7 +54,9 @@ let main () =
   in
   if !parse_only then Caml.exit 1;
   (* Solve the problem proper. *)
-  let outputs = ctx >>> Many.find_and_solve_problem psi_comps all_pmrs in
+  let num_configurations, outputs =
+    ctx >>> Many.find_and_solve_problem psi_comps all_pmrs
+  in
   let n_out = List.length outputs in
   let print_unrealizable = !Config.print_unrealizable_configs || n_out < 2 in
   let check_output u_count (ctx, pb, soln) =
@@ -85,9 +87,11 @@ let main () =
       | [ a ] -> snd (check_output u_count a)
       | _ ->
         let subproblem_jsons = List.map ~f:(check_output u_count) outputs in
-        `Assoc
-          (List.map subproblem_jsons ~f:(fun (psi_id, json) ->
-               Fmt.(str "problem_%i" psi_id), json))
+        let results =
+          List.map subproblem_jsons ~f:(fun (psi_id, json) ->
+              Fmt.(str "problem_%i" psi_id), json)
+        in
+        `Assoc (("total_configurations", `Int num_configurations) :: results)
     in
     if n_out > 1
     then

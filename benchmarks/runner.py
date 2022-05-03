@@ -11,7 +11,6 @@ def run_one(progress, bench_id, command, algo, optim, filename, extra_opt, expec
     sys.stdout.flush()
     process = subprocess.Popen(
         command, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
-    print(command, end="\n")
     info = None
     last_refinement_string = ""
     last_verif_time = 0.0
@@ -43,28 +42,82 @@ def run_one(progress, bench_id, command, algo, optim, filename, extra_opt, expec
     return last_info
 
 
-def success_msg(progress, info, elapsed, bench_name, num_runs, delta, timing, verif_elapsed):
-    current_algo = info.algo(0)
-    if info.is_proved_by_induction(0):
-        p_by_induction = "✓"
-    else:
-        p_by_induction = "~"
+class BenchmarkResult(object):
+    def __init__(self, info, progress, elapsed):
+        self.info = info
+        self.progress = progress
+        self.elapsed = elapsed
+        self.benchmark_name = ""
+        self.delta = 0.0
+        self.num_runs = 0
+        self.verif_elapsed = 0.0
 
-    if info.is_classified_by_induction(0):
-        c_by_induction = "✓"
-    else:
-        c_by_induction = "~"
+    def timing(self):
+        return f"average: {self.elapsed: 4.3f}s ±{self.delta_str()}"
 
-    refinement_rounds = info.get_refinement_summary(0)
-    if "." in refinement_rounds:
-        induction_info = f"B:{c_by_induction},B':{p_by_induction}"
-    else:
-        induction_info = "        "
+    def delta_str(self):
+        delta_str = f"{self.delta : .0f}ms"
+        if (float(self.delta) / (1000.0 * self.elapsed)) > 0.05:
+            delta_str = f"{delta_str} !"
+        else:
+            delta_str = f"{delta_str}  "
+        return delta_str
 
-    msg = f"{progress : >11s} ✅ {current_algo: <6s} : {bench_name : <33s} ×{num_runs} runs, {str(timing): <30s} {induction_info} | R: {refinement_rounds} {sp : <20s} "
-    print(msg)
+    def success_msg(self):
+        current_algo = self.info.algo(0)
+        if self.info.is_proved_by_induction(0):
+            p_by_induction = "✓"
+        else:
+            p_by_induction = "~"
 
-    return f"{elapsed: 4.3f}, N/A, {delta : .0f},{refinement_rounds},{c_by_induction},{p_by_induction},{verif_elapsed : 4.3f}"
+        if self.info.is_classified_by_induction(0):
+            c_by_induction = "✓"
+        else:
+            c_by_induction = "~"
+
+        refinement_rounds = self.info.get_refinement_summary(0)
+        if "." in refinement_rounds:
+            induction_info = f"B:{c_by_induction},B':{p_by_induction}"
+        else:
+            induction_info = "        "
+
+        msg = f"{self.progress : >11s} ✅"
+        msg += f"{current_algo: <6s}: {self.benchmark_name: <33s} ×{self.num_runs} runs,"
+        msg += f" {self.timing(): <30s} {induction_info} | R: {refinement_rounds} {sp : <15s} "
+        print(msg)
+
+        csv = f"{self.elapsed: 4.3f},"
+        csv += "N/A,"
+        csv += f"{self.delta : .0f},"
+        csv += f"{refinement_rounds},"
+        csv += f"{c_by_induction},"
+        csv += f"{p_by_induction},"
+        csv += f"{self.verif_elapsed : 4.3f}"
+        return csv
+
+    def success_msg_multi(self):
+        current_algo = self.info.algo(0)
+        num_solved_confs = self.info.count_solved_configurations()
+        num_total_confs = self.info.count_total_configurations()
+        num_solutions = self.info.count_solutions()
+        num_unrealizable = self.info.count_unrealizable_configurations()
+
+        msg = f"{self.progress : >11s} ✅"
+        msg += f"{current_algo: <6s}: {self.benchmark_name: <33s} ×{self.num_runs} runs,"
+        msg += f" {self.timing(): <30s}"
+        cnt = f"{num_solved_confs}/{num_total_confs} S:{num_solutions}, U:{num_unrealizable}"
+        msg += f" {cnt : <10s}"
+        print(msg)
+
+        csv = f"{self.elapsed: 4.3f},"
+        csv += "N/A,"
+        csv += f"{self.delta : .0f},"
+        csv += f"{num_solved_confs},"
+        csv += f"{num_total_confs},"
+        csv += f"{num_solutions},"
+        csv += f"{num_unrealizable},"
+        csv += f"{self.verif_elapsed : 4.3f}"
+        return csv
 
 
 def run_n(progress, bench_id, command, filename, realizable=True, expect_many=False, algo="se2gis",
@@ -109,21 +162,19 @@ def run_n(progress, bench_id, command, filename, realizable=True, expect_many=Fa
         else:
             break
 
-    elapsed = total_elapsed / num_runs
-    verif_elapsed = verif_elapsed / num_runs
-    delta = 1000 * max(abs(max_e - elapsed), abs(min_e-elapsed))
+    result = BenchmarkResult(info, progress, total_elapsed / num_runs)
+    result.verif_elapsed = verif_elapsed / num_runs
+    delta = 1000 * max(abs(max_e - result.elapsed), abs(min_e-result.elapsed))
     sp = " "
     csvline = "?,?,?,?,?,?"
 
     if info is not None and info.is_successful and ((realizable and not info.is_unrealizable) or (not realizable and info.is_unrealizable)):
-        delta_str = f"{delta : .0f}ms"
-        if (float(delta) / (1000.0 * elapsed)) > 0.05:
-            delta_str = f"{delta_str} !"
+        result.delta = delta
+        result.timing
+        if expect_many:
+            csvline = result.success_msg_multi()
         else:
-            delta_str = f"{delta_str}  "
-        timing = f"average: {elapsed: 4.3f}s ±{delta_str}"
-        csvline = success_msg(progress, info, elapsed,
-                              bench_name, num_runs, delta, timing, verif_elapsed)
+            csvline = result.success_msg()
     else:
         errors += [bench_id]
         print(f"{progress: >11s} ❌ {bench_id : <90s}")
@@ -134,7 +185,7 @@ def run_n(progress, bench_id, command, filename, realizable=True, expect_many=Fa
 
     sys.stdout.flush()
 
-    return errors,  elapsed, csvline
+    return errors, result.elapsed, csvline
 
 
 # def run_multi_configuration(progress, bench_id, command, filename, )

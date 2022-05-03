@@ -39,5 +39,5 @@ let rec list_is_sorted_decreasing = function
 
 and aux_decr a = function
   | Nil -> true
-  | Cons (hd, tl) -> a >= hd && aux_incr hd tl
+  | Cons (hd, tl) -> a >= hd && aux_decr hd tl
 ;;
