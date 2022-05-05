@@ -12,7 +12,6 @@ def run_one(progress, bench_id, command, algo, optim, filename, extra_opt, expec
     process = subprocess.Popen(
         command, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
     info = None
-    last_refinement_string = ""
     last_verif_time = 0.0
     last_elapsed = 0.0
     last_info = None
@@ -26,8 +25,16 @@ def run_one(progress, bench_id, command, algo, optim, filename, extra_opt, expec
     while True:
         try:
             line = process.stdout.readline()
+        except:
+            break
+        try:
             data = json.loads(line)
+        except Exception as e:
+            break
+
+        try:
             info = MultiDataObj(data)
+
             if info.is_intermediate:
                 interm_elapsed += info.elapsed
                 interm_verif += info.verif_elapsed
@@ -53,6 +60,9 @@ def run_one(progress, bench_id, command, algo, optim, filename, extra_opt, expec
         if info.is_progress:
             print(
                 f"{progress : >11s}.. benchmarks/{filename} {extra_opt} {algo[1]} {optim[1]} 🏃 at step {info.major_step_count(0)}:{info.minor_step_count(0)}", end="\r")
+        if info.is_intermediate:
+            print(
+                f"{progress : >11s}... benchmarks/{filename} {extra_opt} {algo[1]} {optim[1]} 🏃 [{count_solns}/{count_unr}/{count_fails}]", end='\r')
 
     if info is not None and last_info is None:
         last_info = info
@@ -82,7 +92,7 @@ class BenchmarkResult(object):
 
     def delta_str(self):
         delta_str = f"{self.delta : .0f}ms"
-        if (float(self.delta) / (1000.0 * self.elapsed)) > 0.05:
+        if self.elapsed > 0 and (float(self.delta) / (1000.0 * self.elapsed)) > 0.05:
             delta_str = f"{delta_str} !"
         else:
             delta_str = f"{delta_str}  "
@@ -183,7 +193,7 @@ def run_n(progress, bench_id, command, filename, realizable=True, expect_many=Fa
         matches_expected_realizability = ((realizable and not info.is_unrealizable) or
                                           (not realizable and info.is_unrealizable)) if info is not None else False
 
-        if matches_expected_realizability and info.is_successful:
+        if (matches_expected_realizability or expect_many) and info.is_successful:
             total_elapsed += info.elapsed
             verif_elapsed += info.verif_elapsed
             max_e = max(info.elapsed, max_e)
@@ -203,7 +213,10 @@ def run_n(progress, bench_id, command, filename, realizable=True, expect_many=Fa
     sp = " "
     csvline = "?,?,?,?,?,?"
 
-    matches_expected_realizability = ((realizable and not info.is_unrealizable) or
+    result_realizable = (not info.is_unrealizable) or (
+        info.count_solutions() > 0)
+
+    matches_expected_realizability = ((realizable and result_realizable) or
                                       (not realizable and info.is_unrealizable)) if info is not None else False
 
     if matches_expected_realizability and info.is_successful:
