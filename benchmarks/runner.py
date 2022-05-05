@@ -155,7 +155,7 @@ class BenchmarkResult(object):
         csv = f"{self.elapsed: 4.3f},"
         csv += "N/A,"
         csv += f"{self.delta : .0f},"
-        csv += f"{not self.info.is_intermediate}"
+        csv += f"{not self.info.is_intermediate},"
         csv += f"{num_solved_confs},"
         csv += f"{num_total_confs},"
         csv += f"{num_solutions},"
