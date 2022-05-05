@@ -36,12 +36,12 @@ let rec sum = function
 
 (* This is the target function.
   There are three unknown components:
-  s0, f0 and join
+  u0, u1 and u2
   *)
 let rec hsum = function
-  | CNil -> [%synt s0]
-  | Single a -> [%synt f0] a
-  | Concat (x, y) -> [%synt join] (hsum x) (hsum y)
+  | CNil -> [%synt u0]
+  | Single a -> [%synt u1] a
+  | Concat (x, y) -> [%synt u2] (hsum x)
 ;;
 
 assert (hsum = clist_to_conslist @@ sum)
