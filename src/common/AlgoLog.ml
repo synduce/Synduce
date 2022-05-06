@@ -91,6 +91,18 @@ let show_stat_intermediate_solution
     (total_configurations : int)
     : unit
   =
+  (* *)
+  let () =
+    match soln with
+    | Some (Either.First soln) ->
+      Log.info
+        Fmt.(
+          fun fmt () ->
+            pf fmt "%a" (box (ctx >- Pretty.pp_soln ~use_ocaml_syntax:true)) soln)
+    | Some (Either.Second _) -> Log.info Fmt.(fun fmt () -> pf fmt "Unrealizable.")
+    | None -> Log.info Fmt.(fun fmt () -> pf fmt "Failure.")
+  in
+  (* Json output *)
   if !Config.json_progressive && !Config.json_out
   then (
     let json =

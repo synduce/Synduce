@@ -77,6 +77,42 @@ def run_one(progress, bench_id, command, algo, optim, filename, extra_opt, expec
     return last_info
 
 
+class MultiCsvLine(object):
+    def __init__(self, elapsed, delta, complete, solved, total, solutions, unrealizable, verif):
+        self.elapsed = elapsed
+        self.delta = delta
+        self.complete = complete
+        self.solved = solved
+        self.total = total
+        self.solutions = solutions
+        self.unrealizable = unrealizable
+        self.verif_time = verif
+
+    def get_csv_string(self):
+        l = [self.elapsed, self.delta]
+        l += [self.complete, self.solved, self.total]
+        l += [self.solutions, self.unrealizable]
+        l += [self.verif]
+        return ",".join([str(x) for x in l])
+
+
+class SingleCsvLine(object):
+    def __init__(self, elapsed, delta, refinement_rounds,
+                 c_by_induction, p_by_induction, verif_elapsed):
+        self.elapsed = elapsed
+        self.delta = delta
+        self.refinement_rounds = refinement_rounds
+        self.c_by_induction = c_by_induction
+        self.p_by_induction = p_by_induction
+        self.verif_elapsed = verif_elapsed
+
+    def get_csv_string(self):
+        l = [self.elapsed, "N/A", self.delta]
+        l += [self.refinement_rounds, self.p_by_induction, self.c_by_induction]
+        l += [self.verif_elapsed]
+        return ",".join([str(x) for x in l])
+
+
 class BenchmarkResult(object):
     def __init__(self, info, progress, elapsed):
         self.info = info
@@ -121,14 +157,10 @@ class BenchmarkResult(object):
         msg += f" {self.timing(): <30s} {induction_info} | R: {refinement_rounds} {sp : <15s} "
         print(msg)
 
-        csv = f"{self.elapsed: 4.3f},"
-        csv += "N/A,"
-        csv += f"{self.delta : .0f},"
-        csv += f"{refinement_rounds},"
-        csv += f"{c_by_induction},"
-        csv += f"{p_by_induction},"
-        csv += f"{self.verif_elapsed : 4.3f}"
-        return csv
+        csv_obj = SingleCsvLine(self.elapsed, self.delta,
+                                refinement_rounds, c_by_induction, p_by_induction,
+                                self.verif_elapsed)
+        return csv_obj.get_csv_string()
 
     def success_msg_multi(self):
         current_algo = self.info.algo(0)
@@ -152,16 +184,12 @@ class BenchmarkResult(object):
         msg += f" {cnt : <24s}"
         print(msg)
 
-        csv = f"{self.elapsed: 4.3f},"
-        csv += "N/A,"
-        csv += f"{self.delta : .0f},"
-        csv += f"{not self.info.is_intermediate},"
-        csv += f"{num_solved_confs},"
-        csv += f"{num_total_confs},"
-        csv += f"{num_solutions},"
-        csv += f"{num_unrealizable},"
-        csv += f"{self.verif_elapsed : 4.3f}"
-        return csv
+        csv_obj = MultiCsvLine(self.elapsed, self.delta,
+                               not self.info.is_intermediate,
+                               num_solved_confs, num_total_confs,
+                               num_solutions, num_unrealizable,
+                               self.verif_elapsed)
+        return csv_obj.get_csv_string()
 
 
 def run_n(progress, bench_id, command, filename, realizable=True, expect_many=False, algo="se2gis",
@@ -230,11 +258,29 @@ def run_n(progress, bench_id, command, filename, realizable=True, expect_many=Fa
             csvline = result.success_msg()
     else:
         errors += [bench_id]
-        print(f"{progress: >11s} ❌ {bench_id : <90s}")
-        if info is not None:
-            csvline = f"N/A,N/A,N/A,f{info.major_step_count},N/A,N/A,{info.verif_elapsed : 4.3f}"
+        if expect_many:
+            print(f"{progress: >11s} ❌ {bench_id : <90s}")
+            if info is not None:
+                num_solutions = info.count_solutions()
+                num_unrealizable = info.count_unrealizable_configurations()
+                csv_obj = MultiCsvLine(
+                    info.elapsed, 0, False, info.count_solved_configurations(),
+                    info.total_configurations, num_solutions, num_unrealizable,
+                    info.verif_elapsed)
+                csvline = csv_obj.get_csv_string()
+            else:
+                csv_obj = MultiCsvLine("N/A", 0, False, 0, 0, 0, 0, "N/A")
+                csvline = csv_obj.get_csv_string()
         else:
-            csvline = f"N/A,N/A,N/A,N/A,N/A,N/A,N/A"
+            print(f"{progress: >11s} ❌ {bench_id : <90s}")
+            if info is not None:
+                csv_obj = SingleCsvLine(
+                    "N/A", "N/A", f"f{info.major_step_count}", "N/A", "N/A", info.verif_elapsed)
+                csvline = csv_obj.get_csv_string()
+            else:
+                csv_obj = SingleCsvLine(
+                    "N/A", "N/A", "N/A", "N/A", "N/A", "N/A")
+                csvline = csv_obj.get_csv_string()
 
     sys.stdout.flush()
 

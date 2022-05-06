@@ -46,13 +46,13 @@ list/zero_after_one.ml,se2gis:all, 1.862,N/A, 0,True,4,8,1,3, 0.000
 list/zeros_ones.ml,se2gis:all, 1.238,N/A, 0,True,4,8,1,3, 0.000
 tree/maxPathWeight.pmrs,se2gis:all, 11.003,N/A, 0,True,6,32,5,1, 0.000
 tree/max.ml,se2gis:all, 0.871,N/A, 0,True,5,16,1,4, 0.000
-tree/max2.pmrs,se2gis:all,N/A,N/A,N/A,f<bound method MultiDataObj.major_step_count of <parsing.MultiDataObj object at 0x7eff8fe7c2b0>>,N/A,N/A, 0.000
+tree/max2.pmrs,se2gis:all,N/A,N/A,N/A,N/A,N/A,N/A, 0.000
 tree/min.ml,se2gis:all, 0.800,N/A, 0,True,5,16,1,4, 0.000
 tree/minmax.ml,se2gis:all, 7.793,N/A, 0,True,7,64,5,2, 0.000
 tree/mips.ml,se2gis:all, 3.942,N/A, 0,True,4,8,1,3, 0.000
 tree/mits.ml,se2gis:all, 5.764,N/A, 0,True,4,8,1,3, 0.000
-tree/mpps.ml,se2gis:all,N/A,N/A,N/A,f<bound method MultiDataObj.major_step_count of <parsing.MultiDataObj object at 0x7eff8fe1dc10>>,N/A,N/A, 0.000
-tree/poly.ml,se2gis:all,N/A,N/A,N/A,f<bound method MultiDataObj.major_step_count of <parsing.MultiDataObj object at 0x7eff8fe7c2b0>>,N/A,N/A, 0.000
+tree/mpps.ml,se2gis:all,N/A,N/A,N/A,fN/A,N/A,N/A, 0.000
+tree/poly.ml,se2gis:all,N/A,N/A,N/A,fN/A,N/A,N/A, 0.000
 tree/poly2.ml,se2gis:all, 35.266,N/A, 0,True,6,32,2,4, 0.000
 tree/sorted.ml,se2gis:all, 3.265,N/A, 0,False,5,16,1,1, 0.026
 tree/sorted_2.ml,se2gis:all,N/A,N/A,N/A,f<bound method MultiDataObj.major_step_count of <parsing.MultiDataObj object at 0x7eff8fe1dd90>>,N/A,N/A, 0.000
