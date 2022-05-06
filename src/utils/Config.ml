@@ -119,6 +119,14 @@ let sysfe_opt = ref true
 *)
 let force_nonlinear = ref false
 
+(**
+  When `node_failure_behaviour` is set to `true` (the default value), the failure to solve a
+  given configuration is considered as an unrealizability result. That is, the configuration will
+  not be refined further. If `node_failure_behaviour` is set to `false`, the failure will only
+  interpreted as realizable: subconfigurations will be explored.
+*)
+let node_failure_behavior = ref true
+
 (* ============================================================================================= *)
 (*                                STORAGE AND BINARY PATHS                                       *)
 (* ============================================================================================= *)
@@ -260,6 +268,7 @@ let options print_usage parse_only =
   ; 'C', "check-smt-unrealizable", set check_unrealizable_smt_unsatisfiable true, None
   ; 'u', "no-check-unrealizable", set check_unrealizable false, None
   ; 'd', "debug", set debug true, None
+  ; 'e', "expand-on-failure", set node_failure_behavior false, None
   ; 'f', "force-nonlinear", set force_nonlinear true, None
   ; 'h', "help", Some print_usage, None
   ; 'i', "info-off", set info false, None
@@ -275,7 +284,7 @@ let options print_usage parse_only =
   ; 'o', "output", None, Some set_output_folder
   ; 'p', "num-threads", None, Some set_num_threads
   ; 's', "max-solutions", None, Some set_max_solutions
-  ; 't', "no-detupling", set detupling_on false, None
+  ; 't', "solve-timeout", None, Some set_wait_parallel_tlimit
   ; 'v', "verbose", set verbose true, None
   ; 'X', "classify-ctex", set classify_ctex true, None
   ; '\000', "segis", set use_segis true, None
@@ -294,6 +303,7 @@ let options print_usage parse_only =
   ; '\000', "json-progress", set json_progressive true, None
   ; '\000', "max-lifting", None, Some set_max_lifting_attempts
   ; '\000', "no-assumptions", set make_partial_correctness_assumption false, None
+  ; '\000', "no-detupling", set detupling_on false, None
   ; '\000', "no-gropt", set optimize_grammars 0, None
   ; '\000', "no-splitting", set split_solve_on false, None
   ; '\000', "no-rew", set use_rewrite_solver false, None
@@ -303,7 +313,6 @@ let options print_usage parse_only =
   ; '\000', "parse-only", set parse_only true, None
   ; '\000', "rstar-limit", None, Some set_rstar_limit
   ; '\000', "show-vars", set show_vars true, None
-  ; '\000', "solve-timeout", None, Some set_wait_parallel_tlimit
   ; '\000', "sysfe-opt-off", set sysfe_opt false, None
   ; '\000', "use-bmc", set use_bmc true, None
   ; '\000', "verif-with", None, Some set_verification_solver

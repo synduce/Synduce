@@ -303,9 +303,9 @@ if __name__ == "__main__":
             ["all", ""],
             #["ini", "-c"],
             # equation system splitting optimizations
-            ["split", "-t --no-splitting"],
+            ["split", "--no-detupling --no-splitting"],
             ["syn", "--no-syndef --no-gropt --no-rew"],  # syntactic optimizations
-            ["off", "-t --no-syndef --no-gropt --no-rew --no-splitting"]
+            ["off", "--no-detupling --no-syndef --no-gropt --no-rew --no-splitting"]
         ]
 
     # Table 4 / Test

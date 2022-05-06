@@ -59,7 +59,7 @@ let main () =
   in
   let n_out = List.length outputs in
   let print_unrealizable = !Config.print_unrealizable_configs || n_out < 2 in
-  let check_output u_count (ctx, pb, soln) =
+  let check_output (u_count, f_count) (ctx, pb, soln) =
     Common.ProblemDefs.(
       match pb, soln with
       | pb, Realizable soln ->
@@ -77,16 +77,19 @@ let main () =
                 pb
                 (Either.Second ctexs) )
       | _, Failed _ ->
+        Int.incr f_count;
         Log.error_msg "Failed to find a solution or a witness of unrealizability";
         pb.PsiDef.id, ctx >>> ToolMessages.on_failure pb)
   in
   let json_out =
-    let u_count = ref 0 in
+    let u_count = ref 0
+    and f_count = ref 0 in
     let json =
       match outputs with
-      | [ a ] when !Config.Optims.max_solutions <= 0 -> snd (check_output u_count a)
+      | [ a ] when !Config.Optims.max_solutions <= 0 ->
+        snd (check_output (u_count, f_count) a)
       | _ ->
-        let subproblem_jsons = List.map ~f:(check_output u_count) outputs in
+        let subproblem_jsons = List.map ~f:(check_output (u_count, f_count)) outputs in
         let results =
           List.map subproblem_jsons ~f:(fun (psi_id, json) ->
               Fmt.(str "problem_%i" psi_id), json)
@@ -100,10 +103,11 @@ let main () =
           fun fmt () ->
             pf
               fmt
-              "%i configurations solved, %i solutions (%i unrealizable)."
+              "%i configurations solved, %i solutions, %i unrealizable (%i failed)."
               n_out
               (n_out - !u_count)
-              !u_count);
+              !u_count
+              !f_count);
     json
   in
   (if !Config.json_out

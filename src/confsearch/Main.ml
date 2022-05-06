@@ -80,7 +80,7 @@ let find_and_solve_problem
     let open Configuration in
     let rstate = G.generate_configurations ctx top_userdef_problem.PsiDef.target in
     let rec find_sols a =
-      match G.next rstate with
+      match G.next ~shuffle:true rstate with
       | Some sub_conf ->
         Int.incr num_attempts;
         let conf = Subconf.to_conf mc sub_conf in
@@ -106,10 +106,11 @@ let find_and_solve_problem
           | Unrealizable u ->
             G.mark_unrealizable rstate sub_conf;
             G.cache rstate u;
-            find_sols (a @ [ new_ctx, new_pdef, Unrealizable u ])
+            find_sols ((new_ctx, new_pdef, Unrealizable u) :: a)
           | Failed f ->
-            G.mark_unrealizable rstate sub_conf;
-            find_sols (a @ [ new_ctx, new_pdef, Failed f ]))
+            G.mark_failed rstate sub_conf;
+            if !Config.node_failure_behavior then () else G.expand rstate sub_conf;
+            find_sols ((new_ctx, new_pdef, Failed f) :: a))
       | None -> a
     in
     find_sols []

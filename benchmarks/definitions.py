@@ -82,7 +82,7 @@ reduced_benchmark_set_table2 = [
     ["list/minhom.pmrs", ""],
     ["list/last.pmrs", ""],
     ["list/msshom.pmrs", ""],
-    ["tree/sorted.pmrs", "-t"],
+    ["tree/sorted.pmrs", "--no-detupling"],
     ["tree/mips.pmrs", ""],
 ]
 
@@ -154,7 +154,7 @@ base_benchmark_set = [
     ["list/zero_after_one.ml", ""],
     ["list/zeros_ones.ml", ""],
     # List to tree
-    ["list/issorted.pmrs", "-t"],
+    ["list/issorted.pmrs", "--no-detupling"],
     ["list_to_tree/search.pmrs", ""],
     ["list_to_tree/search_v2.pmrs", ""],
     ["list_to_tree/search_v3.pmrs", ""],
@@ -192,7 +192,7 @@ base_benchmark_set = [
     ["tree/mpps.pmrs", "--no-gropt"],
     ["tree/poly.pmrs", ""],
     ["tree/poly2.ml", ""],
-    ["tree/sorted.pmrs", "-t"],
+    ["tree/sorted.pmrs", "--no-detupling"],
     ["tree/sorted_2.ml", ""],
     ["tree/sumtree.pmrs", ""],
     # Tree paths
@@ -458,7 +458,7 @@ incomplete_benchmarks = [
     ["tree/mpps.ml", "--no-gropt", True, 1],
     ["tree/poly.ml", "", True, 1],
     ["tree/poly2.ml", "", True, 1],
-    ["tree/sorted.ml", "-t", True, 1],
+    ["tree/sorted.ml", "--no-detupling", True, 1],
     ["tree/sorted_2.ml", "", True, 1],
     ["tree/sum.ml", "", True, 1],
 ]

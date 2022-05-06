@@ -12,12 +12,18 @@ open Lang
 module G = Graph.Imperative.Digraph.Concrete (Subconf)
 include G
 
+type mark =
+  | Realizable
+  | Unrealizable
+  | Failed
+  | Unsolved
+
 (** A type to represent the state of the configuration graph exploration.
   We need to remember the graph and mark configurations as solved or not.
 *)
 type state =
   { graph : t (** The graph of configurations. *)
-  ; marks : int Hashtbl.M(Subconf).t
+  ; marks : mark Hashtbl.M(Subconf).t
         (**
         A negative mark means unrealizable.
         A positive mark means a solution has been found.
@@ -34,14 +40,20 @@ type state =
   }
 
 let mark_unrealizable (s : state) (conf : Subconf.t) =
-  Hashtbl.set s.marks ~key:conf ~data:(-1)
+  Hashtbl.set s.marks ~key:conf ~data:Unrealizable
 ;;
 
-let mark_realizable (s : state) (conf : Subconf.t) = Hashtbl.set s.marks ~key:conf ~data:1
+let mark_realizable (s : state) (conf : Subconf.t) =
+  Hashtbl.set s.marks ~key:conf ~data:Realizable
+;;
+
+let mark_failed (s : state) (conf : Subconf.t) =
+  Hashtbl.set s.marks ~key:conf ~data:Failed
+;;
 
 let is_unmarked (s : state) (conf : Subconf.t) =
   match Hashtbl.find s.marks conf with
-  | Some 0 | None -> true
+  | Some Unsolved | None -> true
   | _ -> false
 ;;
 
@@ -97,15 +109,18 @@ let expand ?(use_po = true) (s : state) (conf : Subconf.t) : unit =
     List.iter (Subconf.drop_arg conf) ~f:(fun c ->
         match Hashtbl.find s.marks c with
         (* Already solved: no need to add new edge. *)
-        | Some x when not (x = 0) -> ()
-        | Some _ -> add_edge s.graph conf c
+        | Some Realizable | Some Unrealizable -> ()
+        | Some Failed ->
+          if !Utils.Config.node_failure_behavior then () else add_edge s.graph conf c
+        | Some Unsolved -> add_edge s.graph conf c
         | None ->
-          Hashtbl.set s.marks ~key:c ~data:0;
+          Hashtbl.set s.marks ~key:c ~data:Unsolved;
           add_edge s.graph conf c)
   in
   match Hashtbl.find s.marks conf with
   (* The configuration is unrealizable. No subconfiguration can be realizable. *)
-  | Some x when x < 0 -> if use_po then () else add_edges ()
+  | Some Unrealizable -> if use_po then () else add_edges ()
+  | Some Failed -> if !Utils.Config.node_failure_behavior then () else add_edges ()
   | _ -> add_edges ()
 ;;
 
@@ -119,15 +134,15 @@ let next ?(shuffle = false) (s : state) : Subconf.t option =
   let rec loop () =
     Option.bind (Queue.dequeue q) ~f:(fun curr ->
         match Hashtbl.find s.marks curr with
-        | Some 0 -> Some curr
-        | None ->
-          Hashtbl.set s.marks ~key:curr ~data:0;
-          Some curr
-        | Some x when x < 0 -> loop ()
+        | Some Unsolved -> Some curr
+        | Some Unrealizable -> loop ()
         | Some _ ->
           let children = List.filter ~f:(is_unmarked s) (succ s.graph curr) in
           Queue.enqueue_all q (if shuffle then List.permute children else children);
-          loop ())
+          loop ()
+        | None ->
+          Hashtbl.set s.marks ~key:curr ~data:Unsolved;
+          Some curr)
   in
   loop ()
 ;;
@@ -140,7 +155,7 @@ let generate_configurations (ctx : env) (p : PMRS.t) : state =
   let graph = create ~size () in
   add_vertex graph root;
   let marks = Hashtbl.create (module Subconf) ~size in
-  Hashtbl.set marks ~key:root ~data:0;
+  Hashtbl.set marks ~key:root ~data:Unsolved;
   let cache = ctx >- ECache.create () in
   { graph; marks; root; super; ctx; cache }
 ;;
