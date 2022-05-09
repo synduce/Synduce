@@ -48,7 +48,6 @@ let on_success
   (match result with
   | Either.First soln ->
     Log.(
-      sep ();
       info (print_solvers_summary pb.id);
       info (fun frmt () ->
           pf
@@ -62,7 +61,6 @@ let on_success
     if print_unrealizable
     then (
       Log.(
-        sep ();
         info (print_solvers_summary pb.id);
         info (fun frmt () ->
             pf

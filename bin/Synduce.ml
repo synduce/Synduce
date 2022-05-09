@@ -61,6 +61,7 @@ let main () =
   let print_unrealizable = !Config.print_unrealizable_configs || n_out < 2 in
   let check_output (u_count, f_count) (ctx, pb, soln) =
     Common.ProblemDefs.(
+      Log.sep ~i:(Some pb.PsiDef.id) ();
       match pb, soln with
       | pb, Realizable soln ->
         ( pb.PsiDef.id

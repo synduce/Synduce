@@ -85,6 +85,36 @@ module SyncSmt = struct
   ;;
 end
 
+let wait_on_failure (counter : int ref) (t : (solver_response * 'a) Lwt.t)
+    : (solver_response * 'a) Lwt.t
+  =
+  Lwt.bind t (fun t ->
+      match t with
+      (* Wait on failure. *)
+      | (Unknown | Error _), _ ->
+        let rec wait_and_check t =
+          Lwt.bind (Lwt_unix.sleep 1.0) (fun _ ->
+              if !counter > 1 || Float.(t < 0.)
+              then wait_and_check (t -. 1.0)
+              else Lwt.return ())
+        in
+        Lwt.map
+          (fun _ -> t)
+          (if !counter > 1
+          then (
+            Int.decr counter;
+            wait_and_check !Config.Optims.wait_parallel_tlimit)
+          else Lwt.return ())
+      (* Continue on success. *)
+      | _ ->
+        Int.decr counter;
+        Lwt.return t)
+;;
+
+(* ============================================================================================= *)
+(*                                           CONVERSION FUNCTIONS                                *)
+(* ============================================================================================= *)
+
 let string_of_smtSymbol (s : smtSymbol) : string =
   match s with
   | SSimple s -> s

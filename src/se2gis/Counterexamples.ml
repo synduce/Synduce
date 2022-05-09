@@ -607,7 +607,7 @@ let mk_model_sat_asserts ~fctx ~ctx ctex f_o_r instantiate =
   stalls or returns unknown.
 *)
 let check_tinv_unsat ~(ctx : env) ~(p : PsiDef.t) (tinv : PMRS.t) (ctex : ctex)
-    : (Stats.verif_method * SmtLib.solver_response) t * int Lwt.u
+    : (SmtLib.solver_response * Stats.verif_method) t * int Lwt.u
   =
   let build_task (cvc4_instance, task_start) =
     let* _ = task_start in
@@ -673,7 +673,7 @@ let check_tinv_unsat ~(ctx : env) ~(p : PsiDef.t) (tinv : PMRS.t) (ctex : ctex)
     in
     let* resp = AsyncSmt.check_sat cvc4_instance in
     let* () = AsyncSmt.close_solver cvc4_instance in
-    return (Stats.Induction, resp)
+    return (resp, Stats.Induction)
   in
   AsyncSmt.(cancellable_task (AsyncSmt.make_solver "cvc") build_task)
 ;;
@@ -683,7 +683,7 @@ let check_tinv_unsat ~(ctx : env) ~(p : PsiDef.t) (tinv : PMRS.t) (ctex : ctex)
     response and a resolver for that promise. The promise is cancellable.
  *)
 let check_tinv_sat ~(ctx : env) ~(p : PsiDef.t) (tinv : PMRS.t) (ctex : ctex)
-    : (Stats.verif_method * SmtLib.solver_response) t * int Lwt.u
+    : (SmtLib.solver_response * Stats.verif_method) t * int Lwt.u
   =
   let f_compose_r t =
     let repr_of_v =
@@ -761,28 +761,30 @@ let check_tinv_sat ~(ctx : env) ~(p : PsiDef.t) (tinv : PMRS.t) (ctex : ctex)
            (return (TermSet.singleton ctex.ctex_eqn.eterm))
     in
     let* () = AsyncSmt.close_solver solver in
-    return (Stats.BoundedChecking, res)
+    return (res, Stats.BoundedChecking)
   in
   AsyncSmt.(cancellable_task (make_solver "z3") task)
 ;;
 
 let satisfies_tinv ~(ctx : env) ~(p : PsiDef.t) (tinv : PMRS.t) (ctex : ctex) : ctex =
-  let vmethod, resp =
+  let task_counter = ref 2 in
+  let resp, vmethod =
     try
       Lwt_main.run
         ((* This call is expected to respond "unsat" when terminating. *)
          let pr1, resolver1 = check_tinv_unsat ~ctx ~p tinv ctex in
+         let pr1 = wait_on_failure task_counter pr1 in
          (* This call is expected to respond "sat" when terminating. *)
          let pr2, resolver2 = check_tinv_sat ~ctx ~p tinv ctex in
+         let pr2 = wait_on_failure task_counter pr2 in
          Lwt.wakeup resolver2 1;
          Lwt.wakeup resolver1 1;
-         (* The first call to return is kept, the other one is ignored. *)
          Lwt.pick [ pr1; pr2 ])
     with
     | End_of_file ->
       Log.error_msg "Solvers terminated unexpectedly  ⚠️";
       Log.error_msg "Please inspect logs.";
-      Stats.Induction, SmtLib.Unknown
+      SmtLib.Unknown, Stats.Induction
   in
   ctx >- AlgoLog.requires_ctex_class tinv ctex resp vmethod;
   match resp with

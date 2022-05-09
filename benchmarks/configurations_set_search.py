@@ -64,6 +64,8 @@ incomplete_benchmarks_set1 = [
     ["constraints/bst/sum_gt_by_key.ml", "", True, 1],
     ["constraints/bst/sum_between.ml", "", True, 1],
     ["incomplete/bst/count_between.ml", "-n 20", True, 1],
+    ["constraints/sortedlist/index_of.ml", "", True, 1],
+    ["constraints/sortedlist/exists_equal_elems.ml", "", True, 1]
 ]
 
 incomplete_benchmarks = incomplete_benchmarks_set0 + incomplete_benchmarks_set1

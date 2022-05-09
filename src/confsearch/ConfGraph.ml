@@ -124,6 +124,13 @@ let expand ?(use_po = true) (s : state) (conf : Subconf.t) : unit =
   | _ -> add_edges ()
 ;;
 
+let to_explore (s : state) (conf : Subconf.t) =
+  match Hashtbl.find s.marks conf with
+  | Some Unrealizable -> false
+  | Some Failed -> not !Utils.Config.node_failure_behavior
+  | _ -> true
+;;
+
 (**
   Find the next 0-marked configuration in the graph.
   Return None if there is no such configuration.
@@ -137,7 +144,7 @@ let next ?(shuffle = false) (s : state) : Subconf.t option =
         | Some Unsolved -> Some curr
         | Some Unrealizable -> loop ()
         | Some _ ->
-          let children = List.filter ~f:(is_unmarked s) (succ s.graph curr) in
+          let children = List.filter ~f:(to_explore s) (succ s.graph curr) in
           Queue.enqueue_all q (if shuffle then List.permute children else children);
           loop ()
         | None ->
