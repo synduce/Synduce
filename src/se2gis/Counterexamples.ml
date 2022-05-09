@@ -377,7 +377,7 @@ let add_cause (ctx : ctex_stat) (cause : spurious_cause) =
 (*               CLASSIFYING SPURIOUS COUNTEREXAMPLES - NOT IN REFERENCE IMAGE                   *)
 
 let check_image_sat ~(ctx : env) ~(p : PsiDef.t) ctex
-    : (Stats.verif_method * SmtLib.solver_response) Lwt.t * int u
+    : (SmtLib.solver_response * Stats.verif_method) Lwt.t * int u
   =
   let f_compose_r t =
     let repr_of_v =
@@ -442,13 +442,13 @@ let check_image_sat ~(ctx : env) ~(p : PsiDef.t) ctex
       ctx >- Expand.lwt_expand_loop steps t_check (return (TermSet.singleton x))
     in
     let* () = AsyncSmt.close_solver solver_instance in
-    return (Stats.BoundedChecking, res)
+    return (res, Stats.BoundedChecking)
   in
   AsyncSmt.(cancellable_task (make_solver "z3") build_task)
 ;;
 
 let check_image_unsat ~(ctx : env) ~(p : PsiDef.t) ctex
-    : (Stats.verif_method * SmtLib.solver_response) t * int u
+    : (SmtLib.solver_response * Stats.verif_method) t * int u
   =
   let f_compose_r t =
     let repr_of_v =
@@ -513,7 +513,7 @@ let check_image_unsat ~(ctx : env) ~(p : PsiDef.t) ctex
     in
     let* resp = AsyncSmt.check_sat solver in
     let* () = AsyncSmt.close_solver solver in
-    return (Stats.Induction, resp)
+    return (resp, Stats.Induction)
   in
   AsyncSmt.(cancellable_task (AsyncSmt.make_solver "cvc") build_task)
 ;;
@@ -532,16 +532,19 @@ let check_ctex_in_image
   Log.verbose_msg
     Fmt.(
       str "Checking whether ctex is in the image of %s..." p.PsiDef.reference.pvar.vname);
-  let vmethod, resp =
+  let task_counter = ref 2 in
+  let resp, vmethod =
     if ctx >- Analysis.is_bounded ctex.ctex_eqn.eterm
-    then Stats.Induction, SmtLib.Sat
+    then SmtLib.Sat, Stats.Induction
     else (
       try
         Lwt_main.run
           ((* This call is expected to respond "unsat" when terminating. *)
            let pr1, resolver1 = check_image_sat ~ctx ~p ctex in
+           let pr1 = wait_on_failure task_counter pr1 in
            (* This call is expected to respond "sat" when terminating. *)
            let pr2, resolver2 = check_image_unsat ~ctx ~p ctex in
+           let pr2 = wait_on_failure task_counter pr2 in
            Lwt.wakeup resolver2 1;
            Lwt.wakeup resolver1 1;
            (* The first call to return is kept, the other one is ignored. *)
@@ -550,11 +553,11 @@ let check_ctex_in_image
       | End_of_file ->
         Log.error_msg "Solvers terminated unexpectedly  ⚠️ .";
         Log.error_msg "Please inspect logs.";
-        Stats.Induction, SmtLib.Unknown)
+        SmtLib.Unknown, Stats.Induction)
   in
   ctx >- AlgoLog.image_ctex_class p ctex resp vmethod;
   match resp with
-  | Sat -> ctex
+  | Sat -> { ctex with ctex_stat = Valid }
   | Unsat -> { ctex with ctex_stat = add_cause ctex.ctex_stat NotInReferenceImage }
   | _ -> if ignore_unknown then ctex else { ctex with ctex_stat = Unknown }
 ;;
