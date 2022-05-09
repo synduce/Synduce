@@ -49,53 +49,8 @@ let rec refinement_loop
   in
   match s_resp, solution with
   | RSuccess _, First sol ->
-    (* Synthesis has succeeded, now we need to verify the solution. *)
     (try
-       (* The solution is verified with a bounded check.  *)
-       let verif_time, check_r =
-         Stats.timed (fun () -> Verify.check_solution ~ctx ~p lstate_in sol)
-       in
-       match check_r with
-       | `Ctexs (t_set, u_set) ->
-         (* If check_r is some new set of MR-terms t_set, and terms u_set, this means
-               verification failed. The generalized counterexamples have been added to new_t_set,
-               which is also a superset of t_set.
-            *)
-         ctx >- AlgoLog.show_counterexamples lstate_in t_set;
-         Stats.log_major_step_end ~synth_time ~verif_time ~t:tsize ~u:usize false;
-         let lstate =
-           if !Config.Optims.make_partial_correctness_assumption
-           then Equations.update_assumptions ~ctx ~p lstate_in sol t_set
-           else lstate_in
-         in
-         (* Continue looping with the new sets. *)
-         refinement_loop ~ctx ~major:true p { lstate with t_set; u_set; lifting }
-       | `Incorrect_assumptions ->
-         if !Config.Optims.use_syntactic_definitions
-            || !Config.Optims.make_partial_correctness_assumption
-         then (
-           (* The tool might have made some incorrect assumptions. *)
-           AlgoLog.msg_too_many_opts ();
-           Stats.log_major_step_end
-             ~failure_step:true
-             ~synth_time
-             ~verif_time
-             ~t:tsize
-             ~u:usize
-             false;
-           Config.Optims.turn_off_eager_optims ();
-           refinement_loop ~ctx ~major p lstate_in)
-         else Failed RFail
-       | `Correct ->
-         (* This case happens when verification succeeded.
-               Store the equation system, return the solution. *)
-         Stats.log_major_step_end ~synth_time ~verif_time ~t:tsize ~u:usize true;
-         Common.ProblemDefs.solved_eqn_system := Some eqns;
-         Log.print_ok ();
-         Realizable
-           { soln_rec_scheme = p.PsiDef.target
-           ; soln_implems = ctx >- Analysis.rename_nicely sol
-           }
+       success_case ~ctx ~p ~synth_time lstate_in (tsize, usize) lifting (eqns, sol)
      with
     | Failure s ->
       Log.error_msg Fmt.(str "Failure: %s" s);
@@ -103,6 +58,7 @@ let rec refinement_loop
       Failed RFail
     | e -> raise e)
   | RUnknown, _ -> Failed RUnknown
+  | RFail, Second [] -> Failed RFail
   | _ as synt_failure_info ->
     (* On synthesis failure, start by trying to synthesize lemmas. *)
     (match
@@ -135,6 +91,53 @@ let rec refinement_loop
       Stats.log_major_step_end ~synth_time ~verif_time:0. ~t:tsize ~u:usize false;
       Unrealizable ctexs
     | _ -> Failed RFail)
+
+and success_case ~ctx ~p ~synth_time lstate_in (tsize, usize) lifting (eqns, sol) =
+  (* The solution is verified with a bounded check.  *)
+  let verif_time, check_r =
+    Stats.timed (fun () -> Verify.check_solution ~ctx ~p lstate_in sol)
+  in
+  match check_r with
+  | `Ctexs (t_set, u_set) ->
+    (* If check_r is some new set of MR-terms t_set, and terms u_set, this means
+                  verification failed. The generalized counterexamples have been added to new_t_set,
+                  which is also a superset of t_set.
+               *)
+    ctx >- AlgoLog.show_counterexamples lstate_in t_set;
+    Stats.log_major_step_end ~synth_time ~verif_time ~t:tsize ~u:usize false;
+    let lstate =
+      if !Config.Optims.make_partial_correctness_assumption
+      then Equations.update_assumptions ~ctx ~p lstate_in sol t_set
+      else lstate_in
+    in
+    (* Continue looping with the new sets. *)
+    refinement_loop ~ctx ~major:true p { lstate with t_set; u_set; lifting }
+  | `Incorrect_assumptions ->
+    if !Config.Optims.use_syntactic_definitions
+       || !Config.Optims.make_partial_correctness_assumption
+    then (
+      (* The tool might have made some incorrect assumptions. *)
+      AlgoLog.msg_too_many_opts ();
+      Stats.log_major_step_end
+        ~failure_step:true
+        ~synth_time
+        ~verif_time
+        ~t:tsize
+        ~u:usize
+        false;
+      Config.Optims.turn_off_eager_optims ();
+      refinement_loop ~ctx ~major:true p lstate_in)
+    else Failed RFail
+  | `Correct ->
+    (* This case happens when verification succeeded.
+                  Store the equation system, return the solution. *)
+    Stats.log_major_step_end ~synth_time ~verif_time ~t:tsize ~u:usize true;
+    Common.ProblemDefs.solved_eqn_system := Some eqns;
+    Log.print_ok ();
+    Realizable
+      { soln_rec_scheme = p.PsiDef.target
+      ; soln_implems = ctx >- Analysis.rename_nicely sol
+      }
 ;;
 
 let se2gis ?(lemmas = Lemmas.empty_lemmas ()) ~(ctx : env) (p : PsiDef.t) =

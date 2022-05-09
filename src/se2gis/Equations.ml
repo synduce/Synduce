@@ -404,8 +404,8 @@ module Solve = struct
                   soln');
         resp, First (soln @ soln')
       | Second ctexs, (resp, Second ctexs') -> resp, Second (ctexs @ ctexs')
-      | Second ctexs, (resp, First _) | First _, (resp, Second ctexs) ->
-        resp, Second ctexs)
+      | Second ctexs, (resp, First _) -> resp, Second ctexs
+      | First _, (resp, Second ctexs) -> resp, Second ctexs)
   ;;
 
   (** Solve the trivial equations first, avoiding the overhead from the
@@ -772,6 +772,7 @@ module Solve = struct
         (if Set.mem all_operators (Binary Max) then Semantic.[ max_definition ] else [])
         @ if Set.mem all_operators (Binary Min) then Semantic.[ min_definition ] else []
       in
+      (* Call the SyGuS solver. *)
       let solver =
         HLSolver.(
           make ~extra_defs ()
@@ -856,7 +857,7 @@ module Solve = struct
   ;;
 
   let solve_eqns (ctx : env) (unknowns : VarSet.t) (eqns : equation list)
-      : Sygus.solver_response * (partial_soln, unrealizability_ctex list) Either.t
+      : (Sygus.solver_response * (partial_soln, unrealizability_ctex list) Either.t) Lwt.t
     =
     let opt_cst =
       Set.exists unknowns ~f:(fun v -> RType.is_base (Variable.vtype_or_new ctx.ctx v))
@@ -909,13 +910,12 @@ module Solve = struct
           (VarSet.pp ctx.ctx)
           unknowns
           (List.length lwt_tasks));
-    Lwt_main.run
-      (Lwt.pick
-         (List.map
-            ~f:(fun (r, t) ->
-              Lwt.wakeup r 0;
-              t)
-            lwt_tasks))
+    Lwt.pick
+      (List.map
+         ~f:(fun (r, t) ->
+           Lwt.wakeup r 0;
+           t)
+         lwt_tasks)
   ;;
 
   let solve_eqns_proxy (ctx : env) (unknowns : VarSet.t) (eqns : equation list) =
@@ -925,8 +925,10 @@ module Solve = struct
         solve_syntactic_definitions ~ctx unknowns eqns
       in
       if Set.length new_unknowns > 0
-      then combine ~ctx (Either.First partial_soln) (solve_eqns ctx new_unknowns new_eqns)
-      else RSuccess [], Either.First partial_soln)
+      then
+        let* part_soln = solve_eqns ctx new_unknowns new_eqns in
+        Lwt.return (combine ~ctx (Either.First partial_soln) part_soln)
+      else Lwt.return (Sygus.RSuccess [], Either.First partial_soln))
     else solve_eqns ctx unknowns eqns
   ;;
 
@@ -970,7 +972,11 @@ module Solve = struct
       sl @ [ u, e ]
     in
     let solve_eqn_aux (unknowns, equations) =
-      if Set.length unknowns > 0 then [ solve_eqns_proxy ctx unknowns equations ] else []
+      if Set.length unknowns > 0
+      then
+        let* aux_soln = solve_eqns_proxy ctx unknowns equations in
+        Lwt.return [ aux_soln ]
+      else Lwt.return []
     in
     let comb_l l =
       List.fold
@@ -985,7 +991,7 @@ module Solve = struct
       ~init:(Sygus.RSuccess [], Either.first partial_soln)
       ~finish:identity
       ~f:(fun (_, prev_soln) subsystem ->
-        match comb_l (solve_eqn_aux subsystem) with
+        match comb_l (Lwt_main.run (solve_eqn_aux subsystem)) with
         | resp, Either.First solution ->
           Continue (combine ~ctx prev_soln (resp, Either.First solution))
         | resp, Either.Second counterexamples ->
@@ -1008,7 +1014,7 @@ module Solve = struct
     then split_solve ~ctx psol u e
     else
       Either.(
-        match solve_eqns ctx u e with
+        match Lwt_main.run (solve_eqns ctx u e) with
         | resp, First soln -> resp, First (psol @ soln)
         | resp, Second ctexs -> resp, Second ctexs)
   ;;

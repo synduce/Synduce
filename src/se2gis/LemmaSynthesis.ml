@@ -606,6 +606,7 @@ let synthesize_lemmas
    *)
   let ( (ensures_positives, ensures_negatives)
       , (lemma_synt_positives, lemma_synt_negatives)
+      , classif_failures
       , unr_ctexs )
     =
     match synt_failure_info with
@@ -626,8 +627,18 @@ let synthesize_lemmas
       let lemma_synt_positives, lemma_synt_negatives, _ =
         List.partition3_map ~f:ctexs_for_lemma_synt classified_ctexs
       in
+      (* Witnesses that could not be classified. *)
+      let classif_failures =
+        List.filter
+          ~f:(fun ctex ->
+            match ctex.ctex_stat with
+            | Unknown -> true
+            | _ -> false)
+          classified_ctexs
+      in
       ( (ensures_positives, ensures_negatives)
       , (lemma_synt_positives, lemma_synt_negatives)
+      , classif_failures
       , unrealizability_ctexs )
   in
   let lemma_synthesis_success =
@@ -658,10 +669,15 @@ let synthesize_lemmas
           Lemmas.add_term_info lstate.lemmas ~key ~data);
       if success then `CoarseningOk else `CoarseningFailure
     | [], [] ->
-      update true lemma_synt_positives lstate.lemmas;
-      (* lemma_synt_negatives and ensures_negatives are empty; all ctexs non spurious! *)
-      AlgoLog.no_spurious_ctex ();
-      `Unrealizable
+      (match classif_failures with
+      | [] ->
+        update true lemma_synt_positives lstate.lemmas;
+        (* lemma_synt_negatives and ensures_negatives are empty; all ctexs non spurious! *)
+        AlgoLog.no_spurious_ctex ();
+        `Unrealizable
+      | _ :: _ ->
+        AlgoLog.witness_classification_failure ();
+        `CoarseningFailure)
   in
   match lemma_synthesis_success with
   | `CoarseningOk -> Ok (Either.First lstate)

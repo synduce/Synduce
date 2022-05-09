@@ -117,7 +117,7 @@ let on_failure ?(is_ocaml_syntax = true) ~(ctx : env) (pb : PsiDef.t) : Yojson.t
     info (fun frmt () ->
         pf
           frmt
-          "Filed to find solution %4.4fs (%3.1f%% verifying):@.%a@]"
+          "Failed to find solution %4.4fs (%3.1f%% verifying):@.%a@]"
           elapsed
           verif_ratio
           (box (ctx >- Lang.PMRS.pp_ocaml ~short:false))
@@ -161,7 +161,7 @@ let print_usage () =
     \       --no-splitting              Do not split systems into subsystems.\n\
     \       --no-syndef                 Do not use syntactic definitions.\n\
     \       --no-rew                    Do not use rewrite solver.\n\
-    \    -t --no-detupling              Turn off detupling.\n\
+    \       --no-detupling              Turn off detupling.\n\
     \    -c --simple-init               Initialize T naively.\n\
     \    -l --lemma-sketch              Sketch lemmas in synthesis.\n\
     \       --segis                    Use the Abstract CEGIS algorithm. Turns bmc on.\n\
@@ -199,6 +199,7 @@ let print_usage () =
      unsat.\n\
     \  -B   --bounded-lemma-check       Use depth-bounded check to verify lemma \
      candidates and generate positive examples for lemma synth.\n\
+    \  -t   --solve-timeout             Timeout for a single solver instance.\n\
     \       --interactive-check-lemma   Manually set if a lemma is true and, if not, \
      give counterexample.\n\
     \       --parse-only                Just parse the input.\n\

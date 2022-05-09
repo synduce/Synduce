@@ -780,7 +780,7 @@ let satisfies_tinv ~(ctx : env) ~(p : PsiDef.t) (tinv : PMRS.t) (ctex : ctex) : 
          Lwt.pick [ pr1; pr2 ])
     with
     | End_of_file ->
-      Log.error_msg "Solvers terminated unexpectedly  ⚠️ .";
+      Log.error_msg "Solvers terminated unexpectedly  ⚠️";
       Log.error_msg "Please inspect logs.";
       Stats.Induction, SmtLib.Unknown
   in
@@ -788,7 +788,8 @@ let satisfies_tinv ~(ctx : env) ~(p : PsiDef.t) (tinv : PMRS.t) (ctex : ctex) : 
   match resp with
   | Sat -> { ctex with ctex_stat = Valid }
   | Unsat -> { ctex with ctex_stat = add_cause ctex.ctex_stat ViolatesTargetRequires }
-  | _ -> ctex
+  | Error _ | Unknown -> { ctex with ctex_stat = Unknown }
+  | _ -> failwith "Unexpected response."
 ;;
 
 (** Classify counterexamples into positive or negative counterexamples with respect
@@ -804,20 +805,16 @@ let classify_ctexs ~(ctx : env) ~(p : PsiDef.t) (ctexs : ctex list) : ctex list 
   Log.start_section "Classify counterexamples...";
   (* First pass ignoring unknowns. *)
   (* let ctexs = classify_wrt_ref true ctexs in *)
-  let ctexs_c1, ignore_further_unknowns =
+  let ctexs_c1 =
     match p.tinv with
-    | Some tinv ->
-      (* If there is some tinv, we may ignore unknowns in further classification steps. *)
-      classify_with_tinv tinv ctexs, true
-    | None ->
-      (* Otherwise don't ignore anything. *)
-      ctexs, false
+    | Some tinv -> classify_with_tinv tinv ctexs
+    | None -> ctexs
   in
   let ctexs_c2 =
-    if ignore_further_unknowns
-    then (* TODO: there are some bugs with classification.. *)
+    if Option.is_some p.tinv
+    then (* TODO find a way to do both classifications efficiently. *)
       ctexs_c1
-    else classify_wrt_ref ignore_further_unknowns ctexs_c1
+    else classify_wrt_ref false ctexs_c1
   in
   Log.end_section ();
   ctexs_c2

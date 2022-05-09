@@ -92,7 +92,7 @@ class MultiCsvLine(object):
         l = [self.elapsed, self.delta]
         l += [self.complete, self.solved, self.total]
         l += [self.solutions, self.unrealizable]
-        l += [self.verif]
+        l += [self.verif_time]
         return ",".join([str(x) for x in l])
 
 

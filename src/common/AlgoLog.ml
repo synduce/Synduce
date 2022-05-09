@@ -245,6 +245,11 @@ let no_spurious_ctex () =
       pf fmt "All counterexamples are non-spurious: nothing to refine.")
 ;;
 
+let witness_classification_failure () =
+  Log.info (fun fmt () ->
+      pf fmt "Some unrealizability witnesses could not be classified ⚠️")
+;;
+
 let spurious_violates_requires i =
   Log.info (fun fmt () -> pf fmt "%i counterexamples violate requires." i)
 ;;
