@@ -45,4 +45,14 @@ val last_lemma_proved : verif_method option ref
 val set_lemma_synthesized : string -> string -> unit
 val set_last_lemma_proof_method : verif_method -> unit
 val log_minor_step : synth_time:float -> auxtime:float -> bool -> unit
+
+(** Reset all the algorithm counters. Call between two different configurations. *)
 val restart : unit -> unit
+
+(** A counter for the number of times a configuration is unrealizable according to the cache. *)
+val num_unr_cache_hits : int ref
+
+(** Boolean indicates whether counfiguration exploration lead to the original configuartion given
+    by the user.
+*)
+val orig_solution_hit : bool ref

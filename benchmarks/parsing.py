@@ -88,7 +88,7 @@ def get_last_step_elapsed(data: dict):
 
 
 def get_verif_elapsed(data: dict):
-    verif_elapsed = data.get("verif_elapsed")
+    verif_elapsed = data.get("verif-elapsed")
     return verif_elapsed
 
 
@@ -98,7 +98,7 @@ class DataObj:
         self.algo = data.get("algorithm")
         self.minor_step_count = get_minor_step_count(data)
         self.major_step_count = get_major_step_count(data)
-        self.elapsed = data.get("total_elapsed")
+        self.elapsed = data.get("total-elapsed")
         self.last_elapsed = get_last_step_elapsed(data)
         self.verif_elapsed = get_verif_elapsed(data)
         self.is_successful = is_successful(data)
@@ -149,6 +149,8 @@ class MultiDataObj():
         self.verif_elapsed = 0
         self.elapsed = 0
         self.total_configurations = -1
+        self.unr_cache_hits = 0
+        self.orig_conf_hit = False
         # If algo is specified, then this is a single entry
         if algo:
             final_dat = DataObj(data)
@@ -167,30 +169,34 @@ class MultiDataObj():
             self.is_unrealizable = True  # compute later
 
         # This message contains an intermediate result
-        elif "intermediate_result" in data:
+        elif "intermediate-result" in data:
             self.is_intermediate = True
-            self.total_configurations = data.get("total_configurations")
-            res = data.get("intermediate_result")
+            self.total_configurations = data.get("total-configurations")
+            self.unr_cache_hits = data.get("unr-cache-hits")
+            self.orig_conf_hit = data.get("orig-conf-hit")
+            res = data.get("intermediate-result")
             if "failure" in res:
                 self.failed = True
                 self.is_unrealizable = False
             else:
                 self.failed = False
                 self.is_unrealizable = res.get("unrealizable")
-            self.elapsed = res.get("total_elapsed")
-            self.verif_elapsed = res.get("verif_elapsed")
+            self.elapsed = res.get("total-elapsed")
+            self.verif_elapsed = res.get("verif-elapsed")
 
         # Otherwise, it should be a set of responses:
         else:
             for problem_id, problem_data in data.items():
-                if problem_id == "total_configurations":
-                    pass
-                else:
+                if problem_id.startswith("problem"):
                     data_obj = DataObj(problem_data)
                     if data_obj is not None:
                         self.data_objs.append(data_obj)
+                else:
+                    pass
 
-            total_configurations = data.get('total_configurations')
+            total_configurations = data.get('total-configurations')
+            self.unr_cache_hits = data.get("unr-cache-hits")
+            self.orig_conf_hit = data.get("orig-conf-hit")
             if total_configurations is not None:
                 self.total_configurations = total_configurations
 

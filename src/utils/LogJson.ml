@@ -14,7 +14,7 @@ let solvers_summary () : Yojson.t =
     let instances = List.length data in
     total_solvers_time := !total_solvers_time +. total_time;
     total_instances := !total_instances + instances;
-    key, `Assoc [ "total_time", `Float total_time; "num_instances", `Int instances ]
+    key, `Assoc [ "total-time", `Float total_time; "num-instances", `Int instances ]
   in
   let l : (string * Yojson.t) list = List.map ~f (Stats.get_solver_pids ()) in
   `Assoc l

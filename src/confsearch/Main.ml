@@ -91,13 +91,19 @@ let find_and_solve_problem
         let new_pdef =
           { top_userdef_problem with target = new_target; id = !num_attempts }
         in
+        (* Update stat: whether we have hit the original configuration. *)
+        Stats.orig_solution_hit := same_conf new_pdef.target top_userdef_problem.target;
+        (* Check unrealizability via cache first. *)
         if G.check_unrealizable_from_cache new_ctx new_pdef rstate
         then (
           Log.info
             Fmt.(fun fmt () -> pf fmt "Configuration is unrealizable according to cache.");
           G.mark_unrealizable rstate sub_conf;
+          (* Update stats: number of cache hits. *)
+          Int.incr Stats.num_unr_cache_hits;
           find_sols (a @ [ new_ctx, new_pdef, Unrealizable [] ]))
         else (
+          (* Call the single configuration solver. *)
           match single_configuration_solver ~ctx:new_ctx new_pdef with
           | Realizable s ->
             G.mark_realizable rstate sub_conf;

@@ -51,7 +51,7 @@ def run_benchmarks(input_files, algos, optims, num_runs=1, csv_output=None, exit
 
                 # Print benchmark name, algorithm used and optimization options.
                 bench_id = "%s,%s+%s" % (filename, algo[0], optim[0])
-                progress = f"({benchmark_cnt} / {benchmark_total})"
+                progress = f"{benchmark_cnt}/{benchmark_total}"
                 command = ("%s %s %s --compact -j --json-progress %s %s %s %s %s" %
                            (timeout, exec_path, algo[1], optim[1], extra_opt,
                             os.path.realpath(os.path.join(

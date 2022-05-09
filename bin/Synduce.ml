@@ -95,7 +95,12 @@ let main () =
           List.map subproblem_jsons ~f:(fun (psi_id, json) ->
               Fmt.(str "problem_%i" psi_id), json)
         in
-        `Assoc (("total_configurations", `Int num_configurations) :: results)
+        `Assoc
+          ([ "total-configurations", `Int num_configurations
+           ; "unr-cache-hits", `Int !Stats.num_unr_cache_hits
+           ; "orig-conf-hit", `Bool !Stats.orig_solution_hit
+           ]
+          @ results)
     in
     if n_out > 1
     then

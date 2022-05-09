@@ -28,7 +28,7 @@ let show_stat_refinement_step env elapsed tsize usize =
     let json =
       `Assoc
         [ "progress", LogJson.refinement_steps_summary ()
-        ; "verif_elapsed", `Float !Stats.verif_time
+        ; "verif-elapsed", `Float !Stats.verif_time
         ]
     in
     pf stdout "%s@." (Yojson.to_string ~std:false json))
@@ -73,8 +73,8 @@ let single_configuration_json
   in
   `Assoc
     ([ "algorithm", `String algo
-     ; "total_elapsed", `Float elapsed
-     ; "verif_elapsed", `Float verif
+     ; "total-elapsed", `Float elapsed
+     ; "verif-elapsed", `Float verif
      ; "solver-usage", solvers
      ; "refinement-steps", refinement_steps
      ; "id", `Int pb.id
@@ -107,10 +107,12 @@ let show_stat_intermediate_solution
   then (
     let json =
       `Assoc
-        [ ( "intermediate_result"
+        [ ( "intermediate-result"
           , single_configuration_json ~is_ocaml_syntax:true ~ctx pb soln elapsed verif )
         ; "id", `Int pb.id
-        ; "total_configurations", `Int total_configurations
+        ; "total-configurations", `Int total_configurations
+        ; "unr-cache-hits", `Int !Stats.num_unr_cache_hits
+        ; "orig-conf-hit", `Bool !Stats.orig_solution_hit
         ]
     in
     pf stdout "%s@." (Yojson.to_string ~std:false json))

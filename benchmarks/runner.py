@@ -124,7 +124,7 @@ class BenchmarkResult(object):
         self.verif_elapsed = 0.0
 
     def timing(self):
-        return f"average: {self.elapsed: 4.3f}s ±{self.delta_str()}"
+        return f"avg: {self.elapsed: 4.3f}s ±{self.delta_str()}"
 
     def delta_str(self):
         delta_str = f"{self.delta : .0f}ms"
@@ -152,7 +152,7 @@ class BenchmarkResult(object):
         else:
             induction_info = "        "
 
-        msg = f"{self.progress : >11s} ✅"
+        msg = f"{self.progress : >8s} ✅"
         msg += f"{current_algo: <6s}: {self.benchmark_name: <33s} ×{self.num_runs} runs,"
         msg += f" {self.timing(): <30s} {induction_info} | R: {refinement_rounds} {sp : <15s} "
         print(msg)
@@ -170,17 +170,18 @@ class BenchmarkResult(object):
         num_unrealizable = self.info.count_unrealizable_configurations()
         num_failures = self.info.count_failures()
 
-        msg = f"{self.progress : >11s}"
+        msg = f"{self.progress : >6s}"
         if self.info.is_intermediate:
             msg += " ❔ "
         else:
             msg += " ✅ "
-        msg += f"{current_algo: <6s}: {self.benchmark_name: <33s} ×{self.num_runs} runs,"
+        msg += f"{current_algo: <8s}: {self.benchmark_name: <33s} ×{self.num_runs},"
         msg += f" {self.timing(): <25s}"
         ratio = f"{num_solved_confs}/{num_total_confs}"
-        cnt = f"{ratio: <15s} S:{str(num_solutions) : <6s}"
-        cnt += f"U:{str(num_unrealizable): <6s}"
-        cnt += f"F:{str(num_failures): <6s}"
+        cnt = f"{ratio: <10s}"
+        nums = f"[{num_solutions},{num_unrealizable},{num_failures}]"
+        cnt += f"{nums : <10s}"
+        cnt += f"CH:{self.info.unr_cache_hits} S:{self.info.orig_conf_hit}"
         msg += f" {cnt : <24s}"
         print(msg)
 
@@ -207,7 +208,7 @@ def run_n(progress, bench_id, command, filename, realizable=True, expect_many=Fa
     info = MultiDataObj({})
     info.is_successful = False
     print(
-        f"{progress : >11s} {bench_name: <25s}", end="\r")
+        f"{progress : >8s} {bench_name: <25s}", end="\r")
 
     # Run the tests num_run times
     for i in range(num_runs):
