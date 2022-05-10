@@ -45,7 +45,8 @@ let rec refinement_loop
   in
   (* The solve the set of constraints with the assumption equations. *)
   let synth_time, (s_resp, solution) =
-    Stats.timed (fun () -> Equations.solve ctx ~p (eqns @ lstate_in.assumptions))
+    Stats.timed (fun () ->
+        Lwt_main.run (Equations.solve ctx ~p (eqns @ lstate_in.assumptions)))
   in
   match s_resp, solution with
   | RSuccess _, First sol ->

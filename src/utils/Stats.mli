@@ -1,4 +1,5 @@
 val timed : (unit -> 'a) -> float * 'a
+val lwt_timed : (unit Lwt.t -> 'a Lwt.t) -> (float * 'a) Lwt.t
 
 type proc_time_info =
   { pti_start : float

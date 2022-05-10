@@ -156,6 +156,27 @@ let subsets l =
   aux [] l
 ;;
 
+type 'a continue_or_stop =
+  | Continue of 'a
+  | Stop of 'a
+
+let lwt_until
+    ~(f : 'a -> 'b -> 'a continue_or_stop Lwt.t)
+    ~(init : 'a Lwt.t)
+    (l : 'b list)
+    : 'a Lwt.t
+  =
+  let rec aux c = function
+    | hd :: tl ->
+      let c' = Lwt.bind c (fun x -> f x hd) in
+      Lwt.bind c' (function
+          | Continue x -> aux (Lwt.return x) tl
+          | Stop x -> Lwt.return x)
+    | [] -> c
+  in
+  aux init l
+;;
+
 (* ============================================================================================= *)
 (*                  FILE MANAGEMENT HELPERS                                                      *)
 (* ============================================================================================= *)
