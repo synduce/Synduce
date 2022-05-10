@@ -12,9 +12,9 @@ let single_configuration_solver
     ?(lemmas = Se2gis.Lemmas.empty_lemmas ())
     ~(ctx : env)
     (p : PsiDef.t)
-    : Syguslib.Sygus.solver_response segis_response
+    : Syguslib.Sygus.solver_response segis_response Lwt.t
   =
-  let resp =
+  let%lwt resp =
     if !Config.Optims.use_segis (* Symbolic CEGIS. *)
     then Se2gis.Baselines.algo_segis ~ctx p
     else if !Config.Optims.use_cegis (* Concrete CEGIS. *)
@@ -55,14 +55,14 @@ let single_configuration_solver
         !total_configurations);
   (* Save stats an restart counters. *)
   LogJson.save_stats_and_restart p.id;
-  resp
+  Lwt.return resp
 ;;
 
 let find_and_solve_problem
     ~(ctx : env)
     (psi_comps : (string * string * string) option)
     (pmrs : (string, PMRS.t, Base.String.comparator_witness) Map.t)
-    : int * (env * PsiDef.t * Syguslib.Sygus.solver_response segis_response) list
+    : (int * (env * PsiDef.t * Syguslib.Sygus.solver_response segis_response) list) Lwt.t
   =
   (*  Find problem components *)
   let target_fname, spec_fname, repr_fname =
@@ -104,7 +104,7 @@ let find_and_solve_problem
           find_sols (a @ [ new_ctx, new_pdef, Unrealizable [] ]))
         else (
           (* Call the single configuration solver. *)
-          match single_configuration_solver ~ctx:new_ctx new_pdef with
+          match%lwt single_configuration_solver ~ctx:new_ctx new_pdef with
           | Realizable s ->
             G.mark_realizable rstate sub_conf;
             G.expand rstate sub_conf;
@@ -117,7 +117,7 @@ let find_and_solve_problem
             G.mark_failed rstate sub_conf;
             if !Config.node_failure_behavior then () else G.expand rstate sub_conf;
             find_sols ((new_ctx, new_pdef, Failed f) :: a))
-      | None -> a
+      | None -> Lwt.return a
     in
     find_sols []
   in
@@ -141,8 +141,12 @@ let find_and_solve_problem
     in
     total_configurations := subconf_count;
     Utils.Log.info (fun fmt () -> Fmt.pf fmt "%i configurations possible." subconf_count);
-    subconf_count, find_multiple_solutions ctx top_userdef_problem max_configuration)
-  else
+    let%lwt multi_sols =
+      find_multiple_solutions ctx top_userdef_problem max_configuration
+    in
+    Lwt.return (subconf_count, multi_sols))
+  else (
     (* Only solve the top-level skeleton, i.e. the problem specified by the user. *)
-    1, [ ctx, top_userdef_problem, single_configuration_solver ~ctx top_userdef_problem ]
+    let%lwt top_soln = single_configuration_solver ~ctx top_userdef_problem in
+    Lwt.return (1, [ ctx, top_userdef_problem, top_soln ]))
 ;;

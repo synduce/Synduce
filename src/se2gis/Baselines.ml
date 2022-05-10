@@ -23,7 +23,7 @@ open Syguslib.Sygus
     Use the option [--segis] in the executable to use this synthesis algorithm.
 *)
 let rec segis_loop ~(ctx : env) (p : PsiDef.t) (t_set : TermSet.t)
-    : solver_response segis_response
+    : solver_response segis_response Lwt.t
   =
   incr_refinement ctx;
   if get_refinement_steps ctx > !Config.refinement_rounds_warning_limit
@@ -57,8 +57,8 @@ let rec segis_loop ~(ctx : env) (p : PsiDef.t) (t_set : TermSet.t)
       ~lifting:Lifting.empty_lifting
       t_set
   in
-  let synth_time, (s_resp, solution) =
-    Stats.timed (fun () -> Lwt_main.run (Equations.solve ctx ~p eqns))
+  let%lwt synth_time, (s_resp, solution) =
+    Stats.lwt_timed (fun a -> Lwt.bind a (fun _ -> Equations.solve ctx ~p eqns))
   in
   match s_resp, solution with
   | RSuccess _, First sol ->
@@ -77,7 +77,7 @@ let rec segis_loop ~(ctx : env) (p : PsiDef.t) (t_set : TermSet.t)
     | verif_time, None ->
       Stats.log_major_step_end ~synth_time ~verif_time ~t:tsize ~u:0 true;
       Log.print_ok ();
-      Realizable { soln_rec_scheme = p.PsiDef.target; soln_implems = sol })
+      Lwt.return (Realizable { soln_rec_scheme = p.PsiDef.target; soln_implems = sol }))
   | RInfeasible, Second ctexs ->
     Stats.log_major_step_end ~synth_time ~verif_time:0. ~t:tsize ~u:0 false;
     Log.info
@@ -88,14 +88,14 @@ let rec segis_loop ~(ctx : env) (p : PsiDef.t) (t_set : TermSet.t)
             "@[<hov 2><SEGIS> This problem has no solution. Counterexample set:@;%a@]"
             (list ~sep:sp (pp_term ctx.ctx))
             (Set.elements t_set));
-    Unrealizable ctexs
+    Lwt.return (Unrealizable ctexs)
   | RFail, _ ->
     Log.error_msg "<SEGIS> SyGuS solver failed to find a solution.";
-    Failed RFail
+    Lwt.return (Failed RFail)
   | RUnknown, _ ->
     Log.error_msg "<SEGIS> SyGuS solver returned unknown.";
-    Failed RUnknown
-  | _ -> Failed s_resp
+    Lwt.return (Failed RUnknown)
+  | _ -> Lwt.return (Failed s_resp)
 ;;
 
 let algo_segis ~(ctx : env) (p : PsiDef.t) =

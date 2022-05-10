@@ -55,7 +55,7 @@ let main () =
   if !parse_only then Caml.exit 1;
   (* Solve the problem proper. *)
   let num_configurations, outputs =
-    ctx >>> Many.find_and_solve_problem psi_comps all_pmrs
+    Lwt_main.run (ctx >>> Many.find_and_solve_problem psi_comps all_pmrs)
   in
   let n_out = List.length outputs in
   let print_unrealizable = !Config.print_unrealizable_configs || n_out < 2 in

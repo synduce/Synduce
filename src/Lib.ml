@@ -12,7 +12,7 @@ open Codegen.Commons
 open Env
 
 let solve_file ?(print_info = false) (filename : string)
-    : (problem_descr * (soln option, unrealizability_ctex list) Either.t) list
+    : (problem_descr * (soln option, unrealizability_ctex list) Either.t) list Lwt.t
   =
   Utils.Config.problem_name
     := Caml.Filename.basename (Caml.Filename.chop_extension filename);
@@ -26,12 +26,15 @@ let solve_file ?(print_info = false) (filename : string)
   pb_env >- Parsers.seek_types prog;
   let all_pmrs = pb_env >>- Parsers.translate prog in
   let outputs = Single.find_and_solve_problem ~ctx:pb_env psi_comps all_pmrs in
-  List.map outputs ~f:(fun (problem, result) ->
-      let pd = pb_env >- problem_descr_of_psi_def problem in
-      match result with
-      | Realizable soln -> pd, Either.First (Some soln)
-      | Unrealizable soln -> pd, Either.Second soln
-      | Failed _ -> pd, Either.First None)
+  let final_step l =
+    List.map l ~f:(fun (problem, result) ->
+        let pd = pb_env >- problem_descr_of_psi_def problem in
+        match result with
+        | Realizable soln -> pd, Either.First (Some soln)
+        | Unrealizable soln -> pd, Either.Second soln
+        | Failed _ -> pd, Either.First None)
+  in
+  Lwt.map final_step outputs
 ;;
 
 (**

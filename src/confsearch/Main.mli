@@ -12,8 +12,9 @@ val find_and_solve_problem
   :  ctx:Env.env
   -> (string * string * string) option
   -> (string, Lang.PMRS.t, Base.String.comparator_witness) Base.Map.t
-  -> int
+  -> (int
      * (Env.env
        * ProblemDefs.PsiDef.t
        * Syguslib.Sygus.solver_response ProblemDefs.segis_response)
-       list
+       list)
+     Lwt.t
