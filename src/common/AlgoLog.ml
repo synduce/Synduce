@@ -12,7 +12,7 @@ open Term
 open Utils
 open Env
 
-let show_stat env elapsed tsize usize =
+let show_stat_refinement_step env elapsed tsize usize =
   if !Config.timings
   then
     pf
@@ -28,7 +28,91 @@ let show_stat env elapsed tsize usize =
     let json =
       `Assoc
         [ "progress", LogJson.refinement_steps_summary ()
-        ; "verif_elapsed", `Float !Stats.verif_time
+        ; "verif-elapsed", `Float !Stats.verif_time
+        ]
+    in
+    pf stdout "%s@." (Yojson.to_string ~std:false json))
+  else ()
+;;
+
+let single_configuration_json
+    ~(is_ocaml_syntax : bool)
+    ~(ctx : env)
+    (pb : PsiDef.t)
+    (soln : (soln, unrealizability_ctex list) Either.t option)
+    (elapsed : float)
+    (verif : float)
+    : Yojson.t
+  =
+  let solvers =
+    Option.value ~default:(`String "unknown") (Utils.LogJson.get_solver_stats pb.id)
+  in
+  let refinement_steps =
+    Option.value ~default:(`String "unknown") (Utils.LogJson.get_summary pb.id)
+  in
+  let algo =
+    if !Config.Optims.use_segis
+    then "SEGIS"
+    else if !Config.Optims.use_cegis
+    then "CEGIS"
+    else "SE2GIS"
+  in
+  let soln_or_refutation =
+    match soln with
+    | Some (Either.First soln) ->
+      [ ( "solution"
+        , `String
+            (Fmt.str
+               "%a"
+               (box (ctx >- Pretty.pp_soln ~use_ocaml_syntax:is_ocaml_syntax))
+               soln) )
+      ; "unrealizable", `Bool false
+      ]
+    | Some (Either.Second _) -> [ "unrealizable", `Bool true ]
+    | None -> [ "failure", `Bool true ]
+  in
+  `Assoc
+    ([ "algorithm", `String algo
+     ; "total-elapsed", `Float elapsed
+     ; "verif-elapsed", `Float verif
+     ; "solver-usage", solvers
+     ; "refinement-steps", refinement_steps
+     ; "id", `Int pb.id
+     ]
+    @ soln_or_refutation)
+;;
+
+let show_stat_intermediate_solution
+    ~(ctx : env)
+    (pb : PsiDef.t)
+    (soln : (soln, unrealizability_ctex list) Either.t option)
+    (elapsed : float)
+    (verif : float)
+    (total_configurations : int)
+    : unit
+  =
+  (* *)
+  let () =
+    match soln with
+    | Some (Either.First soln) ->
+      Log.info
+        Fmt.(
+          fun fmt () ->
+            pf fmt "%a" (box (ctx >- Pretty.pp_soln ~use_ocaml_syntax:true)) soln)
+    | Some (Either.Second _) -> Log.info Fmt.(fun fmt () -> pf fmt "Unrealizable.")
+    | None -> Log.info Fmt.(fun fmt () -> pf fmt "Failure.")
+  in
+  (* Json output *)
+  if !Config.json_progressive && !Config.json_out
+  then (
+    let json =
+      `Assoc
+        [ ( "intermediate-result"
+          , single_configuration_json ~is_ocaml_syntax:true ~ctx pb soln elapsed verif )
+        ; "id", `Int pb.id
+        ; "total-configurations", `Int total_configurations
+        ; "unr-cache-hits", `Int !Stats.num_unr_cache_hits
+        ; "orig-conf-hit", `Bool !Stats.orig_solution_hit
         ]
     in
     pf stdout "%s@." (Yojson.to_string ~std:false json))
@@ -161,6 +245,11 @@ let show_unrealizability_witnesses ~(ctx : Context.t) unknowns eqns ctexs =
 let no_spurious_ctex () =
   Log.info (fun fmt () ->
       pf fmt "All counterexamples are non-spurious: nothing to refine.")
+;;
+
+let witness_classification_failure () =
+  Log.info (fun fmt () ->
+      pf fmt "Some unrealizability witnesses could not be classified ⚠️")
 ;;
 
 let spurious_violates_requires i =

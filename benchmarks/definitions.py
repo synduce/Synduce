@@ -1,8 +1,9 @@
-
+from configurations_set_search import incomplete_benchmarks
 import sys
 
 # Timeout for all experiments.
-timeout_value = 360
+global timeout_value
+timeout_value = 30
 timestamp_definition = "%d-%m-%y-%H:%M:%S"
 experimental_setup = "a machine with an AMD® Ryzen 7 3700x 8-core processor and 32GB Ram running Ubuntu 20.04"
 experimental_setup_2 = "a laptop with an Intel Core i7-8750H 6-core processor and 32GB Ram running Ubuntu 21.04"
@@ -38,36 +39,36 @@ else:
     exit(-1)
 
 kick_the_tires_set = [
-    ["list/sumhom.pmrs", ""],
-    ["ptree/sum.pmrs", ""],
-    ["tree/sumtree.pmrs", ""],
-    ["tailopt/sum.pmrs", ""],
-    ["treepaths/sum.pmrs", ""],
-    ["treepaths/height.pmrs", ""],
-    ["treepaths/maxPathWeight.pmrs", ""],
-    ["ptree/mul.pmrs", ""],
-    ["tree/maxtree.pmrs", ""],
+    ["list/sum.ml", ""],
+    ["ptree/sum.ml", ""],
+    ["tree/sum.ml", ""],
+    ["tailopt/sum.ml", ""],
+    ["treepaths/sum.ml", ""],
+    ["treepaths/height.ml", ""],
+    ["treepaths/maxPathWeight.ml", ""],
+    ["ptree/mul.ml", ""],
+    ["tree/max.ml", ""],
     ["tree/min.pmrs", ""],
     ["tree/maxtree2.pmrs", ""],
-    ["list/sumodds.pmrs", ""],
-    ["list/prodhom.pmrs", ""],
-    ["list/polyhom.pmrs", ""],
-    ["list/hamming.pmrs", ""],
-    ["list/sumevens.pmrs", ""],
-    ["list/lenhom.pmrs", ""],
+    ["list/sumodds.ml", ""],
+    ["list/prod.ml", ""],
+    ["list/poly.ml", ""],
+    ["list/hamming.ml", ""],
+    ["list/sumevens.ml", ""],
+    ["list/len.ml", ""],
     ["list/last.pmrs", ""],
     ["constraints/sortedlist/count_lt.ml", ""],
     ["constraints/bst/count_lt.ml", "-NB"],
     ["constraints/ensures/mps_no_ensures.ml", "-B"],
     ["list/largest_diff_sorted_list_nohead.ml", ""],
     ["list/poly_no_fac.ml", ""],
-    ["unrealizable/po_sorted.ml", ""]
+    ["unrealizable/po_sorted.ml", "", False]
 ]
 
 reduced_benchmark_set_table2 = [
-    ["list/sumhom.pmrs", ""],
-    ["ptree/sum.pmrs", ""],
-    ["tree/sumtree.pmrs", ""],
+    ["list/sum.ml", ""],
+    ["ptree/sum.ml", ""],
+    ["tree/sum.ml", ""],
     ["tailopt/sum.pmrs", ""],
     ["tailopt/mps.pmrs", ""],
     ["treepaths/sum.pmrs", ""],
@@ -82,7 +83,7 @@ reduced_benchmark_set_table2 = [
     ["list/minhom.pmrs", ""],
     ["list/last.pmrs", ""],
     ["list/msshom.pmrs", ""],
-    ["tree/sorted.pmrs", "-t"],
+    ["tree/sorted.pmrs", "--no-detupling"],
     ["tree/mips.pmrs", ""],
 ]
 
@@ -154,7 +155,7 @@ base_benchmark_set = [
     ["list/zero_after_one.ml", ""],
     ["list/zeros_ones.ml", ""],
     # List to tree
-    ["list/issorted.pmrs", "-t"],
+    ["list/issorted.pmrs", "--no-detupling"],
     ["list_to_tree/search.pmrs", ""],
     ["list_to_tree/search_v2.pmrs", ""],
     ["list_to_tree/search_v3.pmrs", ""],
@@ -192,7 +193,7 @@ base_benchmark_set = [
     ["tree/mpps.pmrs", "--no-gropt"],
     ["tree/poly.pmrs", ""],
     ["tree/poly2.ml", ""],
-    ["tree/sorted.pmrs", "-t"],
+    ["tree/sorted.pmrs", "--no-detupling"],
     ["tree/sorted_2.ml", ""],
     ["tree/sumtree.pmrs", ""],
     # Tree paths
@@ -400,13 +401,7 @@ unrealizable_benchmarks = [
     ["unimodal_lists/prod_needs_aux.ml",  "--no-lifting", False],
 ]
 
-incomplete_benchmarks = [
-    ["incomplete/bst/count_lt_partial.ml", "", True, 1],
-    ["incomplete/bst/count_lt_partial_2.ml", "", True, 1],
-    ["incomplete/sortedlist/count_lt_p1.ml", "", True, 1],
-    ["incomplete/list/sum_p1.ml", "", True, 1],
-    ["incomplete/list/sum_p2.ml", "", True, 1],
-]
+incomplete_benchmarks = incomplete_benchmarks
 
 benchmark_set = constraint_benchmarks + base_benchmark_set + lifting_benchmarks
 

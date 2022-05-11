@@ -347,7 +347,7 @@ let handle_lemma_synth_response
     ~(ctx : Context.t)
     (ti : term_info)
     ((task, resolver) : Sy.solver_response option Lwt.t * int Lwt.u)
-    : term list option
+    : term list option Lwt.t
   =
   let parse_synth_fun (_, _, _, fbody) =
     let body, _ =
@@ -357,16 +357,15 @@ let handle_lemma_synth_response
     in
     body
   in
-  match
-    Lwt_main.run
-      (Lwt.wakeup resolver 0;
-       task)
+  match%lwt
+    Lwt.wakeup resolver 0;
+    task
   with
   | Some (RSuccess resps) ->
     let soln = List.map ~f:parse_synth_fun resps in
     let _ = List.iter ~f:(fun t -> log_soln ~ctx ti.lemma.vname ti.scalar_vars t) soln in
-    Some soln
-  | Some RInfeasible | Some RFail | Some RUnknown | None -> None
+    Lwt.return (Some soln)
+  | Some RInfeasible | Some RFail | Some RUnknown | None -> Lwt.return None
 ;;
 
 let parse_positive_example_solver_model
@@ -404,7 +403,9 @@ let parse_positive_example_solver_model
       "Parse model failure: Positive example cannot be found during lemma refinement."
 ;;
 
-let synthesize_new_lemma ~(ctx : env) ~(p : PsiDef.t) (det : term_info) : term option =
+let synthesize_new_lemma ~(ctx : env) ~(p : PsiDef.t) (det : term_info)
+    : term option Lwt.t
+  =
   let with_synth_obj i synth_obj logic =
     ctx >- AlgoLog.announce_new_lemma_synthesis i det;
     let neg_constraints =
@@ -422,14 +423,16 @@ let synthesize_new_lemma ~(ctx : env) ~(p : PsiDef.t) (det : term_info) : term o
          @ pos_constraints
          @ [ Sy.mk_c_check_synth () ])
     in
-    match
+    match%lwt
       ctx
       >>- handle_lemma_synth_response
             det
-            (SygusInterface.SygusSolver.solve_commands commands)
+            (SygusInterface.SygusSolver.solve_commands
+               ~timeout:(Some !Config.Optims.wait_parallel_tlimit)
+               commands)
     with
-    | None -> None
-    | Some solns -> List.nth solns 0
+    | None -> Lwt.return None
+    | Some solns -> Lwt.return (List.nth solns 0)
   in
   match ctx >>- synthfun_of_det ~p det with
   | [ (synth_obj, logic) ] -> with_synth_obj 0 synth_obj logic
@@ -437,15 +440,14 @@ let synthesize_new_lemma ~(ctx : env) ~(p : PsiDef.t) (det : term_info) : term o
     let lwt_tasks =
       List.mapi obj_choices ~f:(fun i (synth_obj, logic) ->
           Lwt.task ()
-          |> fun (t, r) -> Lwt.map (fun _ -> with_synth_obj i synth_obj logic) t, r)
+          |> fun (t, r) -> Lwt.bind t (fun _ -> with_synth_obj i synth_obj logic), r)
     in
-    Lwt_main.run
-      (Lwt.pick
-         (List.map
-            ~f:(fun (t, r) ->
-              Lwt.wakeup r 0;
-              t)
-            lwt_tasks))
+    Lwt.pick
+      (List.map
+         ~f:(fun (t, r) ->
+           Lwt.wakeup r 0;
+           t)
+         lwt_tasks)
 ;;
 
 (* ============================================================================================= *)
@@ -453,12 +455,12 @@ let synthesize_new_lemma ~(ctx : env) ~(p : PsiDef.t) (det : term_info) : term o
 (* ============================================================================================= *)
 
 let rec lemma_refinement_loop ~(ctx : env) ~(p : PsiDef.t) (det : term_info)
-    : term_info option
+    : term_info option Lwt.t
   =
-  match synthesize_new_lemma ~ctx ~p det with
+  match%lwt synthesize_new_lemma ~ctx ~p det with
   | None ->
     Log.debug_msg "Lemma synthesis failure.";
-    None
+    Lwt.return None
   | Some lemma_term ->
     if !Config.interactive_check_lemma
     then
@@ -470,7 +472,7 @@ let rec lemma_refinement_loop ~(ctx : env) ~(p : PsiDef.t) (det : term_info)
            lemma_term
            det
     else (
-      match
+      match%lwt
         ctx >>- verify_lemma_candidate ~p { det with lemma_candidate = Some lemma_term }
       with
       | vmethod, Unsat ->
@@ -480,7 +482,8 @@ let rec lemma_refinement_loop ~(ctx : env) ~(p : PsiDef.t) (det : term_info)
           | Some pre -> Terms.(pre => lemma_term)
         in
         ctx >- AlgoLog.lemma_proved_correct vmethod det lemma;
-        Some { det with lemma_candidate = None; lemmas = lemma :: det.lemmas }
+        Lwt.return
+          (Some { det with lemma_candidate = None; lemmas = lemma :: det.lemmas })
       | vmethod, S.SExps x ->
         AlgoLog.lemma_not_proved_correct vmethod;
         let new_positive_ctexs =
@@ -498,13 +501,13 @@ let rec lemma_refinement_loop ~(ctx : env) ~(p : PsiDef.t) (det : term_info)
           { det with positive_ctexs = det.positive_ctexs @ new_positive_ctexs }
       | _, Sat ->
         Log.error_msg "Lemma verification returned Sat. This is unexpected.";
-        None
+        Lwt.return None
       | _, Unknown ->
         Log.error_msg "Lemma verification returned Unknown.";
-        None
+        Lwt.return None
       | _ ->
         Log.error_msg "Lemma verification is indeterminate.";
-        None)
+        Lwt.return None)
 ;;
 
 (** Partitioning function to partitiion a list into (a,b,c) where a are
@@ -538,15 +541,15 @@ let refine_ensures_predicates
     ~(p : PsiDef.t)
     ~(neg_ctexs : ctex list)
     ~(pos_ctexs : ctex list)
-    : [ `CoarseningOk | `CoarseningFailure | `Unrealizable ]
+    : [ `CoarseningOk | `CoarseningFailure | `Unrealizable ] Lwt.t
   =
   Log.info
     Fmt.(
       fun fmt () ->
         pf fmt "%i counterexamples violate image assumption." (List.length neg_ctexs));
-  let maybe_pred = ImagePredicates.synthesize ~ctx ~p pos_ctexs neg_ctexs [] in
+  let%lwt maybe_pred = ImagePredicates.synthesize ~ctx ~p pos_ctexs neg_ctexs [] in
   match maybe_pred with
-  | None -> `CoarseningFailure
+  | None -> Lwt.return `CoarseningFailure
   | Some ensures ->
     (match ctx >- Specifications.get_ensures p.PsiDef.reference.pvar with
     | None ->
@@ -570,7 +573,7 @@ let refine_ensures_predicates
       in
       AlgoLog.show_new_ensures_predicate ~ctx p.PsiDef.reference.pvar new_pred;
       ctx >- Specifications.set_ensures p.PsiDef.reference.pvar new_pred);
-    `CoarseningOk
+    Lwt.return `CoarseningOk
 ;;
 
 let synthesize_lemmas
@@ -578,8 +581,10 @@ let synthesize_lemmas
     ~(p : PsiDef.t)
     synt_failure_info
     (lstate : refinement_loop_state)
-    : ( (refinement_loop_state, unrealizability_ctex list) Either.t, Sy.solver_response
-    ) Result.t
+    : ( (refinement_loop_state, unrealizability_ctex list) Either.t
+      , Sy.solver_response )
+      Result.t
+    Lwt.t
   =
   let _interactive_synthesis () =
     !Config.interactive_lemmas_loop
@@ -602,16 +607,17 @@ let synthesize_lemmas
     The lemma corresponding to a particular term should be refined to eliminate the counterexample
     (a counterexample cex is also associated to a particular term through cex.ctex_eqn.eterm)
    *)
-  let ( (ensures_positives, ensures_negatives)
-      , (lemma_synt_positives, lemma_synt_negatives)
-      , unr_ctexs )
+  let%lwt ( (ensures_positives, ensures_negatives)
+          , (lemma_synt_positives, lemma_synt_negatives)
+          , classif_failures
+          , unr_ctexs )
     =
     match synt_failure_info with
     | _, Either.First _ -> failwith "There is no synt_failure_info in synthesize_lemmas."
     | _, Either.Second unrealizability_ctexs ->
       (* Forget about the specific association in pairs. *)
       let ctexs = List.concat_map unrealizability_ctexs ~f:(fun uc -> [ uc.ci; uc.cj ]) in
-      let classified_ctexs =
+      let%lwt classified_ctexs =
         if !Config.classify_ctex
         then ctx >- LemmasInteractive.classify_ctexs_opt ctexs
         else classify_ctexs ~ctx ~p ctexs
@@ -624,11 +630,22 @@ let synthesize_lemmas
       let lemma_synt_positives, lemma_synt_negatives, _ =
         List.partition3_map ~f:ctexs_for_lemma_synt classified_ctexs
       in
-      ( (ensures_positives, ensures_negatives)
-      , (lemma_synt_positives, lemma_synt_negatives)
-      , unrealizability_ctexs )
+      (* Witnesses that could not be classified. *)
+      let classif_failures =
+        List.filter
+          ~f:(fun ctex ->
+            match ctex.ctex_stat with
+            | Unknown -> true
+            | _ -> false)
+          classified_ctexs
+      in
+      Lwt.return
+        ( (ensures_positives, ensures_negatives)
+        , (lemma_synt_positives, lemma_synt_negatives)
+        , classif_failures
+        , unrealizability_ctexs )
   in
-  let lemma_synthesis_success =
+  let%lwt lemma_synthesis_success =
     match ensures_negatives, lemma_synt_negatives with
     | _ :: _, _ ->
       refine_ensures_predicates
@@ -641,43 +658,51 @@ let synthesize_lemmas
       update false lemma_synt_negatives lstate.lemmas;
       update true lemma_synt_positives lstate.lemmas;
       AlgoLog.spurious_violates_requires (List.length lemma_synt_negatives);
-      let success, lemmas_to_add =
-        Hashtbl.fold lstate.lemmas ~init:(true, []) ~f:(fun ~key ~data status ->
-            List.fold data ~init:status ~f:(fun (status, additions) det ->
-                (* Skip lemma synth for bounded terms and when status is false *)
-                if ctx >- Analysis.is_bounded det.term || not status
-                then status, additions
-                else (
-                  match lemma_refinement_loop ~ctx ~p det with
-                  | None -> false, additions
-                  | Some det -> status, (key, det) :: additions)))
+      let%lwt success, lemmas_to_add =
+        let inner_func key (status, additions) det =
+          (* Skip lemma synth for bounded terms and when status is false *)
+          if ctx >- Analysis.is_bounded det.term || not status
+          then Lwt.return (status, additions)
+          else (
+            match%lwt lemma_refinement_loop ~ctx ~p det with
+            | None -> Lwt.return (false, additions)
+            | Some det -> Lwt.return (status, (key, det) :: additions))
+        in
+        let f ~key ~data status =
+          Lwt.bind status (fun stat -> Lwt_list.fold_left_s (inner_func key) stat data)
+        in
+        Hashtbl.fold lstate.lemmas ~init:(Lwt.return (true, [])) ~f
       in
       List.iter lemmas_to_add ~f:(fun (key, data) ->
           Lemmas.add_term_info lstate.lemmas ~key ~data);
-      if success then `CoarseningOk else `CoarseningFailure
+      Lwt.return (if success then `CoarseningOk else `CoarseningFailure)
     | [], [] ->
-      update true lemma_synt_positives lstate.lemmas;
-      (* lemma_synt_negatives and ensures_negatives are empty; all ctexs non spurious! *)
-      AlgoLog.no_spurious_ctex ();
-      `Unrealizable
+      (match classif_failures with
+      | [] ->
+        update true lemma_synt_positives lstate.lemmas;
+        (* lemma_synt_negatives and ensures_negatives are empty; all ctexs non spurious! *)
+        AlgoLog.no_spurious_ctex ();
+        Lwt.return `Unrealizable
+      | _ :: _ ->
+        AlgoLog.witness_classification_failure ();
+        Lwt.return `CoarseningFailure)
   in
-  match lemma_synthesis_success with
-  | `CoarseningOk -> Ok (Either.First lstate)
-  | `Unrealizable -> Ok (Either.Second unr_ctexs)
-  | `CoarseningFailure ->
-    (match synt_failure_info with
-    | Sy.RFail, _ ->
-      Log.error_msg "SyGuS solver failed to find a solution.";
-      Error RFail
-    | RInfeasible, _ ->
-      (* Rare - but the synthesis solver can answer "infeasible", in which case it can give
-             counterexamples. *)
-      ctx >- AlgoLog.print_infeasible_message lstate.t_set;
-      Ok (Either.Second unr_ctexs)
-    | RUnknown, _ ->
-      (* In most cases if the synthesis solver does not find a solution and terminates, it will
+  Lwt.return
+    (match lemma_synthesis_success with
+    | `CoarseningOk -> Ok (Either.First lstate)
+    | `Unrealizable -> Ok (Either.Second unr_ctexs)
+    | `CoarseningFailure ->
+      (match synt_failure_info with
+      | Sy.RFail, _ ->
+        Log.error_msg "SyGuS solver failed to find a solution.";
+        Error Sy.RFail
+      | RInfeasible, _ ->
+        (* The synthesis solver had answered infeasible but we couln not generate a predicate. *)
+        Error Sy.RFail
+      | RUnknown, _ ->
+        (* In most cases if the synthesis solver does not find a solution and terminates, it will
              answer unknowns. We interpret it as "no solution can be found". *)
-      Log.error_msg "SyGuS solver returned unknown.";
-      Error RUnknown
-    | s_resp, _ -> Error s_resp)
+        Log.error_msg "SyGuS solver returned unknown.";
+        Error Sy.RUnknown
+      | s_resp, _ -> Error s_resp))
 ;;

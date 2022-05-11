@@ -24,12 +24,10 @@ let rec f = function
       && mss >= mps]
 ;;
 
-let rec target t = h t
-
-and h = function
+let rec target = function
   | CNil -> [%synt s0]
   | Single a -> [%synt f0] a
-  | Concat (y, z) -> [%synt odot] (h y) (h z)
+  | Concat (y, z) -> [%synt odot] (target y) (target z)
 ;;
 
 let rec repr t = c t

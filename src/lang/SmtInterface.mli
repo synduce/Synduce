@@ -91,6 +91,17 @@ module SyncSmt : sig
   val make_solver : string -> online_solver
 end
 
+(** `wait_on_failure c s` waits if the first component of s indicates that the solver
+    failed or returned unknown.
+    Will stop waiting when `Config.wait_parallel_tlimit` seconds have elapsed or
+    `c <= 1`. Decrements `c` when it stops waiting, or if the solver response indicates
+    success.
+*)
+val wait_on_failure
+  :  int ref
+  -> (SmtLib.solver_response * 'a) Lwt.t
+  -> (SmtLib.solver_response * 'a) Lwt.t
+
 val rtype_of_smtSort : ctx:Term.Context.t -> SmtLib.smtSort -> RType.t option
 val sort_of_rtype : RType.t -> SmtLib.smtSort
 val dec_parametric : RType.t -> RType.t list -> SmtLib.smtSort

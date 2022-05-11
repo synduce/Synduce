@@ -6,6 +6,12 @@ let timed (f : unit -> 'a) : float * 'a =
   Unix.gettimeofday () -. t0, res
 ;;
 
+let lwt_timed (f : unit Lwt.t -> 'a Lwt.t) : (float * 'a) Lwt.t =
+  (* TODO: better time measurement method. *)
+  let t0 = Unix.gettimeofday () in
+  Lwt.map (fun res -> Unix.gettimeofday () -. t0, res) (f (Lwt.return ()))
+;;
+
 (* ============================================================================================= *)
 (*                                SUBPROCESS TIMING INFO                                         *)
 (* ============================================================================================= *)
@@ -281,3 +287,10 @@ let restart () =
   (* Restart global time. *)
   glob_start ()
 ;;
+
+(* ============================================================================================= *)
+(*                               OTHER STATS                                                     *)
+(* ============================================================================================= *)
+
+let num_unr_cache_hits = ref 0
+let orig_solution_hit = ref false

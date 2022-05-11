@@ -246,7 +246,7 @@ let print_solvers_summary (i : int) (frmt : Formatter.t) () : unit =
       let total_instances = ref 0 in
       let f (key, data) =
         match data with
-        | `Assoc [ ("total_time", `Float total_time); ("num_instances", `Int instances) ]
+        | `Assoc [ ("total-time", `Float total_time); ("num-instances", `Int instances) ]
           ->
           total_solvers_time := !total_solvers_time +. total_time;
           total_instances := !total_instances + instances;

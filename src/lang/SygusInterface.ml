@@ -663,14 +663,14 @@ module HLSolver = struct
     [ mk_c_set_logic solver.logic ] @ pre tuple_decls @ core @ [ mk_c_check_synth () ]
   ;;
 
-  let solve ~(ctx : Context.t) (solver : t) =
+  let solve ?(timeout = None) ~(ctx : Context.t) (solver : t) =
     let solver_kind =
       if !Config.use_eusolver
       then SygusSolver.CoreSolver.EUSolver
       else SygusSolver.CoreSolver.CVC
     in
     let commands = all_commands ~ctx solver in
-    SygusSolver.solve_commands ~solver_kind commands
+    SygusSolver.solve_commands ~timeout ~solver_kind commands
   ;;
 
   let to_file ~(ctx : Context.t) (filename : string) (solver : t) : unit =

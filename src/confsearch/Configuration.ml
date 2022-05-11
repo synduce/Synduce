@@ -180,6 +180,13 @@ let configuration_of (p : PMRS.t) : conf =
       join accum (from_rhs rhs))
 ;;
 
+(** `same_conf p1 p2` is true if `p1` and `p2` are in the same configuration. *)
+let same_conf (p1 : PMRS.t) (p2 : PMRS.t) : bool =
+  let c1 = configuration_of p1
+  and c2 = configuration_of p2 in
+  Subconf.(equal (of_conf c1) (of_conf c2))
+;;
+
 (** Apply a configuration to a given PMRS. The environment is copied before the type
   information for the unknowns is changed. The copied environment is then returned.
 *)

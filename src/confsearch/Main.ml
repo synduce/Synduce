@@ -6,13 +6,15 @@ open Lang
 open Utils
 module G = ConfGraph
 
+let total_configurations = ref 0
+
 let single_configuration_solver
     ?(lemmas = Se2gis.Lemmas.empty_lemmas ())
     ~(ctx : env)
     (p : PsiDef.t)
-    : Syguslib.Sygus.solver_response segis_response
+    : Syguslib.Sygus.solver_response segis_response Lwt.t
   =
-  let resp =
+  let%lwt resp =
     if !Config.Optims.use_segis (* Symbolic CEGIS. *)
     then Se2gis.Baselines.algo_segis ~ctx p
     else if !Config.Optims.use_cegis (* Concrete CEGIS. *)
@@ -21,15 +23,46 @@ let single_configuration_solver
       (* Default algorithm: best combination of techniques (TODO) *)
     else Se2gis.Main.solve_problem ~lemmas ~ctx p
   in
+  (* Print intermediate result if we are looking for more than one solution *)
+  if !Config.Optims.max_solutions > 0
+  then (
+    let elapsed = Stats.get_glob_elapsed ()
+    and verif = !Stats.verif_time in
+    match resp with
+    | Realizable s ->
+      AlgoLog.show_stat_intermediate_solution
+        ~ctx
+        p
+        (Some (Either.first s))
+        elapsed
+        verif
+        !total_configurations
+    | Unrealizable u ->
+      AlgoLog.show_stat_intermediate_solution
+        ~ctx
+        p
+        (Some (Either.second u))
+        elapsed
+        verif
+        !total_configurations
+    | Failed _ ->
+      AlgoLog.show_stat_intermediate_solution
+        ~ctx
+        p
+        None
+        elapsed
+        verif
+        !total_configurations);
+  (* Save stats an restart counters. *)
   LogJson.save_stats_and_restart p.id;
-  resp
+  Lwt.return resp
 ;;
 
 let find_and_solve_problem
     ~(ctx : env)
     (psi_comps : (string * string * string) option)
     (pmrs : (string, PMRS.t, Base.String.comparator_witness) Map.t)
-    : (env * PsiDef.t * Syguslib.Sygus.solver_response segis_response) list
+    : (int * (env * PsiDef.t * Syguslib.Sygus.solver_response segis_response) list) Lwt.t
   =
   (*  Find problem components *)
   let target_fname, spec_fname, repr_fname =
@@ -47,7 +80,7 @@ let find_and_solve_problem
     let open Configuration in
     let rstate = G.generate_configurations ctx top_userdef_problem.PsiDef.target in
     let rec find_sols a =
-      match G.next rstate with
+      match G.next ~shuffle:true rstate with
       | Some sub_conf ->
         Int.incr num_attempts;
         let conf = Subconf.to_conf mc sub_conf in
@@ -58,14 +91,20 @@ let find_and_solve_problem
         let new_pdef =
           { top_userdef_problem with target = new_target; id = !num_attempts }
         in
+        (* Update stat: whether we have hit the original configuration. *)
+        Stats.orig_solution_hit := same_conf new_pdef.target top_userdef_problem.target;
+        (* Check unrealizability via cache first. *)
         if G.check_unrealizable_from_cache new_ctx new_pdef rstate
         then (
           Log.info
             Fmt.(fun fmt () -> pf fmt "Configuration is unrealizable according to cache.");
           G.mark_unrealizable rstate sub_conf;
+          (* Update stats: number of cache hits. *)
+          Int.incr Stats.num_unr_cache_hits;
           find_sols (a @ [ new_ctx, new_pdef, Unrealizable [] ]))
         else (
-          match single_configuration_solver ~ctx:new_ctx new_pdef with
+          (* Call the single configuration solver. *)
+          match%lwt single_configuration_solver ~ctx:new_ctx new_pdef with
           | Realizable s ->
             G.mark_realizable rstate sub_conf;
             G.expand rstate sub_conf;
@@ -73,11 +112,12 @@ let find_and_solve_problem
           | Unrealizable u ->
             G.mark_unrealizable rstate sub_conf;
             G.cache rstate u;
-            find_sols (a @ [ new_ctx, new_pdef, Unrealizable u ])
-          | Failed _ ->
-            G.mark_unrealizable rstate sub_conf;
-            find_sols a)
-      | None -> a
+            find_sols ((new_ctx, new_pdef, Unrealizable u) :: a)
+          | Failed f ->
+            G.mark_failed rstate sub_conf;
+            if !Config.node_failure_behavior then () else G.expand rstate sub_conf;
+            find_sols ((new_ctx, new_pdef, Failed f) :: a))
+      | None -> Lwt.return a
     in
     find_sols []
   in
@@ -99,9 +139,14 @@ let find_and_solve_problem
         ~f:(fun ~key:_ ~data:l c -> c * (2 ** List.length l))
         max_configuration
     in
+    total_configurations := subconf_count;
     Utils.Log.info (fun fmt () -> Fmt.pf fmt "%i configurations possible." subconf_count);
-    find_multiple_solutions ctx top_userdef_problem max_configuration)
-  else
+    let%lwt multi_sols =
+      find_multiple_solutions ctx top_userdef_problem max_configuration
+    in
+    Lwt.return (subconf_count, multi_sols))
+  else (
     (* Only solve the top-level skeleton, i.e. the problem specified by the user. *)
-    [ ctx, top_userdef_problem, single_configuration_solver ~ctx top_userdef_problem ]
+    let%lwt top_soln = single_configuration_solver ~ctx top_userdef_problem in
+    Lwt.return (1, [ ctx, top_userdef_problem, top_soln ]))
 ;;

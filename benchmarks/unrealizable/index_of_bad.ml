@@ -24,8 +24,9 @@ let spec x t =
 
 let target x t =
   let rec g = function
-    | Elt a -> [%synt xi_0] x a
-    | Cons (hd, tl) -> if hd >= x then [%synt xi_1] x hd else [%synt xi_2] x hd (g tl)
+    | Elt a -> [%synt xi_0] x
+    | Cons (hd, tl) ->
+      if hd >= x then [%synt xi_1] x hd (g tl) else [%synt xi_2] x hd (g tl)
   in
   g t
   [@@requires is_sorted]

@@ -23,7 +23,7 @@ open Syguslib.Sygus
     Use the option [--segis] in the executable to use this synthesis algorithm.
 *)
 let rec segis_loop ~(ctx : env) (p : PsiDef.t) (t_set : TermSet.t)
-    : solver_response segis_response
+    : solver_response segis_response Lwt.t
   =
   incr_refinement ctx;
   if get_refinement_steps ctx > !Config.refinement_rounds_warning_limit
@@ -40,9 +40,11 @@ let rec segis_loop ~(ctx : env) (p : PsiDef.t) (t_set : TermSet.t)
   let tsize = Set.length t_set
   and usize = 0 in
   Stats.log_new_major_step ~tsize ~usize ();
+  (* Show intemediate refinement step information depending on mode. *)
   if !Config.info
   then AlgoLog.show_steps ctx tsize usize
-  else AlgoLog.show_stat ctx elapsed tsize usize;
+  else if !Config.Optims.max_solutions <= 0
+  then AlgoLog.show_stat_refinement_step ctx elapsed tsize usize;
   Log.debug_msg
     Fmt.(str "<SEGIS> Start refinement loop with %i terms in T." (Set.length t_set));
   (* Start of the algorithm. *)
@@ -55,8 +57,8 @@ let rec segis_loop ~(ctx : env) (p : PsiDef.t) (t_set : TermSet.t)
       ~lifting:Lifting.empty_lifting
       t_set
   in
-  let synth_time, (s_resp, solution) =
-    Stats.timed (fun () -> Equations.solve ctx ~p eqns)
+  let%lwt synth_time, (s_resp, solution) =
+    Stats.lwt_timed (fun a -> Lwt.bind a (fun _ -> Equations.solve ctx ~p eqns))
   in
   match s_resp, solution with
   | RSuccess _, First sol ->
@@ -75,7 +77,7 @@ let rec segis_loop ~(ctx : env) (p : PsiDef.t) (t_set : TermSet.t)
     | verif_time, None ->
       Stats.log_major_step_end ~synth_time ~verif_time ~t:tsize ~u:0 true;
       Log.print_ok ();
-      Realizable { soln_rec_scheme = p.PsiDef.target; soln_implems = sol })
+      Lwt.return (Realizable { soln_rec_scheme = p.PsiDef.target; soln_implems = sol }))
   | RInfeasible, Second ctexs ->
     Stats.log_major_step_end ~synth_time ~verif_time:0. ~t:tsize ~u:0 false;
     Log.info
@@ -86,14 +88,14 @@ let rec segis_loop ~(ctx : env) (p : PsiDef.t) (t_set : TermSet.t)
             "@[<hov 2><SEGIS> This problem has no solution. Counterexample set:@;%a@]"
             (list ~sep:sp (pp_term ctx.ctx))
             (Set.elements t_set));
-    Unrealizable ctexs
+    Lwt.return (Unrealizable ctexs)
   | RFail, _ ->
     Log.error_msg "<SEGIS> SyGuS solver failed to find a solution.";
-    Failed RFail
+    Lwt.return (Failed RFail)
   | RUnknown, _ ->
     Log.error_msg "<SEGIS> SyGuS solver returned unknown.";
-    Failed RUnknown
-  | _ -> Failed s_resp
+    Lwt.return (Failed RUnknown)
+  | _ -> Lwt.return (Failed s_resp)
 ;;
 
 let algo_segis ~(ctx : env) (p : PsiDef.t) =
@@ -114,7 +116,7 @@ let algo_segis ~(ctx : env) (p : PsiDef.t) =
     Use the option [--cegis] in the executable to use this synthesis algorithm.
 *)
 let rec cegis_loop ~(ctx : Env.env) (p : PsiDef.t) (t_set : TermSet.t)
-    : solver_response segis_response
+    : solver_response segis_response Lwt.t
   =
   incr_refinement ctx;
   if get_refinement_steps ctx > !Config.refinement_rounds_warning_limit
@@ -131,7 +133,8 @@ let rec cegis_loop ~(ctx : Env.env) (p : PsiDef.t) (t_set : TermSet.t)
   Stats.log_new_major_step ~tsize ~usize:0 ();
   if !Config.info
   then AlgoLog.show_steps ctx tsize 0
-  else AlgoLog.show_stat ctx elapsed tsize 0;
+  else if !Config.Optims.max_solutions <= 0
+  then AlgoLog.show_stat_refinement_step ctx elapsed tsize 0;
   Log.debug_msg
     Fmt.(str "<CEGIS> Start refinement loop with %i terms in T." (Set.length t_set));
   (* Start of the algorithm. *)
@@ -144,8 +147,8 @@ let rec cegis_loop ~(ctx : Env.env) (p : PsiDef.t) (t_set : TermSet.t)
       ~lifting:Lifting.empty_lifting
       t_set
   in
-  let synth_time, (s_resp, solution) =
-    Stats.timed (fun () -> Equations.solve ctx ~p eqns)
+  let%lwt synth_time, (s_resp, solution) =
+    Stats.lwt_timed (fun a -> Lwt.bind a (fun () -> Equations.solve ctx ~p eqns))
   in
   match s_resp, solution with
   | RSuccess _, First sol ->
@@ -166,7 +169,7 @@ let rec cegis_loop ~(ctx : Env.env) (p : PsiDef.t) (t_set : TermSet.t)
     | verif_time, None ->
       Stats.log_major_step_end ~synth_time ~verif_time ~t:tsize ~u:0 true;
       Log.print_ok ();
-      Realizable { soln_rec_scheme = p.PsiDef.target; soln_implems = sol })
+      Lwt.return (Realizable { soln_rec_scheme = p.PsiDef.target; soln_implems = sol }))
   | RInfeasible, Second ctexs ->
     Stats.log_major_step_end ~synth_time ~verif_time:0. ~t:tsize ~u:0 false;
     Log.info
@@ -177,17 +180,17 @@ let rec cegis_loop ~(ctx : Env.env) (p : PsiDef.t) (t_set : TermSet.t)
             "@[<hov 2><CEGIS> This problem has no solution. Counterexample set:@;%a@]"
             (list ~sep:sp (pp_term ctx.ctx))
             (Set.elements t_set));
-    Unrealizable ctexs
+    Lwt.return (Unrealizable ctexs)
   | RFail, _ ->
     Log.error_msg "<CEGIS> SyGuS solver failed to find a solution.";
-    Failed RFail
+    Lwt.return (Failed RFail)
   | RUnknown, _ ->
     Log.error_msg "<CEGIS> SyGuS solver returned unknown.";
-    Failed RUnknown
-  | _ -> Failed s_resp
+    Lwt.return (Failed RUnknown)
+  | _ -> Lwt.return (Failed s_resp)
 ;;
 
-let algo_cegis ~(ctx : Env.env) (p : PsiDef.t) =
+let algo_cegis ~(ctx : Env.env) (p : PsiDef.t) : solver_response segis_response Lwt.t =
   let t_set =
     TermSet.of_list
       (List.map

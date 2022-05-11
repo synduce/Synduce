@@ -4,143 +4,9 @@ import os
 import sys
 import time
 import argparse
-import subprocess
-import json
 # Local helper modules
 from definitions import *
-from parsing import DataObj, MultiDataObj
-
-
-def run_one(progress, bench_id, command, algo, optim, filename, extra_opt, expect_more):
-    print(f"{progress : >11s}  {bench_id} 🏃", end="\r")
-    sys.stdout.flush()
-
-    process = subprocess.Popen(
-        command, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
-    info = None
-    last_refinement_string = ""
-    last_verif_time = 0.0
-    last_elapsed = 0.0
-    last_info = None
-    # Poll process for new output until finished
-    while True:
-        try:
-            line = process.stdout.readline()
-            data = json.loads(line)
-            info = MultiDataObj(data)
-            last_verif_time = info.verif_elapsed
-            last_elapsed = info.elapsed
-            last_info = info
-        except Exception as e:
-            info = MultiDataObj({})
-            info.is_successful = False
-            info.verif_elapsed = last_verif_time
-            info.elapsed = last_elapsed
-            break
-
-        if process.poll() is not None or info.is_successful:
-            break
-        print(
-            f"{progress : >11s}.. benchmarks/{filename} {extra_opt} {algo[1]} {optim[1]} 🏃 at step {info.major_step_count(0)}:{info.minor_step_count(0)}", end="\r")
-
-    if info is not None and last_info is None:
-        last_info = info
-    return last_info
-
-
-def run_n(progress, bench_id, command, filename, realizable=True, expect_many=False, algo="se2gis",
-          optim="", extra_opt="", errors=[], num_runs=1, csv_output=None):
-    total_elapsed = 0.0
-    total_last_step_elapsed = 0.0
-    verif_elapsed = 0.0
-    max_e = 0
-    min_e = timeout_value
-    estim = 0
-    delta = 0
-    sp = " "
-    bench_parts = bench_id.split(".")[0].split("/")
-    bench_name = bench_parts[-1]
-    info = MultiDataObj({})
-    info.is_successful = False
-    print(
-        f"{progress : >11s} {bench_name: <25s}", end="\r")
-
-    # Run the tests num_run times
-    for i in range(num_runs):
-        try:
-            info = run_one(progress, bench_id, command,
-                           algo, optim, filename, extra_opt, expect_many)
-        except:
-            info = MultiDataObj({})
-            info.is_successful = False
-
-        if (info is not None and
-            info.is_successful and
-            ((realizable and not info.is_unrealizable) or
-                (not realizable and info.is_unrealizable))):
-            total_elapsed += info.elapsed
-            verif_elapsed += info.verif_elapsed
-            max_e = max(info.elapsed, max_e)
-            min_e = min(info.elapsed, min_e)
-            estim = float(estim * i + info.elapsed) / float(i + 1)
-
-            msg = f"[estimate: {estim: 4.3f} s] ({i}/{num_runs} runs){sp : <30s}"
-            print(msg, end="\r")
-            sys.stdout.flush()
-        else:
-            break
-
-    elapsed = total_elapsed / num_runs
-    verif_elapsed = verif_elapsed / num_runs
-    delta = 1000 * max(abs(max_e - elapsed), abs(min_e-elapsed))
-    sp = " "
-    csvline = "?,?,?,?,?,?"
-
-    if info is not None and info.is_successful and ((realizable and not info.is_unrealizable) or (not realizable and info.is_unrealizable)):
-        delta_str = f"{delta : .0f}ms"
-        if (float(delta) / (1000.0 * elapsed)) > 0.05:
-            delta_str = f"{delta_str} !"
-        else:
-            delta_str = f"{delta_str}  "
-        timing = f"average: {elapsed: 4.3f}s ±{delta_str}"
-
-        if expect_many:
-            p_by_induction = "∅"
-            c_by_induction = "∅"
-            induction_info = "        "
-            refinement_rounds = "∅"
-            current_algo = "Portfolio"
-        else:
-            current_algo = info.algo(0)
-            if info.is_proved_by_induction(0):
-                p_by_induction = "✓"
-            else:
-                p_by_induction = "~"
-
-            if info.is_classified_by_induction(0):
-                c_by_induction = "✓"
-            else:
-                c_by_induction = "~"
-            refinement_rounds = info.get_refinement_summary(0)
-            if "." in refinement_rounds:
-                induction_info = f"B:{c_by_induction},B':{p_by_induction}"
-            else:
-                induction_info = "        "
-
-        msg = f"{progress : >11s} ✅ {current_algo: <6s} : {bench_name : <33s} ×{num_runs} runs, {str(timing): <30s} {induction_info} | R: {refinement_rounds} {sp : <20s} "
-        print(msg)
-        csvline = f"{elapsed: 4.3f}, N/A, {delta : .0f},{refinement_rounds},{c_by_induction},{p_by_induction},{verif_elapsed : 4.3f}"
-    else:
-        errors += [bench_id]
-        print(f"{progress: >11s} ❌ {bench_id : <90s}")
-        if info is not None:
-            csvline = f"N/A,N/A,N/A,f{info.major_step_count},N/A,N/A,{info.verif_elapsed : 4.3f}"
-        else:
-            csvline = f"N/A,N/A,N/A,N/A,N/A,N/A,N/A"
-
-    sys.stdout.flush()
-
-    return errors,  elapsed, csvline
+from runner import *
 
 
 def run_benchmarks(input_files, algos, optims, num_runs=1, csv_output=None, exit_err=False):
@@ -185,21 +51,27 @@ def run_benchmarks(input_files, algos, optims, num_runs=1, csv_output=None, exit
 
                 # Print benchmark name, algorithm used and optimization options.
                 bench_id = "%s,%s+%s" % (filename, algo[0], optim[0])
-                progress = f"({benchmark_cnt} / {benchmark_total})"
-                command = ("%s %s %s -j --json-progress %s %s %s %s %s" %
+                progress = f"{benchmark_cnt}/{benchmark_total}"
+                command = ("%s %s %s --compact -j --json-progress %s %s %s %s %s" %
                            (timeout, exec_path, algo[1], optim[1], extra_opt,
                             os.path.realpath(os.path.join(
                                 "benchmarks", filename)),
                             soln_file_opt, gen_opt))
+                # print(command)
                 bench_cat = "->".join(bench_id.split(".")[0].split("/")[:-1])
                 if not bench_cat == prev_bench_cat:
                     print(f"\n⏺ Category: {bench_cat}")
                     prev_bench_cat = bench_cat
 
                 # Run the benchmark n times.
-                errors, elapsed, csvline = run_n(progress, bench_id, command, filename, realizable=realizable,
-                                                 algo=algo, expect_many=expect_many, optim=optim, extra_opt=extra_opt,
-                                                 errors=errors, num_runs=num_runs,
+                errors, elapsed, csvline = run_n(progress, bench_id, command, filename,
+                                                 realizable=realizable,
+                                                 algo=algo,
+                                                 expect_many=expect_many,
+                                                 optim=optim,
+                                                 extra_opt=extra_opt,
+                                                 errors=errors,
+                                                 num_runs=num_runs,
                                                  csv_output=csv_output)
 
                 csvline_all_algos += [f"{algo[0]}:{optim[0]}", csvline]
@@ -253,6 +125,8 @@ if __name__ == "__main__":
     aparser.add_argument(
         "--single", help="Run the lifting benchmark in benchmarks/[FILE]", type=str, default=None)
     aparser.add_argument(
+        "-m", "--multi", help="Run the benchmark with multiple solution.", default=False, action="store_true")
+    aparser.add_argument(
         "-n", "--num-runs", help="Run each benchmark NUM times.", type=int, default=1
     )
     aparser.add_argument(
@@ -265,6 +139,9 @@ if __name__ == "__main__":
 
     aparser.add_argument(
         "-T", "--timeout", help="Set the timeout in seconds.", type=int, default=600)
+    aparser.add_argument(
+        "-Z", "--solve-timeout", help="Set the single instance solver timeout in seconds.",
+        type=float, default=-1.0)
     args = aparser.parse_args()
 
     if args.summary:
@@ -313,12 +190,12 @@ if __name__ == "__main__":
             run_base_benchmarks = True
 
     # Background solver selection : cvc4 by default.
-    cvc = "--cvc4"
+    cvc = " --cvc4"
     if args.cvc5:
-        cvc = "--cvc5"
+        cvc = " --cvc5"
 
     other_alg = []
-    print(args.compare)
+
     if args.compare is not None:
         if "segis" in args.compare:
             other_alg += [["segis", "--segis " + cvc]]
@@ -331,11 +208,17 @@ if __name__ == "__main__":
     if args.single and args.single != "":
         print("Running single file")
         algos = [["se2gis", cvc]] + other_alg
-        optims = [["all", ""]]
+        if args.solve_timeout > 0:
+            optims = [["all", f"--solve-timeout={args.solve_timeout}"]]
+        else:
+            optims = [["all", ""]]
         binfo = str(args.single).split("+")
+        extra_args = str(binfo[1]).strip() if len(binfo) > 1 else ""
+        binfo = [str(binfo[0]), extra_args, args.unrealizable]
 
-        if len(binfo) == 1:
-            binfo = [str(binfo[0]), "", args.unrealizable]
+        if args.multi:
+            binfo += [1]
+
         run_benchmarks([binfo], algos, optims,
                        csv_output=csv_output, num_runs=runs)
         exit()
@@ -371,7 +254,12 @@ if __name__ == "__main__":
             bench_set += unrealizable_benchmarks
 
         if run_incomplete:
-            optims = [["all", ""]]
+            if args.solve_timeout > 0:
+                solve_timeout = args.solve_timeout
+            else:
+                solve_timeout = 10.0
+            optims = [
+                ["all", f"-s 2 --no-lifting -NB --solve-timeout={solve_timeout}"]]
             bench_set += incomplete_benchmarks
 
         run_benchmarks(bench_set, algos,
@@ -415,26 +303,26 @@ if __name__ == "__main__":
             ["all", ""],
             #["ini", "-c"],
             # equation system splitting optimizations
-            ["split", "-t --no-splitting"],
+            ["split", "--no-detupling --no-splitting"],
             ["syn", "--no-syndef --no-gropt --no-rew"],  # syntactic optimizations
-            ["off", "-t --no-syndef --no-gropt --no-rew --no-splitting"]
+            ["off", "--no-detupling --no-syndef --no-gropt --no-rew --no-splitting"]
         ]
 
     # Table 4 / Test
     elif table_no == 4:
-        algos = [["se2gis", "--cvc4"], ["segis", "--segis --cvc4"]]
+        algos = [["se2gis", cvc], ["segis", "--segis " + cvc]]
         optims = [["all", ""]]
 
     # Table 5 / Test with cvc4 against baseline comparison
     elif table_no == 5:
-        algos = [["se2gis", "--cvc4"],
-                 ["segis", "--segis --cvc4"],
-                 ["segis0", "--segis --cvc4 -u"]]
+        algos = [["se2gis", cvc],
+                 ["segis", "--segis " + cvc],
+                 ["segis0", "--segis -u" + cvc]]
         optims = [["all", ""]]
 
     # No table - just run the base algorithm.
     else:
-        algos = [["se2gis", "--cvc4"], ["segis", "--segis --cvc4"]]
+        algos = [["se2gis", cvc], ["segis", "--segis " + cvc]]
         optims = [["all", ""]]
 
     # If no csv output has been provided, generate a timestamped output file

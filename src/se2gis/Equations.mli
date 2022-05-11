@@ -39,6 +39,7 @@ val free_vars_of_equations
   -> Term.VarSet.t
 
 type partial_soln = (string * Term.variable list * Term.term) list
+type partial_soln_or_ctexs = (partial_soln, unrealizability_ctex list) Either.t
 
 val pp_partial_soln
   :  ctx:Env.env
@@ -50,8 +51,7 @@ val solve
   :  Env.env
   -> p:PsiDef.t
   -> Common.ProblemDefs.equation list
-  -> Syguslib.Sygus.solver_response
-     * (partial_soln, Common.ProblemDefs.unrealizability_ctex list) Either.t
+  -> (Syguslib.Sygus.solver_response * partial_soln_or_ctexs) Lwt.t
 
 val update_assumptions
   :  ctx:Env.env

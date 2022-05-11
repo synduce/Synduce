@@ -6,6 +6,9 @@ let problem_name = ref "unknown"
 (** Toggle debugging. *)
 let debug = ref false
 
+(** Print messages in compact form, non human readable.*)
+let compact = ref false
+
 (** Limit the size of debugging messages. *)
 let debug_msg_max_chars = ref 400
 
@@ -15,8 +18,15 @@ let info = ref true
 (** Json output toggle.  *)
 let json_out = ref false
 
-(** When Json output is on, set true to get partial updates in Json format. *)
+(**
+  When Json output is on, set true to get partial updates in Json format.
+  When the tool searches for a single solution, print intermediate refinement steps.
+  When the tool searches for multiples ones, print intermediate results (unrealizable,
+  failures and solutions).
+*)
 let json_progressive = ref false
+
+let print_unrealizable_configs = ref false
 
 (** Toggle printing timing info when info is off. Set to true by default. *)
 let timings = ref true
@@ -108,6 +118,14 @@ let sysfe_opt = ref true
     Sometimes non-linearity occurs even when the reference only has linear operators.
 *)
 let force_nonlinear = ref false
+
+(**
+  When `node_failure_behaviour` is set to `true` (the default value), the failure to solve a
+  given configuration is considered as an unrealizability result. That is, the configuration will
+  not be refined further. If `node_failure_behaviour` is set to `false`, the failure will only
+  interpreted as realizable: subconfigurations will be explored.
+*)
+let node_failure_behavior = ref true
 
 (* ============================================================================================= *)
 (*                                STORAGE AND BINARY PATHS                                       *)
@@ -250,6 +268,7 @@ let options print_usage parse_only =
   ; 'C', "check-smt-unrealizable", set check_unrealizable_smt_unsatisfiable true, None
   ; 'u', "no-check-unrealizable", set check_unrealizable false, None
   ; 'd', "debug", set debug true, None
+  ; 'e', "expand-on-failure", set node_failure_behavior false, None
   ; 'f', "force-nonlinear", set force_nonlinear true, None
   ; 'h', "help", Some print_usage, None
   ; 'i', "info-off", set info false, None
@@ -265,13 +284,14 @@ let options print_usage parse_only =
   ; 'o', "output", None, Some set_output_folder
   ; 'p', "num-threads", None, Some set_num_threads
   ; 's', "max-solutions", None, Some set_max_solutions
-  ; 't', "no-detupling", set detupling_on false, None
+  ; 't', "solve-timeout", None, Some set_wait_parallel_tlimit
   ; 'v', "verbose", set verbose true, None
   ; 'X', "classify-ctex", set classify_ctex true, None
   ; '\000', "segis", set use_segis true, None
   ; '\000', "cegis", set use_cegis true, None
   ; '\000', "cvc4", set use_cvc4 true, None
   ; '\000', "cvc5", set use_cvc4 false, None
+  ; '\000', "compact", set compact true, None
   ; '\000', "const-grammars", set no_grammar_for_constants false, None
   ; '\000', "eusolver", set use_eusolver true, None
   ; '\000', "fuzzing", None, Some set_fuzzing_count
@@ -283,6 +303,7 @@ let options print_usage parse_only =
   ; '\000', "json-progress", set json_progressive true, None
   ; '\000', "max-lifting", None, Some set_max_lifting_attempts
   ; '\000', "no-assumptions", set make_partial_correctness_assumption false, None
+  ; '\000', "no-detupling", set detupling_on false, None
   ; '\000', "no-gropt", set optimize_grammars 0, None
   ; '\000', "no-splitting", set split_solve_on false, None
   ; '\000', "no-rew", set use_rewrite_solver false, None

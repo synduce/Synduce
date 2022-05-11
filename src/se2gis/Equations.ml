@@ -364,6 +364,7 @@ let free_vars_of_equations ~(ctx : env) (sys_eq : equation list) : VarSet.t =
 
 module Solve = struct
   type partial_soln = (string * variable list * term) list
+  type partial_soln_or_ctexs = (partial_soln, unrealizability_ctex list) Either.t
 
   let pick_only_one_soln =
     List.dedup_and_sort ~compare:(fun (n1, _, _) (n2, _, _) -> String.compare n1 n2)
@@ -388,7 +389,13 @@ module Solve = struct
   ;;
 
   (** Combine two steps of partial solving.*)
-  let combine ?(verb = false) ~ctx prev_sol new_response =
+  let combine
+      ?(verb = false)
+      ~ctx
+      (prev_sol : partial_soln_or_ctexs)
+      (new_response : 'b * partial_soln_or_ctexs)
+      : 'b * partial_soln_or_ctexs
+    =
     Either.(
       match prev_sol, new_response with
       | First soln, (resp, First soln') ->
@@ -404,14 +411,16 @@ module Solve = struct
                   soln');
         resp, First (soln @ soln')
       | Second ctexs, (resp, Second ctexs') -> resp, Second (ctexs @ ctexs')
-      | Second ctexs, (resp, First _) | First _, (resp, Second ctexs) ->
-        resp, Second ctexs)
+      | Second ctexs, (resp, First _) -> resp, Second ctexs
+      | First _, (resp, Second ctexs) -> resp, Second ctexs)
   ;;
 
   (** Solve the trivial equations first, avoiding the overhead from the
      sygus solver.
   *)
-  let solve_constant_eqns ~ctx (unknowns : VarSet.t) (eqns : equation list) =
+  let solve_constant_eqns ~ctx (unknowns : VarSet.t) (eqns : equation list)
+      : partial_soln * VarSet.t * equation list
+    =
     let ok_precond precond =
       match precond with
       | Some { tkind = TConst Constant.CFalse; _ } -> false
@@ -678,6 +687,14 @@ module Solve = struct
     List.concat_map ~f (Set.elements unknowns)
   ;;
 
+  (** Core function for solving a system of equations. Returns a promise for a solver response, with
+      either a partial solution or a list of counterexamples, and a resolver.
+      If `~predict_constants` is not `None` (default value) then the function will first call the
+      `solve_constant_eqns` auxiliary functions with the boolean in `predict_constants` as parameter
+      for whether to use multiplicative constants or not.
+      If `~gen_only` is true, then it will generate the system of equations in a file an then return
+      failure.
+  *)
   let core_solve
       ?(predict_constants = None)
       ?(use_bools = true)
@@ -685,6 +702,7 @@ module Solve = struct
       ~(gen_only : bool)
       (unknowns : VarSet.t)
       (eqns : equation list)
+      : (Sygus.solver_response * partial_soln_or_ctexs) Lwt.t * int Lwt.u
     =
     let _ = ctx in
     let psoln, unknowns, eqns =
@@ -772,6 +790,7 @@ module Solve = struct
         (if Set.mem all_operators (Binary Max) then Semantic.[ max_definition ] else [])
         @ if Set.mem all_operators (Binary Min) then Semantic.[ min_definition ] else []
       in
+      (* Call the SyGuS solver. *)
       let solver =
         HLSolver.(
           make ~extra_defs ()
@@ -814,7 +833,9 @@ module Solve = struct
       (* Call the solver on the generated file. *)
       if not gen_only
       then (
-        let t, r = ctx >- HLSolver.solve solver in
+        let t, r =
+          ctx >- HLSolver.solve ~timeout:(Some !Config.Optims.wait_parallel_tlimit) solver
+        in
         ( Lwt.map
             (function
               | Some resp -> handle_response resp
@@ -854,7 +875,7 @@ module Solve = struct
   ;;
 
   let solve_eqns (ctx : env) (unknowns : VarSet.t) (eqns : equation list)
-      : Sygus.solver_response * (partial_soln, unrealizability_ctex list) Either.t
+      : (Sygus.solver_response * (partial_soln, unrealizability_ctex list) Either.t) Lwt.t
     =
     let opt_cst =
       Set.exists unknowns ~f:(fun v -> RType.is_base (Variable.vtype_or_new ctx.ctx v))
@@ -907,13 +928,12 @@ module Solve = struct
           (VarSet.pp ctx.ctx)
           unknowns
           (List.length lwt_tasks));
-    Lwt_main.run
-      (Lwt.pick
-         (List.map
-            ~f:(fun (r, t) ->
-              Lwt.wakeup r 0;
-              t)
-            lwt_tasks))
+    Lwt.pick
+      (List.map
+         ~f:(fun (r, t) ->
+           Lwt.wakeup r 0;
+           t)
+         lwt_tasks)
   ;;
 
   let solve_eqns_proxy (ctx : env) (unknowns : VarSet.t) (eqns : equation list) =
@@ -923,8 +943,10 @@ module Solve = struct
         solve_syntactic_definitions ~ctx unknowns eqns
       in
       if Set.length new_unknowns > 0
-      then combine ~ctx (Either.First partial_soln) (solve_eqns ctx new_unknowns new_eqns)
-      else RSuccess [], Either.First partial_soln)
+      then
+        let* part_soln = solve_eqns ctx new_unknowns new_eqns in
+        Lwt.return (combine ~ctx (Either.First partial_soln) part_soln)
+      else Lwt.return (Sygus.RSuccess [], Either.First partial_soln))
     else solve_eqns ctx unknowns eqns
   ;;
 
@@ -933,6 +955,7 @@ module Solve = struct
       (partial_soln : partial_soln)
       (unknowns : VarSet.t)
       (eqns : equation list)
+      : (Sygus.solver_response * partial_soln_or_ctexs) Lwt.t
     =
     (* If an unknown depends only on itself, it can be split from the rest *)
     let split_eqn_systems =
@@ -968,29 +991,37 @@ module Solve = struct
       sl @ [ u, e ]
     in
     let solve_eqn_aux (unknowns, equations) =
-      if Set.length unknowns > 0 then [ solve_eqns_proxy ctx unknowns equations ] else []
+      if Set.length unknowns > 0
+      then
+        let* aux_soln = solve_eqns_proxy ctx unknowns equations in
+        Lwt.return [ aux_soln ]
+      else Lwt.return []
     in
     let comb_l l =
-      List.fold
+      Lwt_list.fold_left_s
+        (fun (_, prev_sol) r -> Lwt.return (combine ~ctx prev_sol r))
+        (Sygus.RSuccess [], Either.First partial_soln)
         l
-        ~init:(Sygus.RSuccess [], Either.First partial_soln)
-        ~f:(fun (_, prev_sol) r -> combine ~ctx prev_sol r)
     in
-    List.fold_until
+    lwt_until
       (List.stable_sort
          ~compare:(fun (vs1, _) (vs2, _) -> compare (Set.length vs1) (Set.length vs2))
          (List.rev split_eqn_systems))
-      ~init:(Sygus.RSuccess [], Either.first partial_soln)
-      ~finish:identity
+      ~init:(Lwt.return (Sygus.RSuccess [], Either.first partial_soln))
       ~f:(fun (_, prev_soln) subsystem ->
-        match comb_l (solve_eqn_aux subsystem) with
-        | resp, Either.First solution ->
-          Continue (combine ~ctx prev_soln (resp, Either.First solution))
-        | resp, Either.Second counterexamples ->
-          Stop (combine ~ctx prev_soln (resp, Either.Second counterexamples)))
+        let l = Lwt.bind (solve_eqn_aux subsystem) comb_l in
+        Lwt.bind l (function
+            | resp, Either.First solution ->
+              let c = combine ~ctx prev_soln (resp, Either.First solution) in
+              Lwt.return (Continue c)
+            | resp, Either.Second counterexamples ->
+              Lwt.return
+                (Stop (combine ~ctx prev_soln (resp, Either.Second counterexamples)))))
   ;;
 
-  let solve_stratified (ctx : env) (unknowns : VarSet.t) (eqns : equation list) =
+  let solve_stratified (ctx : env) (unknowns : VarSet.t) (eqns : equation list)
+      : (Sygus.solver_response * partial_soln_or_ctexs) Lwt.t
+    =
     let psol, u, e =
       if !Config.Optims.use_syntactic_definitions
       then (
@@ -1006,15 +1037,16 @@ module Solve = struct
     then split_solve ~ctx psol u e
     else
       Either.(
-        match solve_eqns ctx u e with
-        | resp, First soln -> resp, First (psol @ soln)
-        | resp, Second ctexs -> resp, Second ctexs)
+        match%lwt solve_eqns ctx u e with
+        | resp, First soln -> Lwt.return (resp, First (psol @ soln))
+        | resp, Second ctexs -> Lwt.return (resp, Second ctexs))
   ;;
 end
 
 (* Export some defs at module level. *)
 
 type partial_soln = Solve.partial_soln
+type partial_soln_or_ctexs = Solve.partial_soln_or_ctexs
 
 let pp_partial_soln = Solve.pp_partial_soln
 
@@ -1155,7 +1187,7 @@ end
   function and body of a function) or a list of unrealizability counterexamples.
 *)
 let solve (ctx : env) ~(p : PsiDef.t) (eqns : equation list)
-    : Sygus.solver_response * (partial_soln, unrealizability_ctex list) Either.t
+    : (Sygus.solver_response * Solve.partial_soln_or_ctexs) Lwt.t
   =
   let unknowns = p.PsiDef.target.psyntobjs in
   let preprocessing_actions =
@@ -1165,7 +1197,7 @@ let solve (ctx : env) ~(p : PsiDef.t) (eqns : equation list)
       ; preprocess_factor_subexpressions
       ]
   in
-  let resp, soln_final =
+  let* resp, soln_final =
     (* Apply the preprocessing actions, and construct the postprocessing in reverse. *)
     let unknowns', eqns', postprocessing_actions =
       List.fold
@@ -1177,10 +1209,13 @@ let solve (ctx : env) ~(p : PsiDef.t) (eqns : equation list)
             ppact.pre_unknowns, ppact.pre_equations, ppact.pre_postprocessing :: post_acts))
     in
     (* Apply the postprocessing after solving. *)
-    List.fold
-      postprocessing_actions
-      ~init:(Solve.solve_stratified ctx unknowns' eqns')
-      ~f:(fun partial_solution post_act -> post_act partial_solution)
+    Lwt.map
+      (fun solution ->
+        List.fold
+          postprocessing_actions
+          ~init:solution
+          ~f:(fun partial_solution post_act -> post_act partial_solution))
+      (Solve.solve_stratified ctx unknowns' eqns')
   in
   Either.(
     match soln_final with
@@ -1194,7 +1229,7 @@ let solve (ctx : env) ~(p : PsiDef.t) (eqns : equation list)
               (box (Solve.pp_partial_soln ~ctx))
               soln)
     | _ -> ());
-  resp, Either.map ~first:Solve.pick_only_one_soln ~second:identity soln_final
+  Lwt.return (resp, Either.map ~first:Solve.pick_only_one_soln ~second:identity soln_final)
 ;;
 
 (* ============================================================================================= *)
