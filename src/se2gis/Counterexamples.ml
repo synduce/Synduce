@@ -527,39 +527,39 @@ let check_ctex_in_image
     ~(ctx : env)
     ~(p : PsiDef.t)
     (ctex : ctex)
-    : ctex
+    : ctex Lwt.t
   =
   Log.verbose_msg
     Fmt.(
       str "Checking whether ctex is in the image of %s..." p.PsiDef.reference.pvar.vname);
   let task_counter = ref 2 in
-  let resp, vmethod =
+  let%lwt resp, vmethod =
     if ctx >- Analysis.is_bounded ctex.ctex_eqn.eterm
-    then SmtLib.Sat, Stats.Induction
+    then Lwt.return (SmtLib.Sat, Stats.Induction)
     else (
       try
-        Lwt_main.run
-          ((* This call is expected to respond "unsat" when terminating. *)
-           let pr1, resolver1 = check_image_sat ~ctx ~p ctex in
-           let pr1 = wait_on_failure task_counter pr1 in
-           (* This call is expected to respond "sat" when terminating. *)
-           let pr2, resolver2 = check_image_unsat ~ctx ~p ctex in
-           let pr2 = wait_on_failure task_counter pr2 in
-           Lwt.wakeup resolver2 1;
-           Lwt.wakeup resolver1 1;
-           (* The first call to return is kept, the other one is ignored. *)
-           Lwt.pick [ pr1; pr2 ])
+        (* This call is expected to respond "unsat" when terminating. *)
+        let pr1, resolver1 = check_image_sat ~ctx ~p ctex in
+        let pr1 = wait_on_failure task_counter pr1 in
+        (* This call is expected to respond "sat" when terminating. *)
+        let pr2, resolver2 = check_image_unsat ~ctx ~p ctex in
+        let pr2 = wait_on_failure task_counter pr2 in
+        Lwt.wakeup resolver2 1;
+        Lwt.wakeup resolver1 1;
+        (* The first call to return is kept, the other one is ignored. *)
+        Lwt.pick [ pr1; pr2 ]
       with
       | End_of_file ->
         Log.error_msg "Solvers terminated unexpectedly  ⚠️ .";
         Log.error_msg "Please inspect logs.";
-        SmtLib.Unknown, Stats.Induction)
+        Lwt.return (SmtLib.Unknown, Stats.Induction))
   in
   ctx >- AlgoLog.image_ctex_class p ctex resp vmethod;
   match resp with
-  | Sat -> { ctex with ctex_stat = Valid }
-  | Unsat -> { ctex with ctex_stat = add_cause ctex.ctex_stat NotInReferenceImage }
-  | _ -> if ignore_unknown then ctex else { ctex with ctex_stat = Unknown }
+  | Sat -> Lwt.return { ctex with ctex_stat = Valid }
+  | Unsat ->
+    Lwt.return { ctex with ctex_stat = add_cause ctex.ctex_stat NotInReferenceImage }
+  | _ -> Lwt.return (if ignore_unknown then ctex else { ctex with ctex_stat = Unknown })
 ;;
 
 (* ============================================================================================= *)
@@ -769,57 +769,60 @@ let check_tinv_sat ~(ctx : env) ~(p : PsiDef.t) (tinv : PMRS.t) (ctex : ctex)
   AsyncSmt.(cancellable_task (make_solver "z3") task)
 ;;
 
-let satisfies_tinv ~(ctx : env) ~(p : PsiDef.t) (tinv : PMRS.t) (ctex : ctex) : ctex =
+let satisfies_tinv ~(ctx : env) ~(p : PsiDef.t) (tinv : PMRS.t) (ctex : ctex) : ctex Lwt.t
+  =
   let task_counter = ref 2 in
-  let resp, vmethod =
+  let%lwt resp, vmethod =
     try
-      Lwt_main.run
-        ((* This call is expected to respond "unsat" when terminating. *)
-         let pr1, resolver1 = check_tinv_unsat ~ctx ~p tinv ctex in
-         let pr1 = wait_on_failure task_counter pr1 in
-         (* This call is expected to respond "sat" when terminating. *)
-         let pr2, resolver2 = check_tinv_sat ~ctx ~p tinv ctex in
-         let pr2 = wait_on_failure task_counter pr2 in
-         Lwt.wakeup resolver2 1;
-         Lwt.wakeup resolver1 1;
-         Lwt.pick [ pr1; pr2 ])
+      (* This call is expected to respond "unsat" when terminating. *)
+      let pr1, resolver1 = check_tinv_unsat ~ctx ~p tinv ctex in
+      let pr1 = wait_on_failure task_counter pr1 in
+      (* This call is expected to respond "sat" when terminating. *)
+      let pr2, resolver2 = check_tinv_sat ~ctx ~p tinv ctex in
+      let pr2 = wait_on_failure task_counter pr2 in
+      Lwt.wakeup resolver2 1;
+      Lwt.wakeup resolver1 1;
+      Lwt.pick [ pr1; pr2 ]
     with
     | End_of_file ->
       Log.error_msg "Solvers terminated unexpectedly  ⚠️";
       Log.error_msg "Please inspect logs.";
-      SmtLib.Unknown, Stats.Induction
+      Lwt.return (SmtLib.Unknown, Stats.Induction)
   in
   ctx >- AlgoLog.requires_ctex_class tinv ctex resp vmethod;
-  match resp with
-  | Sat -> { ctex with ctex_stat = Valid }
-  | Unsat -> { ctex with ctex_stat = add_cause ctex.ctex_stat ViolatesTargetRequires }
-  | Error _ | Unknown -> { ctex with ctex_stat = Unknown }
-  | _ -> failwith "Unexpected response."
+  Lwt.return
+    (match resp with
+    | Sat -> { ctex with ctex_stat = Valid }
+    | Unsat -> { ctex with ctex_stat = add_cause ctex.ctex_stat ViolatesTargetRequires }
+    | Error _ | Unknown -> { ctex with ctex_stat = Unknown }
+    | _ -> failwith "Unexpected response.")
 ;;
 
 (** Classify counterexamples into positive or negative counterexamples with respect
     to the Tinv predicate in the problem.
 *)
-let classify_ctexs ~(ctx : env) ~(p : PsiDef.t) (ctexs : ctex list) : ctex list =
+let classify_ctexs ~(ctx : env) ~(p : PsiDef.t) (ctexs : ctex list) : ctex list Lwt.t =
   let classify_with_tinv tinv ctexs =
     (* TODO: DT_LIA for z3, DTLIA for cvc4... Should write a type to represent logics. *)
     let f (ctex : ctex) = satisfies_tinv ~ctx ~p tinv ctex in
-    List.map ~f ctexs
+    Lwt_list.map_p f ctexs
   in
-  let classify_wrt_ref b = List.map ~f:(check_ctex_in_image ~ctx ~ignore_unknown:b ~p) in
+  let classify_wrt_ref b =
+    Lwt_list.map_p (check_ctex_in_image ~ctx ~ignore_unknown:b ~p)
+  in
   Log.start_section "Classify counterexamples...";
   (* First pass ignoring unknowns. *)
   (* let ctexs = classify_wrt_ref true ctexs in *)
   let ctexs_c1 =
     match p.tinv with
     | Some tinv -> classify_with_tinv tinv ctexs
-    | None -> ctexs
+    | None -> Lwt.return ctexs
   in
   let ctexs_c2 =
     if Option.is_some p.tinv
     then (* TODO find a way to do both classifications efficiently. *)
       ctexs_c1
-    else classify_wrt_ref false ctexs_c1
+    else bind ctexs_c1 (classify_wrt_ref false)
   in
   Log.end_section ();
   ctexs_c2

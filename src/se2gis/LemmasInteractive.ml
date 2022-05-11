@@ -32,7 +32,7 @@ let make_term_info ~(ctx : env) ~(p : PsiDef.t) (term : term) : term_info =
   }
 ;;
 
-let classify_ctexs_opt ~ctx ctexs : ctex list =
+let classify_ctexs_opt ~ctx ctexs : ctex list Lwt.t =
   let f ctex =
     Log.info (fun frmt () ->
         Fmt.(
@@ -47,7 +47,7 @@ let classify_ctexs_opt ~ctx ctexs : ctex list =
     | Some "P" -> { ctex with ctex_stat = Valid }
     | _ -> ctex
   in
-  List.map ~f ctexs
+  Lwt.return (List.map ~f ctexs)
 ;;
 
 let set_term_lemma
@@ -181,7 +181,9 @@ let interactive_get_positive_examples ~(ctx : Context.t) (det : term_info) =
     | Some ctex -> [ ctex ])
 ;;
 
-let interactive_check_lemma ~ctx lemma_refinement_loop name vars lemma_term det =
+let interactive_check_lemma ~ctx lemma_refinement_loop name vars lemma_term det
+    : term_info option Lwt.t
+  =
   Log.info (fun f () ->
       Fmt.(
         pf
@@ -202,7 +204,7 @@ let interactive_check_lemma ~ctx lemma_refinement_loop name vars lemma_term det 
       | None -> lemma_term
       | Some pre -> mk_bin Binop.Or (mk_un Unop.Not pre) lemma_term
     in
-    Some { det with lemma_candidate = None; lemmas = lemma :: det.lemmas }
+    Lwt.return (Some { det with lemma_candidate = None; lemmas = lemma :: det.lemmas })
   | _ ->
     Log.info (fun f () ->
         Fmt.(
@@ -216,5 +218,5 @@ let interactive_check_lemma ~ctx lemma_refinement_loop name vars lemma_term det 
         { det with
           positive_ctexs = det.positive_ctexs @ interactive_get_positive_examples ~ctx det
         }
-    | _ -> None)
+    | _ -> Lwt.return None)
 ;;
