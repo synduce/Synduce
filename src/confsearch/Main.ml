@@ -8,10 +8,7 @@ module G = ConfGraph
 
 let total_configurations = ref 0
 
-let single_configuration_solver
-    ?(lemmas = Se2gis.Lemmas.empty_lemmas ())
-    ~(ctx : env)
-    (p : PsiDef.t)
+let single_configuration_solver ~(ctx : env) (p : PsiDef.t)
     : Syguslib.Sygus.solver_response segis_response Lwt.t
   =
   let%lwt resp =
@@ -21,7 +18,7 @@ let single_configuration_solver
     then
       Se2gis.Baselines.algo_cegis ~ctx p
       (* Default algorithm: best combination of techniques (TODO) *)
-    else Se2gis.Main.solve_problem ~lemmas ~ctx p
+    else Se2gis.Main.solve_problem ~ctx p
   in
   (* Print intermediate result if we are looking for more than one solution *)
   if !Config.Optims.max_solutions > 0

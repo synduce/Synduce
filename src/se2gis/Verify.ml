@@ -71,7 +71,7 @@ let partial_bounding_checker
   let f (acc_tset, acc_lstate) t =
     match ctx >- Specifications.get_requires p.PsiDef.target.pvar with
     | Some req ->
-      (match ctx >- Lemmas.get_lemma ~p acc_lstate.lemmas ~key:t with
+      (match Predicates.get ~ctx ~p t with
       | Some _ ->
         (* Everything ok, a lemma has been computed *)
         acc_tset @ [ t, t ], acc_lstate
@@ -79,14 +79,7 @@ let partial_bounding_checker
         (* There is a requires and no lemma, the term has to be bounded. *)
         let bt = ctx >- Expand.make_bounded t in
         let lem_t = ctx_reduce ctx (mk_app req [ bt ]) in
-        let () =
-          LemmasInteractive.set_term_lemma
-            ~ctx
-            ~p
-            acc_lstate.lemmas
-            ~key:(bt, None)
-            ~lemma:lem_t
-        in
+        let () = LemmasInteractive.set_term_lemma ~ctx ~p ~key:(bt, None) ~lemma:lem_t in
         acc_tset @ [ t, bt ], acc_lstate)
     | None -> acc_tset @ [ t, t ], acc_lstate
   in
@@ -131,7 +124,7 @@ let check_solution
   in
   let expand_and_check i (t0 : term) =
     let t_set, u_set = ctx >>- Expand.to_maximally_reducible p t0 in
-    let t_set, tmp_lstate = partial_bounding_checker ~ctx ~p lstate t_set in
+    let t_set, _ = partial_bounding_checker ~ctx ~p lstate t_set in
     let num_terms_to_check = List.length t_set in
     if num_terms_to_check > 0
     then (
@@ -140,7 +133,6 @@ let check_solution
           ~ctx
           ~force_replace_off:true
           ~p:{ p with target = target_inst }
-          ~lemmas:tmp_lstate.lemmas
           ~lifting:lstate.lifting
           (TermSet.of_list (List.map ~f:snd t_set))
       in
@@ -244,7 +236,6 @@ let bounded_check
         ~ctx
         ~force_replace_off:true
         ~p:{ p with target = target_inst }
-        ~lemmas:(Lemmas.empty_lemmas ())
         ~lifting:Lifting.empty_lifting
         (TermSet.singleton term)
     in

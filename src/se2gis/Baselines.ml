@@ -49,13 +49,7 @@ let rec segis_loop ~(ctx : env) (p : PsiDef.t) (t_set : TermSet.t)
     Fmt.(str "<SEGIS> Start refinement loop with %i terms in T." (Set.length t_set));
   (* Start of the algorithm. *)
   let eqns, _ =
-    Equations.make
-      ~ctx
-      ~force_replace_off:true
-      ~p
-      ~lemmas:(Lemmas.empty_lemmas ()) (* No need for lemmas with bounded terms. *)
-      ~lifting:Lifting.empty_lifting
-      t_set
+    Equations.make ~ctx ~force_replace_off:true ~p ~lifting:Lifting.empty_lifting t_set
   in
   let%lwt synth_time, (s_resp, solution) =
     Stats.lwt_timed (fun a -> Lwt.bind a (fun _ -> Equations.solve ctx ~p eqns))
@@ -139,13 +133,7 @@ let rec cegis_loop ~(ctx : Env.env) (p : PsiDef.t) (t_set : TermSet.t)
     Fmt.(str "<CEGIS> Start refinement loop with %i terms in T." (Set.length t_set));
   (* Start of the algorithm. *)
   let eqns, _ =
-    Equations.make
-      ~ctx
-      ~force_replace_off:true
-      ~p
-      ~lemmas:(Lemmas.empty_lemmas ()) (* No need for lemmas in CEGIS *)
-      ~lifting:Lifting.empty_lifting
-      t_set
+    Equations.make ~ctx ~force_replace_off:true ~p ~lifting:Lifting.empty_lifting t_set
   in
   let%lwt synth_time, (s_resp, solution) =
     Stats.lwt_timed (fun a -> Lwt.bind a (fun () -> Equations.solve ctx ~p eqns))

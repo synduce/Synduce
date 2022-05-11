@@ -6,7 +6,6 @@ open ProblemDefs
 val compute_preconds
   :  ctx:Env.env
   -> p:PsiDef.t
-  -> lemmas:Common.ProblemDefs.lemmas
   -> (Term.term -> Term.term)
   -> Term.term
   -> Term.term option
@@ -21,7 +20,6 @@ val make
   :  ?force_replace_off:bool
   -> ctx:Env.env
   -> p:PsiDef.t
-  -> lemmas:Common.ProblemDefs.lemmas
   -> lifting:Common.ProblemDefs.lifting
   -> TermSet.t
   -> Common.ProblemDefs.equation list * Common.ProblemDefs.lifting

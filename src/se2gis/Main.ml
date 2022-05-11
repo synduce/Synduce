@@ -36,14 +36,7 @@ let rec refinement_loop
     else ()
   in
   (* First, generate the set of constraints corresponding to the set of terms t_set. *)
-  let eqns, lifting =
-    Equations.make
-      ~ctx
-      ~p
-      ~lemmas:lstate_in.lemmas
-      ~lifting:lstate_in.lifting
-      lstate_in.t_set
-  in
+  let eqns, lifting = Equations.make ~ctx ~p ~lifting:lstate_in.lifting lstate_in.t_set in
   (* The solve the set of constraints with the assumption equations. *)
   let%lwt synth_time, (s_resp, solution) =
     Stats.lwt_timed (fun a ->
@@ -144,9 +137,7 @@ and success_case ~ctx ~p ~synth_time lstate_in (tsize, usize) lifting (eqns, sol
          })
 ;;
 
-let se2gis ?(lemmas = Lemmas.empty_lemmas ()) ~(ctx : env) (p : PsiDef.t)
-    : solver_response segis_response Lwt.t
-  =
+let se2gis ~(ctx : env) (p : PsiDef.t) : solver_response segis_response Lwt.t =
   let%lwt _ = Lwt.return () in
   (* Initialize sets with the most general terms. *)
   let t_set, u_set =
@@ -181,26 +172,21 @@ let se2gis ?(lemmas = Lemmas.empty_lemmas ()) ~(ctx : env) (p : PsiDef.t)
     refinement_loop
       ~ctx
       p
-      (Lwt.return
-         { t_set; u_set; lemmas; lifting = Lifting.empty_lifting; assumptions = [] }))
+      (Lwt.return { t_set; u_set; lifting = Lifting.empty_lifting; assumptions = [] }))
 ;;
 
 (* ============================================================================================= *)
 (*                                                 MAIN ENTRY POINTS                             *)
 (* ============================================================================================= *)
 
-let solve_problem
-    ?(lemmas = Lemmas.empty_lemmas ())
-    ~(ctx : env)
-    (synthesis_problem : PsiDef.t)
+let solve_problem ~(ctx : env) (synthesis_problem : PsiDef.t)
     : solver_response segis_response Lwt.t
   =
   (* Solve the problem using portofolio of techniques. *)
-  se2gis ~lemmas ~ctx synthesis_problem
+  se2gis ~ctx synthesis_problem
 ;;
 
 let find_and_solve_problem
-    ?(lemmas = Lemmas.empty_lemmas ())
     ~(ctx : env)
     (psi_comps : (string * string * string) option)
     (pmrs : (string, PMRS.t, Base.String.comparator_witness) Map.t)
@@ -227,7 +213,7 @@ let find_and_solve_problem
     then
       Baselines.algo_cegis ~ctx
       (* Default algorithm: best combination of techniques. *)
-    else solve_problem ~lemmas ~ctx
+    else solve_problem ~ctx
   in
   let%lwt sol_or_ctexs = main_algo top_userdef_problem in
   Lwt.return [ top_userdef_problem, sol_or_ctexs ]

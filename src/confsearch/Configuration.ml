@@ -216,7 +216,6 @@ let apply_configuration (ctx : env) (config : conf) (p : PMRS.t) : PMRS.t * env 
 ;;
 
 let get_rstar (ctx : env) (p : ProblemDefs.PsiDef.t) (k : int) =
-  let open Se2gis in
   let x0 =
     mk_var
       ctx.ctx

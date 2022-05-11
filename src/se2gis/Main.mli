@@ -7,11 +7,7 @@ open Lang
 may use the best portoflio of techniques to solve the problem, with the goal to find whether
 the problem is realizable or not.
  *)
-val solve_problem
-  :  ?lemmas:lemmas
-  -> ctx:Env.env
-  -> PsiDef.t
-  -> Sygus.solver_response segis_response Lwt.t
+val solve_problem : ctx:Env.env -> PsiDef.t -> Sygus.solver_response segis_response Lwt.t
 
 (**
   [find_and_solve_problem ctx (Some (target, reference, representation))] solves the synthesis problem
@@ -24,8 +20,7 @@ val solve_problem
   [ManyProgramRefinement.find_and_solve_problem]
 *)
 val find_and_solve_problem
-  :  ?lemmas:lemmas
-  -> ctx:Env.env
+  :  ctx:Env.env
   -> (string * string * string) option
   -> (string, PMRS.t, Base.String.comparator_witness) Base.Map.t
   -> (PsiDef.t * Syguslib.Sygus.solver_response segis_response) list Lwt.t

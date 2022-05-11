@@ -99,16 +99,6 @@ type term_info =
   }
 
 (**
-  A type for lemmas.
-  It is used during the generation of constraints from a set of terms.
-  If a term t used to generate a constraint appears in the lemma map, then the lemmas lem_map(t)
-  are added to the precondition of the constraint, and every subterm of the form
-  (f(r(x)) or (target(x)) is replaced by a scalar (matching the substitution happenning
-  during the constraint generation).
- *)
-type lemmas = (term, term_info list) Hashtbl.t
-
-(**
   The type to describe liftings.
   tmap is a map from terms to the expression of the lifting.
 *)
@@ -120,7 +110,6 @@ type lifting = { tmap : ((int * term) * term) list }
 type refinement_loop_state =
   { t_set : TermSet.t
   ; u_set : TermSet.t
-  ; lemmas : lemmas
   ; lifting : lifting
   ; assumptions : equation list
   }

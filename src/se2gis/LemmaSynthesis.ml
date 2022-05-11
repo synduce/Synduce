@@ -45,19 +45,21 @@ let lemmas_of_context ~(ctx : Context.t) ~(is_pos_ctex : bool) (ctex : ctex) : t
   update the term state by adding the counterexample's models.
 *)
 let create_or_update_lemmas_with_ctex
-    ~(ctx : Context.t)
+    ~(p : PsiDef.t)
+    ~(ctx : Env.env)
     ~(is_pos_ctex : bool)
-    (ts : lemmas)
     (ctex : ctex)
     : unit
   =
-  match Lemmas.find_term_info ts (ctex.ctex_eqn.eterm, ctex.ctex_eqn.esplitter) with
+  match
+    Predicates.get_with_precond ~ctx ~p ~key:(ctex.ctex_eqn.eterm, ctex.ctex_eqn.esplitter)
+  with
   | None ->
-    AlgoLog.announce_new_lemmas ~ctx ctex;
-    Lemmas.add_term_info
-      ts
+    ctx >- AlgoLog.announce_new_lemmas ctex;
+    Predicates.add
+      ~ctx
       ~key:ctex.ctex_eqn.eterm
-      ~data:(lemmas_of_context ~ctx ~is_pos_ctex ctex)
+      ~data:(ctx >- lemmas_of_context ~is_pos_ctex ctex)
   | Some _ ->
     let change_ti det =
       if is_pos_ctex
@@ -70,7 +72,7 @@ let create_or_update_lemmas_with_ctex
             | Some pre ->
               let pre' =
                 substitution
-                  (subs_from_elim_to_elim ~ctx det.recurs_elim ctex.ctex_eqn.eelim)
+                  (ctx >- subs_from_elim_to_elim det.recurs_elim ctex.ctex_eqn.eelim)
                   pre
               in
               Some pre')
@@ -78,11 +80,11 @@ let create_or_update_lemmas_with_ctex
         ; positive_ctexs = det.positive_ctexs
         }
     in
-    Lemmas.change_lemma
-      ts
+    Predicates.change
+      ~ctx
       ~key:ctex.ctex_eqn.eterm
       ~split:ctex.ctex_eqn.esplitter
-      ~data:change_ti
+      change_ti
 ;;
 
 (* ============================================================================================= *)
@@ -595,10 +597,10 @@ let synthesize_lemmas
      | Some "Y" -> true
      | _ -> false)
   in
-  let update is_positive ctexs ts =
+  let update is_positive ctexs =
     List.iter
       ctexs
-      ~f:(ctx >- create_or_update_lemmas_with_ctex ~is_pos_ctex:is_positive ts)
+      ~f:(create_or_update_lemmas_with_ctex ~p ~ctx ~is_pos_ctex:is_positive)
   in
   (*
     Example: the synt_failure_info should be a list of unrealizability counterexamples, which
@@ -655,8 +657,8 @@ let synthesize_lemmas
         ~pos_ctexs:ensures_positives
     | _, _ :: _ ->
       (* Update the term state by adding the positive and negative counterexamples to it. *)
-      update false lemma_synt_negatives lstate.lemmas;
-      update true lemma_synt_positives lstate.lemmas;
+      update false lemma_synt_negatives;
+      update true lemma_synt_positives;
       AlgoLog.spurious_violates_requires (List.length lemma_synt_negatives);
       let%lwt success, lemmas_to_add =
         let inner_func key (status, additions) det =
@@ -671,15 +673,15 @@ let synthesize_lemmas
         let f ~key ~data status =
           Lwt.bind status (fun stat -> Lwt_list.fold_left_s (inner_func key) stat data)
         in
-        Hashtbl.fold lstate.lemmas ~init:(Lwt.return (true, [])) ~f
+        Predicates.fold ~ctx ~init:(Lwt.return (true, [])) ~f
       in
       List.iter lemmas_to_add ~f:(fun (key, data) ->
-          Lemmas.add_term_info lstate.lemmas ~key ~data);
+          Predicates.add_direct ~ctx ~key ~data);
       Lwt.return (if success then `CoarseningOk else `CoarseningFailure)
     | [], [] ->
       (match classif_failures with
       | [] ->
-        update true lemma_synt_positives lstate.lemmas;
+        update true lemma_synt_positives;
         (* lemma_synt_negatives and ensures_negatives are empty; all ctexs non spurious! *)
         AlgoLog.no_spurious_ctex ();
         Lwt.return `Unrealizable

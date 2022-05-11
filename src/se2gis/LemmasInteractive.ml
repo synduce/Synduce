@@ -53,24 +53,22 @@ let classify_ctexs_opt ~ctx ctexs : ctex list Lwt.t =
 let set_term_lemma
     ~(ctx : env)
     ~(p : PsiDef.t)
-    (ts : lemmas)
     ~(key : term * term option)
     ~(lemma : term)
     : unit
   =
-  let term_key, splitter_key = key in
-  match Hashtbl.find ts term_key with
+  match Predicates.find ~ctx ~key:(first key) with
   | None ->
-    Hashtbl.add_multi
-      ts
-      ~key:term_key
+    Predicates.add
+      ~ctx
+      ~key:(first key)
       ~data:{ (make_term_info ~ctx ~p (fst key)) with lemmas = [ lemma ] }
   | Some term_infos ->
     let repl = ref false in
     let nl =
       List.map
         ~f:(fun ti ->
-          if Option.equal Terms.equal ti.splitter splitter_key
+          if Option.equal Terms.equal ti.splitter (second key)
           then (
             repl := true;
             { ti with lemmas = [ lemma ] })
@@ -78,10 +76,10 @@ let set_term_lemma
         term_infos
     in
     if !repl
-    then Hashtbl.set ts ~key:term_key ~data:nl
+    then Predicates.set ~ctx ~key:(first key) ~data:nl
     else (
       let new_elt = { (make_term_info ~ctx ~p (fst key)) with lemmas = [ lemma ] } in
-      Hashtbl.set ts ~key:term_key ~data:(new_elt :: nl))
+      Predicates.set ~ctx ~key:(first key) ~data:(new_elt :: nl))
 ;;
 
 let add_lemmas ~(ctx : env) ~(p : PsiDef.t) (lstate : refinement_loop_state) : unit =
@@ -114,13 +112,13 @@ let add_lemmas ~(ctx : env) ~(p : PsiDef.t) (lstate : refinement_loop_state) : u
       in
       let pred_term = ctx >>- term_of_smt env in
       let term x =
-        match ctx >- Lemmas.get_precise_lemma ~p lstate.lemmas ~key:(t, None) with
+        match Predicates.get_with_precond ~ctx ~p ~key:(t, None) with
         | None -> pred_term x
         | Some inv -> mk_bin Binop.And inv (pred_term x)
       in
       (match smtterm with
       | None -> ()
-      | Some x -> set_term_lemma ~ctx ~p lstate.lemmas ~key:(t, None) ~lemma:(term x))
+      | Some x -> set_term_lemma ~ctx ~p ~key:(t, None) ~lemma:(term x))
   in
   Set.iter ~f lstate.t_set
 ;;

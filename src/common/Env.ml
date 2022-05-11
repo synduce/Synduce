@@ -1,12 +1,17 @@
 open Base
 open Lang
+open ProblemDefs
 
 type env =
   { functions : PMRS.Functions.ctx
-  ; ctx : Term.Context.t
-  ; refinement_steps : int ref
-  ; secondary_refinement_steps : int ref (* Problem types. *)
-  ; alpha : RType.t ref
+        (** Context for global or PMRS local function symbols. *)
+  ; ctx : Term.Context.t (** Context for types and terms. *)
+  ; pcache : (Expression.t, term_info list) Hashtbl.t
+  ; (* Number of refinement steps. *)
+    refinement_steps : int ref
+  ; secondary_refinement_steps : int ref
+  ; (* Problem types. *)
+    alpha : RType.t ref
         (** The type D in the paper: the output type of the reference and the target recursion skeleton. The
     first element is the pure type output type of the functions, and the second element is an
     optional term that represents the additional predicate on the output of the reference function.
@@ -21,6 +26,7 @@ type env =
 let group (ctx : Term.Context.t) (functions : PMRS.Functions.ctx) =
   { functions
   ; ctx
+  ; pcache = Hashtbl.create (module Expression)
   ; refinement_steps = ref 0
   ; secondary_refinement_steps = ref 0
   ; alpha = ref RType.TInt
@@ -32,6 +38,7 @@ let group (ctx : Term.Context.t) (functions : PMRS.Functions.ctx) =
 let env_copy (c : env) =
   { functions = PMRS.Functions.copy c.functions
   ; ctx = Term.Context.copy c.ctx
+  ; pcache = c.pcache
   ; refinement_steps = ref !(c.refinement_steps)
   ; secondary_refinement_steps = ref !(c.secondary_refinement_steps)
   ; alpha = ref !(c.alpha)
@@ -43,6 +50,7 @@ let env_copy (c : env) =
 let env_create () =
   { functions = PMRS.Functions.create ()
   ; ctx = Term.Context.create ()
+  ; pcache = Hashtbl.create (module Expression)
   ; refinement_steps = ref 0
   ; secondary_refinement_steps = ref 0
   ; alpha = ref RType.TInt

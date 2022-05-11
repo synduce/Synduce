@@ -1,33 +1,28 @@
 open Lang
 open Base
 open SmtInterface
-open Common
 
 val mk_recursion_elimination_term
   :  ctx:Env.env
-  -> Common.ProblemDefs.PsiDef.t
+  -> ProblemDefs.PsiDef.t
   -> (Term.term * Term.term) option
 
 val subst_recursive_calls
   :  ctx:Env.env
-  -> Common.ProblemDefs.PsiDef.t
+  -> ProblemDefs.PsiDef.t
   -> Term.term list
   -> (Term.term * Term.term) list * TermSet.t
 
-val maximally_reduced_app
-  :  Common.ProblemDefs.PsiDef.t
-  -> Term.term
-  -> Term.term list
-  -> bool
+val maximally_reduced_app : ProblemDefs.PsiDef.t -> Term.term -> Term.term list -> bool
 
 val nonreduced_terms
-  :  Common.ProblemDefs.PsiDef.t
+  :  ProblemDefs.PsiDef.t
   -> Term.VarSet.t
   -> Term.term
   -> (Term.variable * Term.term list) list
 
 val nonreduced_terms_all
-  :  Common.ProblemDefs.PsiDef.t
+  :  ProblemDefs.PsiDef.t
   -> Term.term
   -> (Term.variable * Term.term list) list
 
@@ -37,7 +32,7 @@ val replace_rhs_of_main
   :  ?verbose:bool
   -> ?for_mr:bool
   -> ctx:Term.Context.t
-  -> Common.ProblemDefs.PsiDef.t
+  -> ProblemDefs.PsiDef.t
   -> PMRS.t
   -> Term.term
   -> Term.term
@@ -46,7 +41,7 @@ val replace_rhs_of_main
 *)
 val replace_rhs_of_mains
   :  ctx:Term.Context.t
-  -> Common.ProblemDefs.PsiDef.t
+  -> ProblemDefs.PsiDef.t
   -> Term.term
   -> Term.term
 
@@ -69,7 +64,7 @@ val make_bounded : ctx:Term.Context.t -> Term.term -> Term.term
 val is_mr
   :  fctx:PMRS.Functions.ctx
   -> ctx:Term.Context.t
-  -> Common.ProblemDefs.PsiDef.t
+  -> ProblemDefs.PsiDef.t
   -> PMRS.t
   -> Term.term
   -> Term.VarSet.t
@@ -78,14 +73,14 @@ val is_mr
 val is_mr_all
   :  fctx:PMRS.Functions.ctx
   -> ctx:Term.Context.t
-  -> Common.ProblemDefs.PsiDef.t
+  -> ProblemDefs.PsiDef.t
   -> Term.term
   -> bool
 
 val to_maximally_reducible
   :  fctx:PMRS.Functions.ctx
   -> ctx:Term.Context.t
-  -> Common.ProblemDefs.PsiDef.t
+  -> ProblemDefs.PsiDef.t
   -> Term.term
   -> TermSet.t * TermSet.t
 
@@ -96,7 +91,7 @@ val to_maximally_reducible
 val expand_all
   :  fctx:PMRS.Functions.ctx
   -> ctx:Term.Context.t
-  -> Common.ProblemDefs.PsiDef.t
+  -> ProblemDefs.PsiDef.t
   -> TermSet.t * TermSet.t
   -> TermSet.t * TermSet.t
 
