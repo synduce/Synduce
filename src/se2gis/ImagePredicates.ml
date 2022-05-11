@@ -220,7 +220,7 @@ let handle_ensures_synth_response
     ~(ctx : Context.t)
     ((task, resolver) : Sygus.solver_response option Lwt.t * int Lwt.u)
     (var : variable)
-    : [ `Solution of (string * string list * term) list | `Infeasible | `Failure ]
+    : [ `Solution of (string * string list * term) list | `Infeasible | `Failure ] Lwt.t
   =
   let parse_synth_fun (fname, _fargs, _, fbody) =
     let body, _ =
@@ -230,16 +230,15 @@ let handle_ensures_synth_response
     in
     fname, [], body
   in
-  match
-    Lwt_main.run
-      (Lwt.wakeup resolver 0;
-       task)
+  match%lwt
+    Lwt.wakeup resolver 0;
+    task
   with
   | Some (RSuccess resps) ->
     let soln = List.map ~f:parse_synth_fun resps in
-    `Solution soln
-  | Some RInfeasible -> `Infeasible
-  | Some RFail | Some RUnknown | None -> `Failure
+    Lwt.return (`Solution soln)
+  | Some RInfeasible -> Lwt.return `Infeasible
+  | Some RFail | Some RUnknown | None -> Lwt.return `Failure
 ;;
 
 let make_ensures_name (id : int) = "ensures_" ^ Int.to_string id
@@ -468,7 +467,7 @@ let verify_ensures_candidate
     ~(p : PsiDef.t)
     (maybe_ensures : term option)
     (var : variable)
-    : SmtInterface.SyncSmt.solver_response
+    : SmtInterface.SyncSmt.solver_response Lwt.t
   =
   match maybe_ensures with
   | None -> failwith "Cannot verify ensures candidate; there is none."
@@ -476,45 +475,45 @@ let verify_ensures_candidate
     Log.verbose (fun f () -> Fmt.(pf f "Checking ensures candidate..."));
     let resp =
       try
-        Lwt_main.run
-          (let pr1, resolver1 = verify_ensures_bounded ~fctx ~ctx ~p ensures var in
-           let pr2, resolver2 = verify_ensures_inductive ~fctx ~ctx ~p ensures in
-           Lwt.wakeup resolver2 1;
-           Lwt.wakeup resolver1 1;
-           (* The first call to return is kept, the other one is ignored. *)
-           Lwt.pick [ pr1; pr2 ])
+        let pr1, resolver1 = verify_ensures_bounded ~fctx ~ctx ~p ensures var in
+        let pr2, resolver2 = verify_ensures_inductive ~fctx ~ctx ~p ensures in
+        Lwt.wakeup resolver2 1;
+        Lwt.wakeup resolver1 1;
+        (* The first call to return is kept, the other one is ignored. *)
+        Lwt.pick [ pr1; pr2 ]
       with
       | End_of_file ->
         Log.error_msg "Solvers terminated unexpectedly  ⚠️ .";
         Log.error_msg "Please inspect logs.";
-        SmtLib.Unknown
+        Lwt.return SmtLib.Unknown
     in
     resp
 ;;
 
 let handle_ensures_verif_response
     ~(ctx : Context.t)
-    (response : S.solver_response)
+    (response : S.solver_response Lwt.t)
     (ensures : term)
+    : (bool * Sexp.t list option) Lwt.t
   =
-  match response with
+  match%lwt response with
   | Unsat ->
     Log.verbose (fun f () -> Fmt.(pf f "This ensures has been proven correct."));
     Log.verbose (fun frmt () -> Fmt.pf frmt "Ensures is %a" (pp_term ctx) ensures);
-    true, None
+    Lwt.return (true, None)
   | SmtLib.SExps x ->
     Log.verbose (fun f () ->
         Fmt.(pf f "This ensures has not been proven correct. Refining ensures..."));
-    false, Some x
+    Lwt.return (false, Some x)
   | Sat ->
     Log.error_msg "Ensures verification returned Sat, which was not expected.";
-    false, None
+    Lwt.return (false, None)
   | Unknown ->
     Log.error_msg "Ensures verification returned Unknown.";
-    false, None
+    Lwt.return (false, None)
   | _ ->
     Log.error_msg "Ensures verification is indeterminate.";
-    false, None
+    Lwt.return (false, None)
 ;;
 
 let constraint_of_neg ~(ctx : Context.t) (id : int) ~(p : PsiDef.t) (ctex : ctex) : term =
@@ -537,7 +536,7 @@ let rec synthesize
     (positives : ctex list)
     (negatives : ctex list)
     (prev_positives : term list)
-    : term option
+    : term option Lwt.t
   =
   Log.(info (wrap "Synthesize predicates.."));
   ctx >- AlgoLog.violates_ensures p negatives;
@@ -560,7 +559,7 @@ let rec synthesize
               (List.map ~f:(ctx >- constraint_of_neg id ~p) negatives
               @ List.map ~f:(ctx >- constraint_of_pos id) new_positives)))
   in
-  match
+  match%lwt
     ctx
     >>- handle_ensures_synth_response
           (ctx
@@ -569,8 +568,8 @@ let rec synthesize
   with
   | `Infeasible ->
     (* TODO check logic *)
-    Some (Terms.bool true)
-  | `Failure -> None
+    Lwt.return (Some (Terms.bool true))
+  | `Failure -> Lwt.return None
   | `Solution solns ->
     let _, _, body = List.nth_exn solns 0 in
     let ensures = mk_fun ctx.ctx [ FPatVar var ] (Eval.simplify body) in
@@ -581,13 +580,13 @@ let rec synthesize
         ~t:(Some p.PsiDef.reference.poutput_typ)
         (Alpha.fresh ctx.ctx.names)
     in
-    (match
+    (match%lwt
        ctx
        >- handle_ensures_verif_response
             (ctx >>- verify_ensures_candidate ~p (Some ensures) var)
             ensures
      with
-    | true, _ -> Some ensures
+    | true, _ -> Lwt.return (Some ensures)
     | false, Some sexprs ->
       let result =
         Map.find (ctx >>- SmtInterface.model_to_constmap (SmtLib.SExps sexprs)) var.vname
@@ -595,11 +594,11 @@ let rec synthesize
       (match result with
       | None ->
         Log.debug_msg "No model found; cannot refine ensures.";
-        None
+        Lwt.return None
       | Some r ->
         Log.debug_msg
           Fmt.(
             str "The counterexample to the ensures candidate is %a" (pp_term ctx.ctx) r);
         synthesize ~ctx ~p positives negatives (r :: new_positives))
-    | false, _ -> None)
+    | false, _ -> Lwt.return None)
 ;;

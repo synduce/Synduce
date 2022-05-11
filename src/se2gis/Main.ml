@@ -63,9 +63,10 @@ let rec refinement_loop
   | RFail, Second [] -> Lwt.return (Failed RFail)
   | _ as synt_failure_info ->
     (* On synthesis failure, start by trying to synthesize lemmas. *)
-    (match
-       Stats.timed (fun () ->
-           LemmaSynthesis.synthesize_lemmas ~ctx ~p synt_failure_info lstate_in)
+    (match%lwt
+       Stats.lwt_timed (fun a ->
+           Lwt.bind a (fun _ ->
+               LemmaSynthesis.synthesize_lemmas ~ctx ~p synt_failure_info lstate_in))
      with
     | lsynt_time, Ok (First new_lstate) ->
       Stats.log_minor_step ~synth_time ~auxtime:lsynt_time false;

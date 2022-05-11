@@ -463,7 +463,7 @@ let verify_lemma_candidate
     ~(ctx : Context.t)
     ~(p : PsiDef.t)
     (det : term_info)
-    : Utils.Stats.verif_method * SyncSmt.solver_response
+    : (Stats.verif_method * SyncSmt.solver_response) Lwt.t
   =
   match det.lemma_candidate with
   | None -> failwith "Cannot verify lemma candidate; there is none."
@@ -471,18 +471,17 @@ let verify_lemma_candidate
     Log.verbose (fun f () -> Fmt.(pf f "Checking lemma candidate..."));
     let resp =
       try
-        Lwt_main.run
-          (let pr1, resolver1 = verify_lemma_bounded ~fctx ~ctx ~p det in
-           let pr2, resolver2 = verify_lemma_unbounded ~fctx ~ctx ~p det in
-           Lwt.wakeup resolver2 1;
-           Lwt.wakeup resolver1 1;
-           (* The first call to return is kept, the other one is ignored. *)
-           Lwt.pick [ pr1; pr2 ])
+        let pr1, resolver1 = verify_lemma_bounded ~fctx ~ctx ~p det in
+        let pr2, resolver2 = verify_lemma_unbounded ~fctx ~ctx ~p det in
+        Lwt.wakeup resolver2 1;
+        Lwt.wakeup resolver1 1;
+        (* The first call to return is kept, the other one is ignored. *)
+        Lwt.pick [ pr1; pr2 ]
       with
       | End_of_file ->
         Log.error_msg "Solvers terminated unexpectedly  ⚠️ .";
         Log.error_msg "Please inspect logs.";
-        BoundedChecking, S.Unknown
+        Lwt.return (Stats.BoundedChecking, S.Unknown)
     in
     resp
 ;;
