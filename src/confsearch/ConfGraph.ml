@@ -99,24 +99,15 @@ let check_unrealizable_from_cache (ctx : env) (p : PsiDef.t) (s : state) =
   configurations is not used to prune unrealizable cases).
   `use_po` is `true` by default.
 *)
-let expand ?(use_po = true) (s : state) (conf : Subconf.t) : unit =
-  let add_edges () =
-    List.iter (Subconf.drop_arg conf) ~f:(fun c ->
-        match Hashtbl.find s.marks c with
-        (* Already solved: no need to add new edge. *)
-        | Some Realizable | Some Unrealizable -> ()
-        | Some Failed ->
-          if !Utils.Config.node_failure_behavior then () else add_edge s.graph conf c
-        | Some Unsolved -> add_edge s.graph conf c
-        | None ->
-          Hashtbl.set s.marks ~key:c ~data:Unsolved;
-          add_edge s.graph conf c)
-  in
-  match Hashtbl.find s.marks conf with
-  (* The configuration is unrealizable. No subconfiguration can be realizable. *)
-  | Some Unrealizable -> if use_po then () else add_edges ()
-  | Some Failed -> if !Utils.Config.node_failure_behavior then () else add_edges ()
-  | _ -> add_edges ()
+let expand ?(mark = Unsolved) (s : state) (conf : Subconf.t) : unit =
+  List.iter (Subconf.drop_arg conf) ~f:(fun c ->
+      match Hashtbl.find s.marks c with
+      (* Already solved: no need to add new edge. *)
+      | Some Realizable | Some Unrealizable | Some Failed -> ()
+      | Some Unsolved -> add_edge s.graph conf c
+      | None ->
+        Hashtbl.set s.marks ~key:c ~data:mark;
+        add_edge s.graph conf c)
 ;;
 
 let to_explore (s : state) (conf : Subconf.t) =
@@ -136,11 +127,43 @@ let next ?(shuffle = false) (s : state) : Subconf.t option =
   let rec loop () =
     Option.bind (Queue.dequeue q) ~f:(fun curr ->
         match Hashtbl.find s.marks curr with
+        | None ->
+          Hashtbl.set s.marks ~key:curr ~data:Unsolved;
+          Some curr
+        | Some Unsolved -> Some curr
+        | Some Unrealizable -> loop ()
+        | Some Failed ->
+          if !Utils.Config.node_failure_behavior
+          then loop ()
+          else (
+            let children = List.filter ~f:(to_explore s) (succ s.graph curr) in
+            Queue.enqueue_all q (if shuffle then List.permute children else children);
+            loop ())
+        | Some _ ->
+          let children = List.filter ~f:(to_explore s) (succ s.graph curr) in
+          Queue.enqueue_all q (if shuffle then List.permute children else children);
+          loop ())
+  in
+  loop ()
+;;
+
+(**
+  Find the next 0-marked configuration in the graph.
+  Return None if there is no such configuration.
+*)
+let next_dfs ?(shuffle = false) (s : state) : Subconf.t option =
+  let q = Stack.create () in
+  Stack.push q s.root;
+  let rec loop () =
+    Option.bind (Stack.pop q) ~f:(fun curr ->
+        match Hashtbl.find s.marks curr with
         | Some Unsolved -> Some curr
         | Some Unrealizable -> loop ()
         | Some _ ->
           let children = List.filter ~f:(to_explore s) (succ s.graph curr) in
-          Queue.enqueue_all q (if shuffle then List.permute children else children);
+          List.iter
+            (if shuffle then List.permute children else children)
+            ~f:(Stack.push q);
           loop ()
         | None ->
           Hashtbl.set s.marks ~key:curr ~data:Unsolved;

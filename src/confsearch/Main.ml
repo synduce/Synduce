@@ -77,7 +77,9 @@ let find_and_solve_problem
     let open Configuration in
     let rstate = G.generate_configurations ctx top_userdef_problem.PsiDef.target in
     let rec find_sols a =
-      match G.next ~shuffle:true rstate with
+      match
+        (if !Config.next_algo_bfs then G.next else G.next_dfs) ~shuffle:true rstate
+      with
       | Some sub_conf ->
         Int.incr num_attempts;
         let conf = Subconf.to_conf mc sub_conf in
@@ -96,6 +98,7 @@ let find_and_solve_problem
           Log.info
             Fmt.(fun fmt () -> pf fmt "Configuration is unrealizable according to cache.");
           G.mark_unrealizable rstate sub_conf;
+          G.expand ~mark:G.Unrealizable rstate sub_conf;
           (* Update stats: number of cache hits. *)
           Int.incr Stats.num_unr_cache_hits;
           find_sols (a @ [ new_ctx, new_pdef, Unrealizable [] ]))
@@ -108,11 +111,12 @@ let find_and_solve_problem
             find_sols ((new_ctx, new_pdef, Realizable s) :: a)
           | Unrealizable u ->
             G.mark_unrealizable rstate sub_conf;
+            G.expand ~mark:G.Unrealizable rstate sub_conf;
             G.cache rstate u;
             find_sols ((new_ctx, new_pdef, Unrealizable u) :: a)
           | Failed f ->
             G.mark_failed rstate sub_conf;
-            if !Config.node_failure_behavior then () else G.expand rstate sub_conf;
+            G.expand rstate sub_conf;
             find_sols ((new_ctx, new_pdef, Failed f) :: a))
       | None -> Lwt.return a
     in

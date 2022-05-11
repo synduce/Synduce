@@ -5,7 +5,9 @@ open Lang
 open ProblemDefs
 open Term
 
-let term_info_to_lemma ~(ctx : env) ~(p : PsiDef.t) (det : term_info) =
+let term_info_to_lemma ~(ctx : env) ~(p : PsiDef.t) ~(t : term) (det : term_info) =
+  (* Term adjustment substituions *)
+  let subst1 = ctx >- Matching.matches ~pattern:det.term t in
   (* Recursion elimination substitutions *)
   let subst =
     List.concat_map
@@ -16,10 +18,14 @@ let term_info_to_lemma ~(ctx : env) ~(p : PsiDef.t) (det : term_info) =
         | _ -> [ t2, frt1 ])
       det.recurs_elim
   in
-  let f lem = Term.substitution subst lem in
-  Option.map
-    ~f:(ctx >- Rewriter.simplify_term)
-    (mk_assoc Binop.And (List.map ~f det.lemmas))
+  let f lem =
+    let t1 = Term.substitution subst lem in
+    match subst1 with
+    | None -> None
+    | Some subst' -> Some (Term.substitution (VarMap.to_subst ctx.ctx subst') t1)
+  in
+  let lems = Option.all (List.map ~f det.lemmas) in
+  Option.(lems >>= mk_assoc Binop.And >>| (ctx >- Rewriter.simplify_term))
 ;;
 
 let key_of_term (t : term) = Expression.(Option.map ~f:nameless_normal_form (of_term t))
@@ -31,7 +37,7 @@ let get ~(ctx : env) ~(p : PsiDef.t) (t : term) =
     (match Hashtbl.find_multi ctx.pcache e_key with
     | [] -> None
     | tis ->
-      (match List.filter_opt (List.map ~f:(term_info_to_lemma ~ctx ~p) tis) with
+      (match List.filter_opt (List.map ~f:(term_info_to_lemma ~ctx ~p ~t) tis) with
       | [] -> None
       | [ a ] -> Some a
       | _ as conds -> mk_assoc Binop.And conds))
@@ -53,7 +59,9 @@ let find ~(ctx : env) ~(key : term) =
 let get_with_precond ~(ctx : env) ~(p : PsiDef.t) ~(key : term * term option)
     : term option
   =
-  Option.bind ~f:(term_info_to_lemma ~ctx ~p) (find_term_info ~ctx key)
+  Option.bind
+    ~f:(term_info_to_lemma ~ctx ~p ~t:(Utils.first key))
+    (find_term_info ~ctx key)
 ;;
 
 let change

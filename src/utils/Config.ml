@@ -127,6 +127,9 @@ let force_nonlinear = ref false
 *)
 let node_failure_behavior = ref true
 
+(** Use DFS or BFS when searching for next configuration (true for BFS, false for DFS)*)
+let next_algo_bfs = ref true
+
 (* ============================================================================================= *)
 (*                                STORAGE AND BINARY PATHS                                       *)
 (* ============================================================================================= *)
@@ -315,6 +318,7 @@ let options print_usage parse_only =
   ; '\000', "show-vars", set show_vars true, None
   ; '\000', "sysfe-opt-off", set sysfe_opt false, None
   ; '\000', "use-bmc", set use_bmc true, None
+  ; '\000', "use-dfs", set next_algo_bfs false, None
   ; '\000', "verif-with", None, Some set_verification_solver
   ; (* Background solver parameters *)
     '\000', "ind-tlimit", None, Some set_induction_proof_tlimit
