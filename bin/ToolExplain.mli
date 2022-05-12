@@ -9,17 +9,17 @@ val find_missing_argument
   :  ctx:Common.Env.env
   -> Common.ProblemDefs.PsiDef.t
   -> (Lang.TermTypes.variable * (Lang.TermTypes.term * Lang.TermTypes.term)) list
-  -> Common.ProblemDefs.ctex
+  -> Common.ProblemDefs.witness
   -> unit
 
 val find_missing_delta
   :  ctx:Common.Env.env
   -> Common.ProblemDefs.PsiDef.t
-  -> Common.ProblemDefs.unrealizability_ctex
+  -> Common.ProblemDefs.unrealizability_witness
   -> unit
 
 val when_unrealizable
   :  ctx:Common.Env.env
   -> Common.ProblemDefs.PsiDef.t
-  -> Common.ProblemDefs.unrealizability_ctex list
+  -> Common.ProblemDefs.unrealizability_witness list
   -> unit

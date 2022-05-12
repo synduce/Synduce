@@ -64,5 +64,5 @@ val scalar
   :  ctx:env
   -> p:PsiDef.t
   -> refinement_loop_state
-  -> Syguslib.Sygus.solver_response * ('a, unrealizability_ctex list) Base.Either.t
+  -> Syguslib.Sygus.solver_response * ('a, unrealizability_witness list) Base.Either.t
   -> (PsiDef.t * refinement_loop_state, Syguslib.Sygus.solver_response) result

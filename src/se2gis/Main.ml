@@ -64,7 +64,7 @@ let rec refinement_loop
     | lsynt_time, Ok (First new_lstate) ->
       Stats.log_minor_step ~synth_time ~auxtime:lsynt_time false;
       refinement_loop ~ctx ~major:false p (Lwt.return new_lstate)
-    | lsynt_time, Ok (Second ctexs)
+    | lsynt_time, Ok (Second witnesss)
       when !Config.Optims.attempt_lifting
            && Lifting.lifting_count ~ctx p < !Config.Optims.max_lifting_attempts ->
       (* If all no counterexample is spurious, lemma synthesis fails, we need lifting. *)
@@ -78,14 +78,14 @@ let rec refinement_loop
         (match r' with
         | RInfeasible ->
           Stats.log_major_step_end ~synth_time ~verif_time:0. ~t:tsize ~u:usize false;
-          Lwt.return (Unrealizable ctexs)
+          Lwt.return (Unrealizable witnesss)
         | _ -> Lwt.return (Failed r')))
-    | _, Ok (Second ctexs) ->
+    | _, Ok (Second witnesss) ->
       (* Infeasible is not a failure! When the sygus solver answers infeasible,
         we do not have witnesses of unrealizability.
        *)
       Stats.log_major_step_end ~synth_time ~verif_time:0. ~t:tsize ~u:usize false;
-      Lwt.return (Unrealizable ctexs)
+      Lwt.return (Unrealizable witnesss)
     | _ -> Lwt.return (Failed RFail))
 
 and success_case ~ctx ~p ~synth_time lstate_in (tsize, usize) lifting (eqns, sol) =
@@ -94,7 +94,7 @@ and success_case ~ctx ~p ~synth_time lstate_in (tsize, usize) lifting (eqns, sol
     Stats.timed (fun () -> Verify.check_solution ~ctx ~p lstate_in sol)
   in
   match check_r with
-  | `Ctexs (t_set, u_set) ->
+  | `witnesss (t_set, u_set) ->
     (* If check_r is some new set of MR-terms t_set, and terms u_set, this means
                   verification failed. The generalized counterexamples have been added to new_t_set,
                   which is also a superset of t_set.
@@ -215,6 +215,6 @@ let find_and_solve_problem
       (* Default algorithm: best combination of techniques. *)
     else solve_problem ~ctx
   in
-  let%lwt sol_or_ctexs = main_algo top_userdef_problem in
-  Lwt.return [ top_userdef_problem, sol_or_ctexs ]
+  let%lwt sol_or_witnesss = main_algo top_userdef_problem in
+  Lwt.return [ top_userdef_problem, sol_or_witnesss ]
 ;;

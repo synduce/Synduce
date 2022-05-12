@@ -39,7 +39,7 @@ let single_configuration_json
     ~(is_ocaml_syntax : bool)
     ~(ctx : env)
     (pb : PsiDef.t)
-    (soln : (soln, unrealizability_ctex list) Either.t option)
+    (soln : (soln, unrealizability_witness list) Either.t option)
     (elapsed : float)
     (verif : float)
     : Yojson.t
@@ -85,7 +85,7 @@ let single_configuration_json
 let show_stat_intermediate_solution
     ~(ctx : env)
     (pb : PsiDef.t)
-    (soln : (soln, unrealizability_ctex list) Either.t option)
+    (soln : (soln, unrealizability_witness list) Either.t option)
     (elapsed : float)
     (verif : float)
     (total_configurations : int)
@@ -187,10 +187,10 @@ let msg_too_many_opts () =
 (*                           Messages from the Counterexamples                                   *)
 (* ============================================================================================= *)
 
-let pp_unrealizability_ctex
+let pp_unrealizability_witness
     ~(ctx : Context.t)
     (frmt : Formatter.t)
-    (uc : unrealizability_ctex)
+    (uc : unrealizability_witness)
     : unit
   =
   let pp_model frmt model =
@@ -205,15 +205,15 @@ let pp_unrealizability_ctex
       "@[M<%i> = [%a]@]@;@[M'<%i> = [%a]@]"
       uc.i
       pp_model
-      uc.ci.ctex_model
+      uc.ci.witness_model
       uc.j
       pp_model
-      uc.cj.ctex_model)
+      uc.cj.witness_model)
 ;;
 
-let show_unrealizability_witnesses ~(ctx : Context.t) unknowns eqns ctexs =
+let show_unrealizability_witnesses ~(ctx : Context.t) unknowns eqns witnesss =
   Log.verbose (fun f () ->
-      match ctexs with
+      match witnesss with
       | [] ->
         Fmt.(
           pf
@@ -234,15 +234,15 @@ let show_unrealizability_witnesses ~(ctx : Context.t) unknowns eqns ctexs =
             unknowns
             (list ~sep:sp (box (pair ~sep:colon int (box (pp_equation ~ctx)))))
             (List.mapi ~f:(fun i eqn -> i, eqn) eqns)
-            (list ~sep:sep_and (pp_unrealizability_ctex ~ctx))
-            ctexs))
+            (list ~sep:sep_and (pp_unrealizability_witness ~ctx))
+            witnesss))
 ;;
 
 (* ============================================================================================= *)
 (*                           Messages from the Lemma Synthesis                                   *)
 (* ============================================================================================= *)
 
-let no_spurious_ctex () =
+let no_spurious_witness () =
   Log.info (fun fmt () ->
       pf fmt "All counterexamples are non-spurious: nothing to refine.")
 ;;
@@ -265,15 +265,15 @@ let print_infeasible_message ~ctx t_set =
         (Set.elements t_set))
 ;;
 
-let announce_new_lemmas ~(ctx : Context.t) ctex =
+let announce_new_lemmas ~(ctx : Context.t) witness =
   Log.debug (fun fmt () ->
       pf
         fmt
         "Creating new lemma for term@;%a@;under condition %a@;"
         (pp_term ctx)
-        ctex.ctex_eqn.eterm
+        witness.witness_eqn.eterm
         (option (pp_term ctx))
-        ctex.ctex_eqn.esplitter)
+        witness.witness_eqn.esplitter)
 ;;
 
 let announce_new_lemma_synthesis ~(ctx : Context.t) (thread_no : int) (det : term_info) =
@@ -354,10 +354,10 @@ let lemma_proved_correct
 
 (* Messages from ImagePredicates *)
 
-let violates_ensures ~(ctx : Context.t) p ctexs =
-  List.iter ctexs ~f:(fun ctex ->
-      List.iter ctex.ctex_eqn.eelim ~f:(fun (_, elimv) ->
-          let tval = Eval.in_model ~ctx ctex.ctex_model elimv in
+let violates_ensures ~(ctx : Context.t) p witnesss =
+  List.iter witnesss ~f:(fun witness ->
+      List.iter witness.witness_eqn.eelim ~f:(fun (_, elimv) ->
+          let tval = Eval.in_model ~ctx witness.witness_model elimv in
           Log.verbose (fun fmt () ->
               pf
                 fmt
@@ -406,10 +406,10 @@ let show_new_ensures_predicate ~(ctx : env) (f : variable) (ensures : term) =
 (*                  Messages from the Counterexamples Classification                             *)
 (* ============================================================================================= *)
 
-let image_ctex_class
+let image_witness_class
     ~(ctx : Context.t)
     (p : PsiDef.t)
-    (ctex : ctex)
+    (witness : witness)
     (resp : Smtlib.SmtLib.solver_response)
     (vmethod : Stats.verif_method)
   =
@@ -420,25 +420,25 @@ let image_ctex_class
         Fmt.(
           pf
             frmt
-            "%s: %a: ctex not in the image of reference function \"%s\":@;<1 4>%a."
+            "%s: %a: witness not in the image of reference function \"%s\":@;<1 4>%a."
             (Stats.verif_method_to_str vmethod)
             (styled (`Fg `Red) string)
             "SPURIOUS"
             p.PsiDef.reference.pvar.vname
-            (box (pp_ctex ~ctx))
-            ctex)
+            (box (pp_witness ~ctx))
+            witness)
       else if SmtInterface.SyncSmt.is_sat resp
       then
         Fmt.(
           pf
             frmt
-            "%s: %a: ctex in the image of %s:@;%a"
+            "%s: %a: witness in the image of %s:@;%a"
             (Stats.verif_method_to_str vmethod)
             (styled (`Fg `Green) string)
             "VALID"
             p.PsiDef.reference.pvar.vname
-            (box (pp_ctex ~ctx))
-            ctex)
+            (box (pp_witness ~ctx))
+            witness)
       else
         Fmt.(
           pf
@@ -448,14 +448,14 @@ let image_ctex_class
             (styled (`Fg `White) (styled (`Bg `Red) string))
             "UNKNOWN"
             p.PsiDef.reference.pvar.vname
-            (box (pp_ctex ~ctx))
-            ctex))
+            (box (pp_witness ~ctx))
+            witness))
 ;;
 
-let requires_ctex_class
+let requires_witness_class
     ~(ctx : Context.t)
     (tinv : PMRS.t)
-    (ctex : ctex)
+    (witness : witness)
     (resp : Smtlib.SmtLib.solver_response)
     (vmethod : Stats.verif_method)
   =
@@ -466,34 +466,34 @@ let requires_ctex_class
         Fmt.(
           pf
             frmt
-            "%s: %a ctex does not satisfy \"%s\":@;<1 4>%a"
+            "%s: %a witness does not satisfy \"%s\":@;<1 4>%a"
             (Stats.verif_method_to_str vmethod)
             (styled (`Fg `Red) string)
             "SPURIOUS"
             tinv.PMRS.pvar.vname
-            (box (pp_ctex ~ctx))
-            ctex)
+            (box (pp_witness ~ctx))
+            witness)
       else if SmtInterface.SyncSmt.is_sat resp
       then
         Fmt.(
           pf
             frmt
-            "%s: %a ctex satisfies %s:@;<1 4>%a"
+            "%s: %a witness satisfies %s:@;<1 4>%a"
             (Stats.verif_method_to_str vmethod)
             (styled (`Fg `Green) string)
             "VALID"
             tinv.PMRS.pvar.vname
-            (box (pp_ctex ~ctx))
-            ctex)
+            (box (pp_witness ~ctx))
+            witness)
       else
         Fmt.(
           pf
             frmt
-            "%s: %a The ctex satisfies %s?@;<1 4>%a"
+            "%s: %a The witness satisfies %s?@;<1 4>%a"
             (Stats.verif_method_to_str vmethod)
             (styled (`Fg `White) (styled (`Bg `Red) string))
             "UNKNOWN"
             tinv.PMRS.pvar.vname
-            (box (pp_ctex ~ctx))
-            ctex))
+            (box (pp_witness ~ctx))
+            witness))
 ;;

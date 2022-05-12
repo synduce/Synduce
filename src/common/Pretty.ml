@@ -47,7 +47,7 @@ let pp_equation ~(ctx : Context.t) (f : Formatter.t) (eqn : equation) =
         eqn.erhs)
 ;;
 
-let pp_ctex ~(ctx : Context.t) (f : Formatter.t) (ctex : ctex) : unit =
+let pp_witness ~(ctx : Context.t) (f : Formatter.t) (witness : witness) : unit =
   let pp_model frmt model =
     (* Print as comma-separated list of variable -> term *)
     Fmt.(list ~sep:comma (pair ~sep:Utils.rightarrow (Variable.pp ctx) (pp_term ctx)))
@@ -58,11 +58,11 @@ let pp_ctex ~(ctx : Context.t) (f : Formatter.t) (ctex : ctex) : unit =
     f
     "@[M = [%a]@]@;@[for %a@]@;@[with elim. %a@]"
     pp_model
-    ctex.ctex_model
+    witness.witness_model
     (pp_term ctx)
-    ctex.ctex_eqn.eterm
+    witness.witness_eqn.eterm
     (pp_subs ctx)
-    ctex.ctex_eqn.eelim
+    witness.witness_eqn.eelim
 ;;
 
 let pp_implems

@@ -18,8 +18,10 @@ module Sm = Syguslib.Semantic
 (*                                  Creating and updating term states                            *)
 (* ============================================================================================= *)
 
-let lemmas_of_context ~(ctx : Context.t) ~(is_pos_ctex : bool) (ctex : ctex) : term_info =
-  let scalar_vars = Map.keys ctex.ctex_model in
+let term_info_of_witness ~(ctx : Context.t) ~(is_pos_witness : bool) (witness : witness)
+    : term_info
+  =
+  let scalar_vars = Map.keys witness.witness_model in
   let input_args_t = List.map ~f:(Variable.vtype_or_new ctx) scalar_vars in
   let lemma_f =
     Variable.mk
@@ -27,16 +29,16 @@ let lemmas_of_context ~(ctx : Context.t) ~(is_pos_ctex : bool) (ctex : ctex) : t
       ~t:(Some (RType.fun_typ_pack input_args_t TBool))
       (Alpha.fresh ~s:"lemma" ctx.names)
   in
-  { term = ctex.ctex_eqn.eterm
-  ; splitter = ctex.ctex_eqn.esplitter
+  { term = witness.witness_eqn.eterm
+  ; splitter = witness.witness_eqn.esplitter
   ; lemmas = []
   ; lemma = lemma_f
   ; lemma_candidate = None
-  ; negative_ctexs = (if is_pos_ctex then [] else [ ctex ])
-  ; positive_ctexs = (if is_pos_ctex then [ ctex ] else [])
-  ; recurs_elim = ctex.ctex_eqn.eelim
-  ; scalar_vars = Map.keys ctex.ctex_model
-  ; current_preconds = ctex.ctex_eqn.eprecond
+  ; negative_witnesss = (if is_pos_witness then [] else [ witness ])
+  ; positive_witnesss = (if is_pos_witness then [ witness ] else [])
+  ; recurs_elim = witness.witness_eqn.eelim
+  ; scalar_vars = Map.keys witness.witness_model
+  ; current_preconds = witness.witness_eqn.eprecond
   }
 ;;
 
@@ -44,46 +46,49 @@ let lemmas_of_context ~(ctx : Context.t) ~(is_pos_ctex : bool) (ctex : ctex) : t
   or if a term state exists for the term associated with that counterexample,
   update the term state by adding the counterexample's models.
 *)
-let create_or_update_lemmas_with_ctex
+let create_or_update_lemmas_with_witness
     ~(p : PsiDef.t)
     ~(ctx : Env.env)
-    ~(is_pos_ctex : bool)
-    (ctex : ctex)
+    ~(is_pos_witness : bool)
+    (witness : witness)
     : unit
   =
   match
-    Predicates.get_with_precond ~ctx ~p ~key:(ctex.ctex_eqn.eterm, ctex.ctex_eqn.esplitter)
+    Predicates.get_with_precond
+      ~ctx
+      ~p
+      ~key:(witness.witness_eqn.eterm, witness.witness_eqn.esplitter)
   with
   | None ->
-    ctx >- AlgoLog.announce_new_lemmas ctex;
+    ctx >- AlgoLog.announce_new_lemmas witness;
     Predicates.add
       ~ctx
-      ~key:ctex.ctex_eqn.eterm
-      ~data:(ctx >- lemmas_of_context ~is_pos_ctex ctex)
+      ~key:witness.witness_eqn.eterm
+      ~data:(ctx >- term_info_of_witness ~is_pos_witness witness)
   | Some _ ->
     let change_ti det =
-      if is_pos_ctex
-      then { det with positive_ctexs = ctex :: det.positive_ctexs }
+      if is_pos_witness
+      then { det with positive_witnesss = witness :: det.positive_witnesss }
       else
         { det with
           current_preconds =
-            (match ctex.ctex_eqn.eprecond with
+            (match witness.witness_eqn.eprecond with
             | None -> None
             | Some pre ->
               let pre' =
                 substitution
-                  (ctx >- subs_from_elim_to_elim det.recurs_elim ctex.ctex_eqn.eelim)
+                  (ctx >- subs_from_elim_to_elim det.recurs_elim witness.witness_eqn.eelim)
                   pre
               in
               Some pre')
-        ; negative_ctexs = ctex :: det.negative_ctexs
-        ; positive_ctexs = det.positive_ctexs
+        ; negative_witnesss = witness :: det.negative_witnesss
+        ; positive_witnesss = det.positive_witnesss
         }
     in
     Predicates.change
       ~ctx
-      ~key:ctex.ctex_eqn.eterm
-      ~split:ctex.ctex_eqn.esplitter
+      ~key:witness.witness_eqn.eterm
+      ~split:witness.witness_eqn.esplitter
       change_ti
 ;;
 
@@ -219,11 +224,11 @@ let term_var_string ~ctx term : string =
   | var :: _ -> var.vname
 ;;
 
-let convert_term_rec_to_ctex_rec
+let convert_term_rec_to_witness_rec
     ~(ctx : Context.t)
     ~(p : PsiDef.t)
     (det : term_info)
-    (ctex : ctex)
+    (witness : witness)
     (name : string)
     : string
   =
@@ -231,7 +236,7 @@ let convert_term_rec_to_ctex_rec
     match lst with
     | [] ->
       failwith
-        (Fmt.str "Could not find name %s in the ctex's recursion elimination." name)
+        (Fmt.str "Could not find name %s in the witness's recursion elimination." name)
     | (a, b) :: tl ->
       let i = term_var_string ~ctx b in
       let l = term_var_string ~ctx a in
@@ -241,7 +246,7 @@ let convert_term_rec_to_ctex_rec
     match elim with
     | [] ->
       failwith
-        (Fmt.str "Could not find ctex rec elim entry for tuple entry named %s." name)
+        (Fmt.str "Could not find witness rec elim entry for tuple entry named %s." name)
     | (a, b) :: tl ->
       let l = term_var_string ~ctx a in
       if String.(equal l recvar)
@@ -251,7 +256,10 @@ let convert_term_rec_to_ctex_rec
         | _ ->
           failwith
             Fmt.(
-              str "Cannot get tuple entry %s in ctex rec elim; %s is not a tuple.)" name l))
+              str
+                "Cannot get tuple entry %s in witness rec elim; %s is not a tuple.)"
+                name
+                l))
       else h recvar n tl
   in
   let rec f lst =
@@ -266,70 +274,75 @@ let convert_term_rec_to_ctex_rec
            List.find_mapi vars ~f:(fun n x ->
                let l = term_var_string ~ctx a in
                let i = term_var_string ~ctx x in
-               if String.(equal i name) then Some (h l n ctex.ctex_eqn.eelim) else None)
+               if String.(equal i name)
+               then Some (h l n witness.witness_eqn.eelim)
+               else None)
          with
         | Some s -> s
         | None -> f tl)
       | _ ->
         let i = term_var_string ~ctx b in
         let l = term_var_string ~ctx a in
-        if String.(equal i name) then g l ctex.ctex_eqn.eelim else f tl)
+        if String.(equal i name) then g l witness.witness_eqn.eelim else f tl)
   in
   match
     VarSet.find_by_name
       (Set.union
          (Analysis.free_variables ~ctx det.term)
-         (Set.union (VarSet.of_list p.PsiDef.reference.pargs) ctex.ctex_vars))
+         (Set.union (VarSet.of_list p.PsiDef.reference.pargs) witness.witness_vars))
       name
   with
   | None -> f det.recurs_elim
   | Some _ -> name
 ;;
 
-let ctex_model_to_args
+let witness_model_to_args
     ~(ctx : Context.t)
     ~(p : PsiDef.t)
     (det : term_info)
     (params : (string * Sy.sygus_sort) list)
-    ctex
+    witness
     : Sy.sygus_term list
   =
   List.map params ~f:(fun (param_name, _) ->
       match
-        let name = convert_term_rec_to_ctex_rec ~ctx ~p det ctex param_name in
+        let name = convert_term_rec_to_witness_rec ~ctx ~p det witness param_name in
         Map.find
-          ctex.ctex_model
+          witness.witness_model
           (match
              VarSet.find_by_name
                (Set.union
                   (* Don't include functions, we won't get a model for them in CVC5. *)
                   (Analysis.free_variables ~ctx ~include_functions:false det.term)
-                  (Set.union (VarSet.of_list p.PsiDef.reference.pargs) ctex.ctex_vars))
+                  (Set.union
+                     (VarSet.of_list p.PsiDef.reference.pargs)
+                     witness.witness_vars))
                name
            with
           | None ->
             failwith
               (Fmt.str
-                 "Failed to extract argument list from ctex model (%s unknown)."
+                 "Failed to extract argument list from witness model (%s unknown)."
                  name)
           | Some v -> v)
       with
       | None ->
         Log.error Fmt.(fun fmt () -> pf fmt "I was looking for %s" param_name);
-        Log.error Fmt.(fun fmt () -> pf fmt "The ctex: %a" (Pretty.pp_ctex ~ctx) ctex);
-        failwith "Failed to extract argument list from ctex model."
+        Log.error
+          Fmt.(fun fmt () -> pf fmt "The witness: %a" (Pretty.pp_witness ~ctx) witness);
+        failwith "Failed to extract argument list from witness model."
       | Some t -> sygus_of_term ~ctx t)
 ;;
 
-let constraint_of_neg_ctex ~ctx (det : term_info) ctex =
+let constraint_of_neg_witness ~ctx (det : term_info) witness =
   let neg_constraint =
-    mk_un Not (mk_app (mk_var ctx det.lemma) (Map.data ctex.ctex_model))
+    mk_un Not (mk_app (mk_var ctx det.lemma) (Map.data witness.witness_model))
   in
   Sy.mk_c_constraint (sygus_of_term ~ctx neg_constraint)
 ;;
 
-let constraint_of_pos_ctex ~ctx (det : term_info) ctex =
-  let pos_constraint = mk_app (mk_var ctx det.lemma) (Map.data ctex.ctex_model) in
+let constraint_of_pos_witness ~ctx (det : term_info) witness =
+  let pos_constraint = mk_app (mk_var ctx det.lemma) (Map.data witness.witness_model) in
   Sy.mk_c_constraint (sygus_of_term ~ctx pos_constraint)
 ;;
 
@@ -386,8 +399,8 @@ let parse_positive_example_solver_model
         model
     in
     (* Remap the names to ids of the original variables in m' *)
-    [ ({ (placeholder_ctex det) with
-         ctex_model =
+    [ ({ (placeholder_witness det) with
+         witness_model =
            Map.fold
              ~init:VarMap.empty
              ~f:(fun ~key ~data acc ->
@@ -398,7 +411,7 @@ let parse_positive_example_solver_model
                | Some var -> Map.set ~data acc ~key:var)
              m
        }
-        : ctex)
+        : witness)
     ]
   | _ ->
     failwith
@@ -411,10 +424,10 @@ let synthesize_new_lemma ~(ctx : env) ~(p : PsiDef.t) (det : term_info)
   let with_synth_obj i synth_obj logic =
     ctx >- AlgoLog.announce_new_lemma_synthesis i det;
     let neg_constraints =
-      List.map ~f:(ctx >- constraint_of_neg_ctex det) det.negative_ctexs
+      List.map ~f:(ctx >- constraint_of_neg_witness det) det.negative_witnesss
     in
     let pos_constraints =
-      List.map ~f:(ctx >- constraint_of_pos_ctex det) det.positive_ctexs
+      List.map ~f:(ctx >- constraint_of_pos_witness det) det.positive_witnesss
     in
     let extra_defs = Sm.[ max_definition; min_definition ] in
     let commands =
@@ -488,19 +501,23 @@ let rec lemma_refinement_loop ~(ctx : env) ~(p : PsiDef.t) (det : term_info)
           (Some { det with lemma_candidate = None; lemmas = lemma :: det.lemmas })
       | vmethod, S.SExps x ->
         AlgoLog.lemma_not_proved_correct vmethod;
-        let new_positive_ctexs =
+        let new_positive_witnesss =
           ctx >>- parse_positive_example_solver_model (S.SExps x) det
         in
         List.iter
-          ~f:(fun ctex ->
+          ~f:(fun witness ->
             Log.verbose (fun f () ->
                 Fmt.(
-                  pf f "Found a positive example: %a" (box (ctx >- Pretty.pp_ctex)) ctex)))
-          new_positive_ctexs;
+                  pf
+                    f
+                    "Found a positive example: %a"
+                    (box (ctx >- Pretty.pp_witness))
+                    witness)))
+          new_positive_witnesss;
         lemma_refinement_loop
           ~ctx
           ~p
-          { det with positive_ctexs = det.positive_ctexs @ new_positive_ctexs }
+          { det with positive_witnesss = det.positive_witnesss @ new_positive_witnesss }
       | _, Sat ->
         Log.error_msg "Lemma verification returned Sat. This is unexpected.";
         Lwt.return None
@@ -517,12 +534,12 @@ let rec lemma_refinement_loop ~(ctx : env) ~(p : PsiDef.t) (det : term_info)
   b are examples that do not satisfy the invariant,
   c are examples that are spurious for other reasons.
 *)
-let ctexs_for_lemma_synt ctex =
-  match ctex.ctex_stat with
-  | Valid -> `Fst ctex
+let witnesss_for_lemma_synt witness =
+  match witness.witness_stat with
+  | Valid -> `Fst witness
   | Spurious causes ->
-    if Caml.List.mem ViolatesTargetRequires causes then `Snd ctex else `Trd ctex
-  | _ -> `Trd ctex
+    if Caml.List.mem ViolatesTargetRequires causes then `Snd witness else `Trd witness
+  | _ -> `Trd witness
 ;;
 
 (** Partitioning function to partitiion a list into (a,b,c) where a are
@@ -530,26 +547,26 @@ let ctexs_for_lemma_synt ctex =
   b are examples that are in the reference function's image,
   c are examples that are spurious for other reasons.
 *)
-let ctexs_for_ensures_synt ctex =
-  match ctex.ctex_stat with
-  | Valid -> `Fst ctex
+let witnesss_for_ensures_synt witness =
+  match witness.witness_stat with
+  | Valid -> `Fst witness
   | Spurious causes ->
-    if Caml.List.mem NotInReferenceImage causes then `Snd ctex else `Trd ctex
-  | _ -> `Trd ctex
+    if Caml.List.mem NotInReferenceImage causes then `Snd witness else `Trd witness
+  | _ -> `Trd witness
 ;;
 
 let refine_ensures_predicates
     ~(ctx : env)
     ~(p : PsiDef.t)
-    ~(neg_ctexs : ctex list)
-    ~(pos_ctexs : ctex list)
+    ~(neg_witnesss : witness list)
+    ~(pos_witnesss : witness list)
     : [ `CoarseningOk | `CoarseningFailure | `Unrealizable ] Lwt.t
   =
   Log.info
     Fmt.(
       fun fmt () ->
-        pf fmt "%i counterexamples violate image assumption." (List.length neg_ctexs));
-  let%lwt maybe_pred = ImagePredicates.synthesize ~ctx ~p pos_ctexs neg_ctexs [] in
+        pf fmt "%i counterexamples violate image assumption." (List.length neg_witnesss));
+  let%lwt maybe_pred = ImagePredicates.synthesize ~ctx ~p pos_witnesss neg_witnesss [] in
   match maybe_pred with
   | None -> Lwt.return `CoarseningFailure
   | Some ensures ->
@@ -583,7 +600,7 @@ let synthesize_lemmas
     ~(p : PsiDef.t)
     synt_failure_info
     (lstate : refinement_loop_state)
-    : ( (refinement_loop_state, unrealizability_ctex list) Either.t
+    : ( (refinement_loop_state, unrealizability_witness list) Either.t
       , Sy.solver_response )
       Result.t
     Lwt.t
@@ -597,55 +614,57 @@ let synthesize_lemmas
      | Some "Y" -> true
      | _ -> false)
   in
-  let update is_positive ctexs =
+  let update is_positive witnesss =
     List.iter
-      ctexs
-      ~f:(create_or_update_lemmas_with_ctex ~p ~ctx ~is_pos_ctex:is_positive)
+      witnesss
+      ~f:(create_or_update_lemmas_with_witness ~p ~ctx ~is_pos_witness:is_positive)
   in
   (*
     Example: the synt_failure_info should be a list of unrealizability counterexamples, which
     are pairs of counterexamples.
     Each counterexample can be classified as positive or negative w.r.t to the predicate p.psi_tinv.
     The lemma corresponding to a particular term should be refined to eliminate the counterexample
-    (a counterexample cex is also associated to a particular term through cex.ctex_eqn.eterm)
+    (a counterexample cex is also associated to a particular term through cex.witness_eqn.eterm)
    *)
   let%lwt ( (ensures_positives, ensures_negatives)
           , (lemma_synt_positives, lemma_synt_negatives)
           , classif_failures
-          , unr_ctexs )
+          , unr_witnesss )
     =
     match synt_failure_info with
     | _, Either.First _ -> failwith "There is no synt_failure_info in synthesize_lemmas."
-    | _, Either.Second unrealizability_ctexs ->
+    | _, Either.Second unrealizability_witnesss ->
       (* Forget about the specific association in pairs. *)
-      let ctexs = List.concat_map unrealizability_ctexs ~f:(fun uc -> [ uc.ci; uc.cj ]) in
-      let%lwt classified_ctexs =
-        if !Config.classify_ctex
-        then ctx >- LemmasInteractive.classify_ctexs_opt ctexs
-        else classify_ctexs ~ctx ~p ctexs
+      let witnesss =
+        List.concat_map unrealizability_witnesss ~f:(fun uc -> [ uc.ci; uc.cj ])
+      in
+      let%lwt classified_witnesss =
+        if !Config.classify_witness
+        then ctx >- LemmasInteractive.classify_witnesss_opt witnesss
+        else classify_witnesss ~ctx ~p witnesss
       in
       (* Positive and negatives for the ensures predicates. *)
       let ensures_positives, ensures_negatives, _ =
-        List.partition3_map ~f:ctexs_for_ensures_synt classified_ctexs
+        List.partition3_map ~f:witnesss_for_ensures_synt classified_witnesss
       in
       (* Positive and negatives for the requires of the target function. *)
       let lemma_synt_positives, lemma_synt_negatives, _ =
-        List.partition3_map ~f:ctexs_for_lemma_synt classified_ctexs
+        List.partition3_map ~f:witnesss_for_lemma_synt classified_witnesss
       in
       (* Witnesses that could not be classified. *)
       let classif_failures =
         List.filter
-          ~f:(fun ctex ->
-            match ctex.ctex_stat with
+          ~f:(fun witness ->
+            match witness.witness_stat with
             | Unknown -> true
             | _ -> false)
-          classified_ctexs
+          classified_witnesss
       in
       Lwt.return
         ( (ensures_positives, ensures_negatives)
         , (lemma_synt_positives, lemma_synt_negatives)
         , classif_failures
-        , unrealizability_ctexs )
+        , unrealizability_witnesss )
   in
   let%lwt lemma_synthesis_success =
     match ensures_negatives, lemma_synt_negatives with
@@ -653,8 +672,8 @@ let synthesize_lemmas
       refine_ensures_predicates
         ~ctx
         ~p
-        ~neg_ctexs:ensures_negatives
-        ~pos_ctexs:ensures_positives
+        ~neg_witnesss:ensures_negatives
+        ~pos_witnesss:ensures_positives
     | _, _ :: _ ->
       (* Update the term state by adding the positive and negative counterexamples to it. *)
       update false lemma_synt_negatives;
@@ -682,8 +701,8 @@ let synthesize_lemmas
       (match classif_failures with
       | [] ->
         update true lemma_synt_positives;
-        (* lemma_synt_negatives and ensures_negatives are empty; all ctexs non spurious! *)
-        AlgoLog.no_spurious_ctex ();
+        (* lemma_synt_negatives and ensures_negatives are empty; all witnesss non spurious! *)
+        AlgoLog.no_spurious_witness ();
         Lwt.return `Unrealizable
       | _ :: _ ->
         AlgoLog.witness_classification_failure ();
@@ -692,7 +711,7 @@ let synthesize_lemmas
   Lwt.return
     (match lemma_synthesis_success with
     | `CoarseningOk -> Ok (Either.First lstate)
-    | `Unrealizable -> Ok (Either.Second unr_ctexs)
+    | `Unrealizable -> Ok (Either.Second unr_witnesss)
     | `CoarseningFailure ->
       (match synt_failure_info with
       | Sy.RFail, _ ->

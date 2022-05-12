@@ -32,11 +32,11 @@ let find_missing_argument
     ~ctx
     (pb : PsiDef.t)
     (diff : (variable * (term * term)) list)
-    (c : ctex)
+    (c : witness)
   =
   let msg_missing_arg rec_case u t =
     let msg =
-      if (not rec_case) || is_shallow_value c.ctex_eqn.eterm t
+      if (not rec_case) || is_shallow_value c.witness_eqn.eterm t
       then "."
       else "It may help to add the recursive call having access to that value."
     in
@@ -45,7 +45,7 @@ let find_missing_argument
           fmt
           "@[On input %a, %a should have access to %a@;%a"
           (ctx @>- pp_term)
-          c.ctex_eqn.eterm
+          c.witness_eqn.eterm
           (ctx @>- VarSet.pp_var_names)
           u
           (ctx @>- pp_term)
@@ -53,7 +53,7 @@ let find_missing_argument
           string
           msg)
   in
-  let fv = ctx >- Analysis.free_variables c.ctex_eqn.erhs in
+  let fv = ctx >- Analysis.free_variables c.witness_eqn.erhs in
   let rhs_args = Set.diff fv pb.PsiDef.target.psyntobjs in
   let unknowns_in_use =
     VarSet.filter_map fv ~f:(find_matching_unknown pb.PsiDef.target.psyntobjs)
@@ -62,7 +62,7 @@ let find_missing_argument
     if not (Set.mem rhs_args v)
     then (
       match
-        List.find c.ctex_eqn.eelim ~f:(fun (_, tscalar) ->
+        List.find c.witness_eqn.eelim ~f:(fun (_, tscalar) ->
             Set.mem (ctx >- Analysis.free_variables tscalar) v)
       with
       | Some (trec, _) ->
@@ -82,15 +82,15 @@ let find_missing_argument
   | _ -> List.iter pnonargs_diff ~f:say_diff
 ;;
 
-let find_missing_delta ~ctx (pb : PsiDef.t) (ctex : unrealizability_ctex) =
+let find_missing_delta ~ctx (pb : PsiDef.t) (witness : unrealizability_witness) =
   let g = mk_var ctx.ctx pb.PsiDef.target.pmain_symb in
   let summ c =
-    let f x = ctx >- Eval.in_model ~no_simplify:x c.ctex_model in
-    let cinput = f false c.ctex_eqn.eterm in
+    let f x = ctx >- Eval.in_model ~no_simplify:x c.witness_model in
+    let cinput = f false c.witness_eqn.eterm in
     let celim_str =
       let conc_elims =
-        List.map c.ctex_eqn.eelim ~f:(fun (trec, telims) ->
-            Terms.(mk_app g [ trec ] == (ctx >- Eval.in_model c.ctex_model telims)))
+        List.map c.witness_eqn.eelim ~f:(fun (trec, telims) ->
+            Terms.(mk_app g [ trec ] == (ctx >- Eval.in_model c.witness_model telims)))
       in
       match conc_elims with
       | [] -> ""
@@ -104,24 +104,24 @@ let find_missing_delta ~ctx (pb : PsiDef.t) (ctex : unrealizability_ctex) =
           cinput
           celim_str
           (ctx @>- pp_term)
-          (f true c.ctex_eqn.erhs)
+          (f true c.witness_eqn.erhs)
           (ctx @>- pp_term)
-          (f true c.ctex_eqn.elhs)
+          (f true c.witness_eqn.elhs)
           (ctx @>- pp_term)
-          (f false c.ctex_eqn.erhs)
+          (f false c.witness_eqn.erhs)
           (ctx @>- pp_term)
-          (f false c.ctex_eqn.elhs))
+          (f false c.witness_eqn.elhs))
   in
   let fv =
     Set.union
-      (ctx >- Analysis.free_variables ctex.ci.ctex_eqn.erhs)
-      (ctx >- Analysis.free_variables ctex.cj.ctex_eqn.erhs)
+      (ctx >- Analysis.free_variables witness.ci.witness_eqn.erhs)
+      (ctx >- Analysis.free_variables witness.cj.witness_eqn.erhs)
   in
   let unknowns_in_use =
     VarSet.filter_map fv ~f:(find_matching_unknown pb.PsiDef.target.psyntobjs)
   in
-  summ ctex.ci;
-  summ ctex.cj;
+  summ witness.ci;
+  summ witness.cj;
   Log.info (fun fmt () ->
       pf
         fmt
@@ -133,27 +133,29 @@ let find_missing_delta ~ctx (pb : PsiDef.t) (ctex : unrealizability_ctex) =
 (** When we get a witness of unrealizability, we need to explain why the problem is unrealizable.
   This function contains heuristics to root cause th problem an guide the user.
 *)
-let when_unrealizable ~ctx pb (ctexs : unrealizability_ctex list) : unit =
+let when_unrealizable ~ctx pb (witnesss : unrealizability_witness list) : unit =
   Log.(info (wrap "💡 Explanation: "));
-  let f ctex =
+  let f witness =
     let common_vars =
-      Set.inter (VarMap.keyset ctex.ci.ctex_model) (VarMap.keyset ctex.cj.ctex_model)
+      Set.inter
+        (VarMap.keyset witness.ci.witness_model)
+        (VarMap.keyset witness.cj.witness_model)
     in
     let diff =
       Set.fold common_vars ~init:[] ~f:(fun accum key ->
-          let vi = Map.find_exn ctex.ci.ctex_model key in
-          let vj = Map.find_exn ctex.cj.ctex_model key in
+          let vi = Map.find_exn witness.ci.witness_model key in
+          let vj = Map.find_exn witness.cj.witness_model key in
           if Terms.equal vi vj then accum else (key, (vi, vj)) :: accum)
     in
-    let ti = substitution ctex.ci.ctex_eqn.eelim ctex.ci.ctex_eqn.eterm
-    and tj = substitution ctex.cj.ctex_eqn.eelim ctex.cj.ctex_eqn.eterm in
+    let ti = substitution witness.ci.witness_eqn.eelim witness.ci.witness_eqn.eterm
+    and tj = substitution witness.cj.witness_eqn.eelim witness.cj.witness_eqn.eterm in
     if Terms.equal ti tj
     then
       (* Case 1: unknown is missing an argument. *)
-      find_missing_argument ~ctx pb diff ctex.ci
+      find_missing_argument ~ctx pb diff witness.ci
     else (
       match diff with
-      | [] -> find_missing_delta ~ctx pb ctex
+      | [] -> find_missing_delta ~ctx pb witness
       | _ ->
         Log.(
           let pp_term = ctx @>- pp_term
@@ -163,15 +165,15 @@ let when_unrealizable ~ctx pb (ctexs : unrealizability_ctex list) : unit =
                 fmt
                 "@[@[Terms: %a vs %a@].@;\
                  [@Equations: %a vs %a]@;\
-                 @[Ctex differs in %a.@]@]"
+                 @[witness differs in %a.@]@]"
                 pp_term
                 ti
                 pp_term
                 tj
                 pp_equation
-                ctex.ci.ctex_eqn
+                witness.ci.witness_eqn
                 pp_equation
-                ctex.cj.ctex_eqn
+                witness.cj.witness_eqn
                 Fmt.(
                   list
                     (parens
@@ -181,5 +183,5 @@ let when_unrealizable ~ctx pb (ctexs : unrealizability_ctex list) : unit =
                           (pair pp_term ~sep:comma pp_term))))
                 diff)))
   in
-  List.iter ~f ctexs
+  List.iter ~f witnesss
 ;;

@@ -57,9 +57,9 @@ let is_unmarked (s : state) (conf : Subconf.t) =
   | _ -> false
 ;;
 
-let cache (s : state) (u : unrealizability_ctex list) =
+let cache (s : state) (u : unrealizability_witness list) =
   let add_as_eset uc =
-    let conv ctex = ECache.norm ctex.ctex_eqn in
+    let conv witness = ECache.norm witness.witness_eqn in
     match conv uc.ci, conv uc.cj with
     | Some ei, Some ej ->
       let eset = ExpressionSet.of_list [ ei; ej ] in

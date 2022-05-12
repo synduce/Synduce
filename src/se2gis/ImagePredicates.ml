@@ -516,12 +516,14 @@ let handle_ensures_verif_response
     Lwt.return (false, None)
 ;;
 
-let constraint_of_neg ~(ctx : Context.t) (id : int) ~(p : PsiDef.t) (ctex : ctex) : term =
+let constraint_of_neg ~(ctx : Context.t) (id : int) ~(p : PsiDef.t) (witness : witness)
+    : term
+  =
   ignore p;
   let params =
     List.concat_map
-      ~f:(fun (_, elimv) -> [ Eval.in_model ~ctx ctex.ctex_model elimv ])
-      ctex.ctex_eqn.eelim
+      ~f:(fun (_, elimv) -> [ Eval.in_model ~ctx witness.witness_model elimv ])
+      witness.witness_eqn.eelim
   in
   mk_un Unop.Not (mk_app (mk_var ctx (Variable.mk ctx (make_ensures_name id))) params)
 ;;
@@ -533,8 +535,8 @@ let constraint_of_pos ~(ctx : Context.t) (id : int) (term : term) : term =
 let rec synthesize
     ~(ctx : env)
     ~(p : PsiDef.t)
-    (positives : ctex list)
-    (negatives : ctex list)
+    (positives : witness list)
+    (negatives : witness list)
     (prev_positives : term list)
     : term option Lwt.t
   =

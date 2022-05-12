@@ -11,8 +11,8 @@ open SmtInterface
 open Utils
 module S = Smtlib.SmtLib
 
-let placeholder_ctex (det : term_info) : ctex =
-  { ctex_eqn =
+let placeholder_witness (det : term_info) : witness =
+  { witness_eqn =
       { eterm = det.term
       ; eprecond = det.current_preconds
       ; esplitter = None
@@ -21,9 +21,9 @@ let placeholder_ctex (det : term_info) : ctex =
         elhs = det.term
       ; erhs = det.term
       }
-  ; ctex_vars = VarSet.of_list det.scalar_vars
-  ; ctex_model = VarMap.empty
-  ; ctex_stat = Unknown
+  ; witness_vars = VarSet.of_list det.scalar_vars
+  ; witness_model = VarMap.empty
+  ; witness_stat = Unknown
   }
 ;;
 
@@ -191,21 +191,25 @@ let inductive_solver_preamble
     return ()
 ;;
 
-let smt_of_disallow_ctex_values ~(ctx : Context.t) (det : term_info) : S.smtTerm =
-  let ctexs = det.positive_ctexs in
-  let of_one_ctex ctex =
+let smt_of_disallow_witness_values ~(ctx : Context.t) (det : term_info) : S.smtTerm =
+  let witnesss = det.positive_witnesss in
+  let of_one_witness witness =
     Map.fold
       ~f:(fun ~key ~data acc ->
         let var =
-          let subs = subs_from_elim_to_elim ~ctx det.recurs_elim ctex.ctex_eqn.eelim in
+          let subs =
+            subs_from_elim_to_elim ~ctx det.recurs_elim witness.witness_eqn.eelim
+          in
           Term.substitution subs (mk_var ctx key)
         in
         smt_of_term ~ctx Terms.(var == data) :: acc)
       ~init:[]
-      ctex.ctex_model
+      witness.witness_model
   in
   S.mk_assoc_and
-    (List.map ~f:(fun ctex -> S.mk_not (S.mk_assoc_and (of_one_ctex ctex))) ctexs)
+    (List.map
+       ~f:(fun witness -> S.mk_not (S.mk_assoc_and (of_one_witness witness)))
+       witnesss)
 ;;
 
 let set_up_to_get_model ~(ctx : Context.t) ~(p : PsiDef.t) solver (det : term_info) =
@@ -234,8 +238,8 @@ let set_up_to_get_model ~(ctx : Context.t) ~(p : PsiDef.t) solver (det : term_in
   in
   (* Step 3. Disallow repeated positive examples. *)
   let%lwt () =
-    if List.length det.positive_ctexs > 0
-    then AsyncSmt.smt_assert solver (smt_of_disallow_ctex_values ~ctx det)
+    if List.length det.positive_witnesss > 0
+    then AsyncSmt.smt_assert solver (smt_of_disallow_witness_values ~ctx det)
     else return ()
   in
   (* Step 4. Assert that lemma candidate is false. *)

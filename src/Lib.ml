@@ -12,7 +12,7 @@ open Codegen.Commons
 open Env
 
 let solve_file ?(print_info = false) (filename : string)
-    : (problem_descr * (soln option, unrealizability_ctex list) Either.t) list Lwt.t
+    : (problem_descr * (soln option, unrealizability_witness list) Either.t) list Lwt.t
   =
   Utils.Config.problem_name
     := Caml.Filename.basename (Caml.Filename.chop_extension filename);

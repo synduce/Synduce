@@ -363,7 +363,7 @@ let free_vars_of_equations ~(ctx : env) (sys_eq : equation list) : VarSet.t =
 
 module Solve = struct
   type partial_soln = (string * variable list * term) list
-  type partial_soln_or_ctexs = (partial_soln, unrealizability_ctex list) Either.t
+  type partial_soln_or_witnesss = (partial_soln, unrealizability_witness list) Either.t
 
   let pick_only_one_soln =
     List.dedup_and_sort ~compare:(fun (n1, _, _) (n2, _, _) -> String.compare n1 n2)
@@ -391,9 +391,9 @@ module Solve = struct
   let combine
       ?(verb = false)
       ~ctx
-      (prev_sol : partial_soln_or_ctexs)
-      (new_response : 'b * partial_soln_or_ctexs)
-      : 'b * partial_soln_or_ctexs
+      (prev_sol : partial_soln_or_witnesss)
+      (new_response : 'b * partial_soln_or_witnesss)
+      : 'b * partial_soln_or_witnesss
     =
     Either.(
       match prev_sol, new_response with
@@ -409,9 +409,9 @@ module Solve = struct
                   (pp_partial_soln ~ctx)
                   soln');
         resp, First (soln @ soln')
-      | Second ctexs, (resp, Second ctexs') -> resp, Second (ctexs @ ctexs')
-      | Second ctexs, (resp, First _) -> resp, Second ctexs
-      | First _, (resp, Second ctexs) -> resp, Second ctexs)
+      | Second witnesss, (resp, Second witnesss') -> resp, Second (witnesss @ witnesss')
+      | Second witnesss, (resp, First _) -> resp, Second witnesss
+      | First _, (resp, Second witnesss) -> resp, Second witnesss)
   ;;
 
   (** Solve the trivial equations first, avoiding the overhead from the
@@ -701,7 +701,7 @@ module Solve = struct
       ~(gen_only : bool)
       (unknowns : VarSet.t)
       (eqns : equation list)
-      : (Sygus.solver_response * partial_soln_or_ctexs) Lwt.t * int Lwt.u
+      : (Sygus.solver_response * partial_soln_or_witnesss) Lwt.t * int Lwt.u
     =
     let _ = ctx in
     let psoln, unknowns, eqns =
@@ -855,8 +855,8 @@ module Solve = struct
       Some
         (let t, r = ctx >>- Counterexamples.check_unrealizable unknowns eqns in
          let task =
-           let* ctexs = t in
-           match ctexs with
+           let* witnesss = t in
+           match witnesss with
            | [] ->
              (* It not infeasible, sleep for timeout duration, unless counter is 0 *)
              let* () = Lwt_unix.sleep !Config.Optims.wait_parallel_tlimit in
@@ -867,14 +867,15 @@ module Solve = struct
              then ignore (core_solve ~ctx ~gen_only:true unknowns eqns);
              if !Config.check_unrealizable_smt_unsatisfiable
              then ctx >- Counterexamples.smt_unsatisfiability_check unknowns eqns;
-             Lwt.return (Sygus.RInfeasible, Either.Second ctexs)
+             Lwt.return (Sygus.RInfeasible, Either.Second witnesss)
          in
          r, task)
     else None
   ;;
 
   let solve_eqns (ctx : env) (unknowns : VarSet.t) (eqns : equation list)
-      : (Sygus.solver_response * (partial_soln, unrealizability_ctex list) Either.t) Lwt.t
+      : (Sygus.solver_response * (partial_soln, unrealizability_witness list) Either.t)
+      Lwt.t
     =
     let opt_cst =
       Set.exists unknowns ~f:(fun v -> RType.is_base (Variable.vtype_or_new ctx.ctx v))
@@ -954,7 +955,7 @@ module Solve = struct
       (partial_soln : partial_soln)
       (unknowns : VarSet.t)
       (eqns : equation list)
-      : (Sygus.solver_response * partial_soln_or_ctexs) Lwt.t
+      : (Sygus.solver_response * partial_soln_or_witnesss) Lwt.t
     =
     (* If an unknown depends only on itself, it can be split from the rest *)
     let split_eqn_systems =
@@ -1019,7 +1020,7 @@ module Solve = struct
   ;;
 
   let solve_stratified (ctx : env) (unknowns : VarSet.t) (eqns : equation list)
-      : (Sygus.solver_response * partial_soln_or_ctexs) Lwt.t
+      : (Sygus.solver_response * partial_soln_or_witnesss) Lwt.t
     =
     let psol, u, e =
       if !Config.Optims.use_syntactic_definitions
@@ -1038,14 +1039,14 @@ module Solve = struct
       Either.(
         match%lwt solve_eqns ctx u e with
         | resp, First soln -> Lwt.return (resp, First (psol @ soln))
-        | resp, Second ctexs -> Lwt.return (resp, Second ctexs))
+        | resp, Second witnesss -> Lwt.return (resp, Second witnesss))
   ;;
 end
 
 (* Export some defs at module level. *)
 
 type partial_soln = Solve.partial_soln
-type partial_soln_or_ctexs = Solve.partial_soln_or_ctexs
+type partial_soln_or_witnesss = Solve.partial_soln_or_witnesss
 
 let pp_partial_soln = Solve.pp_partial_soln
 
@@ -1059,8 +1060,8 @@ module Preprocess = struct
     { pre_unknowns : VarSet.t
     ; pre_equations : equation list
     ; pre_postprocessing :
-        Sygus.solver_response * (partial_soln, unrealizability_ctex list) Either.t
-        -> Sygus.solver_response * (partial_soln, unrealizability_ctex list) Either.t
+        Sygus.solver_response * (partial_soln, unrealizability_witness list) Either.t
+        -> Sygus.solver_response * (partial_soln, unrealizability_witness list) Either.t
     }
 
   (** An empty preprocessing action. *)
@@ -1088,7 +1089,7 @@ module Preprocess = struct
             else soln
           in
           resp, First soln
-        | Second ctexs -> resp, Second ctexs)
+        | Second witnesss -> resp, Second witnesss)
     in
     { pre_unknowns; pre_equations; pre_postprocessing }
   ;;
@@ -1186,7 +1187,7 @@ end
   function and body of a function) or a list of unrealizability counterexamples.
 *)
 let solve (ctx : env) ~(p : PsiDef.t) (eqns : equation list)
-    : (Sygus.solver_response * Solve.partial_soln_or_ctexs) Lwt.t
+    : (Sygus.solver_response * Solve.partial_soln_or_witnesss) Lwt.t
   =
   let unknowns = p.PsiDef.target.psyntobjs in
   let preprocessing_actions =
@@ -1242,7 +1243,7 @@ let update_assumptions
     (sol : partial_soln)
     (t_set : TermSet.t)
   =
-  let new_ctexs = Set.diff t_set lstate.t_set in
+  let new_witnesss = Set.diff t_set lstate.t_set in
   let t0 = Set.max_elt_exn t_set in
   let not_appearing =
     let free_vars =
@@ -1250,7 +1251,7 @@ let update_assumptions
         ~init:VarSet.empty
         ~f:(fun vs t ->
           Set.union vs (ctx >- Analysis.free_variables (compute_rhs ~ctx p t)))
-        (Set.elements new_ctexs)
+        (Set.elements new_witnesss)
     in
     Set.diff p.PsiDef.target.psyntobjs free_vars
   in

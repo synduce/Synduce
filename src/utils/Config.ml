@@ -87,7 +87,7 @@ let interactive_lemmas_loop = ref false
 (** Prompt for lifting expressions. *)
 let interactive_lifting = ref false
 
-let classify_ctex = ref false
+let classify_witness = ref false
 let interactive_check_lemma = ref false
 
 (**
@@ -289,7 +289,7 @@ let options print_usage parse_only =
   ; 's', "max-solutions", None, Some set_max_solutions
   ; 't', "solve-timeout", None, Some set_wait_parallel_tlimit
   ; 'v', "verbose", set verbose true, None
-  ; 'X', "classify-ctex", set classify_ctex true, None
+  ; 'X', "classify-witness", set classify_witness true, None
   ; '\000', "segis", set use_segis true, None
   ; '\000', "cegis", set use_cegis true, None
   ; '\000', "cvc4", set use_cvc4 true, None

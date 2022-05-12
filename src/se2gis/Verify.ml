@@ -92,7 +92,7 @@ let check_solution
     (lstate : refinement_loop_state)
     (soln : (string * variable list * term) list)
     : [ `Incorrect_assumptions
-      | `Ctexs of
+      | `witnesss of
         (term, Terms.comparator_witness) Set.t * (term, Terms.comparator_witness) Set.t
       | `Correct
       ]
@@ -145,19 +145,19 @@ let check_solution
         (ctx
         >- Commands.decls_of_vars
              (Set.diff (Equations.free_vars_of_equations ~ctx sys_eqns) free_vars));
-      let has_ctex =
+      let has_witness =
         List.fold_until ~finish:(fun x -> x) ~init:false ~f:(check_eqn solver) smt_eqns
       in
       SyncSmt.spop solver;
       let select_unbound = if !Config.Optims.bound_after_verif then snd else fst in
       (* Result of solver calls. *)
-      if has_ctex
+      if has_witness
       then true, TermSet.of_list (List.map ~f:select_unbound t_set), u_set, i + 1
       else false, TermSet.empty, u_set, i + num_terms_to_check)
     else (* set is empty *)
       false, TermSet.empty, u_set, i
   in
-  let rec find_ctex num_checks terms_to_expand =
+  let rec find_witness num_checks terms_to_expand =
     if num_checks > !Config.Optims.num_expansions_check
     then None (* Hit the unfolding limit. *)
     else (
@@ -169,29 +169,29 @@ let check_solution
       match List.sort ~compare:term_height_compare next with
       | [] -> None
       | hd :: tl ->
-        let has_ctex, t_set, u_set, num_checks = expand_and_check num_checks hd in
+        let has_witness, t_set, u_set, num_checks = expand_and_check num_checks hd in
         let elts = Set.union u_set (TermSet.of_list tl) in
-        if has_ctex
+        if has_witness
         then Some (Set.union lstate.t_set t_set, elts)
-        else find_ctex num_checks elts)
+        else find_witness num_checks elts)
   in
   (* Execute the preamble. *)
   SyncSmt.exec_all solver preamble;
   (* Check that the solution is correct on current set T. If it is not, this is because of some wrong
   assumption made for optimization. *)
-  match find_ctex 0 lstate.t_set with
+  match find_witness 0 lstate.t_set with
   | Some _ ->
     SyncSmt.close_solver solver;
     `Incorrect_assumptions
   | None ->
-    let ctex_or_none = find_ctex 0 lstate.u_set in
+    let witness_or_none = find_witness 0 lstate.u_set in
     SyncSmt.close_solver solver;
     let elapsed = Unix.gettimeofday () -. start_time in
     Stats.add_verif_time elapsed;
     Log.info (fun f () -> Fmt.(pf f "... finished in %3.4fs" elapsed));
     Config.verbose := verb;
-    (match ctex_or_none with
-    | Some ctex -> `Ctexs ctex
+    (match witness_or_none with
+    | Some witness -> `witnesss witness
     | None -> `Correct)
 ;;
 
@@ -199,13 +199,13 @@ let check_solution
 (*                               Bounded-checking                                                *)
 (* ============================================================================================= *)
 
-let bounded_check_eqn ?(use_concrete_ctex = false) solver eqn =
+let bounded_check_eqn ?(use_concrete_witness = false) solver eqn =
   let formula = SmtLib.mk_not eqn in
   SyncSmt.spush solver;
   SyncSmt.smt_assert solver formula;
   let x = SyncSmt.check_sat solver in
   let model =
-    if use_concrete_ctex
+    if use_concrete_witness
     then (
       match x with
       | Sat -> Some (SyncSmt.get_model solver)
@@ -218,7 +218,7 @@ let bounded_check_eqn ?(use_concrete_ctex = false) solver eqn =
 
 (* Perform a bounded check of the solution *)
 let bounded_check
-    ?(use_concrete_ctex = false)
+    ?(use_concrete_witness = false)
     ~(ctx : env)
     ~(p : PsiDef.t)
     (soln : (string * variable list * term) list)
@@ -252,11 +252,11 @@ let bounded_check
     in
     SyncSmt.exec_all solver init_vardecls;
     SyncSmt.exec_all solver (ctx >- Commands.decls_of_vars new_free_vars);
-    let rec search_ctex _eqns =
+    let rec search_witness _eqns =
       match _eqns with
       | [] -> None
       | (eqn, smt_eqn) :: tl ->
-        (match bounded_check_eqn ~use_concrete_ctex solver smt_eqn with
+        (match bounded_check_eqn ~use_concrete_witness solver smt_eqn with
         | Sat, Some model_response ->
           let model = ctx >>- model_to_constmap model_response in
           let concr = ctx >- Lang.Analysis.concretize ~model in
@@ -273,27 +273,27 @@ let bounded_check
         | Error msg, _ ->
           Log.error_msg Fmt.(str "Solver failed with message: %s." msg);
           failwith "SMT Solver error."
-        | SExps _, _ | Unsat, _ -> search_ctex tl
+        | SExps _, _ | Unsat, _ -> search_witness tl
         | Unknown, _ ->
           Log.error_msg
             Fmt.(str "SMT solver returned unknown. The solution might be incorrect.");
-          search_ctex tl
+          search_witness tl
         | Unsupported, _ ->
           Log.error_msg Fmt.(str "SMT solver returned unsupported, which is unexpected.");
-          search_ctex tl
+          search_witness tl
         | Success, _ ->
-          (* Should not be a valid answer, but keep searching anyway. *) search_ctex tl)
+          (* Should not be a valid answer, but keep searching anyway. *) search_witness tl)
     in
-    let ctex_or_none = search_ctex smt_eqns in
-    (match ctex_or_none with
+    let witness_or_none = search_witness smt_eqns in
+    (match witness_or_none with
     | Some eqn ->
-      let ctex_height = term_height eqn.eterm in
+      let witness_height = term_height eqn.eterm in
       let current_check_depth = !Config.Optims.check_depth in
-      let update = max current_check_depth (ctex_height - 1) in
+      let update = max current_check_depth (witness_height - 1) in
       Config.Optims.check_depth := update;
       Log.verbose_msg Fmt.(str "Check depth: %i." !Config.Optims.check_depth)
     | None -> ());
-    ctex_or_none
+    witness_or_none
   in
   let tset =
     List.sort
@@ -303,21 +303,21 @@ let bounded_check
       )
   in
   Log.debug_msg Fmt.(str "%i terms to check" (List.length tset));
-  let ctex_or_none =
+  let witness_or_none =
     List.fold_until
       tset
       ~init:None
       ~finish:(fun eqn -> eqn)
       ~f:(fun _ t ->
         match check t with
-        | Some ctex -> Continue_or_stop.Stop (Some ctex)
+        | Some witness -> Continue_or_stop.Stop (Some witness)
         | None -> Continue_or_stop.Continue None)
   in
   SyncSmt.close_solver solver;
   let elapsed = Unix.gettimeofday () -. start_time in
   Stats.add_verif_time elapsed;
   Log.info (fun f () -> Fmt.(pf f "... finished in %3.4fs" elapsed));
-  ctex_or_none
+  witness_or_none
 ;;
 
 (* ============================================================================================= *)

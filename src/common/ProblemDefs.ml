@@ -45,7 +45,7 @@ type spurious_cause =
   function's image.
 *)
 
-type ctex_stat =
+type witness_stat =
   | Valid
   | Spurious of spurious_cause list
   | Unknown
@@ -55,21 +55,21 @@ type ctex_stat =
 
 (** A counterexample related to an equation and some info on the validity of the counterexample.
 *)
-type ctex =
-  { ctex_eqn : equation (** The equation the counterexample relates to. *)
-  ; ctex_vars : VarSet.t (** The variables in the model.*)
-  ; ctex_model : term VarMap.t
+type witness =
+  { witness_eqn : equation (** The equation the counterexample relates to. *)
+  ; witness_vars : VarSet.t (** The variables in the model.*)
+  ; witness_model : term VarMap.t
         (** The model of the counterexample, mapping variables to terms. The terms should be
         constants. *)
-  ; ctex_stat : ctex_stat (** The spuriousness status of the counterexample. *)
+  ; witness_stat : witness_stat (** The spuriousness status of the counterexample. *)
   }
 
 (** A counterexample to realizability is a pair of models: a pair of maps from variable ids to terms. *)
-type unrealizability_ctex =
+type unrealizability_witness =
   { i : int
   ; j : int
-  ; ci : ctex
-  ; cj : ctex
+  ; ci : witness
+  ; cj : witness
   }
 
 type equation_system = equation list
@@ -87,10 +87,10 @@ type term_info =
             that the splitter predicate is true.*)
   ; lemma : variable (** A function variable to name the lemma. *)
   ; lemma_candidate : term option (** A lemma that is currently only a candidate.*)
-  ; negative_ctexs : ctex list
+  ; negative_witnesss : witness list
         (** A set of valuations for the term's evaluated symbolic value that leads to
       the lemma being false. *)
-  ; positive_ctexs : ctex list
+  ; positive_witnesss : witness list
         (** A set of valuations for the term's evaluated symbolic value that leads to
       the lemma being true. *)
   ; recurs_elim : (term * term) list (** The recursion elimination map for that term. *)
@@ -119,5 +119,5 @@ in which case it provides a list of counterexamples, or failure.
 *)
 type 'a segis_response =
   | Realizable of soln
-  | Unrealizable of unrealizability_ctex list
+  | Unrealizable of unrealizability_witness list
   | Failed of 'a

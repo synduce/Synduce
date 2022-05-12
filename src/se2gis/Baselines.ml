@@ -72,7 +72,7 @@ let rec segis_loop ~(ctx : env) (p : PsiDef.t) (t_set : TermSet.t)
       Stats.log_major_step_end ~synth_time ~verif_time ~t:tsize ~u:0 true;
       Log.print_ok ();
       Lwt.return (Realizable { soln_rec_scheme = p.PsiDef.target; soln_implems = sol }))
-  | RInfeasible, Second ctexs ->
+  | RInfeasible, Second witnesss ->
     Stats.log_major_step_end ~synth_time ~verif_time:0. ~t:tsize ~u:0 false;
     Log.info
       Fmt.(
@@ -82,7 +82,7 @@ let rec segis_loop ~(ctx : env) (p : PsiDef.t) (t_set : TermSet.t)
             "@[<hov 2><SEGIS> This problem has no solution. Counterexample set:@;%a@]"
             (list ~sep:sp (pp_term ctx.ctx))
             (Set.elements t_set));
-    Lwt.return (Unrealizable ctexs)
+    Lwt.return (Unrealizable witnesss)
   | RFail, _ ->
     Log.error_msg "<SEGIS> SyGuS solver failed to find a solution.";
     Lwt.return (Failed RFail)
@@ -141,7 +141,7 @@ let rec cegis_loop ~(ctx : Env.env) (p : PsiDef.t) (t_set : TermSet.t)
   match s_resp, solution with
   | RSuccess _, First sol ->
     (match
-       Stats.timed (fun () -> Verify.bounded_check ~ctx ~use_concrete_ctex:true ~p sol)
+       Stats.timed (fun () -> Verify.bounded_check ~ctx ~use_concrete_witness:true ~p sol)
      with
     (* A concrete conterexample term is returned. *)
     | verif_time, Some eqn ->
@@ -158,7 +158,7 @@ let rec cegis_loop ~(ctx : Env.env) (p : PsiDef.t) (t_set : TermSet.t)
       Stats.log_major_step_end ~synth_time ~verif_time ~t:tsize ~u:0 true;
       Log.print_ok ();
       Lwt.return (Realizable { soln_rec_scheme = p.PsiDef.target; soln_implems = sol }))
-  | RInfeasible, Second ctexs ->
+  | RInfeasible, Second witnesss ->
     Stats.log_major_step_end ~synth_time ~verif_time:0. ~t:tsize ~u:0 false;
     Log.info
       Fmt.(
@@ -168,7 +168,7 @@ let rec cegis_loop ~(ctx : Env.env) (p : PsiDef.t) (t_set : TermSet.t)
             "@[<hov 2><CEGIS> This problem has no solution. Counterexample set:@;%a@]"
             (list ~sep:sp (pp_term ctx.ctx))
             (Set.elements t_set));
-    Lwt.return (Unrealizable ctexs)
+    Lwt.return (Unrealizable witnesss)
   | RFail, _ ->
     Log.error_msg "<CEGIS> SyGuS solver failed to find a solution.";
     Lwt.return (Failed RFail)

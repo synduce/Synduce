@@ -24,30 +24,32 @@ let make_term_info ~(ctx : env) ~(p : PsiDef.t) (term : term) : term_info =
   ; lemmas = []
   ; lemma = lemma_f
   ; lemma_candidate = None
-  ; negative_ctexs = []
-  ; positive_ctexs = []
+  ; negative_witnesss = []
+  ; positive_witnesss = []
   ; recurs_elim
   ; scalar_vars
   ; current_preconds = None
   }
 ;;
 
-let classify_ctexs_opt ~ctx ctexs : ctex list Lwt.t =
-  let f ctex =
+let classify_witnesss_opt ~ctx witnesss : witness list Lwt.t =
+  let f witness =
     Log.info (fun frmt () ->
         Fmt.(
           pf
             frmt
             "Classify this counterexample: %a (P/N/U)"
-            (box (Pretty.pp_ctex ~ctx))
-            ctex));
+            (box (Pretty.pp_witness ~ctx))
+            witness));
     match Stdio.In_channel.input_line Stdio.stdin with
     | Some "N" ->
-      { ctex with ctex_stat = add_cause ctex.ctex_stat ViolatesTargetRequires }
-    | Some "P" -> { ctex with ctex_stat = Valid }
-    | _ -> ctex
+      { witness with
+        witness_stat = add_cause witness.witness_stat ViolatesTargetRequires
+      }
+    | Some "P" -> { witness with witness_stat = Valid }
+    | _ -> witness
   in
-  Lwt.return (List.map ~f ctexs)
+  Lwt.return (List.map ~f witnesss)
 ;;
 
 let set_term_lemma
@@ -123,10 +125,11 @@ let add_lemmas ~(ctx : env) ~(p : PsiDef.t) (lstate : refinement_loop_state) : u
   Set.iter ~f lstate.t_set
 ;;
 
-let parse_interactive_positive_example (det : term_info) (input : string) : ctex option =
+let parse_interactive_positive_example (det : term_info) (input : string) : witness option
+  =
   Some
-    { (placeholder_ctex det) with
-      ctex_model =
+    { (placeholder_witness det) with
+      witness_model =
         List.fold
           ~init:VarMap.empty
           ~f:(fun acc s_ ->
@@ -176,7 +179,7 @@ let interactive_get_positive_examples ~(ctx : Context.t) (det : term_info) =
   | Some s ->
     (match parse_interactive_positive_example det s with
     | None -> []
-    | Some ctex -> [ ctex ])
+    | Some witness -> [ witness ])
 ;;
 
 let interactive_check_lemma ~ctx lemma_refinement_loop name vars lemma_term det
@@ -214,7 +217,8 @@ let interactive_check_lemma ~ctx lemma_refinement_loop name vars lemma_term det
     | Some "Y" ->
       lemma_refinement_loop
         { det with
-          positive_ctexs = det.positive_ctexs @ interactive_get_positive_examples ~ctx det
+          positive_witnesss =
+            det.positive_witnesss @ interactive_get_positive_examples ~ctx det
         }
     | _ -> Lwt.return None)
 ;;

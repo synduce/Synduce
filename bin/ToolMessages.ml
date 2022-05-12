@@ -35,7 +35,7 @@ let on_success
     ~(ctx : env)
     (source_filename : string ref)
     (pb : PsiDef.t)
-    (result : (soln, unrealizability_ctex list) Either.t)
+    (result : (soln, unrealizability_witness list) Either.t)
     : Yojson.t
   =
   let elapsed, verif_time =
@@ -57,7 +57,7 @@ let on_success
             verif_ratio
             (box (ctx >- Common.Pretty.pp_soln ~use_ocaml_syntax:is_ocaml_syntax))
             soln))
-  | Either.Second ctexs ->
+  | Either.Second witnesss ->
     if print_unrealizable
     then (
       Log.(
@@ -69,7 +69,7 @@ let on_success
               elapsed));
       Log.(
         info (fun frmt () -> pf frmt "%a" (ctx >- Lang.PMRS.pp ~short:false) pb.target));
-      ctx >>> ToolExplain.when_unrealizable pb ctexs)
+      ctx >>> ToolExplain.when_unrealizable pb witnesss)
     else ());
   (* If output specified, write the solution in file. *)
   (match result with
@@ -192,7 +192,7 @@ let print_usage () =
     \  -I   --interactive               Request additional lemmas interactively.\n\
     \  -J   --interactive-lifting       Request expressions for lifting.\n\
     \  -L   --interactive-loop          Request lemmas interactively in a loop.\n\
-    \  -X   --classify-ctex             Manually classify ctex as pos or neg.\n\
+    \  -X   --classify-witness             Manually classify witness as pos or neg.\n\
     \  -N   --no-sat-as-unsat           No sat found in bounded checking is accepted as \
      unsat.\n\
     \  -B   --bounded-lemma-check       Use depth-bounded check to verify lemma \

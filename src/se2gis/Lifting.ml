@@ -445,17 +445,17 @@ let scalar
     ~(p : PsiDef.t)
     (l : refinement_loop_state)
     ((_s_resp, synt_failure_info) :
-      solver_response * ('a, unrealizability_ctex list) Either.t)
+      solver_response * ('a, unrealizability_witness list) Either.t)
     : (PsiDef.t * refinement_loop_state, solver_response) Result.t
   =
   (* Select the type of lifting from the synt_failure_info.  *)
   let lifting_type =
     let m uc =
       let hint_1 =
-        let common_vars = Set.union uc.ci.ctex_vars uc.cj.ctex_vars in
+        let common_vars = Set.union uc.ci.witness_vars uc.cj.witness_vars in
         let f type_decision var =
-          let val_in_i = Map.find uc.ci.ctex_model var
-          and val_in_j = Map.find uc.cj.ctex_model var in
+          let val_in_i = Map.find uc.ci.witness_model var
+          and val_in_j = Map.find uc.cj.witness_model var in
           match val_in_i, val_in_j with
           | Some vi, Some vj ->
             if not (Terms.equal vi vj) then Some (var_type ctx var) else type_decision
@@ -473,7 +473,7 @@ let scalar
     let f a uc = join a (m uc) in
     match synt_failure_info with
     | First _ -> lifting_types ~ctx p @ !next_lifing_type
-    | Second ctex_list -> lifting_types ~ctx p @ List.fold ~f ~init:[] ctex_list
+    | Second witness_list -> lifting_types ~ctx p @ List.fold ~f ~init:[] witness_list
   in
   Log.info
     Fmt.(

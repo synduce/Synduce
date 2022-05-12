@@ -9,7 +9,7 @@ open Lang.Term
 
    Checks if ᴪ(p, soln) is valid, assuming `soln` has been synthesized using the term set `t` with
    expansion continuation `u`.
-   Returns the set (t,u) for the next step in the ctex-guided refinement loop.
+   Returns the set (t,u) for the next step in the witness-guided refinement loop.
    This bounded checking procedure takes advantage of the only partial bounding, and does
    not perform bounded checking by expanding unnecessary terms.
 *)
@@ -19,7 +19,7 @@ val check_solution
   -> refinement_loop_state
   -> (string * variable list * term) list
   -> [ `Incorrect_assumptions
-     | `Ctexs of
+     | `witnesss of
        (term, Terms.comparator_witness) Set.t * (term, Terms.comparator_witness) Set.t
      | `Correct
      ]
@@ -31,7 +31,7 @@ val check_solution
     Returns None if the check passed.
 *)
 val bounded_check
-  :  ?use_concrete_ctex:bool
+  :  ?use_concrete_witness:bool
   -> ctx:Env.env
   -> p:Common.ProblemDefs.PsiDef.t
   -> (string * variable list * term) list
