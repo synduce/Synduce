@@ -8,6 +8,7 @@ import shutil
 # Local files
 from commons import *
 from definitions import *
+from table1 import *
 from table2 import *
 from table3 import *
 from table5 import *
@@ -71,6 +72,9 @@ if __name__ == "__main__":
         input_file = select_last_known_experimental_data(table_no)
         print(f"Input file selected: {input_file}")
 
+    if table_no == 1:
+        filenames = make_table_1(input_file, output_file)
+
     # TABLE 2
     if table_no == 2:
         filenames = make_table_2(input_file, output_file)
@@ -85,18 +89,6 @@ if __name__ == "__main__":
                 shutil.copyfile(filenames['scatter_no_timeouts'], os.path.join(
                     LOCAL_COPY, "figures/no_timeouts_scatter_t2.pdf"))
 
-    # SET 2
-    if table_no == 2:
-        filenames = make_table_2(input_file, output_file)
-        if args.copy:
-            LOCAL_COPY = os.getenv('FMSD22_LOCAL_COPY')
-            if LOCAL_COPY is not None:
-                shutil.copyfile(filenames['cactus'], os.path.join(
-                    LOCAL_COPY, "figures/cactus_t2.pdf"))
-                shutil.copyfile(filenames['scatter'], os.path.join(
-                    LOCAL_COPY, "figures/scatter_t2.pdf"))
-                shutil.copyfile(filenames['scatter_no_timeouts'], os.path.join(
-                    LOCAL_COPY, "figures/no_timeouts_scatter_t2.pdf"))
     # SET 3
     if table_no == 3:
         filenames = make_table_3(input_file, output_file)

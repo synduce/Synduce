@@ -78,7 +78,7 @@ def run_one(progress, bench_id, command, algo, optim, filename, extra_opt, expec
 
 
 class MultiCsvLine(object):
-    def __init__(self, elapsed, delta, complete, solved, total, solutions, unrealizable, verif):
+    def __init__(self, elapsed, delta, complete, solved, total, solutions, unrealizable, verif, ch, oh):
         self.elapsed = elapsed
         self.delta = delta
         self.complete = complete
@@ -87,12 +87,30 @@ class MultiCsvLine(object):
         self.solutions = solutions
         self.unrealizable = unrealizable
         self.verif_time = verif
+        self.cache_hits = ch
+        self.orig_conf_hit = oh
+
+    def from_string(line):
+        parts = line.split(",")
+        if len(parts) < 10:
+            return None
+        elapsed = floti(parts[0])
+        delta = floti(parts[1])
+        verif = floti(parts[2])
+        complete = booli(parts[3])
+        solved = int(parts[4])
+        total = int(parts[5])
+        solutions = int(parts[6])
+        unr = int(parts[7])
+        ch = int(parts[8])
+        oh = booli(parts[9])
+        return MultiCsvLine(elapsed, delta, complete, solved, total, solutions, unr, verif, ch, oh)
 
     def get_csv_string(self):
-        l = [self.elapsed, self.delta]
+        l = [self.elapsed, self.delta, self.verif_time]
         l += [self.complete, self.solved, self.total]
         l += [self.solutions, self.unrealizable]
-        l += [self.verif_time]
+        l += [self.cache_hits, self.orig_conf_hit]
         return ",".join([str(x) for x in l])
 
 

@@ -695,6 +695,13 @@ def floti(f):
     return ret
 
 
+def booli(s):
+    if s == "True" or s == "#t" or s == "true":
+        return True
+    else:
+        return False
+
+
 timeout_names = ["N/A", "-", "timeout", "TIMEOUT"]
 
 
