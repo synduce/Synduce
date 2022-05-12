@@ -77,23 +77,29 @@ type equation_system = equation list
 (** Contains the last equation system used to solved the problem when a solution is found. *)
 let solved_eqn_system : equation_system option ref = ref None
 
+type cond_lemma =
+  { cl_flag : bool
+        (** Set to false if the info needs refinement (i.e. the
+      set of witnesses and the lemmas are not in sync). *)
+  ; cl_cond : term option
+        (** A condition that can be assumed for the property in this info. *)
+  ; cl_lemmas : term list
+        (** A set of lemmas that is true about a term, under the assumption
+            that the splitter predicate is true.*)
+  ; cl_negatives : term VarMap.t list
+        (** A set of valuations for the term's evaluated symbolic value that leads to
+      the lemma being false. *)
+  ; cl_positives : term VarMap.t list
+        (** A set of valuations for the term's evaluated symbolic value that leads to
+      the lemma being true. *)
+  }
+
 (** A type containing info about a term and lemmas associated to it. *)
 type term_info =
   { ti_flag : bool
         (** Set to false if the info needs refinement (i.e. the
       set of witnesses and the lemmas are not in sync). *)
   ; ti_term : term (** The term the info is about. *)
-  ; ti_splitter : term option
-        (** A condition that can be assumed for the property in this info. *)
-  ; ti_lemmas : term list
-        (** A set of lemmas that is true about a term, under the assumption
-            that the splitter predicate is true.*)
-  ; ti_negatives : witness list
-        (** A set of valuations for the term's evaluated symbolic value that leads to
-      the lemma being false. *)
-  ; ti_positives : witness list
-        (** A set of valuations for the term's evaluated symbolic value that leads to
-      the lemma being true. *)
   ; ti_elim : (term * term) list (** The recursion elimination map for that term. *)
   ; ti_func : variable (** A variable to model the lemma as a function. *)
   ; ti_formals : variable list (** The argument list of the predicate, as a function.*)

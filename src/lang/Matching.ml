@@ -94,6 +94,25 @@ let matches ?(boundvars = VarSet.empty) ~(ctx : Context.t) (t : term) ~(pattern 
     | _ -> None)
 ;;
 
+let alpha_equal
+    ?(boundvars = VarSet.empty)
+    ~(ctx : Context.t)
+    (t : term)
+    ~(pattern : term)
+    : variable VarMap.t option
+  =
+  match matches ~boundvars ~ctx t ~pattern with
+  | Some term_map ->
+    let var_map =
+      Map.filter_map term_map ~f:(fun t ->
+          match t.tkind with
+          | TVar v -> Some v
+          | _ -> None)
+    in
+    if Map.length var_map = Map.length term_map then Some var_map else None
+  | None -> None
+;;
+
 (** [matches_subpattern ~boundvars t ~pattern] returns some triple [t', subs, vs]
     when some sub-pattern of [pattern] matches [t].
 *)

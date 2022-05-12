@@ -6,7 +6,7 @@ type env =
   { functions : PMRS.Functions.ctx
         (** Context for global or PMRS local function symbols. *)
   ; ctx : Term.Context.t (** Context for types and terms. *)
-  ; pcache : (Expression.t, term_info list) Hashtbl.t
+  ; pcache : (Expression.t, term_info * cond_lemma list) Hashtbl.t
   ; (* Number of refinement steps. *)
     refinement_steps : int ref
   ; secondary_refinement_steps : int ref

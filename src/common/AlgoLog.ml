@@ -276,9 +276,14 @@ let announce_new_lemmas ~(ctx : Context.t) witness =
         witness.witness_eqn.esplitter)
 ;;
 
-let announce_new_lemma_synthesis ~(ctx : Context.t) (thread_no : int) (det : term_info) =
+let announce_new_lemma_synthesis
+    ~(ctx : Context.t)
+    (thread_no : int)
+    (det : term_info)
+    (cl : cond_lemma)
+  =
   Log.debug (fun f () ->
-      match det.ti_splitter with
+      match cl.cl_cond with
       | None ->
         pf
           f

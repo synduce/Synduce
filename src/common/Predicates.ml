@@ -5,27 +5,33 @@ open Lang
 open ProblemDefs
 open Term
 
-let term_info_to_lemma ~(ctx : env) ~(p : PsiDef.t) ~(t : term) (det : term_info) =
+let cond_lemma_to_term
+    ~(ctx : env)
+    ~(p : PsiDef.t)
+    ~(t : term)
+    (ti : term_info)
+    (cl : cond_lemma)
+  =
   (* Term adjustment substituions *)
-  let subst1 = ctx >- Matching.matches ~pattern:det.ti_term t in
-  (* Recursion elimination substitutions *)
-  let subst =
-    List.concat_map
-      ~f:(fun (t1, t2) ->
-        let frt1 = ctx >- mk_f_compose_r_main ~p t1 in
-        match t2.tkind with
-        | TTup t2s -> List.mapi t2s ~f:(fun i t2_i -> t2_i, mk_sel ctx.ctx frt1 i)
-        | _ -> [ t2, frt1 ])
-      det.ti_elim
-  in
-  let f lem =
-    let t1 = Term.substitution subst lem in
-    match subst1 with
-    | None -> None
-    | Some subst' -> Some (Term.substitution (VarMap.to_subst ctx.ctx subst') t1)
-  in
-  let lems = Option.all (List.map ~f det.ti_lemmas) in
-  Option.(lems >>= mk_assoc Binop.And >>| (ctx >- Rewriter.simplify_term))
+  match ctx >- Matching.matches ~pattern:ti.ti_term t with
+  | Some subst1 ->
+    (* Recursion elimination substitutions *)
+    let subst =
+      List.concat_map
+        ~f:(fun (t1, t2) ->
+          let frt1 = ctx >- mk_f_compose_r_main ~p t1 in
+          match t2.tkind with
+          | TTup t2s -> List.mapi t2s ~f:(fun i t2_i -> t2_i, mk_sel ctx.ctx frt1 i)
+          | _ -> [ t2, frt1 ])
+        ti.ti_elim
+    in
+    let apply_subs lem =
+      let t1 = Term.substitution subst lem in
+      Term.substitution (VarMap.to_subst ctx.ctx subst1) t1
+    in
+    let lems = List.map ~f:apply_subs cl.cl_lemmas in
+    Option.(mk_assoc Binop.And lems >>| (ctx >- Rewriter.simplify_term))
+  | None -> None
 ;;
 
 let key_of_term (t : term) = Expression.(Option.map ~f:nameless_normal_form (of_term t))
@@ -34,21 +40,23 @@ let get ~(ctx : env) ~(p : PsiDef.t) (t : term) =
   match key_of_term t with
   | None -> None
   | Some e_key ->
-    (match Hashtbl.find_multi ctx.pcache e_key with
-    | [] -> None
-    | tis ->
-      (match List.filter_opt (List.map ~f:(term_info_to_lemma ~ctx ~p ~t) tis) with
+    (match Hashtbl.find ctx.pcache e_key with
+    | None -> None
+    | Some (ti, cls) ->
+      (match List.filter_opt (List.map ~f:(cond_lemma_to_term ~ctx ~p ~t ti) cls) with
       | [] -> None
       | [ a ] -> Some a
       | _ as conds -> mk_assoc Binop.And conds))
 ;;
 
-let find_term_info ~(ctx : Env.env) ((term, splitter) : term * term option)
-    : term_info option
+let find_lemma_info ~(ctx : Env.env) ((term, splitter) : term * term option)
+    : (term_info * cond_lemma) option
   =
   match Option.bind ~f:(Hashtbl.find ctx.pcache) (key_of_term term) with
-  | Some term_infos ->
-    List.find ~f:(fun ti -> Option.equal Terms.equal ti.ti_splitter splitter) term_infos
+  | Some (ti, cls) ->
+    Option.(
+      List.find ~f:(fun cl -> Option.equal Terms.equal cl.cl_cond splitter) cls
+      >>| fun x -> ti, x)
   | None -> None
 ;;
 
@@ -56,63 +64,66 @@ let find ~(ctx : env) ~(key : term) =
   Option.bind ~f:(fun e_key -> Hashtbl.find ctx.pcache e_key) (key_of_term key)
 ;;
 
-let get_with_precond ~(ctx : env) ~(p : PsiDef.t) ~(key : term * term option)
-    : term option
-  =
+let get_with_precond ~(ctx : env) ~(p : PsiDef.t) ~(key : term * term option) =
   Option.bind
-    ~f:(term_info_to_lemma ~ctx ~p ~t:(Utils.first key))
-    (find_term_info ~ctx key)
+    ~f:(fun (ti, cl) -> cond_lemma_to_term ~ctx ~p ~t:(Utils.first key) ti cl)
+    (find_lemma_info ~ctx key)
 ;;
 
 let change
     ~(ctx : env)
     ~(key : term)
     ~(split : term option)
-    (data_f : term_info -> term_info Lwt.t)
+    (data_f : term_info -> cond_lemma -> cond_lemma Lwt.t)
     : unit Lwt.t
   =
   match key_of_term key with
   | Some e_key ->
     (match Hashtbl.find ctx.pcache e_key with
-    | Some tis ->
+    | Some (ti, cls) ->
       let flag = ref false in
-      let%lwt tis' =
+      let%lwt cls' =
         Lwt_list.map_p
-          (fun ti ->
-            if Option.equal Terms.equal ti.ti_splitter split
+          (fun cl ->
+            if Option.equal Terms.equal cl.cl_cond split
             then (
               flag := true;
-              data_f ti)
-            else Lwt.return ti)
-          tis
+              data_f ti cl)
+            else Lwt.return cl)
+          cls
       in
-      Lwt.return (if !flag then Hashtbl.set ~key:e_key ~data:tis' ctx.pcache)
+      Lwt.return (if !flag then Hashtbl.set ~key:e_key ~data:(ti, cls') ctx.pcache)
     | None -> Lwt.return ())
   | None -> Lwt.return ()
 ;;
 
-let add_direct ~(ctx : env) ~(key : Expression.t) ~(data : term_info) : unit =
+let add_direct
+    ~(ctx : env)
+    ~(key : Expression.t)
+    ~data:((ti, newcl) : term_info * cond_lemma)
+    : unit
+  =
   match Hashtbl.find ctx.pcache key with
-  | Some term_infos ->
+  | Some (term_info, cls) ->
     let a, b =
       List.partition_tf
-        ~f:(fun det -> Option.equal Terms.equal det.ti_splitter data.ti_splitter)
-        term_infos
+        ~f:(fun cl -> Option.equal Terms.equal cl.cl_cond newcl.cl_cond)
+        cls
     in
     (match a with
-    | [] -> Hashtbl.set ctx.pcache ~key ~data:(data :: term_infos)
-    | [ _ ] -> Hashtbl.set ctx.pcache ~key ~data:(data :: b)
+    | [] -> Hashtbl.set ctx.pcache ~key ~data:(term_info, newcl :: cls)
+    | [ _ ] -> Hashtbl.set ctx.pcache ~key ~data:(term_info, newcl :: b)
     | _ -> failwith "Should not be more than one equivalent key")
-  | None -> Hashtbl.add_multi ctx.pcache ~key ~data
+  | None -> Hashtbl.set ctx.pcache ~key ~data:(ti, [ newcl ])
 ;;
 
-let add ~(ctx : env) ~(key : term) ~(data : term_info) : unit =
+let add ~(ctx : env) ~(key : term) ~(data : term_info * cond_lemma) : unit =
   match key_of_term key with
   | Some e_key -> add_direct ~ctx ~key:e_key ~data
   | None -> failwith "Failed to add predicate"
 ;;
 
-let set ~(ctx : env) ~(key : term) ~(data : term_info list) : unit =
+let set ~(ctx : env) ~(key : term) ~(data : term_info * cond_lemma list) : unit =
   match key_of_term key with
   | Some e_key -> Hashtbl.set ctx.pcache ~key:e_key ~data
   | None -> failwith "Failed to set predicate"
@@ -121,7 +132,7 @@ let set ~(ctx : env) ~(key : term) ~(data : term_info list) : unit =
 let fold
     ~(ctx : env)
     ~(init : 'a)
-    ~(f : key:Expression.t -> data:term_info list -> 'a -> 'a)
+    ~(f : key:Expression.t -> data:term_info * cond_lemma list -> 'a -> 'a)
   =
   Hashtbl.fold ctx.pcache ~init ~f
 ;;

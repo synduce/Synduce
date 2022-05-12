@@ -18,7 +18,7 @@ module Sm = Syguslib.Semantic
 (* ============================================================================================= *)
 
 let term_info_of_witness ~(ctx : Context.t) ~(is_pos_witness : bool) (witness : witness)
-    : term_info
+    : term_info * cond_lemma
   =
   let scalar_vars = Map.keys witness.witness_model in
   let input_args_t = List.map ~f:(Variable.vtype_or_new ctx) scalar_vars in
@@ -28,16 +28,44 @@ let term_info_of_witness ~(ctx : Context.t) ~(is_pos_witness : bool) (witness : 
       ~t:(Some (RType.fun_typ_pack input_args_t TBool))
       (Alpha.fresh ~s:"lemma" ctx.names)
   in
-  { ti_flag = false
-  ; ti_term = witness.witness_eqn.eterm
-  ; ti_splitter = witness.witness_eqn.esplitter
-  ; ti_lemmas = []
-  ; ti_negatives = (if is_pos_witness then [] else [ witness ])
-  ; ti_positives = (if is_pos_witness then [ witness ] else [])
-  ; ti_elim = witness.witness_eqn.eelim
-  ; ti_func = lemma_f
-  ; ti_formals = Map.keys witness.witness_model
-  }
+  ( { ti_flag = false
+    ; ti_term = witness.witness_eqn.eterm
+    ; ti_elim = witness.witness_eqn.eelim
+    ; ti_func = lemma_f
+    ; ti_formals = Map.keys witness.witness_model
+    }
+  , { cl_flag = false
+    ; cl_cond = witness.witness_eqn.esplitter
+    ; cl_lemmas = []
+    ; cl_negatives = (if is_pos_witness then [] else [ witness.witness_model ])
+    ; cl_positives = (if is_pos_witness then [ witness.witness_model ] else [])
+    } )
+;;
+
+let remap_witness ~(ctx : Context.t) (det : term_info) (wit : witness) =
+  match Matching.alpha_equal ~ctx ~pattern:wit.witness_eqn.eterm det.ti_term with
+  | Some wit_to_det ->
+    let wts_subst = VarMap.to_subst ctx (Map.map ~f:(fun a -> mk_var ctx a) wit_to_det) in
+    let remapped_wit_elim =
+      List.map ~f:(fun (r, s) -> substitution wts_subst r, s) wit.witness_eqn.eelim
+    in
+    let wit_to_det =
+      List.fold
+        (Elim.subs_from_elim_to_elim ~ctx det.ti_elim remapped_wit_elim)
+        ~init:wit_to_det
+        ~f:(fun m (a, b) ->
+          match a.tkind, b.tkind with
+          | TVar a, TVar b -> Map.set m ~key:a ~data:b
+          | _ -> m)
+    in
+    let wit_var_to_det_var a =
+      match Map.find wit_to_det a with
+      | Some x -> x
+      | None -> a
+    in
+    let f ~key ~data new_map = Map.set new_map ~key:(wit_var_to_det_var key) ~data in
+    Some (Map.fold wit.witness_model ~init:VarMap.empty ~f)
+  | None -> None
 ;;
 
 (* ============================================================================================= *)
@@ -283,14 +311,12 @@ let witness_model_to_args
 ;;
 
 let constraint_of_neg_witness ~ctx (det : term_info) witness =
-  let neg_constraint =
-    mk_un Not (mk_app (mk_var ctx det.ti_func) (Map.data witness.witness_model))
-  in
+  let neg_constraint = mk_un Not (mk_app (mk_var ctx det.ti_func) (Map.data witness)) in
   Sy.mk_c_constraint (sygus_of_term ~ctx neg_constraint)
 ;;
 
 let constraint_of_pos_witness ~ctx (det : term_info) witness =
-  let pos_constraint = mk_app (mk_var ctx det.ti_func) (Map.data witness.witness_model) in
+  let pos_constraint = mk_app (mk_var ctx det.ti_func) (Map.data witness) in
   Sy.mk_c_constraint (sygus_of_term ~ctx pos_constraint)
 ;;
 
@@ -334,8 +360,9 @@ let handle_lemma_synth_response
 let parse_positive_example_solver_model
     ~(fctx : PMRS.Functions.ctx)
     ~(ctx : Context.t)
-    response
     (det : term_info)
+    (response : S.solver_response)
+    : term VarMap.t list
   =
   match response with
   | S.SExps s ->
@@ -347,35 +374,31 @@ let parse_positive_example_solver_model
         model
     in
     (* Remap the names to ids of the original variables in m' *)
-    [ ({ (placeholder_witness det) with
-         witness_model =
-           Map.fold
-             ~init:VarMap.empty
-             ~f:(fun ~key ~data acc ->
-               match VarSet.find_by_name (VarSet.of_list det.ti_formals) key with
-               | None ->
-                 Log.info (fun f () -> Fmt.(pf f "Could not find by name %s" key));
-                 acc
-               | Some var -> Map.set ~data acc ~key:var)
-             m
-       }
-        : witness)
+    [ Map.fold
+        ~init:VarMap.empty
+        ~f:(fun ~key ~data acc ->
+          match VarSet.find_by_name (VarSet.of_list det.ti_formals) key with
+          | None ->
+            Log.info (fun f () -> Fmt.(pf f "Could not find by name %s" key));
+            acc
+          | Some var -> Map.set ~data acc ~key:var)
+        m
     ]
   | _ ->
     failwith
       "Parse model failure: Positive example cannot be found during lemma refinement."
 ;;
 
-let synthesize_new_lemma ~(ctx : env) ~(p : PsiDef.t) (det : term_info)
+let synthesize_new_lemma ~(ctx : env) ~(p : PsiDef.t) (det : term_info) (cl : cond_lemma)
     : term option Lwt.t
   =
   let with_synth_obj i synth_obj logic =
-    ctx >- AlgoLog.announce_new_lemma_synthesis i det;
+    ctx >- AlgoLog.announce_new_lemma_synthesis i det cl;
     let neg_constraints =
-      List.map ~f:(ctx >- constraint_of_neg_witness det) det.ti_negatives
+      List.map ~f:(ctx >- constraint_of_neg_witness det) cl.cl_negatives
     in
     let pos_constraints =
-      List.map ~f:(ctx >- constraint_of_pos_witness det) det.ti_positives
+      List.map ~f:(ctx >- constraint_of_pos_witness det) cl.cl_positives
     in
     let extra_defs = Sm.[ max_definition; min_definition ] in
     let commands =
@@ -417,10 +440,14 @@ let synthesize_new_lemma ~(ctx : env) ~(p : PsiDef.t) (det : term_info)
 (*                                  Main entry points                                            *)
 (* ============================================================================================= *)
 
-let rec lemma_refinement_loop ~(ctx : env) ~(p : PsiDef.t) (det : term_info)
-    : term_info option Lwt.t
+let rec lemma_refinement_loop
+    ~(ctx : env)
+    ~(p : PsiDef.t)
+    (det : term_info)
+    (cl : cond_lemma)
+    : cond_lemma option Lwt.t
   =
-  match%lwt synthesize_new_lemma ~ctx ~p det with
+  match%lwt synthesize_new_lemma ~ctx ~p det cl with
   | None ->
     Log.debug_msg "Lemma synthesis failure.";
     Lwt.return None
@@ -429,27 +456,28 @@ let rec lemma_refinement_loop ~(ctx : env) ~(p : PsiDef.t) (det : term_info)
     then
       ctx
       >- LemmasInteractive.interactive_check_lemma
-           (lemma_refinement_loop ~ctx ~p)
+           (lemma_refinement_loop ~ctx ~p det)
            det.ti_func.vname
            det.ti_formals
            det
+           cl
            lemma_term
     else (
-      match%lwt ctx >>- verify_lemma_candidate ~p det lemma_term with
+      match%lwt ctx >>- verify_lemma_candidate ~p det cl lemma_term with
       (* The candidate lemma has been proved correct. *)
       | vmethod, Unsat ->
         let lemma =
-          match det.ti_splitter with
+          match cl.cl_cond with
           | None -> lemma_term
           | Some pre -> Terms.(pre => lemma_term)
         in
         ctx >- AlgoLog.lemma_proved_correct vmethod det lemma;
-        Lwt.return (Some { det with ti_flag = true; ti_lemmas = lemma :: det.ti_lemmas })
+        Lwt.return (Some { cl with cl_flag = true; cl_lemmas = lemma :: cl.cl_lemmas })
       (* The candidate lemmas has not been proved correct. *)
       | vmethod, S.SExps x ->
         AlgoLog.lemma_not_proved_correct vmethod;
         let new_positive_witnesss =
-          ctx >>- parse_positive_example_solver_model (S.SExps x) det
+          ctx >>- parse_positive_example_solver_model det (S.SExps x)
         in
         List.iter
           ~f:(fun witness ->
@@ -458,13 +486,14 @@ let rec lemma_refinement_loop ~(ctx : env) ~(p : PsiDef.t) (det : term_info)
                   pf
                     f
                     "Found a positive example: %a"
-                    (box (ctx >- Pretty.pp_witness))
-                    witness)))
+                    (box (ctx @>- pp_subs))
+                    (VarMap.to_subst ctx.ctx witness))))
           new_positive_witnesss;
         lemma_refinement_loop
           ~ctx
           ~p
-          { det with ti_positives = det.ti_positives @ new_positive_witnesss }
+          det
+          { cl with cl_positives = cl.cl_positives @ new_positive_witnesss }
       | _, Sat ->
         Log.error_msg "Lemma verification returned Sat. This is unexpected.";
         Lwt.return None
@@ -562,36 +591,37 @@ let create_or_update_lemmas_with_witness
   with
   | None ->
     ctx >- AlgoLog.announce_new_lemmas witness;
-    let det = ctx >- term_info_of_witness ~is_pos_witness witness in
+    let det, cl = ctx >- term_info_of_witness ~is_pos_witness witness in
     let%lwt det' =
       if is_pos_witness
-      then Lwt.return det
+      then Lwt.return (det, cl)
       else (
-        match%lwt lemma_refinement_loop ~ctx ~p det with
+        match%lwt lemma_refinement_loop ~ctx ~p det cl with
         | None ->
           update_flag := false;
-          Lwt.return det
-        | Some new_det -> Lwt.return new_det)
+          Lwt.return (det, cl)
+        | Some new_cl -> Lwt.return (det, new_cl))
     in
     Predicates.add ~ctx ~key:witness.witness_eqn.eterm ~data:det';
     Lwt.return !update_flag
   | Some _ ->
-    let change_ti det =
+    let change_ti det cl =
+      let witness = Option.value_exn (ctx >- remap_witness det witness) in
       if is_pos_witness
-      then Lwt.return { det with ti_positives = witness :: det.ti_positives }
+      then Lwt.return { cl with cl_positives = witness :: cl.cl_positives }
       else (
-        let det' =
-          { det with
-            ti_flag = false
-          ; ti_negatives = witness :: det.ti_negatives
-          ; ti_positives = det.ti_positives
+        let cl' =
+          { cl with
+            cl_flag = false
+          ; cl_negatives = witness :: cl.cl_negatives
+          ; cl_positives = cl.cl_positives
           }
         in
-        match%lwt lemma_refinement_loop ~ctx ~p det' with
+        match%lwt lemma_refinement_loop ~ctx ~p det cl' with
         | None ->
           update_flag := false;
-          Lwt.return det'
-        | Some new_det -> Lwt.return new_det)
+          Lwt.return cl'
+        | Some new_cl -> Lwt.return new_cl)
     in
     let%lwt _ =
       Predicates.change

@@ -104,7 +104,12 @@ let smt_of_lemma_app (det : term_info) =
     (List.map ~f:(fun var -> S.mk_var var.vname) det.ti_formals)
 ;;
 
-let smt_of_lemma_validity ~(ctx : Context.t) ~(p : PsiDef.t) (det : term_info) =
+let smt_of_lemma_validity
+    ~(ctx : Context.t)
+    ~(p : PsiDef.t)
+    (det : term_info)
+    (cl : cond_lemma)
+  =
   let mk_sort maybe_rtype =
     match maybe_rtype with
     | None -> S.mk_int_sort
@@ -119,7 +124,7 @@ let smt_of_lemma_validity ~(ctx : Context.t) ~(p : PsiDef.t) (det : term_info) =
           det.ti_elim)
   in
   let preconds =
-    match det.ti_splitter with
+    match cl.cl_cond with
     | None -> []
     | Some pre -> [ smt_of_term ~ctx pre ]
   in
@@ -184,18 +189,13 @@ let inductive_solver_preamble
   return ()
 ;;
 
-let smt_of_disallow_witness_values ~(ctx : Context.t) (det : term_info) : S.smtTerm =
-  let witnesss = det.ti_positives in
+let smt_of_disallow_witness_values ~(ctx : Context.t) (cl : cond_lemma) : S.smtTerm =
+  let witnesss = cl.cl_positives in
   let of_one_witness witness =
     Map.fold
-      ~f:(fun ~key ~data acc ->
-        let var =
-          let subs = subs_from_elim_to_elim ~ctx det.ti_elim witness.witness_eqn.eelim in
-          Term.substitution subs (mk_var ctx key)
-        in
-        smt_of_term ~ctx Terms.(var == data) :: acc)
+      ~f:(fun ~key ~data acc -> smt_of_term ~ctx Terms.(mk_var ctx key == data) :: acc)
       ~init:[]
-      witness.witness_model
+      witness
   in
   S.mk_assoc_and
     (List.map
@@ -203,7 +203,13 @@ let smt_of_disallow_witness_values ~(ctx : Context.t) (det : term_info) : S.smtT
        witnesss)
 ;;
 
-let set_up_to_get_model ~(ctx : Context.t) ~(p : PsiDef.t) solver (det : term_info) =
+let set_up_to_get_model
+    ~(ctx : Context.t)
+    ~(p : PsiDef.t)
+    solver
+    (det : term_info)
+    (cl : cond_lemma)
+  =
   (* Step 1. Declare vars for term, and assert that term satisfies tinv. *)
   let%lwt () =
     AsyncSmt.exec_all
@@ -221,14 +227,14 @@ let set_up_to_get_model ~(ctx : Context.t) ~(p : PsiDef.t) solver (det : term_in
       (S.mk_assert (smt_of_recurs_elim_eqns ~ctx det.ti_elim ~p))
   in
   let%lwt () =
-    match det.ti_splitter with
+    match cl.cl_cond with
     | None -> return ()
     | Some pre -> AsyncSmt.smt_assert solver (smt_of_term ~ctx pre)
   in
   (* Step 3. Disallow repeated positive examples. *)
   let%lwt () =
-    if List.length det.ti_positives > 0
-    then AsyncSmt.smt_assert solver (smt_of_disallow_witness_values ~ctx det)
+    if List.length cl.cl_positives > 0
+    then AsyncSmt.smt_assert solver (smt_of_disallow_witness_values ~ctx cl)
     else return ()
   in
   (* Step 4. Assert that lemma candidate is false. *)
@@ -271,6 +277,7 @@ let verify_lemma_bounded
     ~(ctx : Context.t)
     ~(p : PsiDef.t)
     (det : term_info)
+    (cl : cond_lemma)
     (candidate : term)
     : (Utils.Stats.verif_method * S.solver_response) Lwt.t * int Lwt.u
   =
@@ -320,7 +327,7 @@ let verify_lemma_bounded
           (* Map.fold ~init:[] ~f:(fun ~key ~data acc -> (mk_var key, data) :: acc) rec_instantation *)
         in
         let preconds =
-          Option.to_list (Option.map ~f:(fun t -> substitution subs t) det.ti_splitter)
+          Option.to_list (Option.map ~f:(fun t -> substitution subs t) cl.cl_cond)
         in
         let model_sat =
           mk_model_sat_asserts ~fctx ~ctx det f_compose_r (Map.find rec_instantation)
@@ -417,6 +424,7 @@ let verify_lemma_unbounded
     ~(ctx : Context.t)
     ~(p : PsiDef.t)
     (det : term_info)
+    (cl : cond_lemma)
     (candidate : term)
     : (Utils.Stats.verif_method * S.solver_response) Lwt.t * int Lwt.u
   =
@@ -427,13 +435,13 @@ let verify_lemma_unbounded
       (Lwt_list.iter_p (fun x ->
            let%lwt _ = AsyncSmt.exec_command cvc4_instance x in
            return ()))
-        (smt_of_lemma_validity ~ctx ~p det)
+        (smt_of_lemma_validity ~ctx ~p det cl)
     in
     let%lwt resp = AsyncSmt.check_sat cvc4_instance in
     let%lwt final_response =
       match resp with
       | Sat | Unknown ->
-        let%lwt _ = set_up_to_get_model cvc4_instance ~ctx ~p det in
+        let%lwt _ = set_up_to_get_model cvc4_instance ~ctx ~p det cl in
         let%lwt resp' = AsyncSmt.check_sat cvc4_instance in
         (match resp' with
         | Sat | Unknown -> AsyncSmt.get_model cvc4_instance
@@ -456,13 +464,14 @@ let verify_lemma_candidate
     ~(ctx : Context.t)
     ~(p : PsiDef.t)
     (det : term_info)
+    (cl : cond_lemma)
     (candidate : term)
     : (Stats.verif_method * SyncSmt.solver_response) Lwt.t
   =
   Log.verbose (fun f () -> Fmt.(pf f "Checking lemma candidate..."));
   try
-    let pr1, resolver1 = verify_lemma_bounded ~fctx ~ctx ~p det candidate in
-    let pr2, resolver2 = verify_lemma_unbounded ~fctx ~ctx ~p det candidate in
+    let pr1, resolver1 = verify_lemma_bounded ~fctx ~ctx ~p det cl candidate in
+    let pr2, resolver2 = verify_lemma_unbounded ~fctx ~ctx ~p det cl candidate in
     Lwt.wakeup resolver2 1;
     Lwt.wakeup resolver1 1;
     (* The first call to return is kept, the other one is ignored. *)

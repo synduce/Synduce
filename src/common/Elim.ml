@@ -41,13 +41,14 @@ let flatten_rec_elim_tuples ~(ctx : Context.t) (elim : (term * term) list)
     elim
 ;;
 
+(** Construct a substitution from images in elim2 to images in elim1. *)
 let subs_from_elim_to_elim ~ctx elim1 elim2 : (term * term) list =
   List.concat_map
-    ~f:(fun (a, b) ->
+    ~f:(fun (r1, s1) ->
       let rec f lst =
         match lst with
         | [] -> []
-        | (a', b') :: tl -> if Terms.(equal a a') then [ b', b ] else f tl
+        | (r2, s2) :: tl -> if Terms.(equal r1 r2) then [ s2, s1 ] else f tl
       in
       f (flatten_rec_elim_tuples ~ctx elim2))
     (flatten_rec_elim_tuples ~ctx elim1)
