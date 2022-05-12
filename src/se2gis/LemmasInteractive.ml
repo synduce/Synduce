@@ -11,28 +11,27 @@ open Utils
 open SmtInterface
 
 let make_term_info ~(ctx : env) ~(p : PsiDef.t) (term : term) : term_info =
-  let recurs_elim, scalar_vars = recurs_elim_of_term ~ctx ~p term in
-  let input_args_t = List.map ~f:(var_type ctx) scalar_vars in
+  let ti_elim, ti_formals = recurs_elim_of_term ~ctx ~p term in
+  let input_args_t = List.map ~f:(var_type ctx) ti_formals in
   let lemma_f =
     Variable.mk
       ctx.ctx
       ~t:(Some (RType.fun_typ_pack input_args_t TBool))
       (Alpha.fresh ~s:"lemma" ctx.ctx.names)
   in
-  { term
-  ; splitter = None
-  ; lemmas = []
-  ; lemma = lemma_f
-  ; lemma_candidate = None
-  ; negative_witnesss = []
-  ; positive_witnesss = []
-  ; recurs_elim
-  ; scalar_vars
-  ; current_preconds = None
+  { ti_flag = true
+  ; ti_term = term
+  ; ti_splitter = None
+  ; ti_lemmas = []
+  ; ti_func = lemma_f
+  ; ti_negatives = []
+  ; ti_positives = []
+  ; ti_elim
+  ; ti_formals
   }
 ;;
 
-let classify_witnesss_opt ~ctx witnesss : witness list Lwt.t =
+let classify_witnesss_opt ~ctx witness : witness list Lwt.t =
   let f witness =
     Log.info (fun frmt () ->
         Fmt.(
@@ -49,7 +48,7 @@ let classify_witnesss_opt ~ctx witnesss : witness list Lwt.t =
     | Some "P" -> { witness with witness_stat = Valid }
     | _ -> witness
   in
-  Lwt.return (List.map ~f witnesss)
+  Lwt.return (List.map ~f witness)
 ;;
 
 let set_term_lemma
@@ -64,23 +63,23 @@ let set_term_lemma
     Predicates.add
       ~ctx
       ~key:(first key)
-      ~data:{ (make_term_info ~ctx ~p (fst key)) with lemmas = [ lemma ] }
+      ~data:{ (make_term_info ~ctx ~p (fst key)) with ti_lemmas = [ lemma ] }
   | Some term_infos ->
     let repl = ref false in
     let nl =
       List.map
         ~f:(fun ti ->
-          if Option.equal Terms.equal ti.splitter (second key)
+          if Option.equal Terms.equal ti.ti_splitter (second key)
           then (
             repl := true;
-            { ti with lemmas = [ lemma ] })
+            { ti with ti_lemmas = [ lemma ] })
           else ti)
         term_infos
     in
     if !repl
     then Predicates.set ~ctx ~key:(first key) ~data:nl
     else (
-      let new_elt = { (make_term_info ~ctx ~p (fst key)) with lemmas = [ lemma ] } in
+      let new_elt = { (make_term_info ~ctx ~p (fst key)) with ti_lemmas = [ lemma ] } in
       Predicates.set ~ctx ~key:(first key) ~data:(new_elt :: nl))
 ;;
 
@@ -139,7 +138,7 @@ let parse_interactive_positive_example (det : term_info) (input : string) : witn
             else (
               let key = trim (List.nth_exn s 0) in
               let data = mk_const (CInt (Int.of_string (trim (List.nth_exn s 1)))) in
-              match VarSet.find_by_name (VarSet.of_list det.scalar_vars) key with
+              match VarSet.find_by_name (VarSet.of_list det.ti_formals) key with
               | None -> acc
               | Some var -> Map.set ~data acc ~key:var))
           (Str.split (Str.regexp " *, *") input)
@@ -153,7 +152,7 @@ let interactive_get_positive_examples ~(ctx : Context.t) (det : term_info) =
         match Variable.vtype ctx var with
         | None -> false
         | Some t -> not (RType.is_recursive ctx.types t))
-      (Analysis.free_variables ~ctx det.term)
+      (Analysis.free_variables ~ctx det.ti_term)
   in
   Log.info (fun f () ->
       Fmt.(
@@ -182,7 +181,7 @@ let interactive_get_positive_examples ~(ctx : Context.t) (det : term_info) =
     | Some witness -> [ witness ])
 ;;
 
-let interactive_check_lemma ~ctx lemma_refinement_loop name vars lemma_term det
+let interactive_check_lemma ~ctx lemma_refinement_loop name vars det lemma_term
     : term_info option Lwt.t
   =
   Log.info (fun f () ->
@@ -195,17 +194,17 @@ let interactive_check_lemma ~ctx lemma_refinement_loop name vars lemma_term det
           (pp_term ctx)
           lemma_term
           (pp_term ctx)
-          det.term
+          det.ti_term
           (pp_subs ctx)
-          det.recurs_elim));
+          det.ti_elim));
   match Stdio.In_channel.input_line Stdio.stdin with
   | Some "Y" ->
     let lemma =
-      match det.current_preconds with
+      match det.ti_splitter with
       | None -> lemma_term
       | Some pre -> mk_bin Binop.Or (mk_un Unop.Not pre) lemma_term
     in
-    Lwt.return (Some { det with lemma_candidate = None; lemmas = lemma :: det.lemmas })
+    Lwt.return (Some { det with ti_lemmas = lemma :: det.ti_lemmas })
   | _ ->
     Log.info (fun f () ->
         Fmt.(
@@ -217,8 +216,7 @@ let interactive_check_lemma ~ctx lemma_refinement_loop name vars lemma_term det
     | Some "Y" ->
       lemma_refinement_loop
         { det with
-          positive_witnesss =
-            det.positive_witnesss @ interactive_get_positive_examples ~ctx det
+          ti_positives = det.ti_positives @ interactive_get_positive_examples ~ctx det
         }
     | _ -> Lwt.return None)
 ;;

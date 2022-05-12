@@ -79,23 +79,24 @@ let solved_eqn_system : equation_system option ref = ref None
 
 (** A type containing info about a term and lemmas associated to it. *)
 type term_info =
-  { term : term (** The term the info is about. *)
-  ; splitter : term option
+  { ti_flag : bool
+        (** Set to false if the info needs refinement (i.e. the
+      set of witnesses and the lemmas are not in sync). *)
+  ; ti_term : term (** The term the info is about. *)
+  ; ti_splitter : term option
         (** A condition that can be assumed for the property in this info. *)
-  ; lemmas : term list
+  ; ti_lemmas : term list
         (** A set of lemmas that is true about a term, under the assumption
             that the splitter predicate is true.*)
-  ; lemma : variable (** A function variable to name the lemma. *)
-  ; lemma_candidate : term option (** A lemma that is currently only a candidate.*)
-  ; negative_witnesss : witness list
+  ; ti_negatives : witness list
         (** A set of valuations for the term's evaluated symbolic value that leads to
       the lemma being false. *)
-  ; positive_witnesss : witness list
+  ; ti_positives : witness list
         (** A set of valuations for the term's evaluated symbolic value that leads to
       the lemma being true. *)
-  ; recurs_elim : (term * term) list (** The recursion elimination map for that term. *)
-  ; scalar_vars : variable list
-  ; current_preconds : term option
+  ; ti_elim : (term * term) list (** The recursion elimination map for that term. *)
+  ; ti_func : variable (** A variable to model the lemma as a function. *)
+  ; ti_formals : variable list (** The argument list of the predicate, as a function.*)
   }
 
 (**

@@ -7,7 +7,7 @@ open Term
 
 let term_info_to_lemma ~(ctx : env) ~(p : PsiDef.t) ~(t : term) (det : term_info) =
   (* Term adjustment substituions *)
-  let subst1 = ctx >- Matching.matches ~pattern:det.term t in
+  let subst1 = ctx >- Matching.matches ~pattern:det.ti_term t in
   (* Recursion elimination substitutions *)
   let subst =
     List.concat_map
@@ -16,7 +16,7 @@ let term_info_to_lemma ~(ctx : env) ~(p : PsiDef.t) ~(t : term) (det : term_info
         match t2.tkind with
         | TTup t2s -> List.mapi t2s ~f:(fun i t2_i -> t2_i, mk_sel ctx.ctx frt1 i)
         | _ -> [ t2, frt1 ])
-      det.recurs_elim
+      det.ti_elim
   in
   let f lem =
     let t1 = Term.substitution subst lem in
@@ -24,7 +24,7 @@ let term_info_to_lemma ~(ctx : env) ~(p : PsiDef.t) ~(t : term) (det : term_info
     | None -> None
     | Some subst' -> Some (Term.substitution (VarMap.to_subst ctx.ctx subst') t1)
   in
-  let lems = Option.all (List.map ~f det.lemmas) in
+  let lems = Option.all (List.map ~f det.ti_lemmas) in
   Option.(lems >>= mk_assoc Binop.And >>| (ctx >- Rewriter.simplify_term))
 ;;
 
@@ -48,7 +48,7 @@ let find_term_info ~(ctx : Env.env) ((term, splitter) : term * term option)
   =
   match Option.bind ~f:(Hashtbl.find ctx.pcache) (key_of_term term) with
   | Some term_infos ->
-    List.find ~f:(fun ti -> Option.equal Terms.equal ti.splitter splitter) term_infos
+    List.find ~f:(fun ti -> Option.equal Terms.equal ti.ti_splitter splitter) term_infos
   | None -> None
 ;;
 
@@ -79,7 +79,7 @@ let change
       let tis' =
         List.map
           ~f:(fun ti ->
-            if Option.equal Terms.equal ti.splitter split
+            if Option.equal Terms.equal ti.ti_splitter split
             then (
               flag := true;
               data ti)
@@ -93,20 +93,29 @@ let change
 
 let add_direct ~(ctx : env) ~(key : Expression.t) ~(data : term_info) : unit =
   match Hashtbl.find ctx.pcache key with
-  | Some term_infos -> Hashtbl.set ctx.pcache ~key ~data:(data :: term_infos)
+  | Some term_infos ->
+    let a, b =
+      List.partition_tf
+        ~f:(fun det -> Option.equal Terms.equal det.ti_splitter data.ti_splitter)
+        term_infos
+    in
+    (match a with
+    | [] -> Hashtbl.set ctx.pcache ~key ~data:(data :: term_infos)
+    | [ _ ] -> Hashtbl.set ctx.pcache ~key ~data:(data :: b)
+    | _ -> failwith "Should not be more than one equivalent key")
   | None -> Hashtbl.add_multi ctx.pcache ~key ~data
 ;;
 
 let add ~(ctx : env) ~(key : term) ~(data : term_info) : unit =
   match key_of_term key with
   | Some e_key -> add_direct ~ctx ~key:e_key ~data
-  | None -> ()
+  | None -> failwith "Failed to add predicate"
 ;;
 
 let set ~(ctx : env) ~(key : term) ~(data : term_info list) : unit =
   match key_of_term key with
   | Some e_key -> Hashtbl.set ctx.pcache ~key:e_key ~data
-  | None -> ()
+  | None -> failwith "Failed to set predicate"
 ;;
 
 let fold

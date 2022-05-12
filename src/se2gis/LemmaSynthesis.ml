@@ -2,7 +2,6 @@ open Base
 open Common
 open Counterexamples
 open Env
-open Elim
 open Lang
 open LemmaVerif
 open Term
@@ -29,16 +28,15 @@ let term_info_of_witness ~(ctx : Context.t) ~(is_pos_witness : bool) (witness : 
       ~t:(Some (RType.fun_typ_pack input_args_t TBool))
       (Alpha.fresh ~s:"lemma" ctx.names)
   in
-  { term = witness.witness_eqn.eterm
-  ; splitter = witness.witness_eqn.esplitter
-  ; lemmas = []
-  ; lemma = lemma_f
-  ; lemma_candidate = None
-  ; negative_witnesss = (if is_pos_witness then [] else [ witness ])
-  ; positive_witnesss = (if is_pos_witness then [ witness ] else [])
-  ; recurs_elim = witness.witness_eqn.eelim
-  ; scalar_vars = Map.keys witness.witness_model
-  ; current_preconds = witness.witness_eqn.eprecond
+  { ti_flag = false
+  ; ti_term = witness.witness_eqn.eterm
+  ; ti_splitter = witness.witness_eqn.esplitter
+  ; ti_lemmas = []
+  ; ti_negatives = (if is_pos_witness then [] else [ witness ])
+  ; ti_positives = (if is_pos_witness then [ witness ] else [])
+  ; ti_elim = witness.witness_eqn.eelim
+  ; ti_func = lemma_f
+  ; ti_formals = Map.keys witness.witness_model
   }
 ;;
 
@@ -68,21 +66,12 @@ let create_or_update_lemmas_with_witness
   | Some _ ->
     let change_ti det =
       if is_pos_witness
-      then { det with positive_witnesss = witness :: det.positive_witnesss }
+      then { det with ti_positives = witness :: det.ti_positives }
       else
         { det with
-          current_preconds =
-            (match witness.witness_eqn.eprecond with
-            | None -> None
-            | Some pre ->
-              let pre' =
-                substitution
-                  (ctx >- subs_from_elim_to_elim det.recurs_elim witness.witness_eqn.eelim)
-                  pre
-              in
-              Some pre')
-        ; negative_witnesss = witness :: det.negative_witnesss
-        ; positive_witnesss = det.positive_witnesss
+          ti_flag = false
+        ; ti_negatives = witness :: det.ti_negatives
+        ; ti_positives = det.ti_positives
         }
     in
     Predicates.change
@@ -107,7 +96,7 @@ let skeleton_of_tinv
     (tinv_of_t : term)
   =
   let arg_num var =
-    Option.(List.findi ~f:(fun _ a -> Variable.equal a var) det.scalar_vars >>| fst)
+    Option.(List.findi ~f:(fun _ a -> Variable.equal a var) det.ti_formals >>| fst)
   in
   let _tuple_of_args args =
     VarSet.union_list
@@ -116,7 +105,7 @@ let skeleton_of_tinv
            Analysis.free_variables
              ~ctx
              ~include_functions:false
-             (substitution det.recurs_elim arg))
+             (substitution det.ti_elim arg))
          args)
   in
   let tinv_of_t' = Reduce.reduce_term ~ctx ~fctx ~projecting:true tinv_of_t in
@@ -198,18 +187,18 @@ let synthfun_of_det
         ~guess
         ~bools:true
         opset
-        det.scalar_vars
+        det.ti_formals
         RType.TBool
     in
     let logic = logic_of_operators opset in
-    mk_synthinv ~ctx det.lemma.vname det.scalar_vars grammar, logic
+    mk_synthinv ~ctx det.ti_func.vname det.ti_formals grammar, logic
   in
   if !Config.Optims.make_partial_lemma_sketches
   then (
     let skeleton_guess =
       match p.tinv with
       | Some tinv ->
-        skeleton_of_tinv ~fctx ~ctx det (Reduce.reduce_pmrs ~ctx ~fctx tinv det.term)
+        skeleton_of_tinv ~fctx ~ctx det (Reduce.reduce_pmrs ~ctx ~fctx tinv det.ti_term)
       | _ -> None
     in
     [ gen_of_guess true skeleton_guess; gen_of_guess false skeleton_guess ])
@@ -288,11 +277,11 @@ let convert_term_rec_to_witness_rec
   match
     VarSet.find_by_name
       (Set.union
-         (Analysis.free_variables ~ctx det.term)
+         (Analysis.free_variables ~ctx det.ti_term)
          (Set.union (VarSet.of_list p.PsiDef.reference.pargs) witness.witness_vars))
       name
   with
-  | None -> f det.recurs_elim
+  | None -> f det.ti_elim
   | Some _ -> name
 ;;
 
@@ -313,7 +302,7 @@ let witness_model_to_args
              VarSet.find_by_name
                (Set.union
                   (* Don't include functions, we won't get a model for them in CVC5. *)
-                  (Analysis.free_variables ~ctx ~include_functions:false det.term)
+                  (Analysis.free_variables ~ctx ~include_functions:false det.ti_term)
                   (Set.union
                      (VarSet.of_list p.PsiDef.reference.pargs)
                      witness.witness_vars))
@@ -336,13 +325,13 @@ let witness_model_to_args
 
 let constraint_of_neg_witness ~ctx (det : term_info) witness =
   let neg_constraint =
-    mk_un Not (mk_app (mk_var ctx det.lemma) (Map.data witness.witness_model))
+    mk_un Not (mk_app (mk_var ctx det.ti_func) (Map.data witness.witness_model))
   in
   Sy.mk_c_constraint (sygus_of_term ~ctx neg_constraint)
 ;;
 
 let constraint_of_pos_witness ~ctx (det : term_info) witness =
-  let pos_constraint = mk_app (mk_var ctx det.lemma) (Map.data witness.witness_model) in
+  let pos_constraint = mk_app (mk_var ctx det.ti_func) (Map.data witness.witness_model) in
   Sy.mk_c_constraint (sygus_of_term ~ctx pos_constraint)
 ;;
 
@@ -368,7 +357,7 @@ let handle_lemma_synth_response
     let body, _ =
       infer_type
         ctx
-        (term_of_sygus ~fctx ~ctx (VarSet.to_env (VarSet.of_list ti.scalar_vars)) fbody)
+        (term_of_sygus ~fctx ~ctx (VarSet.to_env (VarSet.of_list ti.ti_formals)) fbody)
     in
     body
   in
@@ -378,7 +367,7 @@ let handle_lemma_synth_response
   with
   | Some (RSuccess resps) ->
     let soln = List.map ~f:parse_synth_fun resps in
-    let _ = List.iter ~f:(fun t -> log_soln ~ctx ti.lemma.vname ti.scalar_vars t) soln in
+    let _ = List.iter ~f:(fun t -> log_soln ~ctx ti.ti_func.vname ti.ti_formals t) soln in
     Lwt.return (Some soln)
   | Some RInfeasible | Some RFail | Some RUnknown | None -> Lwt.return None
 ;;
@@ -395,7 +384,7 @@ let parse_positive_example_solver_model
     let m, _ =
       Map.partitioni_tf
         ~f:(fun ~key ~data:_ ->
-          Option.is_some (VarSet.find_by_name (VarSet.of_list det.scalar_vars) key))
+          Option.is_some (VarSet.find_by_name (VarSet.of_list det.ti_formals) key))
         model
     in
     (* Remap the names to ids of the original variables in m' *)
@@ -404,7 +393,7 @@ let parse_positive_example_solver_model
            Map.fold
              ~init:VarMap.empty
              ~f:(fun ~key ~data acc ->
-               match VarSet.find_by_name (VarSet.of_list det.scalar_vars) key with
+               match VarSet.find_by_name (VarSet.of_list det.ti_formals) key with
                | None ->
                  Log.info (fun f () -> Fmt.(pf f "Could not find by name %s" key));
                  acc
@@ -424,10 +413,10 @@ let synthesize_new_lemma ~(ctx : env) ~(p : PsiDef.t) (det : term_info)
   let with_synth_obj i synth_obj logic =
     ctx >- AlgoLog.announce_new_lemma_synthesis i det;
     let neg_constraints =
-      List.map ~f:(ctx >- constraint_of_neg_witness det) det.negative_witnesss
+      List.map ~f:(ctx >- constraint_of_neg_witness det) det.ti_negatives
     in
     let pos_constraints =
-      List.map ~f:(ctx >- constraint_of_pos_witness det) det.positive_witnesss
+      List.map ~f:(ctx >- constraint_of_pos_witness det) det.ti_positives
     in
     let extra_defs = Sm.[ max_definition; min_definition ] in
     let commands =
@@ -482,23 +471,22 @@ let rec lemma_refinement_loop ~(ctx : env) ~(p : PsiDef.t) (det : term_info)
       ctx
       >- LemmasInteractive.interactive_check_lemma
            (lemma_refinement_loop ~ctx ~p)
-           det.lemma.vname
-           det.scalar_vars
-           lemma_term
+           det.ti_func.vname
+           det.ti_formals
            det
+           lemma_term
     else (
-      match%lwt
-        ctx >>- verify_lemma_candidate ~p { det with lemma_candidate = Some lemma_term }
-      with
+      match%lwt ctx >>- verify_lemma_candidate ~p det lemma_term with
+      (* The candidate lemma has been proved correct. *)
       | vmethod, Unsat ->
         let lemma =
-          match det.splitter with
+          match det.ti_splitter with
           | None -> lemma_term
           | Some pre -> Terms.(pre => lemma_term)
         in
         ctx >- AlgoLog.lemma_proved_correct vmethod det lemma;
-        Lwt.return
-          (Some { det with lemma_candidate = None; lemmas = lemma :: det.lemmas })
+        Lwt.return (Some { det with ti_flag = true; ti_lemmas = lemma :: det.ti_lemmas })
+      (* The candidate lemmas has not been proved correct. *)
       | vmethod, S.SExps x ->
         AlgoLog.lemma_not_proved_correct vmethod;
         let new_positive_witnesss =
@@ -517,7 +505,7 @@ let rec lemma_refinement_loop ~(ctx : env) ~(p : PsiDef.t) (det : term_info)
         lemma_refinement_loop
           ~ctx
           ~p
-          { det with positive_witnesss = det.positive_witnesss @ new_positive_witnesss }
+          { det with ti_positives = det.ti_positives @ new_positive_witnesss }
       | _, Sat ->
         Log.error_msg "Lemma verification returned Sat. This is unexpected.";
         Lwt.return None
@@ -614,9 +602,9 @@ let synthesize_lemmas
      | Some "Y" -> true
      | _ -> false)
   in
-  let update is_positive witnesss =
+  let update is_positive witness =
     List.iter
-      witnesss
+      witness
       ~f:(create_or_update_lemmas_with_witness ~p ~ctx ~is_pos_witness:is_positive)
   in
   (*
@@ -680,9 +668,12 @@ let synthesize_lemmas
       update true lemma_synt_positives;
       AlgoLog.spurious_violates_requires (List.length lemma_synt_negatives);
       let%lwt success, lemmas_to_add =
+        (* let success_flag = ref true in *)
         let inner_func key (status, additions) det =
           (* Skip lemma synth for bounded terms and when status is false *)
-          if ctx >- Analysis.is_bounded det.term || not status
+          if ctx >- Analysis.is_bounded det.ti_term || not status
+          then Lwt.return (status, additions)
+          else if det.ti_flag
           then Lwt.return (status, additions)
           else (
             match%lwt lemma_refinement_loop ~ctx ~p det with

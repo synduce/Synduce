@@ -402,7 +402,8 @@ module Asyncs (Log : Logger) (Stats : Statistics) = struct
     | Sexp.List (Sexp.Atom "error" :: err_msgs) ->
       List.iter
         ~f:(fun err ->
-          Log.error (fun fmt () -> Fmt.pf fmt "Solver error: %a" Sexp.pp_hum err))
+          Log.error (fun fmt () ->
+              Fmt.pf fmt "%s error: %a" solver.s_name Sexp.pp_hum err))
         err_msgs
     | _ ->
       let resp_ind, prev_resp =

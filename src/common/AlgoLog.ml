@@ -278,16 +278,16 @@ let announce_new_lemmas ~(ctx : Context.t) witness =
 
 let announce_new_lemma_synthesis ~(ctx : Context.t) (thread_no : int) (det : term_info) =
   Log.debug (fun f () ->
-      match det.current_preconds with
+      match det.ti_splitter with
       | None ->
         pf
           f
           "[%i] Synthesizing a new lemma candidate for term@;@[%a[%a]@]."
           thread_no
           (pp_term ctx)
-          det.term
+          det.ti_term
           (pp_subs ctx)
-          det.recurs_elim
+          det.ti_elim
       | Some pre ->
         pf
           f
@@ -297,9 +297,9 @@ let announce_new_lemma_synthesis ~(ctx : Context.t) (thread_no : int) (det : ter
            @[%a@]"
           thread_no
           (pp_term ctx)
-          det.term
+          det.ti_term
           (pp_subs ctx)
-          det.recurs_elim
+          det.ti_elim
           (pp_term ctx)
           pre)
 ;;
@@ -328,26 +328,28 @@ let lemma_proved_correct
     str
       "(%a)[%a]->%s(%s)= %a"
       (pp_term ctx)
-      det.term
+      det.ti_term
       (list ~sep:comma (Fmt.pair ~sep:rightarrow (pp_term ctx) (pp_term ctx)))
-      det.recurs_elim
-      det.lemma.vname
-      (String.concat ~sep:", " (List.map ~f:(fun v -> v.vname) det.scalar_vars))
+      det.ti_elim
+      det.ti_func.vname
+      (String.concat ~sep:", " (List.map ~f:(fun v -> v.vname) det.ti_formals))
       (box (pp_term ctx))
       lemma_term
   in
+  (* Statistics: log which lemmas have been synthesized. *)
   Stats.set_lemma_synthesized
     "requires_lemma"
     (String.concat ~sep:" " (List.map ~f:String.strip (String.split_lines lemma_str)));
   Stats.set_last_lemma_proof_method proof_method;
+  (*  *)
   Log.info (fun frmt () ->
       pf
         frmt
-        "Lemma for term %a:@;\"%s %s =@;@[%a@]\"."
+        "Lemma %a:@;\"%s %s =@;@[%a@]\"@;is correct, memorizing."
         (pp_term ctx)
-        det.term
-        det.lemma.vname
-        (String.concat ~sep:" " (List.map ~f:(fun v -> v.vname) det.scalar_vars))
+        det.ti_term
+        det.ti_func.vname
+        (String.concat ~sep:" " (List.map ~f:(fun v -> v.vname) det.ti_formals))
         (box (pp_term ctx))
         lemma_term)
 ;;
