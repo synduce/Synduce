@@ -68,27 +68,27 @@ let change
     ~(ctx : env)
     ~(key : term)
     ~(split : term option)
-    (data : term_info -> term_info)
-    : unit
+    (data_f : term_info -> term_info Lwt.t)
+    : unit Lwt.t
   =
   match key_of_term key with
   | Some e_key ->
     (match Hashtbl.find ctx.pcache e_key with
     | Some tis ->
       let flag = ref false in
-      let tis' =
-        List.map
-          ~f:(fun ti ->
+      let%lwt tis' =
+        Lwt_list.map_p
+          (fun ti ->
             if Option.equal Terms.equal ti.ti_splitter split
             then (
               flag := true;
-              data ti)
-            else ti)
+              data_f ti)
+            else Lwt.return ti)
           tis
       in
-      if !flag then Hashtbl.set ~key:e_key ~data:tis' ctx.pcache
-    | None -> ())
-  | None -> ()
+      Lwt.return (if !flag then Hashtbl.set ~key:e_key ~data:tis' ctx.pcache)
+    | None -> Lwt.return ())
+  | None -> Lwt.return ()
 ;;
 
 let add_direct ~(ctx : env) ~(key : Expression.t) ~(data : term_info) : unit =

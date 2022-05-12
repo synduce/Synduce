@@ -9,8 +9,8 @@ val change
   :  ctx:Env.env
   -> key:term
   -> split:term option
-  -> (ProblemDefs.term_info -> ProblemDefs.term_info)
-  -> unit
+  -> (ProblemDefs.term_info -> ProblemDefs.term_info Lwt.t)
+  -> unit Lwt.t
 
 val add_direct : ctx:Env.env -> key:Expression.t -> data:ProblemDefs.term_info -> unit
 val add : ctx:Env.env -> key:term -> data:ProblemDefs.term_info -> unit

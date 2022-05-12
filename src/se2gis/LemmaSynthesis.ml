@@ -40,49 +40,8 @@ let term_info_of_witness ~(ctx : Context.t) ~(is_pos_witness : bool) (witness : 
   }
 ;;
 
-(** Given a counterexample, create a new term state that contains that counterexample,
-  or if a term state exists for the term associated with that counterexample,
-  update the term state by adding the counterexample's models.
-*)
-let create_or_update_lemmas_with_witness
-    ~(p : PsiDef.t)
-    ~(ctx : Env.env)
-    ~(is_pos_witness : bool)
-    (witness : witness)
-    : unit
-  =
-  match
-    Predicates.get_with_precond
-      ~ctx
-      ~p
-      ~key:(witness.witness_eqn.eterm, witness.witness_eqn.esplitter)
-  with
-  | None ->
-    ctx >- AlgoLog.announce_new_lemmas witness;
-    Predicates.add
-      ~ctx
-      ~key:witness.witness_eqn.eterm
-      ~data:(ctx >- term_info_of_witness ~is_pos_witness witness)
-  | Some _ ->
-    let change_ti det =
-      if is_pos_witness
-      then { det with ti_positives = witness :: det.ti_positives }
-      else
-        { det with
-          ti_flag = false
-        ; ti_negatives = witness :: det.ti_negatives
-        ; ti_positives = det.ti_positives
-        }
-    in
-    Predicates.change
-      ~ctx
-      ~key:witness.witness_eqn.eterm
-      ~split:witness.witness_eqn.esplitter
-      change_ti
-;;
-
 (* ============================================================================================= *)
-(*                                  Lemma synthesis    functions                                 *)
+(*                                  Lemma synthesis functions                                    *)
 (* ============================================================================================= *)
 
 (** Applying tinv to the term of a term info can help in findiing a good lemma.
@@ -583,6 +542,67 @@ let refine_ensures_predicates
     Lwt.return `CoarseningOk
 ;;
 
+(** Given a counterexample, create a new term state that contains that counterexample,
+  or if a term state exists for the term associated with that counterexample,
+  update the term state by adding the counterexample's models.
+*)
+let create_or_update_lemmas_with_witness
+    ~(p : PsiDef.t)
+    ~(ctx : Env.env)
+    ~(is_pos_witness : bool)
+    (witness : witness)
+    : bool Lwt.t
+  =
+  let update_flag = ref true in
+  match
+    Predicates.get_with_precond
+      ~ctx
+      ~p
+      ~key:(witness.witness_eqn.eterm, witness.witness_eqn.esplitter)
+  with
+  | None ->
+    ctx >- AlgoLog.announce_new_lemmas witness;
+    let det = ctx >- term_info_of_witness ~is_pos_witness witness in
+    let%lwt det' =
+      if is_pos_witness
+      then Lwt.return det
+      else (
+        match%lwt lemma_refinement_loop ~ctx ~p det with
+        | None ->
+          update_flag := false;
+          Lwt.return det
+        | Some new_det -> Lwt.return new_det)
+    in
+    Predicates.add ~ctx ~key:witness.witness_eqn.eterm ~data:det';
+    Lwt.return !update_flag
+  | Some _ ->
+    let change_ti det =
+      if is_pos_witness
+      then Lwt.return { det with ti_positives = witness :: det.ti_positives }
+      else (
+        let det' =
+          { det with
+            ti_flag = false
+          ; ti_negatives = witness :: det.ti_negatives
+          ; ti_positives = det.ti_positives
+          }
+        in
+        match%lwt lemma_refinement_loop ~ctx ~p det' with
+        | None ->
+          update_flag := false;
+          Lwt.return det'
+        | Some new_det -> Lwt.return new_det)
+    in
+    let%lwt _ =
+      Predicates.change
+        ~ctx
+        ~key:witness.witness_eqn.eterm
+        ~split:witness.witness_eqn.esplitter
+        change_ti
+    in
+    Lwt.return !update_flag
+;;
+
 let synthesize_lemmas
     ~(ctx : env)
     ~(p : PsiDef.t)
@@ -602,10 +622,15 @@ let synthesize_lemmas
      | Some "Y" -> true
      | _ -> false)
   in
-  let update is_positive witness =
-    List.iter
+  let update ~is_positive witness =
+    Lwt_list.fold_left_s
+      (fun success_flag wit ->
+        let%lwt b =
+          create_or_update_lemmas_with_witness ~p ~ctx ~is_pos_witness:is_positive wit
+        in
+        Lwt.return (success_flag && b))
+      true
       witness
-      ~f:(create_or_update_lemmas_with_witness ~p ~ctx ~is_pos_witness:is_positive)
   in
   (*
     Example: the synt_failure_info should be a list of unrealizability counterexamples, which
@@ -663,35 +688,15 @@ let synthesize_lemmas
         ~neg_witnesss:ensures_negatives
         ~pos_witnesss:ensures_positives
     | _, _ :: _ ->
-      (* Update the term state by adding the positive and negative counterexamples to it. *)
-      update false lemma_synt_negatives;
-      update true lemma_synt_positives;
       AlgoLog.spurious_violates_requires (List.length lemma_synt_negatives);
-      let%lwt success, lemmas_to_add =
-        (* let success_flag = ref true in *)
-        let inner_func key (status, additions) det =
-          (* Skip lemma synth for bounded terms and when status is false *)
-          if ctx >- Analysis.is_bounded det.ti_term || not status
-          then Lwt.return (status, additions)
-          else if det.ti_flag
-          then Lwt.return (status, additions)
-          else (
-            match%lwt lemma_refinement_loop ~ctx ~p det with
-            | None -> Lwt.return (false, additions)
-            | Some det -> Lwt.return (status, (key, det) :: additions))
-        in
-        let f ~key ~data status =
-          Lwt.bind status (fun stat -> Lwt_list.fold_left_s (inner_func key) stat data)
-        in
-        Predicates.fold ~ctx ~init:(Lwt.return (true, [])) ~f
-      in
-      List.iter lemmas_to_add ~f:(fun (key, data) ->
-          Predicates.add_direct ~ctx ~key ~data);
-      Lwt.return (if success then `CoarseningOk else `CoarseningFailure)
+      (* Update the term state by adding the positive and negative counterexamples to it. *)
+      let%lwt upd_flag_1 = update ~is_positive:true lemma_synt_positives in
+      let%lwt upd_flag_2 = update ~is_positive:false lemma_synt_negatives in
+      Lwt.return (if upd_flag_1 && upd_flag_2 then `CoarseningOk else `CoarseningFailure)
     | [], [] ->
       (match classif_failures with
       | [] ->
-        update true lemma_synt_positives;
+        let%lwt _ = update ~is_positive:true lemma_synt_positives in
         (* lemma_synt_negatives and ensures_negatives are empty; all witnesss non spurious! *)
         AlgoLog.no_spurious_witness ();
         Lwt.return `Unrealizable
