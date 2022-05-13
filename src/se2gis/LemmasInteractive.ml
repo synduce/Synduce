@@ -18,7 +18,13 @@ let make_term_info ~(ctx : env) ~(p : PsiDef.t) (term : term) : term_info * cond
       ~t:(Some (RType.fun_typ_pack input_args_t TBool))
       (Alpha.fresh ~s:"lemma" ctx.ctx.names)
   in
-  ( { ti_flag = true; ti_term = term; ti_func = lemma_f; ti_elim; ti_formals }
+  ( { ti_psi_id = p.id
+    ; ti_flag = true
+    ; ti_term = term
+    ; ti_func = lemma_f
+    ; ti_elim
+    ; ti_formals
+    }
   , { cl_flag = true
     ; cl_cond = None
     ; cl_negatives = []

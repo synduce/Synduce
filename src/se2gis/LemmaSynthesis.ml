@@ -17,7 +17,11 @@ module Sm = Syguslib.Semantic
 (*                                  Creating and updating term states                            *)
 (* ============================================================================================= *)
 
-let term_info_of_witness ~(ctx : Context.t) ~(is_pos_witness : bool) (witness : witness)
+let term_info_of_witness
+    ~(id : int)
+    ~(ctx : Context.t)
+    ~(is_pos_witness : bool)
+    (witness : witness)
     : term_info * cond_lemma
   =
   let scalar_vars = Map.keys witness.witness_model in
@@ -28,7 +32,8 @@ let term_info_of_witness ~(ctx : Context.t) ~(is_pos_witness : bool) (witness : 
       ~t:(Some (RType.fun_typ_pack input_args_t TBool))
       (Alpha.fresh ~s:"lemma" ctx.names)
   in
-  ( { ti_flag = false
+  ( { ti_psi_id = id
+    ; ti_flag = false
     ; ti_term = witness.witness_eqn.eterm
     ; ti_elim = witness.witness_eqn.eelim
     ; ti_func = lemma_f
@@ -621,7 +626,7 @@ let create_or_update_lemmas_with_witness
   with
   | None ->
     ctx >- AlgoLog.announce_new_lemmas witness;
-    let det, cl = ctx >- term_info_of_witness ~is_pos_witness witness in
+    let det, cl = ctx >- term_info_of_witness ~id:p.id ~is_pos_witness witness in
     let%lwt det' =
       if is_pos_witness
       then Lwt.return (det, cl)
@@ -638,7 +643,7 @@ let create_or_update_lemmas_with_witness
     let det, cl =
       match ctx >- cond_lemma_of_witness ~pos:is_pos_witness det witness with
       | Some cl -> det, cl
-      | None -> ctx >- term_info_of_witness ~is_pos_witness witness
+      | None -> ctx >- term_info_of_witness ~id:p.id ~is_pos_witness witness
     in
     let%lwt det' =
       if is_pos_witness

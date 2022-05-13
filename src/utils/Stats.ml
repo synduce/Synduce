@@ -272,7 +272,7 @@ let log_minor_step ~(synth_time : float) ~(auxtime : float) (lifted : bool) : un
 ;;
 
 let restart () =
-  (* Clear process loggin fields. *)
+  (* Clear process logging fields. *)
   _PID_ := -2;
   Hashtbl.clear _PID_TABLE_;
   Hashtbl.clear _TIME_TABLE_;
@@ -294,3 +294,4 @@ let restart () =
 
 let num_unr_cache_hits = ref 0
 let orig_solution_hit = ref false
+let num_foreign_lemma_uses = ref 0

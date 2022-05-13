@@ -151,6 +151,7 @@ class MultiDataObj():
         self.total_configurations = -1
         self.unr_cache_hits = 0
         self.orig_conf_hit = False
+        self.foreign_lemma_uses = 0
         # If algo is specified, then this is a single entry
         if algo:
             final_dat = DataObj(data)
@@ -174,6 +175,7 @@ class MultiDataObj():
             self.total_configurations = data.get("total-configurations")
             self.unr_cache_hits = data.get("unr-cache-hits")
             self.orig_conf_hit = data.get("orig-conf-hit")
+            self.foreign_lemma_uses = data.get("foreign-lemma-uses")
             res = data.get("intermediate-result")
             if "failure" in res:
                 self.failed = True

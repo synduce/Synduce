@@ -1,19 +1,17 @@
-(** @synduce -I ConsList.ml *)
+type nat =
+  | Z
+  | S of nat
 
-open ConsList
+let rec odd = function
+  | Z -> false
+  | S x -> even x
 
-let spec x l =
-  let rec f = function
-    | Elt a -> Cons (x, Elt a)
-    | Cons (hd, tl) -> Cons (x, Cons (hd, tl))
-  in
-  f l
+and even = function
+  | Z -> true
+  | S x -> odd x
 ;;
 
-let target x l =
-  let rec g = function
-    | Elt a -> [%synt f0] x a
-    | Cons (hd, tl) -> [%synt odot] x hd (g tl)
-  in
-  g l
-;;
+let rec query x = odd x && odd (S (S x))
+let rec f x = [%synt fi];;
+
+assert (f = query)

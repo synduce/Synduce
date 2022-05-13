@@ -96,7 +96,8 @@ type cond_lemma =
 
 (** A type containing info about a term and lemmas associated to it. *)
 type term_info =
-  { ti_flag : bool
+  { ti_psi_id : int (** The id of the problem for which the term_info was introduced. *)
+  ; ti_flag : bool
         (** Set to false if the info needs refinement (i.e. the
       set of witnesses and the lemmas are not in sync). *)
   ; ti_term : term (** The term the info is about. *)

@@ -57,3 +57,7 @@ val num_unr_cache_hits : int ref
     by the user.
 *)
 val orig_solution_hit : bool ref
+
+(** The number of times a lemma that has been created for a different configuration is reused.
+*)
+val num_foreign_lemma_uses : int ref

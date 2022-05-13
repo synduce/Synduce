@@ -43,6 +43,7 @@ let get ~(ctx : env) ~(p : PsiDef.t) (t : term) =
     (match Hashtbl.find ctx.pcache e_key with
     | None -> None
     | Some (ti, cls) ->
+      if ti.ti_psi_id = p.id then () else Int.incr Utils.Stats.num_foreign_lemma_uses;
       (match List.filter_opt (List.map ~f:(cond_lemma_to_term ~ctx ~p ~t ti) cls) with
       | [] -> None
       | [ a ] -> Some a

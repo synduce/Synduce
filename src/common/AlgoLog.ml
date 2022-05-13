@@ -113,6 +113,7 @@ let show_stat_intermediate_solution
         ; "total-configurations", `Int total_configurations
         ; "unr-cache-hits", `Int !Stats.num_unr_cache_hits
         ; "orig-conf-hit", `Bool !Stats.orig_solution_hit
+        ; "foreign-lemma-uses", `Int !Stats.num_foreign_lemma_uses
         ]
     in
     pf stdout "%s@." (Yojson.to_string ~std:false json))
