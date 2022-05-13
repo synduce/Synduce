@@ -22,8 +22,6 @@ module AsyncSmt : sig
   val solver_verbose_response_summary : solver -> Sexplib0.Sexp.t -> unit
   val solver_verbose_pp_last_resp_count : solver -> unit
   val already_declared : solver -> SmtLib.smtSymbol -> bool
-  val solver_read : solver -> response
-  val solver_write : solver -> SmtLib.command -> unit Lwt.t
   val solver_declare : solver -> SmtLib.smtSymbol -> unit
   val open_log : unit -> unit
   val log : ?solver:solver option -> SmtLib.command -> unit
@@ -57,23 +55,20 @@ module SyncSmt : sig
   type online_solver = Solvers.Synchronous(SmtLog)(Stats).online_solver =
     { s_name : string
     ; s_pid : int
-    ; s_inputc : Stdio.Out_channel.t
-    ; s_outputc : Stdio.In_channel.t
+    ; s_inputc : out_channel
+    ; s_outputc : in_channel
+    ; mutable s_online : bool
     ; mutable s_scope_level : int
     ; s_declared : (string, int) Base.Hashtbl.t
     ; s_log_file : string
-    ; s_log_outc : Stdio.Out_channel.t
+    ; s_log_outc : out_channel
     }
 
   val open_log : unit -> unit
   val log : ?solver:online_solver option -> SmtLib.command -> unit
-  val solver_write : online_solver -> SmtLib.command -> unit
-  val solver_read : online_solver -> solver_response
   val already_declared : online_solver -> SmtLib.smtSymbol -> bool
   val solver_declare : online_solver -> SmtLib.smtSymbol -> unit
   val exec_command : online_solver -> SmtLib.command -> solver_response
-  val online_solvers : (int * online_solver) list ref
-  val handle_sigchild : int -> unit
   val close_solver : online_solver -> unit
   val call_solver : online_solver -> SmtLib.command list -> solver_response
 
@@ -96,15 +91,31 @@ module SyncSmt : sig
   val make_solver : string -> online_solver
 end
 
-val rtype_of_smtSort : SmtLib.smtSort -> RType.t option
+(** `wait_on_failure c s` waits if the first component of s indicates that the solver
+    failed or returned unknown.
+    Will stop waiting when `Config.wait_parallel_tlimit` seconds have elapsed or
+    `c <= 1`. Decrements `c` when it stops waiting, or if the solver response indicates
+    success.
+*)
+val wait_on_failure
+  :  int ref
+  -> (SmtLib.solver_response * 'a) Lwt.t
+  -> (SmtLib.solver_response * 'a) Lwt.t
+
+val rtype_of_smtSort : ctx:Term.Context.t -> SmtLib.smtSort -> RType.t option
 val sort_of_rtype : RType.t -> SmtLib.smtSort
 val dec_parametric : RType.t -> RType.t list -> SmtLib.smtSort
 val decl_of_tup_type : RType.t list -> SmtLib.smtSymbol * SmtLib.command
-val declare_datatype_of_rtype : RType.t -> (SmtLib.smtSymbol list * SmtLib.command) list
-val smtPattern_of_pattern : Term.pattern -> SmtLib.smtPattern
+
+val declare_datatype_of_rtype
+  :  ctx:Term.Context.t
+  -> RType.t
+  -> (SmtLib.smtSymbol list * SmtLib.command) list
+
+val smtPattern_of_pattern : ctx:Term.Context.t -> Term.pattern -> SmtLib.smtPattern
 val term_of_const : Term.Constant.t -> SmtLib.smtTerm
-val smt_of_term : Term.term -> SmtLib.smtTerm
-val smt_of_case : Term.match_case -> SmtLib.match_case
+val smt_of_term : ctx:Term.Context.t -> Term.term -> SmtLib.smtTerm
+val smt_of_case : ctx:Term.Context.t -> Term.match_case -> SmtLib.match_case
 val constant_of_smtConst : SmtLib.smtSpecConstant -> Term.Constant.t
 
 type id_kind =
@@ -117,38 +128,61 @@ type id_kind =
   | INotDef
 
 val term_of_smt
-  :  (string, Term.variable, Base.String.comparator_witness) Base.Map.t
+  :  fctx:PMRS.Functions.ctx
+  -> ctx:Term.Context.t
+  -> (string, Term.variable, Base.String.comparator_witness) Base.Map.t
   -> SmtLib.smtTerm
   -> Term.term
 
-val sorted_vars_of_vars : Term.VarSet.t -> SmtLib.smtSortedVar list
+val sorted_vars_of_vars : ctx:Term.Context.t -> Term.VarSet.t -> SmtLib.smtSortedVar list
 
 type term_model = (string, Term.term, Base.String.comparator_witness) Base.Map.t
 
 val model_to_constmap
-  :  SyncSmt.solver_response
+  :  fctx:PMRS.Functions.ctx
+  -> ctx:Term.Context.t
+  -> SyncSmt.solver_response
   -> (string, Term.term, Base.String.comparator_witness) Base.Map.t
 
-val model_to_varmap : Term.VarSet.t -> SyncSmt.solver_response -> Term.term Term.VarMap.t
+val model_to_varmap
+  :  fctx:PMRS.Functions.ctx
+  -> ctx:Term.Context.t
+  -> Term.VarSet.t
+  -> SyncSmt.solver_response
+  -> Term.term Term.VarMap.t
 
 val request_different_models
-  :  term_model
+  :  fctx:PMRS.Functions.ctx
+  -> ctx:Term.Context.t
+  -> term_model
   -> int
   -> Solvers.Synchronous(SmtLog)(Stats).online_solver
   -> (string, Term.term, Base.String.comparator_witness) Base.Map.t list
 
 val request_different_models_async
-  :  term_model Lwt.t
+  :  fctx:PMRS.Functions.ctx
+  -> ctx:Term.Context.t
+  -> term_model Lwt.t
   -> int
   -> Solvers.Asyncs(SmtLog)(Stats).solver
   -> (string, Term.term, Base.String.comparator_witness) Base.Map.t list Lwt.t
 
 val smtPattern_of_term : Term.term -> SmtLib.smtPattern option
 val mk_assert : SmtLib.smtTerm -> SmtLib.command
-val smt_of_pmrs : PMRS.t -> SmtLib.command list
+
+(**
+  Generate a set of definitions that define a PMRS. This can consist of datatype declarations
+  and recursive definitions. If the PMRS uses parameters, then the definitions for the parameters
+  are included in the set of definitions.
+*)
+val smt_of_pmrs
+  :  fctx:PMRS.Functions.ctx
+  -> ctx:Term.Context.t
+  -> PMRS.t
+  -> SmtLib.command list
 
 module Commands : sig
-  val decls_of_vars : Term.VarSet.t -> SmtLib.command list
+  val decls_of_vars : ctx:Term.Context.t -> Term.VarSet.t -> SmtLib.command list
   val decl_of_tuple_type : RType.t -> SmtLib.command list
 
   (**
@@ -176,7 +210,8 @@ module Commands : sig
     -> SmtLib.command list
 
   val mk_def_fun
-    :  string
+    :  ctx:Term.Context.t
+    -> string
     -> (string * RType.t) list
     -> RType.t
     -> Term.term

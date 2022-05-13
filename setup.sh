@@ -164,8 +164,16 @@ fi
 
 sep "Installing Ocaml dependencies"
 opam update
+# Initialize and update submodules
+git submodule init
+git submodule update
+# Install first the largest dependency
 opam install -y core
+# Pin the syguslib-utils module
+opam pin syguslib-utils -y
+# Install the rest of the dependencies
 opam install -y . --deps-only
+
 
 sep "Compiling the tool..."
 make
@@ -177,9 +185,6 @@ else
     sep "Create link Synduce to _build/default/bin/Synduce.exe"
     ln -s _build/default/bin/Synduce.exe Synduce
 fi
-# Initialize submodules
-git submodule init
-git submodule update
 
 # Running tests
 sep "Calling the tool, should print help message..."

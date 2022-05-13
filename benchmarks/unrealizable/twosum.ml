@@ -40,7 +40,7 @@ let twosum goal t =
 
 let target x t =
   let rec h = function
-    | Nil -> x
+    | Nil -> [%synt f] x
     | Cons (hd, tl) -> [%synt join] hd (h tl)
   in
   h t

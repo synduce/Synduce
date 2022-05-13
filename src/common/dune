@@ -1,0 +1,6 @@
+(library
+ (name common)
+ (public_name Synduce.Lib.Common)
+ (libraries base fmt utils lang lwt ocamlgraph)
+ (preprocess
+  (pps ppx_let lwt_ppx)))

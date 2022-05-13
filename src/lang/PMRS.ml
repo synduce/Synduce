@@ -55,96 +55,112 @@ type t =
   ; plogic : SmtLogic.logic_info
   }
 
-(** Table of all the PMRS in the file, indexed by the function
-    variable id.
+(** Function contexts:
+    - all PMRS in the file, indexed by the function variable id.
+    - all the nonterminals, indexed by the function variable id.
 *)
-let _GLOBALS : (int, t) Hashtbl.t = Hashtbl.create (module Int)
+module Functions = struct
+  type ctx =
+    { globals : (int, t) Hashtbl.t
+    ; nonterminals : (int, int) Hashtbl.t
+    }
 
-let register_global (p : t) = Hashtbl.set _GLOBALS ~key:p.pvar.vid ~data:p
-let find_global (id : int) = Hashtbl.find _GLOBALS id
+  let create () =
+    { globals = Hashtbl.create (module Int); nonterminals = Hashtbl.create (module Int) }
+  ;;
 
-(** Find a PMRS by name. The name of a PMRS is the name of its pvar.  *)
-let find_by_name (pmrs_name : string) : variable option =
-  let matches = Hashtbl.filter ~f:(fun p -> String.(p.pvar.vname = pmrs_name)) _GLOBALS in
-  Option.map ~f:(fun (_, p) -> p.pvar) (Hashtbl.choose matches)
-;;
+  let clear ctx =
+    Hashtbl.clear ctx.globals;
+    Hashtbl.clear ctx.nonterminals
+  ;;
 
-(** Mapping nonterminals to the PMRS they belong to, index by the nonterminal
-    variable id.
-*)
-let _NONTERMINALS : (int, int) Hashtbl.t = Hashtbl.create (module Int)
+  let copy ctx =
+    { globals = Hashtbl.copy ctx.globals; nonterminals = Hashtbl.copy ctx.nonterminals }
+  ;;
 
-let register_nonterminal (id : int) (pmrsid : t) =
-  Hashtbl.set _NONTERMINALS ~key:id ~data:pmrsid.pvar.vid
-;;
+  let register_global ctx (p : t) = Hashtbl.set ctx.globals ~key:p.pvar.vid ~data:p
+  let find_global ctx (id : int) = Hashtbl.find ctx.globals id
 
-let find_nonterminal (id : int) =
-  Option.(Hashtbl.find _NONTERMINALS id >>= fun pid -> Hashtbl.find _GLOBALS pid)
-;;
+  (** Find a PMRS by name. The name of a PMRS is the name of its pvar.  *)
+  let find_by_name ctx (pmrs_name : string) : variable option =
+    let matches =
+      Hashtbl.filter ~f:(fun p -> String.(p.pvar.vname = pmrs_name)) ctx.globals
+    in
+    Option.map ~f:(fun (_, p) -> p.pvar) (Hashtbl.choose matches)
+  ;;
 
-(** Find a non-terminal (represented by a variable) from its name. *)
-let find_nonterminal_by_name (name : string) : variable option =
-  let r = ref None in
-  Hashtbl.iter _NONTERMINALS ~f:(fun pid ->
-      match Hashtbl.find _GLOBALS pid with
-      | Some t ->
-        (match VarSet.find_by_name t.pnon_terminals name with
-        | Some x -> r := Some x
-        | None -> ())
-      | None -> ());
-  !r
-;;
+  let register_nonterminal ctx (id : int) (pmrsid : t) =
+    Hashtbl.set ctx.nonterminals ~key:id ~data:pmrsid.pvar.vid
+  ;;
+
+  let find_nonterminal ctx (id : int) =
+    Option.(Hashtbl.find ctx.nonterminals id >>= fun pid -> Hashtbl.find ctx.globals pid)
+  ;;
+
+  (** Find a non-terminal (represented by a variable) from its name. *)
+  let find_nonterminal_by_name ctx (name : string) : variable option =
+    let r = ref None in
+    Hashtbl.iter ctx.nonterminals ~f:(fun pid ->
+        match Hashtbl.find ctx.globals pid with
+        | Some t ->
+          (match VarSet.find_by_name t.pnon_terminals name with
+          | Some x -> r := Some x
+          | None -> ())
+        | None -> ());
+    !r
+  ;;
+
+  let update ctx (p : t) =
+    register_global ctx p;
+    Set.iter p.pnon_terminals ~f:(fun v -> register_nonterminal ctx v.vid p)
+  ;;
+end
 
 (**
   Generate the term that corresponds to the left hand side of a rewrite rule in
   a PMRS.
 *)
-let lhs (nt, args, pat, rhs) =
+let lhs ~(ctx : Context.t) (nt, args, pat, rhs) =
   let all_args =
-    let args = List.map ~f:mk_var args in
+    let args = List.map ~f:(mk_var ctx) args in
     match pat with
-    | Some p -> args @ [ term_of_pattern p ]
+    | Some p -> args @ [ term_of_pattern ctx p ]
     | None -> args
   in
-  let t, _ = infer_type (mk_app ~pos:rhs.tpos (mk_var nt) all_args) in
+  let t, _ = infer_type ctx (mk_app ~pos:rhs.tpos (mk_var ctx nt) all_args) in
   t
-;;
-
-let update (p : t) =
-  register_global p;
-  Set.iter p.pnon_terminals ~f:(fun v -> register_nonterminal v.vid p)
-;;
-
-let reinit () =
-  Hashtbl.clear _GLOBALS;
-  Hashtbl.clear _NONTERMINALS
 ;;
 
 (* ============================================================================================= *)
 (*                                 PRETTY PRINTING                                               *)
 (* ============================================================================================= *)
 
-let pp_rewrite_rule (frmt : Formatter.t) ((nt, vargs, pat, t) : rewrite_rule) : unit =
+let pp_rewrite_rule
+    ~(ctx : Context.t)
+    (frmt : Formatter.t)
+    ((nt, vargs, pat, t) : rewrite_rule)
+    : unit
+  =
   Fmt.(
     pf
       frmt
       "@[<hov 2>@[<hov 2>%s %a %a  ⟹@] @;%a@]"
       nt.vname
-      (list ~sep:sp Variable.pp)
+      (list ~sep:sp (Variable.pp ctx))
       vargs
-      (option pp_pattern)
+      (option (pp_pattern ctx))
       pat
-      (box pp_term)
+      (box (pp_term ctx))
       t)
 ;;
 
-let pp (frmt : Formatter.t) ?(short = false) (pmrs : t) : unit =
+let pp ~(ctx : Context.t) (frmt : Formatter.t) ?(short = false) (pmrs : t) : unit =
   let pp_rules frmt () =
     Map.iteri
       ~f:(fun ~key:_ ~data:(nt, args, pat, res) ->
         if Variable.(pmrs.pmain_symb = nt)
-        then Fmt.(pf frmt "@[<v 2>‣ %a@]@;" pp_rewrite_rule (nt, args, pat, res))
-        else Fmt.(pf frmt "@[<v 2>  %a@]@;" pp_rewrite_rule (nt, args, pat, res)))
+        then Fmt.(pf frmt "@[<v 2>‣ %a@]@;" (pp_rewrite_rule ~ctx) (nt, args, pat, res))
+        else Fmt.(pf frmt "@[<v 2>  %a@]@;" (pp_rewrite_rule ~ctx) (nt, args, pat, res)))
       pmrs.prules
   in
   Fmt.(
@@ -152,16 +168,16 @@ let pp (frmt : Formatter.t) ?(short = false) (pmrs : t) : unit =
       frmt
       "@[<hov> %s⟨%a⟩(%a): %a -> %a@;%a@;= @;@[<v 2>%a@]@]"
       pmrs.pvar.vname
-      VarSet.pp_var_names
+      (VarSet.pp_var_names ctx)
       pmrs.psyntobjs
-      (list ~sep:comma Variable.pp)
+      (list ~sep:comma (Variable.pp ctx))
       pmrs.pargs
       (list ~sep:comma RType.pp)
       pmrs.pinput_typ
       RType.pp
       pmrs.poutput_typ
-      (option (box pp_spec))
-      (Specifications.get_spec pmrs.pvar)
+      (option (box (pp_spec ~ctx)))
+      (Specifications.get_spec ~ctx pmrs.pvar)
       (if short then fun _ _ -> () else braces pp_rules)
       ())
 ;;
@@ -169,12 +185,13 @@ let pp (frmt : Formatter.t) ?(short = false) (pmrs : t) : unit =
 (**
   Pretty-print a PMRS as a set of OCaml functions.
 *)
-let pp_ocaml (frmt : Formatter.t) ?(short = false) (pmrs : t) : unit =
+let pp_ocaml ~(ctx : Context.t) (frmt : Formatter.t) ?(short = false) (pmrs : t) : unit =
   let _ = short in
+  let pp_term = pp_term ctx in
   let print_caml_def (frmt : Formatter.t) (nt, args, cases) =
     let pp_case f (opat, rhs) =
       match opat with
-      | Some pat -> Fmt.(pf f "@[@[%a@] -> %a@]" pp_pattern pat pp_term rhs)
+      | Some pat -> Fmt.(pf f "@[@[%a@] -> %a@]" (pp_pattern ctx) pat pp_term rhs)
       | None -> Fmt.(pf f "@[<missing pattern> ->@;%a@]" pp_term rhs)
     in
     match cases with
@@ -188,7 +205,7 @@ let pp_ocaml (frmt : Formatter.t) ?(short = false) (pmrs : t) : unit =
             "@[<hov 2>%a @[%a_x@] %a@;@[%a _x %a@;@[%a -> %a@]@]@]"
             (styled (`Fg `Cyan) string)
             nt.vname
-            (list ~sep:sp Variable.pp)
+            (list ~sep:sp (Variable.pp ctx))
             args
             (styled (`Fg `Red) string)
             "="
@@ -196,7 +213,7 @@ let pp_ocaml (frmt : Formatter.t) ?(short = false) (pmrs : t) : unit =
             "match"
             (styled (`Fg `Yellow) string)
             "with"
-            pp_pattern
+            (pp_pattern ctx)
             pat
             pp_term
             rhs)
@@ -207,7 +224,7 @@ let pp_ocaml (frmt : Formatter.t) ?(short = false) (pmrs : t) : unit =
             "@[<hov 2>%a @[%a@] %a@;%a@]"
             (styled (`Fg `Cyan) string)
             nt.vname
-            (list ~sep:sp Variable.pp)
+            (list ~sep:sp (Variable.pp ctx))
             args
             (styled (`Fg `Red) string)
             "="
@@ -220,7 +237,7 @@ let pp_ocaml (frmt : Formatter.t) ?(short = false) (pmrs : t) : unit =
           "@[%a %a%a@]@;<1 2>@[%a@;%a@]"
           (styled (`Fg `Cyan) string)
           nt.vname
-          (list ~sep:sp Variable.pp)
+          (list ~sep:sp (Variable.pp ctx))
           args
           (styled (`Fg `Red) string)
           "="
@@ -238,7 +255,7 @@ let pp_ocaml (frmt : Formatter.t) ?(short = false) (pmrs : t) : unit =
       let args, match_cases =
         let reconstr_cases (args, match_cases) (_, (_, args', pat, rhs)) =
           let pre_subst = List.zip_exn args' args in
-          let substs = List.map ~f:(fun (x, y) -> mk_var x, mk_var y) pre_subst in
+          let substs = List.map ~f:(fun (x, y) -> mk_var ctx x, mk_var ctx y) pre_subst in
           args, match_cases @ [ pat, substitution substs rhs ]
         in
         match Map.to_alist nt_rules with
@@ -275,14 +292,14 @@ let update_order (p : t) : t =
   { p with porder = order }
 ;;
 
-let set_logic_info_of_pmrs (p : t) : t =
+let set_logic_info_of_pmrs ~(ctx : Context.t) (p : t) : t =
   let f ~key:_ ~data:(_, _, _, rhs) logic_info =
     let operators = Analysis.operators_of rhs in
     let theory = SmtLogic.theory_of (type_of rhs) in
     SmtLogic.
       { theory = Smtlib.Logics.join_theories theory logic_info.theory
       ; linearity = logic_info.linearity && Set.for_all ~f:Operator.is_lia operators
-      ; datatypes = SmtLogic.term_requires_datatype rhs
+      ; datatypes = SmtLogic.term_requires_datatype ~ctx rhs
       }
   in
   let li = Map.fold ~f ~init:SmtLogic.base_logic_info p.prules in
@@ -296,54 +313,55 @@ let set_logic_info_of_pmrs (p : t) : t =
   - the pmain_symb of the PMRS,
   - the unknowns in the PMRS.
 *)
-let clear_pmrs_types (prog : t) : t =
+let clear_pmrs_types ~(ctx : Context.t) (prog : t) : t =
   let rec clear_type_pat pat =
     match pat with
     | PatConstr (_, args) -> List.iter ~f:clear_type_pat args
-    | PatVar v -> Variable.clear_type v
+    | PatVar v -> Variable.clear_type ctx v
     | PatTuple args -> List.iter ~f:clear_type_pat args
     | PatAny | PatConstant _ -> ()
   in
   let f_rule ~key:_ ~data:(nt, args, pat, body) : _ =
-    List.iter ~f:Variable.clear_type args;
+    List.iter ~f:(Variable.clear_type ctx) args;
     let _ = Option.map ~f:clear_type_pat pat in
-    nt, args, pat, erase_term_type body
+    nt, args, pat, erase_term_type ctx body
   in
   let prules = Map.mapi ~f:f_rule prog.prules in
-  Set.iter ~f:Variable.clear_type (Set.union prog.pnon_terminals prog.psyntobjs);
-  Variable.clear_type prog.pvar;
-  Variable.clear_type prog.pmain_symb;
+  Set.iter ~f:(Variable.clear_type ctx) (Set.union prog.pnon_terminals prog.psyntobjs);
+  Variable.clear_type ctx prog.pvar;
+  Variable.clear_type ctx prog.pmain_symb;
   { prog with
     prules
-  ; pinput_typ = [ RType.get_fresh_tvar () ]
-  ; poutput_typ = RType.get_fresh_tvar ()
+  ; pinput_typ = [ RType.get_fresh_tvar ctx.types ]
+  ; poutput_typ = RType.get_fresh_tvar ctx.types
   }
 ;;
 
-let infer_pmrs_types (prog : t) =
+let infer_pmrs_types ~(ctx : Context.t) (prog : t) =
   let infer_aux ~key ~data:(nt, args, pat, body) (map, substs) =
-    let t_body, c_body = infer_type body in
+    let t_body, c_body = infer_type ctx body in
     let t_head, c_head =
       let head_term =
-        let t_args = List.map ~f:mk_var args in
+        let t_args = List.map ~f:(mk_var ctx) args in
         match pat with
-        | Some pattern -> mk_app (mk_var nt) (t_args @ [ term_of_pattern pattern ])
-        | None -> mk_app (mk_var nt) t_args
+        | Some pattern -> mk_app (mk_var ctx nt) (t_args @ [ term_of_pattern ctx pattern ])
+        | None -> mk_app (mk_var ctx nt) t_args
       in
-      infer_type head_term
+      infer_type ctx head_term
     in
     let cur_loc = body.tpos in
     let c_rule = RType.merge_subs cur_loc c_body c_head in
     match RType.unify (RType.mkv (substs @ c_rule) @ [ t_head.ttyp, t_body.ttyp ]) with
     | Ok res ->
-      Map.set map ~key ~data:(nt, args, pat, rewrite_types (RType.mkv res) t_body), res
+      ( Map.set map ~key ~data:(nt, args, pat, rewrite_types ctx (RType.mkv res) t_body)
+      , res )
     | Error e ->
       Log.error_msg Fmt.(str "Error: %a" Sexp.pp_hum e);
       Log.loc_fatal_errmsg
         cur_loc
         (Fmt.str
            "(%a) has type %a, expected type %a."
-           pp_term
+           (pp_term ctx)
            body
            RType.pp
            t_body.ttyp
@@ -355,24 +373,27 @@ let infer_pmrs_types (prog : t) =
   in
   match RType.unify (RType.mkv new_subs) with
   | Ok usubs ->
-    Variable.update_var_types (RType.mkv usubs);
-    let typ_in, typ_out = RType.fun_typ_unpack (Variable.vtype_or_new prog.pmain_symb) in
+    Variable.update_var_types ctx (RType.mkv usubs);
+    let typ_in, typ_out =
+      RType.fun_typ_unpack (Variable.vtype_or_new ctx prog.pmain_symb)
+    in
     Variable.update_var_types
-      [ Variable.vtype_or_new prog.pvar, Variable.vtype_or_new prog.pmain_symb ];
+      ctx
+      [ Variable.vtype_or_new ctx prog.pvar, Variable.vtype_or_new ctx prog.pmain_symb ];
     (* Change types in the specification. *)
     (* Ensures. *)
     let _ =
-      let%bind spec = get_spec prog.pvar in
+      let%bind spec = get_spec ~ctx prog.pvar in
       let%map invariant =
-        Option.map ~f:(fun ens -> first (infer_type ens)) spec.ensures
+        Option.map ~f:(fun ens -> first (infer_type ctx ens)) spec.ensures
       in
-      Specifications.set_spec prog.pvar { spec with ensures = Some invariant }
+      Specifications.set_spec ~ctx prog.pvar { spec with ensures = Some invariant }
     in
     (* Requires *)
     let _ =
-      let%bind spec = get_spec prog.pvar in
+      let%bind spec = get_spec ~ctx prog.pvar in
       let%map invariant =
-        Option.map ~f:(fun ens -> first (infer_type ens)) spec.requires
+        Option.map ~f:(fun ens -> first (infer_type ctx ens)) spec.requires
       in
       (* Check that input of requires is same as input of function (without parameters). *)
       let req_t_in, _ = RType.fun_typ_unpack invariant.ttyp in
@@ -391,7 +412,7 @@ let infer_pmrs_types (prog : t) =
       | List.Or_unequal_lengths.Ok t ->
         (match RType.unify t with
         | Ok _ ->
-          Specifications.set_spec prog.pvar { spec with requires = Some invariant }
+          Specifications.set_spec ~ctx prog.pvar { spec with requires = Some invariant }
         | Error e ->
           Log.error_msg (Sexp.to_string_hum e);
           Log.error_msg err_msg;
@@ -401,6 +422,7 @@ let infer_pmrs_types (prog : t) =
         failwith err_msg
     in
     set_logic_info_of_pmrs
+      ~ctx
       { prog with prules = new_rules; pinput_typ = typ_in; poutput_typ = typ_out }
   | Error e ->
     Log.error_msg Fmt.(str "Error: %a" Sexp.pp_hum e);
@@ -408,6 +430,7 @@ let infer_pmrs_types (prog : t) =
 ;;
 
 let unify_two_with_vartype_update
+    ~(ctx : Context.t)
     ((theta, theta') : RType.t * RType.t)
     ((tau, tau') : RType.t * RType.t)
     : RType.substitution
@@ -418,7 +441,7 @@ let unify_two_with_vartype_update
   | Ok sb1, Ok sb2 ->
     (match RType.unify (RType.mkv (sb1 @ sb2)) with
     | Ok sb' ->
-      Term.Variable.update_var_types (RType.mkv sb');
+      Term.Variable.update_var_types ctx (RType.mkv sb');
       sb'
     | Error e ->
       Log.error_msg Fmt.(str "Error: %a" Sexp.pp_hum e);
@@ -435,12 +458,12 @@ let unify_two_with_vartype_update
     Log.fatal ()
 ;;
 
-let unify_one_with_update (t, t') =
+let unify_one_with_update ~ctx (t, t') =
   let sb1 = RType.unify_one t t' in
   match sb1 with
   | Ok sb1 ->
     (match RType.unify (RType.mkv sb1) with
-    | Ok sb' -> Term.Variable.update_var_types (RType.mkv sb')
+    | Ok sb' -> Term.Variable.update_var_types ctx (RType.mkv sb')
     | Error e ->
       Log.error_msg Fmt.(str "Error: %a" Sexp.pp_hum e);
       Log.error_msg "Could not unify θ and τ in problem definition.";
@@ -461,9 +484,14 @@ let extract_rec_input_typ (prog : t) =
 (*                             TRANSLATION FROM FUNCTION to PMRS and back                        *)
 (* ============================================================================================= *)
 
-let func_to_pmrs (f : Variable.t) (args : fpattern list) (body : Term.term) =
+let func_to_pmrs
+    ~(ctx : Context.t)
+    (f : Variable.t)
+    (args : fpattern list)
+    (body : Term.term)
+  =
   let tin, tout =
-    match Variable.vtype_or_new f with
+    match Variable.vtype_or_new ctx f with
     | RType.TFun (tin, tout) -> tin, tout
     | _ -> failwith "Cannot make pmrs of non-function."
   in
@@ -487,14 +515,19 @@ let func_to_pmrs (f : Variable.t) (args : fpattern list) (body : Term.term) =
   }
 ;;
 
-let build_match_cases pmrs _nont vars (relevant_rules : rewrite_rule list)
+let build_match_cases
+    ~(ctx : Context.t)
+    (pmrs : t)
+    _nont
+    (vars : Variable.t list)
+    (relevant_rules : rewrite_rule list)
     : (term * match_case list) option
   =
   let build_with matched_var rest_args =
     let rule_to_match_case (_, var_args, pat, body) =
       let non_pattern_matched_args = pmrs.pargs @ var_args in
       let case_body =
-        let extra_param_args = List.map ~f:Term.mk_var pmrs.pargs in
+        let extra_param_args = List.map ~f:(Term.mk_var ctx) pmrs.pargs in
         let body' =
           let case f t =
             match t.tkind with
@@ -502,7 +535,7 @@ let build_match_cases pmrs _nont vars (relevant_rules : rewrite_rule list)
               if Set.mem pmrs.pnon_terminals fv
               then (
                 let args' = List.map ~f args in
-                Some (mk_app (Term.mk_var fv) (extra_param_args @ args')))
+                Some (mk_app (Term.mk_var ctx fv) (extra_param_args @ args')))
               else None
             | _ -> None
           in
@@ -511,7 +544,7 @@ let build_match_cases pmrs _nont vars (relevant_rules : rewrite_rule list)
         let sub =
           match
             List.map2
-              ~f:(fun v x -> Term.mk_var v, Term.mk_var x)
+              ~f:(fun v x -> Term.mk_var ctx v, Term.mk_var ctx x)
               non_pattern_matched_args
               rest_args
           with
@@ -523,7 +556,7 @@ let build_match_cases pmrs _nont vars (relevant_rules : rewrite_rule list)
       Option.map ~f:(fun x -> x, case_body) pat
     in
     Option.map
-      ~f:(fun l -> mk_var matched_var, l)
+      ~f:(fun l -> mk_var ctx matched_var, l)
       (all_or_none (List.map ~f:rule_to_match_case relevant_rules))
   in
   match List.last vars, List.drop_last vars with
@@ -531,32 +564,33 @@ let build_match_cases pmrs _nont vars (relevant_rules : rewrite_rule list)
   | _ -> None
 ;;
 
-let single_rule_case vars (args, body) : term =
+let single_rule_case ~(ctx : Context.t) (vars : Variable.t list) (args, body) : term =
   let sub =
-    match List.map2 ~f:(fun v x -> Term.mk_var v, Term.mk_var x) args vars with
+    match List.map2 ~f:(fun v x -> Term.mk_var ctx v, Term.mk_var ctx x) args vars with
     | Ok zipped -> zipped
     | Unequal_lengths -> failwith "Unexpected."
   in
   substitution sub body
 ;;
 
-let vars_and_formals (pmrs : t) (fvar : variable) =
-  let args_t, _ = RType.fun_typ_unpack (Variable.vtype_or_new fvar) in
+let vars_and_formals ~(ctx : Context.t) (pmrs : t) (fvar : variable) =
+  let args_t, _ = RType.fun_typ_unpack (Variable.vtype_or_new ctx fvar) in
   List.map
     ~f:(fun rt ->
       let v =
         Variable.mk
+          ctx
           ~t:(Some rt)
-          (Alpha.fresh ~s:("x" ^ String.drop_suffix fvar.vname 2) ())
+          (Alpha.fresh ctx.names ~s:("x" ^ String.drop_suffix fvar.vname 2))
       in
       v)
-    (List.map ~f:(fun v -> Variable.vtype_or_new v) pmrs.pargs @ args_t)
+    (List.map ~f:(fun v -> Variable.vtype_or_new ctx v) pmrs.pargs @ args_t)
 ;;
 
-let func_of_pmrs (pmrs : t) : function_descr list =
+let func_of_pmrs ~(ctx : Context.t) (pmrs : t) : function_descr list =
   (* Define recursive functions. *)
   let fun_of_nont (nont : variable) : function_descr option =
-    let vars = vars_and_formals pmrs nont in
+    let vars = vars_and_formals ~ctx pmrs nont in
     let maybe_body =
       let relevant_rules =
         Map.data (Map.filter ~f:(fun (k, _, _, _) -> k.vid = nont.vid) pmrs.prules)
@@ -566,15 +600,15 @@ let func_of_pmrs (pmrs : t) : function_descr list =
       in
       if all_pattern_matching
       then (
-        match build_match_cases pmrs nont vars relevant_rules with
-        | Some (x, match_cases) -> Some (mk_match x match_cases)
+        match build_match_cases ~ctx pmrs nont vars relevant_rules with
+        | Some (x, match_cases) -> Some (mk_match ctx x match_cases)
         | None ->
           (match relevant_rules with
-          | [ (_, args, _, body) ] -> Some (single_rule_case vars (args, body))
+          | [ (_, args, _, body) ] -> Some (single_rule_case ~ctx vars (args, body))
           | _ -> None))
       else (
         match relevant_rules with
-        | [ (_, args, _, body) ] -> Some (single_rule_case vars (args, body))
+        | [ (_, args, _, body) ] -> Some (single_rule_case ~ctx vars (args, body))
         | _ -> None)
     in
     Option.map maybe_body ~f:(fun body ->
@@ -594,6 +628,7 @@ let func_of_pmrs (pmrs : t) : function_descr list =
 *)
 let inverted_rule_lookup
     ?(boundvars = VarSet.empty)
+    ~(ctx : Context.t)
     rules
     (func : term)
     (args : term list)
@@ -601,7 +636,7 @@ let inverted_rule_lookup
   let list_matching l =
     let m =
       List.map l ~f:(fun (rhs_arg, arg) ->
-          Matching.matches ~boundvars ~pattern:rhs_arg arg)
+          Matching.matches ~ctx ~boundvars ~pattern:rhs_arg arg)
     in
     let merge_subs ~key:_ s =
       match s with
@@ -621,7 +656,7 @@ let inverted_rule_lookup
   in
   let filter (nt, rule_args, rule_pat, rule_rhs) =
     let lhs_term substs =
-      let t = lhs (nt, rule_args, rule_pat, rule_rhs) in
+      let t = lhs ~ctx (nt, rule_args, rule_pat, rule_rhs) in
       substitution (Terms.substs_of_alist (Map.to_alist substs)) t
     in
     match rule_rhs.tkind with
@@ -640,11 +675,11 @@ let inverted_rule_lookup
 (**
   Apply a substitution to all the right hand side of the PMRS rules.
 *)
-let subst_rule_rhs ~(p : t) (substs : (term * term) list) =
+let subst_rule_rhs ~(ctx : Context.t) ~(p : t) (substs : (term * term) list) =
   let rules' =
     let f (nt, args, pat, body) =
       let body' = substitution substs body in
-      let body'', _ = infer_type body' in
+      let body'', _ = infer_type ctx body' in
       nt, args, pat, body''
     in
     Map.map ~f p.prules
@@ -655,10 +690,10 @@ let subst_rule_rhs ~(p : t) (substs : (term * term) list) =
 (**
   Given an input PMRS, returns a list of PMRS that this PMRS depends on.
   *)
-let depends (p : t) : t list =
+let depends ~(glob : Functions.ctx) ~(ctx : Context.t) (p : t) : t list =
   let f (_, _, _, rule_body) =
-    let vars = Analysis.free_variables rule_body in
-    List.filter_map ~f:(fun v -> Hashtbl.find _GLOBALS v.vid) (Set.elements vars)
+    let vars = Analysis.free_variables ~ctx rule_body in
+    List.filter_map ~f:(fun v -> Hashtbl.find glob.globals v.vid) (Set.elements vars)
   in
   List.dedup_and_sort
     ~compare:(fun p1 p2 -> String.compare p1.pvar.vname p2.pvar.vname)
@@ -668,7 +703,7 @@ let depends (p : t) : t list =
 (**
   Updates and returns the output type of a PMRS.
 *)
-let update_output_type (p : t) : t =
-  let ot = snd (RType.fun_typ_unpack (Variable.vtype_or_new p.pvar)) in
+let update_output_type ~(ctx : Context.t) (p : t) : t =
+  let ot = snd (RType.fun_typ_unpack (Variable.vtype_or_new ctx p.pvar)) in
   { p with poutput_typ = ot }
 ;;

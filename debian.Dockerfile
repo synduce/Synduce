@@ -17,6 +17,7 @@ RUN opam install core -y
 COPY --chown=opam:opam . /home/opam/synduce
 RUN ls /home/opam/synduce
 RUN cd /home/opam/synduce && \
+    opam pin syguslib-utils -y
     opam install . --deps-only -y && \
     eval $(opam env) && \
     dune build bin/Synduce.exe && \

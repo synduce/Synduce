@@ -14,11 +14,15 @@ let soln_descr filename =
   let eqns = Lib.get_lemma_hints () in
   Codegen.Commons.pp_problem_descr Fmt.stdout sum;
   (match soln with
-  | Some s -> Algo.AState.pp_soln ~use_ocaml_syntax:true Fmt.stdout s
+  | Some s -> Algo.Common.ProblemDefs.pp_soln ~use_ocaml_syntax:true Fmt.stdout s
   | None -> ());
-  List.iter ~f:(fun eqn -> pf Fmt.stdout "%a@." Algo.AState.pp_equation eqn) eqns;
+  List.iter
+    ~f:(fun eqn -> pf Fmt.stdout "%a@." Algo.Common.ProblemDefs.pp_equation eqn)
+    eqns;
   Fmt.(pf stdout "=== EXPAND ===@.");
-  let v = mk_var (Variable.mk ~t:(Some !Algo.AState._theta) (Alpha.fresh ())) in
+  let v =
+    mk_var (Variable.mk ~t:(Some !Algo.Common.ProblemDefs._theta) (Alpha.fresh ()))
+  in
   Fmt.(pf stdout "%a@." pp_term v);
   let expansions = Analysis.expand_once v in
   List.iter ~f:(fun t -> Fmt.(pf stdout "@[%a -> %a@]@." pp_term v pp_term t)) expansions;

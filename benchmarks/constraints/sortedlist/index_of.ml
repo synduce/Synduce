@@ -1,8 +1,17 @@
-type list = Elt of int | Cons of int * list
+(** @synduce -NB -n 20 *)
 
-let rec is_sorted = function Elt x -> true | Cons (hd, tl) -> hd <= head tl && is_sorted tl
+type list =
+  | Elt of int
+  | Cons of int * list
 
-and head = function Elt x -> x | Cons (hd, tl) -> hd
+let rec is_sorted = function
+  | Elt x -> true
+  | Cons (hd, tl) -> hd <= head tl && is_sorted tl
+
+and head = function
+  | Elt x -> x
+  | Cons (hd, tl) -> hd
+;;
 
 let spec x t =
   let rec f = function
@@ -11,6 +20,7 @@ let spec x t =
   in
   f t
   [@@ensures fun x -> x >= 0]
+;;
 
 let target x t =
   let rec g = function
@@ -19,3 +29,4 @@ let target x t =
   in
   g t
   [@@requires is_sorted]
+;;

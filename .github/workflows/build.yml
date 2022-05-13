@@ -44,9 +44,14 @@ jobs:
           mkdir -p $HOME/.local/bin
           export PATH="$HOME/.local/bin:$PATH"
 
+
       # Install core
       - name: Install core
         run: opam install -y core
+        
+      # Install and pin submodule
+      - name: Install syguslib-utils v0.2.1 from submodule
+        run: opam pin syguslib-utils
         
       - name: Install Ocaml Project dependencies
         run: opam install -y . --deps-only

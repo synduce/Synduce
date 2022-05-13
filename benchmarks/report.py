@@ -11,6 +11,7 @@ from definitions import *
 from table2 import *
 from table3 import *
 from table5 import *
+from table6 import *
 
 
 def select_last_known_experimental_data(table_no):

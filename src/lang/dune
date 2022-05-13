@@ -12,4 +12,4 @@
   smtlib
   compiler-libs)
  (preprocess
-  (pps ppx_let ppx_sexp_conv)))
+  (pps ppx_hash ppx_let ppx_sexp_conv)))
