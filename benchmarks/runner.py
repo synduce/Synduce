@@ -207,7 +207,10 @@ class BenchmarkResult(object):
                                not self.info.is_intermediate,
                                num_solved_confs, num_total_confs,
                                num_solutions, num_unrealizable,
-                               self.verif_elapsed)
+                               self.verif_elapsed,
+                               self.info.unr_cache_hits,
+                               self.info.orig_conf_hit
+                               )
         return csv_obj.get_csv_string()
 
 
@@ -285,10 +288,11 @@ def run_n(progress, bench_id, command, filename, realizable=True, expect_many=Fa
                 csv_obj = MultiCsvLine(
                     info.elapsed, 0, False, info.count_solved_configurations(),
                     info.total_configurations, num_solutions, num_unrealizable,
-                    info.verif_elapsed)
+                    info.verif_elapsed, info.unr_cache_hits, info.orig_conf_hit)
                 csvline = csv_obj.get_csv_string()
             else:
-                csv_obj = MultiCsvLine("N/A", 0, False, 0, 0, 0, 0, "N/A")
+                csv_obj = MultiCsvLine(
+                    "N/A", 0, False, 0, 0, 0, 0, "N/A", 0, False)
                 csvline = csv_obj.get_csv_string()
         else:
             print(f"{progress: >11s} ❌ {bench_id : <90s}")
