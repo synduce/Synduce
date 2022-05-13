@@ -50,13 +50,11 @@ let get ~(ctx : env) ~(p : PsiDef.t) (t : term) =
 ;;
 
 let find_lemma_info ~(ctx : Env.env) ((term, splitter) : term * term option)
-    : (term_info * cond_lemma) option
+    : (term_info * cond_lemma option) option
   =
   match Option.bind ~f:(Hashtbl.find ctx.pcache) (key_of_term term) with
   | Some (ti, cls) ->
-    Option.(
-      List.find ~f:(fun cl -> Option.equal Terms.equal cl.cl_cond splitter) cls
-      >>| fun x -> ti, x)
+    Some (ti, List.find ~f:(fun cl -> Option.equal Terms.equal cl.cl_cond splitter) cls)
   | None -> None
 ;;
 
@@ -65,9 +63,10 @@ let find ~(ctx : env) ~(key : term) =
 ;;
 
 let get_with_precond ~(ctx : env) ~(p : PsiDef.t) ~(key : term * term option) =
-  Option.bind
-    ~f:(fun (ti, cl) -> cond_lemma_to_term ~ctx ~p ~t:(Utils.first key) ti cl)
-    (find_lemma_info ~ctx key)
+  match find_lemma_info ~ctx key with
+  | Some (ti, Some cl) -> cond_lemma_to_term ~ctx ~p ~t:(Utils.first key) ti cl
+  | Some (_, None) -> None
+  | _ -> None
 ;;
 
 let change

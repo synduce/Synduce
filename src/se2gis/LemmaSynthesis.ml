@@ -42,7 +42,12 @@ let term_info_of_witness ~(ctx : Context.t) ~(is_pos_witness : bool) (witness : 
     } )
 ;;
 
-let remap_witness ~(ctx : Context.t) (det : term_info) (wit : witness) =
+(**
+  Returns a map from the variables in the witness to the variables in the term_info.
+*)
+let remap_witness ~(ctx : Context.t) (det : term_info) (wit : witness)
+    : variable VarMap.t option
+  =
   match Matching.alpha_equal ~ctx ~pattern:wit.witness_eqn.eterm det.ti_term with
   | Some wit_to_det ->
     let wts_subst = VarMap.to_subst ctx (Map.map ~f:(fun a -> mk_var ctx a) wit_to_det) in
@@ -58,13 +63,39 @@ let remap_witness ~(ctx : Context.t) (det : term_info) (wit : witness) =
           | TVar a, TVar b -> Map.set m ~key:a ~data:b
           | _ -> m)
     in
-    let wit_var_to_det_var a =
-      match Map.find wit_to_det a with
-      | Some x -> x
-      | None -> a
+    Some wit_to_det
+  | None -> None
+;;
+
+let remap_model (wit : witness) (m : variable VarMap.t) =
+  let wit_var_to_det_var a =
+    match Map.find m a with
+    | Some x -> x
+    | None -> a
+  in
+  let f ~key ~data new_map = Map.set new_map ~key:(wit_var_to_det_var key) ~data in
+  Map.fold wit.witness_model ~init:VarMap.empty ~f
+;;
+
+let remap_witness_model ~(ctx : Context.t) (det : term_info) (wit : witness) =
+  Option.map ~f:(remap_model wit) (remap_witness ~ctx det wit)
+;;
+
+let cond_lemma_of_witness ~(ctx : Context.t) ~(pos : bool) (ti : term_info) (wi : witness)
+  =
+  match remap_witness ~ctx ti wi with
+  | Some wmap ->
+    let wm = remap_model wi wmap in
+    let cl_cond =
+      Option.map ~f:(substitution (VarMap.to_subst2 ctx wmap)) wi.witness_eqn.esplitter
     in
-    let f ~key ~data new_map = Map.set new_map ~key:(wit_var_to_det_var key) ~data in
-    Some (Map.fold wit.witness_model ~init:VarMap.empty ~f)
+    Some
+      { cl_flag = false
+      ; cl_cond
+      ; cl_lemmas = []
+      ; cl_negatives = (if pos then [] else [ wm ])
+      ; cl_positives = (if pos then [ wm ] else [])
+      }
   | None -> None
 ;;
 
@@ -584,10 +615,9 @@ let create_or_update_lemmas_with_witness
   =
   let update_flag = ref true in
   match
-    Predicates.get_with_precond
+    Predicates.find_lemma_info
       ~ctx
-      ~p
-      ~key:(witness.witness_eqn.eterm, witness.witness_eqn.esplitter)
+      (witness.witness_eqn.eterm, witness.witness_eqn.esplitter)
   with
   | None ->
     ctx >- AlgoLog.announce_new_lemmas witness;
@@ -604,9 +634,27 @@ let create_or_update_lemmas_with_witness
     in
     Predicates.add ~ctx ~key:witness.witness_eqn.eterm ~data:det';
     Lwt.return !update_flag
+  | Some (det, None) ->
+    let det, cl =
+      match ctx >- cond_lemma_of_witness ~pos:is_pos_witness det witness with
+      | Some cl -> det, cl
+      | None -> ctx >- term_info_of_witness ~is_pos_witness witness
+    in
+    let%lwt det' =
+      if is_pos_witness
+      then Lwt.return (det, cl)
+      else (
+        match%lwt lemma_refinement_loop ~ctx ~p det cl with
+        | None ->
+          update_flag := false;
+          Lwt.return (det, cl)
+        | Some new_cl -> Lwt.return (det, new_cl))
+    in
+    Predicates.add ~ctx ~key:witness.witness_eqn.eterm ~data:det';
+    Lwt.return !update_flag
   | Some _ ->
     let change_ti det cl =
-      let witness = Option.value_exn (ctx >- remap_witness det witness) in
+      let witness = Option.value_exn (ctx >- remap_witness_model det witness) in
       if is_pos_witness
       then Lwt.return { cl with cl_positives = witness :: cl.cl_positives }
       else (

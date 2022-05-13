@@ -402,6 +402,10 @@ module VarMap = struct
     List.map ~f:(fun (v, t) -> mk_var ctx v, t) (Map.to_alist map)
   ;;
 
+  let to_subst2 (ctx : Context.t) (map : variable t) =
+    List.map ~f:(fun (v, t) -> mk_var ctx v, mk_var ctx t) (Map.to_alist map)
+  ;;
+
   let ( $@ ) (map : term t) (v : variable) = Map.find map v
 end
 
