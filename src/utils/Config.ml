@@ -253,6 +253,20 @@ let set_included_files (s : string) =
   included_files := List.map ~f:String.strip files
 ;;
 
+(** A set of options to search for multiple solutions. *)
+let set_default_config_confsearch (s : string) =
+  try
+    let i = Float.of_string s in
+    if Float.(i > 0. && i <= 3200.) then Optims.wait_parallel_tlimit := i;
+    Optims.max_solutions := 2;
+    Optims.attempt_lifting := false;
+    no_bounded_sat_as_unsat := true;
+    bounded_lemma_check := true;
+    Optims.num_expansions_check := 20
+  with
+  | _ -> ()
+;;
+
 (* ============================================================================================= *)
 (*                  SYSTEM OF EQUATIONS OPTIMIZATION FLAGS                                       *)
 (* ============================================================================================= *)
@@ -287,6 +301,7 @@ let options print_usage parse_only =
   ; 'o', "output", None, Some set_output_folder
   ; 'p', "num-threads", None, Some set_num_threads
   ; 's', "max-solutions", None, Some set_max_solutions
+  ; 'S', "all-solutions-config", None, Some set_default_config_confsearch
   ; 't', "solve-timeout", None, Some set_wait_parallel_tlimit
   ; 'v', "verbose", set verbose true, None
   ; 'X', "classify-witness", set classify_witness true, None

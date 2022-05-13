@@ -879,6 +879,7 @@ module Solve = struct
     =
     let opt_cst =
       Set.exists unknowns ~f:(fun v -> RType.is_base (Variable.vtype_or_new ctx.ctx v))
+      && Set.length unknowns > 1
     in
     let task_counter =
       if !Config.sysfe_opt then ref ((Bool.to_int opt_cst * 2) + 3) else ref 2
