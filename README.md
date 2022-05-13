@@ -59,8 +59,11 @@ For a single benchmark, the script prints a line of the form:
 ```
 Indicating the average runtime of running the tool on the benchmark with a delta. The string after the R: represents the refinement rounds necessary to produce the solution. A "+" indicates that the approximation needed to be strenghtened, a "." indicates weakening and "^" indicates lifting. For a successful benchmark, the string should end by a check mark, indicating the solution was successfully checked in the last round.
 ## CAV21
-The folder `extras/cav21` contains scripts and a readme to reproduce the results presented in the CAV21 paper (use the `cav21` release).
-Please move the scripts to the root folder before executing them.
+The `cav21` release is the version of the tool described in the CAV'21 paper `Counterexample-Guided Partial Bounding for Recursive Function Synthesis`.
+
+
+## PLDI22
+The `pldi22` release corresponds to the tool as described in the PLDI'22 paper `Recursion Synthesis with Unrealizability Witnesses'.
 
 # Basic Usage
 `./Synduce -h` should get you started.

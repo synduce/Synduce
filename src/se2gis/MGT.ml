@@ -42,9 +42,27 @@ let mgt (env : env) (prog : PMRS.t) : TermSet.t =
   | None -> TermSet.singleton v0
 ;;
 
-(* Start the algorith from a variable. *)
+(** Check that hte mgt covers at least all possible epxansions of an input of the PMRS.
+    *)
+let check_mgt (env : env) (mgt : TermSet.t) : TermSet.t =
+  let x0 = Variable.mk env.ctx ~t:(Some (get_theta env)) "x0" in
+  let xs = env >- expand_once (mk_var env.ctx x0) in
+  if List.for_all xs ~f:(fun expansion ->
+         Set.exists mgt ~f:(fun t ->
+             Option.is_some (env >- Matching.matches t ~pattern:expansion)))
+  then mgt
+  else TermSet.of_list xs
+;;
 
 let most_general_terms (env : env) (prog : PMRS.t) : TermSet.t =
-  let ts = if Set.is_empty prog.psyntobjs then TermSet.empty else mgt env prog in
+  let ts =
+    if Set.is_empty prog.psyntobjs
+    then (* There is nothing to do *)
+      TermSet.empty
+    else (
+      let covering_set = mgt env prog in
+      (* Check that covering set contains all variants. *)
+      check_mgt env covering_set)
+  in
   ts
 ;;
