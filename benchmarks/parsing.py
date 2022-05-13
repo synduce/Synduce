@@ -199,6 +199,7 @@ class MultiDataObj():
             total_configurations = data.get('total-configurations')
             self.unr_cache_hits = data.get("unr-cache-hits")
             self.orig_conf_hit = data.get("orig-conf-hit")
+            self.foreign_lemma_uses = data.get("foreign-lemma-uses")
             if total_configurations is not None:
                 self.total_configurations = total_configurations
 

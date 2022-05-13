@@ -300,6 +300,7 @@ let options print_usage parse_only =
   ; 'N', "no-sat-as-unsat", set no_bounded_sat_as_unsat true, None
   ; 'o', "output", None, Some set_output_folder
   ; 'p', "num-threads", None, Some set_num_threads
+  ; 'P', "reuse-predicates-off", set reuse_predicates false, None
   ; 's', "max-solutions", None, Some set_max_solutions
   ; 'S', "all-solutions-config", None, Some set_default_config_confsearch
   ; 't', "solve-timeout", None, Some set_wait_parallel_tlimit

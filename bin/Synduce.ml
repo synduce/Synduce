@@ -99,6 +99,7 @@ let main () =
           ([ "total-configurations", `Int num_configurations
            ; "unr-cache-hits", `Int !Stats.num_unr_cache_hits
            ; "orig-conf-hit", `Bool !Stats.orig_solution_hit
+           ; "foreign-lemma-uses", `Int !Stats.num_foreign_lemma_uses
            ]
           @ results)
     in

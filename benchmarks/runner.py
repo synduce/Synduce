@@ -78,7 +78,7 @@ def run_one(progress, bench_id, command, algo, optim, filename, extra_opt, expec
 
 
 class MultiCsvLine(object):
-    def __init__(self, elapsed, delta, complete, solved, total, solutions, unrealizable, verif, ch, oh):
+    def __init__(self, elapsed, delta, complete, solved, total, solutions, unrealizable, verif, ch, oh, ph):
         self.elapsed = elapsed
         self.delta = delta
         self.complete = complete
@@ -89,10 +89,11 @@ class MultiCsvLine(object):
         self.verif_time = verif
         self.cache_hits = ch
         self.orig_conf_hit = oh
+        self.predicate_hit = ph
 
     def from_string(line):
         parts = line.split(",")
-        if len(parts) < 10:
+        if len(parts) < 11:
             return None
         elapsed = floti(parts[0])
         delta = floti(parts[1])
@@ -104,13 +105,14 @@ class MultiCsvLine(object):
         unr = int(parts[7])
         ch = int(parts[8])
         oh = booli(parts[9])
-        return MultiCsvLine(elapsed, delta, complete, solved, total, solutions, unr, verif, ch, oh)
+        ph = int(parts[10])
+        return MultiCsvLine(elapsed, delta, complete, solved, total, solutions, unr, verif, ch, oh, ph)
 
     def get_csv_string(self):
         l = [self.elapsed, self.delta, self.verif_time]
         l += [self.complete, self.solved, self.total]
         l += [self.solutions, self.unrealizable]
-        l += [self.cache_hits, self.orig_conf_hit]
+        l += [self.cache_hits, self.orig_conf_hit, self.predicate_hit]
         return ",".join([str(x) for x in l])
 
 
@@ -199,7 +201,7 @@ class BenchmarkResult(object):
         cnt = f"{ratio: <10s}"
         nums = f"[{num_solutions},{num_unrealizable},{num_failures}]"
         cnt += f"{nums : <10s}"
-        cnt += f"CH:{self.info.unr_cache_hits} S:{self.info.orig_conf_hit}"
+        cnt += f"CH:{self.info.unr_cache_hits} S:{self.info.orig_conf_hit} P:{self.info.foreign_lemma_uses}"
         msg += f" {cnt : <24s}"
         print(msg)
 
@@ -209,7 +211,8 @@ class BenchmarkResult(object):
                                num_solutions, num_unrealizable,
                                self.verif_elapsed,
                                self.info.unr_cache_hits,
-                               self.info.orig_conf_hit
+                               self.info.orig_conf_hit,
+                               self.info.foreign_lemma_uses
                                )
         return csv_obj.get_csv_string()
 
@@ -288,11 +291,12 @@ def run_n(progress, bench_id, command, filename, realizable=True, expect_many=Fa
                 csv_obj = MultiCsvLine(
                     info.elapsed, 0, False, info.count_solved_configurations(),
                     info.total_configurations, num_solutions, num_unrealizable,
-                    info.verif_elapsed, info.unr_cache_hits, info.orig_conf_hit)
+                    info.verif_elapsed, info.unr_cache_hits, info.orig_conf_hit,
+                    info.foreign_lemma_uses)
                 csvline = csv_obj.get_csv_string()
             else:
                 csv_obj = MultiCsvLine(
-                    "N/A", 0, False, 0, 0, 0, 0, "N/A", 0, False)
+                    "N/A", 0, False, 0, 0, 0, 0, "N/A", 0, False, 0)
                 csvline = csv_obj.get_csv_string()
         else:
             print(f"{progress: >11s} ❌ {bench_id : <90s}")

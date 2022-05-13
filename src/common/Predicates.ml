@@ -4,6 +4,7 @@ open Elim
 open Lang
 open ProblemDefs
 open Term
+open Utils
 
 let cond_lemma_to_term
     ~(ctx : env)
@@ -43,11 +44,15 @@ let get ~(ctx : env) ~(p : PsiDef.t) (t : term) =
     (match Hashtbl.find ctx.pcache e_key with
     | None -> None
     | Some (ti, cls) ->
-      if ti.ti_psi_id = p.id then () else Int.incr Utils.Stats.num_foreign_lemma_uses;
-      (match List.filter_opt (List.map ~f:(cond_lemma_to_term ~ctx ~p ~t ti) cls) with
-      | [] -> None
-      | [ a ] -> Some a
-      | _ as conds -> mk_assoc Binop.And conds))
+      let same_psi = ti.ti_psi_id = p.id in
+      if (not same_psi) && not !Config.Optims.reuse_predicates
+      then None
+      else (
+        if same_psi then () else Int.incr Utils.Stats.num_foreign_lemma_uses;
+        match List.filter_opt (List.map ~f:(cond_lemma_to_term ~ctx ~p ~t ti) cls) with
+        | [] -> None
+        | [ a ] -> Some a
+        | _ as conds -> mk_assoc Binop.And conds))
 ;;
 
 let find_lemma_info ~(ctx : Env.env) ((term, splitter) : term * term option)
