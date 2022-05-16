@@ -33,6 +33,7 @@ def run_one(progress, bench_id, command, algo, optim, filename, extra_opt, expec
             break
 
         try:
+
             info = MultiDataObj(data)
 
             if info.is_intermediate:

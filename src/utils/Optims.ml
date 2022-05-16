@@ -168,7 +168,7 @@ let set_fuzzing_count (s : string) =
 (**
   Attempt to lift the function if there is no solution.
 *)
-let attempt_lifting = ref false
+let attempt_lifting = ref true
 
 (** The number of times Synduce should attempt to add a lifting variable. *)
 let max_lifting_attempts = ref 2
