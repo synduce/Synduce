@@ -120,13 +120,13 @@ let show_stat_intermediate_solution
   else ()
 ;;
 
-let show_steps env tsize usize =
+let show_steps algo env tsize usize =
   Log.info (fun frmt () ->
       (styled
          (`Fg `Black)
          (styled
             (`Bg (`Hi `Green))
-            (fun frmt (i, j) -> pf frmt "\t\t Refinement step %i:%i " i j)))
+            (fun frmt (i, j) -> pf frmt "\t\t %s Refinement step %i:%i " algo i j)))
         frmt
         (get_refinement_steps env, get_secondary_refinement_steps env));
   Log.debug_msg

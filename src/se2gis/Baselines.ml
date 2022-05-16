@@ -42,7 +42,7 @@ let rec segis_loop ~(ctx : env) (p : PsiDef.t) (t_set : TermSet.t)
   Stats.log_new_major_step ~tsize ~usize ();
   (* Show intemediate refinement step information depending on mode. *)
   if !Config.info
-  then AlgoLog.show_steps ctx tsize usize
+  then AlgoLog.show_steps "segis" ctx tsize usize
   else if !Config.Optims.max_solutions <= 0
   then AlgoLog.show_stat_refinement_step ctx elapsed tsize usize;
   Log.debug_msg
@@ -126,7 +126,7 @@ let rec cegis_loop ~(ctx : Env.env) (p : PsiDef.t) (t_set : TermSet.t)
   let tsize = Set.length t_set in
   Stats.log_new_major_step ~tsize ~usize:0 ();
   if !Config.info
-  then AlgoLog.show_steps ctx tsize 0
+  then AlgoLog.show_steps "cegis" ctx tsize 0
   else if !Config.Optims.max_solutions <= 0
   then AlgoLog.show_stat_refinement_step ctx elapsed tsize 0;
   Log.debug_msg
