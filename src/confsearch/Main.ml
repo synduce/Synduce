@@ -8,11 +8,35 @@ module G = ConfGraph
 
 let total_configurations = ref 0
 
+let pwait counter ctx e =
+  Lwt.bind e (fun x ->
+      match x with
+      | Failed _ as res ->
+        Lwt.map
+          (fun _ -> ctx, res)
+          (if !counter > 1
+          then (
+            Int.decr counter;
+            Concurrency.wait_and_check counter (10. *. !Config.Optims.wait_parallel_tlimit))
+          else Lwt.return ())
+      | Realizable _ | Unrealizable _ -> Lwt.return (ctx, x))
+;;
+
+let pw ctx = Lwt.map (fun x -> ctx, x)
+
+let portfolio_solver ~(ctx : env) (p : PsiDef.t) =
+  let counter = ref 2 in
+  Lwt.pick
+    [ pwait counter ctx (Se2gis.Main.solve_problem ~ctx p)
+    ; (let ctx' = env_copy ctx in
+       pwait counter ctx' (Se2gis.Baselines.algo_segis ~ctx:ctx' p))
+    ]
+;;
+
 let single_configuration_solver ~(ctx : env) (p : PsiDef.t)
     : (env * Syguslib.Sygus.solver_response segis_response) Lwt.t
   =
   let%lwt ctx, resp =
-    let pw ctx = Lwt.map (fun x -> ctx, x) in
     if !Config.Optims.use_segis (* Symbolic CEGIS. *)
     then pw ctx (Se2gis.Baselines.algo_segis ~ctx p)
     else if !Config.Optims.use_cegis (* Concrete CEGIS. *)
@@ -21,12 +45,7 @@ let single_configuration_solver ~(ctx : env) (p : PsiDef.t)
     then
       pw ctx (Se2gis.Main.solve_problem ~ctx p)
       (* Default algorithm: best combination of techniques (TODO) *)
-    else
-      Lwt.pick
-        [ pw ctx (Se2gis.Main.solve_problem ~ctx p)
-        ; (let ctx' = env_copy ctx in
-           pw ctx' (Se2gis.Baselines.algo_segis ~ctx:ctx' p))
-        ]
+    else portfolio_solver ~ctx p
   in
   (* Print intermediate result if we are looking for more than one solution *)
   if !Config.Optims.max_solutions > 0
