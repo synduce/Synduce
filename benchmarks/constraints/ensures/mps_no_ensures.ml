@@ -1,3 +1,5 @@
+(** @synduce -NB *)
+
 type 'a clist =
   | CNil
   | Single of 'a

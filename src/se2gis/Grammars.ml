@@ -370,11 +370,11 @@ let make_unification_guess
     ~(ctx : Context.t)
     (eqns : (term * term option * term * term) list)
     (xi : variable)
-    : [> `First of string * variable list * term | `Second of Skeleton.t | `Third ]
+    : [> `First of string * variable list * term | `Second of Skeleton.t | `Third ] Lwt.t
   =
-  match Deduction.Solver.presolve_equations ~orig_ctx:ctx ~xi eqns with
-  | `Third -> make_basic_guess eqns xi
-  | _ as l -> l
+  match%lwt Deduction.Solver.presolve_equations ~orig_ctx:ctx ~xi eqns with
+  | `Third -> Lwt.return (make_basic_guess eqns xi)
+  | _ as l -> Lwt.return l
 ;;
 
 let make_guess
@@ -382,11 +382,11 @@ let make_guess
     ~(ctx : Context.t)
     (xi : variable)
     (eqns : (term * term option * term * term) list)
-    : [> `First of symbol * variable list * term | `Second of Skeleton.t | `Third ]
+    : [> `First of symbol * variable list * term | `Second of Skeleton.t | `Third ] Lwt.t
   =
   match level with
-  | 0 -> `Third
-  | 1 -> make_basic_guess eqns xi
+  | 0 -> Lwt.return `Third
+  | 1 -> Lwt.return (make_basic_guess eqns xi)
   | 2 -> make_unification_guess ~ctx eqns xi
-  | _ -> `Third
+  | _ -> Lwt.return `Third
 ;;

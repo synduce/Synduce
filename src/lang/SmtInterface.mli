@@ -2,6 +2,9 @@ open Smtlib
 module Stats : Solvers.Statistics
 module SmtLog : Solvers.Logger
 
+val is_unsat : SmtLib.solver_response -> bool
+val is_sat : SmtLib.solver_response -> bool
+
 module AsyncSmt : sig
   type response = SmtLib.solver_response Lwt.t
 
@@ -43,52 +46,7 @@ module AsyncSmt : sig
     -> (solver * int Lwt.t -> 'b Lwt.t)
     -> 'b Lwt.t * int Lwt.u
 
-  val make_solver : string -> solver * int Lwt.t * int Lwt.u
-end
-
-module SyncSmt : sig
-  type solver_response = SmtLib.solver_response
-
-  val is_sat : solver_response -> bool
-  val is_unsat : solver_response -> bool
-
-  type online_solver = Solvers.Synchronous(SmtLog)(Stats).online_solver =
-    { s_name : string
-    ; s_pid : int
-    ; s_inputc : out_channel
-    ; s_outputc : in_channel
-    ; mutable s_online : bool
-    ; mutable s_scope_level : int
-    ; s_declared : (string, int) Base.Hashtbl.t
-    ; s_log_file : string
-    ; s_log_outc : out_channel
-    }
-
-  val open_log : unit -> unit
-  val log : ?solver:online_solver option -> SmtLib.command -> unit
-  val already_declared : online_solver -> SmtLib.smtSymbol -> bool
-  val solver_declare : online_solver -> SmtLib.smtSymbol -> unit
-  val exec_command : online_solver -> SmtLib.command -> solver_response
-  val close_solver : online_solver -> unit
-  val call_solver : online_solver -> SmtLib.command list -> solver_response
-
-  exception SolverError of Sexplib0.Sexp.t list
-
-  val solver_response_errors : solver_response -> Sexplib0.Sexp.t list
-  val pp_solver_response : Format.formatter -> solver_response -> unit
-  val check_sat : online_solver -> solver_response
-  val exec_all : online_solver -> SmtLib.command list -> unit
-  val get_model : online_solver -> solver_response
-  val load_min_max_defs : online_solver -> unit
-  val set_logic : online_solver -> Logics.logic -> unit
-  val set_option : online_solver -> string -> string -> unit
-  val smt_assert : online_solver -> SmtLib.smtTerm -> unit
-  val spop : online_solver -> unit
-  val spush : online_solver -> unit
-  val make_z3_solver : unit -> online_solver
-  val make_yices_solver : unit -> online_solver
-  val make_cvc_solver : unit -> online_solver
-  val make_solver : string -> online_solver
+  val make_solver : ?hint:string -> string -> solver * int Lwt.t * int Lwt.u
 end
 
 (** `wait_on_failure c s` waits if the first component of s indicates that the solver
@@ -141,14 +99,14 @@ type term_model = (string, Term.term, Base.String.comparator_witness) Base.Map.t
 val model_to_constmap
   :  fctx:PMRS.Functions.ctx
   -> ctx:Term.Context.t
-  -> SyncSmt.solver_response
+  -> SmtLib.solver_response
   -> (string, Term.term, Base.String.comparator_witness) Base.Map.t
 
 val model_to_varmap
   :  fctx:PMRS.Functions.ctx
   -> ctx:Term.Context.t
   -> Term.VarSet.t
-  -> SyncSmt.solver_response
+  -> SmtLib.solver_response
   -> Term.term Term.VarMap.t
 
 val request_different_models
@@ -156,8 +114,8 @@ val request_different_models
   -> ctx:Term.Context.t
   -> term_model
   -> int
-  -> Solvers.Synchronous(SmtLog)(Stats).online_solver
-  -> (string, Term.term, Base.String.comparator_witness) Base.Map.t list
+  -> AsyncSmt.solver
+  -> (string, Term.term, Base.String.comparator_witness) Base.Map.t list Lwt.t
 
 val request_different_models_async
   :  fctx:PMRS.Functions.ctx

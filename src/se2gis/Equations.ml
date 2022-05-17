@@ -607,11 +607,12 @@ module Solve = struct
              args
              ret_type
       in
-      match guess with
+      match%lwt guess with
       | `First partial_soln ->
         Log.verbose_msg "Partial solution!";
-        Either.First
-          (partial_soln, ctx >- mk_synthfun xi.vname args ret_type default_grammar)
+        Lwt.return
+          (Either.First
+             (partial_soln, ctx >- mk_synthfun xi.vname args ret_type default_grammar))
       | `Second skeleton ->
         Log.verbose_msg "Got a skeleton, no partial solution.";
         let opt_grammar =
@@ -625,21 +626,25 @@ module Solve = struct
                args
                ret_type
         in
-        Either.Second (ctx >- mk_synthfun xi.vname args ret_type opt_grammar)
-      | `Third -> Either.Second (ctx >- mk_synthfun xi.vname args ret_type default_grammar)
+        Lwt.return (Either.Second (ctx >- mk_synthfun xi.vname args ret_type opt_grammar))
+      | `Third ->
+        Lwt.return
+          (Either.Second (ctx >- mk_synthfun xi.vname args ret_type default_grammar))
     in
-    let synth_objs = List.map ~f (Set.elements unknowns) in
-    if List.for_all ~f:Either.is_first synth_objs && List.length synth_objs > 0
-    then
-      Either.First
-        (List.concat_map synth_objs ~f:(function
-            | Either.First (partial_soln, _) -> [ partial_soln ]
-            | _ -> []))
-    else
-      Either.Second
-        (List.map synth_objs ~f:(function
-            | Either.First (_, g) -> g
-            | Either.Second g -> g))
+    let%lwt synth_objs = Lwt_list.map_p f (Set.elements unknowns) in
+    let%lwt b = Lwt.return (List.for_all ~f:Either.is_first synth_objs) in
+    Lwt.return
+      (if b && List.length synth_objs > 0
+      then
+        Either.First
+          (List.concat_map synth_objs ~f:(function
+              | Either.First (partial_soln, _) -> [ partial_soln ]
+              | _ -> []))
+      else
+        Either.Second
+          (List.map synth_objs ~f:(function
+              | Either.First (_, g) -> g
+              | Either.Second g -> g)))
   ;;
 
   let constraints_of_eqns (eqns : equation list) : term list =
@@ -701,7 +706,7 @@ module Solve = struct
       ~(gen_only : bool)
       (unknowns : VarSet.t)
       (eqns : equation list)
-      : (Sygus.solver_response * partial_soln_or_witnesss) Lwt.t * int Lwt.u
+      : ((Sygus.solver_response * partial_soln_or_witnesss) Lwt.t * int Lwt.u) Lwt.t
     =
     let _ = ctx in
     let psoln, unknowns, eqns =
@@ -756,7 +761,7 @@ module Solve = struct
       in
       (if needs_dt then dt_extend_base_logic base_logic else base_logic), nonlinear
     in
-    match
+    let partial_soln =
       synthfuns_of_unknowns
         ~ctx
         ~nonlinear
@@ -764,84 +769,92 @@ module Solve = struct
         ~eqns
         ~ops:all_operators
         unknowns
-    with
-    (* First case: we actually have a partial solution!  *)
-    | Either.First partial_soln ->
-      let success_resp =
-        let f (fname, args, body) =
-          ( fname
-          , List.map
-              ~f:(fun v ->
-                Sygus.mk_sorted_var
-                  v.vname
-                  (ctx >- sort_of_rtype (Variable.vtype_or_new ctx.ctx v)))
-              args
-          , ctx >- sort_of_rtype body.ttyp
-          , ctx >- sygus_of_term body )
-        in
-        List.map ~f partial_soln
-      in
-      let answer = Sygus.RSuccess success_resp, Either.First (psoln @ partial_soln) in
-      Lwt.task () |> fun (_, r) -> Lwt.return answer, r
-      (* Second case: we only got hints or the base grammar. *)
-    | Either.Second synth_objs ->
-      let extra_defs =
-        (if Set.mem all_operators (Binary Max) then Semantic.[ max_definition ] else [])
-        @ if Set.mem all_operators (Binary Min) then Semantic.[ min_definition ] else []
-      in
-      (* Call the SyGuS solver. *)
-      let solver =
-        HLSolver.(
-          make ~extra_defs ()
-          |> set_logic logic
-          |> synthesize synth_objs
-          |> (ctx >- constrain (constraints_of_eqns eqns)))
-      in
-      (* Handling the solver response. *)
-      let handle_response (resp : Sygus.solver_response) =
-        let parse_synth_fun (fname, fargs, _, fbody) =
-          let args =
-            let f (_, varname, sort) =
-              Variable.mk ctx.ctx ~t:(ctx >- rtype_of_sort sort) varname
+    in
+    Lwt.bind partial_soln (function
+        (* First case: we actually have a partial solution!  *)
+        | Either.First partial_soln ->
+          let success_resp =
+            let f (fname, args, body) =
+              ( fname
+              , List.map
+                  ~f:(fun v ->
+                    Sygus.mk_sorted_var
+                      v.vname
+                      (ctx >- sort_of_rtype (Variable.vtype_or_new ctx.ctx v)))
+                  args
+              , ctx >- sort_of_rtype body.ttyp
+              , ctx >- sygus_of_term body )
             in
-            List.map ~f fargs
+            List.map ~f partial_soln
           in
-          let local_vars = VarSet.of_list args in
-          let body, _ =
-            infer_type ctx.ctx (ctx >>- term_of_sygus (VarSet.to_env local_vars) fbody)
+          let answer = Sygus.RSuccess success_resp, Either.First (psoln @ partial_soln) in
+          Lwt.return (Lwt.task () |> fun (_, r) -> Lwt.return answer, r)
+          (* Second case: we only got hints or the base grammar. *)
+        | Either.Second synth_objs ->
+          let extra_defs =
+            (if Set.mem all_operators (Binary Max)
+            then Semantic.[ max_definition ]
+            else [])
+            @
+            if Set.mem all_operators (Binary Min) then Semantic.[ min_definition ] else []
           in
-          fname, args, body
-        in
-        match resp with
-        | RSuccess resps ->
-          let soln = List.map ~f:parse_synth_fun resps in
-          resp, Either.First (psoln @ soln)
-        | RInfeasible -> RInfeasible, Either.Second []
-        | RFail -> RFail, Either.Second []
-        | RUnknown -> RUnknown, Either.Second []
-      in
-      if !Config.generate_benchmarks
-      then
-        (* Assuming gen_only true only for unrealizable problems. *)
-        ctx
-        >- HLSolver.to_file
-             (Config.new_benchmark_file
-                ~hint:(if gen_only then "unrealizable_" else "")
-                ".sl")
-             solver;
-      (* Call the solver on the generated file. *)
-      if not gen_only
-      then (
-        let t, r =
-          ctx >- HLSolver.solve ~timeout:(Some !Config.Optims.wait_parallel_tlimit) solver
-        in
-        ( Lwt.map
-            (function
-              | Some resp -> handle_response resp
-              | None -> RFail, Either.Second [])
-            t
-        , r ))
-      else Lwt.task () |> fun (_, r) -> Lwt.return (Sygus.RFail, Either.Second []), r
+          (* Call the SyGuS solver. *)
+          let solver =
+            HLSolver.(
+              make ~extra_defs ()
+              |> set_logic logic
+              |> synthesize synth_objs
+              |> (ctx >- constrain (constraints_of_eqns eqns)))
+          in
+          (* Handling the solver response. *)
+          let handle_response (resp : Sygus.solver_response) =
+            let parse_synth_fun (fname, fargs, _, fbody) =
+              let args =
+                let f (_, varname, sort) =
+                  Variable.mk ctx.ctx ~t:(ctx >- rtype_of_sort sort) varname
+                in
+                List.map ~f fargs
+              in
+              let local_vars = VarSet.of_list args in
+              let body, _ =
+                infer_type ctx.ctx (ctx >>- term_of_sygus (VarSet.to_env local_vars) fbody)
+              in
+              fname, args, body
+            in
+            match resp with
+            | RSuccess resps ->
+              let soln = List.map ~f:parse_synth_fun resps in
+              resp, Either.First (psoln @ soln)
+            | RInfeasible -> RInfeasible, Either.Second []
+            | RFail -> RFail, Either.Second []
+            | RUnknown -> RUnknown, Either.Second []
+          in
+          if !Config.generate_benchmarks
+          then
+            (* Assuming gen_only true only for unrealizable problems. *)
+            ctx
+            >- HLSolver.to_file
+                 (Config.new_benchmark_file
+                    ~hint:(if gen_only then "unrealizable_" else "")
+                    ".sl")
+                 solver;
+          (* Call the solver on the generated file. *)
+          if not gen_only
+          then (
+            let t, r =
+              ctx
+              >- HLSolver.solve ~timeout:(Some !Config.Optims.wait_parallel_tlimit) solver
+            in
+            Lwt.return
+              ( Lwt.map
+                  (function
+                    | Some resp -> handle_response resp
+                    | None -> RFail, Either.Second [])
+                  t
+              , r ))
+          else
+            Lwt.return
+              (Lwt.task () |> fun (_, r) -> Lwt.return (Sygus.RFail, Either.Second []), r))
   ;;
 
   let check_unrealizable
@@ -865,11 +878,14 @@ module Solve = struct
            | _ ->
              if !Config.generate_benchmarks
              then ignore (core_solve ~ctx ~gen_only:true unknowns eqns);
-             if !Config.check_unrealizable_smt_unsatisfiable
-             then ctx >- Counterexamples.smt_unsatisfiability_check unknowns eqns;
+             let%lwt () =
+               if !Config.check_unrealizable_smt_unsatisfiable
+               then ctx >- Counterexamples.smt_unsatisfiability_check unknowns eqns
+               else Lwt.return ()
+             in
              Lwt.return (Sygus.RInfeasible, Either.Second witnesss)
          in
-         r, task)
+         Lwt.return (r, task))
     else None
   ;;
 
@@ -889,8 +905,8 @@ module Solve = struct
       if !Config.sysfe_opt && opt
       then
         Some
-          (let t, r = task () in
-           r, wait_on_failure task_counter t)
+          (let%lwt t, r = task () in
+           Lwt.return (r, wait_on_failure task_counter t))
       else None
     in
     (* TODO: heursitic for multiplicative constants. *)
@@ -902,12 +918,12 @@ module Solve = struct
           check_unrealizable ~ctx task_counter unknowns eqns
         ; (* Task 2 : solving system of equations, default strategy. *)
           Some
-            (let t, r = core_solve ~ctx ~gen_only:false unknowns eqns in
+            (let%lwt t, r = core_solve ~ctx ~gen_only:false unknowns eqns in
              (* Wait on failure, if the unrealizability check has not terminated
                 we would end up with a synthesis failure but no counterexamples
                 to decide what to do!
              *)
-             r, wait_on_failure task_counter t)
+             Lwt.return (r, wait_on_failure task_counter t))
         ; (* Task 3,4: solving system of equations, optimizations / grammar choices.
               If answer is Fail, must stall.
           *)
@@ -929,12 +945,15 @@ module Solve = struct
           (VarSet.pp ctx.ctx)
           unknowns
           (List.length lwt_tasks));
-    Lwt.pick
-      (List.map
-         ~f:(fun (r, t) ->
-           Lwt.wakeup r 0;
-           t)
-         lwt_tasks)
+    let%lwt tasks = Lwt.all lwt_tasks in
+    let resolve_tasks =
+      List.map
+        ~f:(fun (r, t) ->
+          Lwt.wakeup r 0;
+          t)
+        tasks
+    in
+    Lwt.pick resolve_tasks
   ;;
 
   let solve_eqns_proxy (ctx : env) (unknowns : VarSet.t) (eqns : equation list) =

@@ -19,7 +19,7 @@ let smt_unsatisfiability_check
     ~(ctx : Context.t)
     (unknowns : VarSet.t)
     (eqns : equation list)
-    : unit
+    : unit Lwt.t
   =
   let free_vars =
     let f fvs eqn =
@@ -55,37 +55,45 @@ let smt_unsatisfiability_check
         mk_forall (sorted_vars_of_vars ~ctx free_vars) (mk_assoc_and eqns_constraints))
     , List.map ~f:(fun eqn -> Terms.(eqn.elhs == eqn.erhs)) eqns )
   in
-  let z3 = SyncSmt.make_z3_solver () in
-  let preamble =
-    Commands.mk_preamble
-      ~logic:
-        (SmtLogic.infer_logic
-           ~ctx
-           ~with_uninterpreted_functions:true
-           ~for_induction:false
-           ~quantifier_free:false
-           terms_for_logic_deduction)
-      ()
+  let task (z3, binder) =
+    let open AsyncSmt in
+    let* _ = binder in
+    let preamble =
+      Commands.mk_preamble
+        ~logic:
+          (SmtLogic.infer_logic
+             ~ctx
+             ~with_uninterpreted_functions:true
+             ~for_induction:false
+             ~quantifier_free:false
+             terms_for_logic_deduction)
+        ()
+    in
+    let* () = exec_all z3 (preamble @ Commands.decls_of_vars ~ctx unknowns) in
+    let* () = smt_assert z3 constraint_of_eqns in
+    let* resp = check_sat z3 in
+    (match resp with
+    | Unsat ->
+      Log.debug
+        Fmt.(
+          fun fmt () ->
+            pf
+              fmt
+              "Z3 query answer for unsatisfiability of synthesis problem: %a"
+              SmtLib.pp_solver_response
+              Unsat)
+    | x ->
+      Log.error
+        Fmt.(
+          fun fmt () ->
+            pf fmt "Z3 unsat check failed with %a@." SmtLib.pp_solver_response x));
+    close_solver z3
   in
-  SyncSmt.exec_all z3 (preamble @ Commands.decls_of_vars ~ctx unknowns);
-  SyncSmt.smt_assert z3 constraint_of_eqns;
-  let resp = SyncSmt.check_sat z3 in
-  (match resp with
-  | Unsat ->
-    Log.debug
-      Fmt.(
-        fun fmt () ->
-          pf
-            fmt
-            "Z3 query answer for unsatisfiability of synthesis problem: %a"
-            SyncSmt.pp_solver_response
-            Unsat)
-  | x ->
-    Log.error
-      Fmt.(
-        fun fmt () ->
-          pf fmt "Z3 unsat check failed with %a@." SyncSmt.pp_solver_response x));
-  SyncSmt.close_solver z3
+  let p, r =
+    AsyncSmt.(cancellable_task (make_solver ~hint:"smt-unsat-check " "z3") task)
+  in
+  Lwt.wakeup r 1;
+  p
 ;;
 
 let merge_all (cl : unrealizability_witness list) : unrealizability_witness list =
@@ -250,35 +258,33 @@ let check_unrealizable
   Log.debug (fun f () -> Fmt.(pf f "Checking unrealizability..."));
   let start_time = Unix.gettimeofday () in
   let task (solver, binder) =
+    let open AsyncSmt in
     let* _ = binder in
-    let* () = AsyncSmt.load_min_max_defs solver in
+    let* () = load_min_max_defs solver in
     (* Main part of the check, applied to each equation in eqns. *)
-    let check_eqn_accum
-        (witnesss : unrealizability_witness list Lwt.t)
-        ((i, eqn_i), (j, eqn_j))
+    let check_eqn_accum (witnesses : unrealizability_witness list) ((i, eqn_i), (j, eqn_j))
       =
-      let* witnesss = witnesss in
       let vseti, vsetj, vsetj', sub, var_subst = gen_info ~ctx (eqn_i, eqn_j) unknowns in
       (* Extract the arguments of the rhs, if it is a proper skeleton. *)
       match components_of_unrealizability ~ctx ~unknowns eqn_i eqn_j with
-      | None -> return witnesss (* If we cannot match the expected structure, skip it. *)
+      | None -> return witnesses (* If we cannot match the expected structure, skip it. *)
       | Some (rhs_args_ij, (lhs_i, lhs_j)) ->
         let lhs_diff =
           let projs = projection_eqns lhs_i (substitution sub lhs_j) in
           List.map ~f:(fun (ei, ej) -> Terms.(~!(ei == ej))) projs
         in
         (* (push). *)
-        let* () = AsyncSmt.spush solver in
+        let* () = spush solver in
         (* Declare the variables. *)
         let* () =
-          AsyncSmt.exec_all solver (Commands.decls_of_vars ~ctx (Set.union vseti vsetj'))
+          exec_all solver (Commands.decls_of_vars ~ctx (Set.union vseti vsetj'))
         in
         (* Assert preconditions, if they exist. *)
         let* () =
           match eqn_i.eprecond with
           | Some pre_i ->
-            let* _ =
-              AsyncSmt.exec_all
+            let* () =
+              exec_all
                 solver
                 (Commands.decls_of_vars ~ctx (Analysis.free_variables ~ctx pre_i))
             in
@@ -289,12 +295,12 @@ let check_unrealizable
         let* () =
           match eqn_j.eprecond with
           | Some pre_j ->
-            let* _ =
-              AsyncSmt.exec_all
+            let* () =
+              exec_all
                 solver
                 (Commands.decls_of_vars ~ctx (Analysis.free_variables ~ctx pre_j))
             in
-            AsyncSmt.smt_assert solver (smt_of_term ~ctx (substitution sub pre_j))
+            smt_assert solver (smt_of_term ~ctx (substitution sub pre_j))
           | None -> return ()
         in
         (* Assert that the lhs of i and j must be different. **)
@@ -304,7 +310,7 @@ let check_unrealizable
             lhs_diff
         in
         (* Assert that the rhs must be equal. *)
-        let* _ =
+        let* () =
           Lwt_list.iter_s
             (fun (rhs_i_arg_term, rhs_j_arg_term) ->
               let rhs_eqs =
@@ -317,11 +323,11 @@ let check_unrealizable
             rhs_args_ij
         in
         (* Check sat and get model. *)
-        let* new_witnesss =
-          let* resp = AsyncSmt.check_sat solver in
+        let* new_witnesses =
+          let* resp = check_sat solver in
           match resp with
           | Sat ->
-            let* model_sexps = AsyncSmt.get_model solver in
+            let* model_sexps = get_model solver in
             (match model_sexps with
             | SExps s ->
               let model = model_to_constmap ~ctx ~fctx (SExps s) in
@@ -348,26 +354,26 @@ let check_unrealizable
                        var_subst)
                   (model :: other_models)
               in
-              return (new_witnesss @ witnesss)
-            | _ -> return witnesss)
-          | _ -> return witnesss
+              return (new_witnesss @ witnesses)
+            | _ -> return witnesses)
+          | _ -> return witnesses
         in
-        let+ () = AsyncSmt.spop solver in
-        new_witnesss
+        let+ () = spop solver in
+        new_witnesses
     in
-    let* witnesss =
+    let* new_witnesses =
       Lwt.map
         merge_all
-        (List.fold
-           ~f:check_eqn_accum
-           ~init:(return [])
+        (Lwt_list.fold_left_s
+           check_eqn_accum
+           []
            (List.mapi ~f:(fun i eqn -> i, eqn) eqns |> combinations))
     in
-    let+ _ = AsyncSmt.close_solver solver in
+    let+ () = close_solver solver in
     let elapsed = Unix.gettimeofday () -. start_time in
     Log.debug (fun f () -> Fmt.(pf f "... finished in %3.4fs" elapsed));
-    AlgoLog.show_unrealizability_witnesses ~ctx unknowns eqns witnesss;
-    witnesss
+    AlgoLog.show_unrealizability_witnesses ~ctx unknowns eqns new_witnesses;
+    new_witnesses
   in
   AsyncSmt.(cancellable_task (make_solver "z3") task)
 ;;

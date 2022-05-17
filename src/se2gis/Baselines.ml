@@ -56,7 +56,9 @@ let rec segis_loop ~(ctx : env) (p : PsiDef.t) (t_set : TermSet.t)
   in
   match s_resp, solution with
   | RSuccess _, First sol ->
-    (match Stats.timed (fun () -> Verify.bounded_check ~ctx ~p sol) with
+    (match%lwt
+       Stats.lwt_timed (fun a -> Lwt.bind a (fun _ -> Verify.bounded_check ~ctx ~p sol))
+     with
     (* A symbolic counterexample term is returned. *)
     | verif_time, Some eqn ->
       Stats.log_major_step_end ~synth_time ~verif_time ~t:tsize ~u:0 false;
@@ -140,8 +142,10 @@ let rec cegis_loop ~(ctx : Env.env) (p : PsiDef.t) (t_set : TermSet.t)
   in
   match s_resp, solution with
   | RSuccess _, First sol ->
-    (match
-       Stats.timed (fun () -> Verify.bounded_check ~ctx ~use_concrete_witness:true ~p sol)
+    (match%lwt
+       Stats.lwt_timed (fun a ->
+           Lwt.bind a (fun _ ->
+               Verify.bounded_check ~ctx ~use_concrete_witness:true ~p sol))
      with
     (* A concrete conterexample term is returned. *)
     | verif_time, Some eqn ->

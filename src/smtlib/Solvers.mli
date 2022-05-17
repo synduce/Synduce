@@ -66,7 +66,7 @@ module Synchronous : functor (Log : Logger) (Stats : Statistics) -> sig
   val already_declared : online_solver -> SmtLib.smtSymbol -> bool
   val solver_declare : online_solver -> SmtLib.smtSymbol -> unit
   val exec_command : online_solver -> SmtLib.command -> solver_response
-  val make_solver : name:string -> string -> string list -> online_solver
+  val make_solver : ?hint:string -> name:string -> string -> string list -> online_solver
   val close_solver : online_solver -> unit
   val call_solver : online_solver -> SmtLib.command list -> solver_response
 
@@ -111,7 +111,14 @@ module Asyncs : functor (Log : Logger) (Stats : Statistics) -> sig
   val open_log : unit -> unit
   val log : ?solver:solver option -> SmtLib.command -> unit
   val exec_command : solver -> SmtLib.command -> response
-  val make_solver : name:string -> string -> string list -> solver * int Lwt.t * int Lwt.u
+
+  val make_solver
+    :  ?hint:string
+    -> name:string
+    -> string
+    -> string list
+    -> solver * int Lwt.t * int Lwt.u
+
   val solver_make_cancellable : solver -> 'a Lwt.t -> unit
   val close_solver : solver -> unit Lwt.t
   val check_sat : solver -> response

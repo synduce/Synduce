@@ -95,8 +95,8 @@ val expand_all
   -> TermSet.t * TermSet.t
   -> TermSet.t * TermSet.t
 
-(** [expand_loop] provides basic functionality for bounded checking.
-    [expand_loop steps f start] will run a bounded checking loop, starting with the term
+(** [lwt_expand_loop] provides basic functionality for bounded checking.
+    [lwt_expand_loop steps f start] will run a bounded checking loop, starting with the term
     set [start] and performing [!Lib.Config.num_expansions_check] steps, applying the
     checking function [f] for each term obtained during the expansion of the term in the set
     [start] into bounded terms.
@@ -115,19 +115,7 @@ val expand_all
     @param r_stop is a function that returns true whenever the loop should stop, given
     the solver response to a call to f.
     @param r_complete is the answer that should be given if all the
-*)
-val expand_loop
-  :  int ref
-  -> (SyncSmt.solver_response -> Term.term -> SyncSmt.solver_response)
-  -> ?r_stop:(SyncSmt.solver_response -> bool)
-  -> ?r_complete:SyncSmt.solver_response
-  -> ctx:Term.Context.t
-  -> TermSet.t
-  -> SyncSmt.solver_response
 
-(** [lwt_expand_loop] provides the same functionality as [expand_loop], but the solver
-    calls are threaded arount a lwt promise. Use [lwt_expand_loop] in place of [expand_loop]
-    when you want to run concurrent solver instances.
 *)
 val lwt_expand_loop
   :  int ref

@@ -225,7 +225,7 @@ constraint_benchmarks = [
     ["constraints/ensures/nested_minmax_noe.ml", ""],
     ["constraints/ensures/bal_2.ml", ""],
     # alist
-    ["constraints/alist/count_eq2.ml", "-NB"],
+    ["constraints/alist/count_eq2.ml", "-NB --se2gis"],
     ["constraints/alist/count_eq.ml", ""],
     ["constraints/alist/most_frequent.ml", ""],
     ["constraints/alist/most_frequent_v2.ml", ""],
@@ -298,7 +298,7 @@ constraint_benchmarks = [
     ["constraints/sortedlist/largest_diff_poslist.ml", ""],
     ["constraints/sortedlist/largest_even.ml", ""],
     ["constraints/sortedlist/largest_even_pos.ml", ""],
-    ["constraints/sortedlist/largest_even_pos_v2.ml", ""],
+    ["constraints/sortedlist/largest_even_pos_v2.ml", "--se2gis"],
     ["constraints/sortedlist/max.ml", ""],
     ["constraints/sortedlist/max_point_sum.ml", ""],
     ["constraints/sortedlist/min.ml", ""],

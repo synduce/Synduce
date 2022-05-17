@@ -23,6 +23,7 @@ val check_solution
        (term, Terms.comparator_witness) Set.t * (term, Terms.comparator_witness) Set.t
      | `Correct
      ]
+     Lwt.t
 
 (** Perform a bounded check of the solution. As opposed to check_solution this does not take advantage
     of partial bounding techniques.
@@ -35,11 +36,11 @@ val bounded_check
   -> ctx:Env.env
   -> p:Common.ProblemDefs.PsiDef.t
   -> (string * variable list * term) list
-  -> Common.ProblemDefs.equation option
+  -> Common.ProblemDefs.equation option Lwt.t
 
 (**
   Solve an equation of the form f(x1,..,xn) = c where f is a recursive function and t is a constant.
   Returns Some list of terms, one for each input of the function f, if the equation admits a solution.
   Returns None if the equation has no solution.
  *)
-val invert : ctx:Env.env -> PMRS.t -> Constant.t -> term list option
+val invert : ctx:Env.env -> PMRS.t -> Constant.t -> term list option Lwt.t

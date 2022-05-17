@@ -7,6 +7,18 @@ open Option.Let_syntax
 open Lwt.Syntax
 module Stats : Solvers.Statistics = Utils.Stats
 
+let is_unsat (resp : solver_response) =
+  match resp with
+  | Unsat -> true
+  | _ -> false
+;;
+
+let is_sat (resp : solver_response) =
+  match resp with
+  | Sat -> true
+  | _ -> false
+;;
+
 module SmtLog : Solvers.Logger = struct
   let verb = Log.verbose
   let debug = Log.debug
@@ -25,63 +37,32 @@ module AsyncSmt = struct
   include S
 
   (** Create a process with a Z3 solver. *)
-  let make_z3_solver () =
-    make_solver ~name:"Z3-SMT" Utils.Config.z3_binary_path ("z3" :: z3_opts)
+  let make_z3_solver ?(hint = "") () =
+    make_solver ~hint ~name:"Z3-SMT" Utils.Config.z3_binary_path ("z3" :: z3_opts)
   ;;
 
-  let make_yices_solver () =
+  let make_yices_solver ?(hint = "") () =
     match Utils.Config.yices_binary_path with
-    | Some yices -> make_solver ~name:"Yices-SMT2" yices ("yices-smt2" :: yices_opts)
+    | Some yices -> make_solver ~hint ~name:"Yices-SMT2" yices ("yices-smt2" :: yices_opts)
     | None ->
       Log.error_msg "Yices not found. Using z3 instead.";
-      make_z3_solver ()
+      make_z3_solver ~hint ()
   ;;
 
   (** Create a process with a CVC4 solver. *)
-  let make_cvc_solver () =
+  let make_cvc_solver ?(hint = "") () =
     let cvc_path = Config.cvc_binary_path () in
     let using_cvc5 = Config.using_cvc5 () in
     let name = if using_cvc5 then "CVC5-SMT" else "CVC4-SMT" in
     let executable_name = if using_cvc5 then "cvc5" else "cvc4" in
-    make_solver ~name cvc_path (executable_name :: cvc_opts)
+    make_solver ~hint ~name cvc_path (executable_name :: cvc_opts)
   ;;
 
-  let make_solver (name : string) =
+  let make_solver ?(hint = "") (name : string) =
     match name with
-    | "cvc" | "cvc4" | "cvc5" -> make_cvc_solver ()
-    | "yices" -> make_yices_solver ()
-    | _ -> make_z3_solver ()
-  ;;
-end
-
-module SyncSmt = struct
-  module S = Solvers.Synchronous (SmtLog) (Stats)
-  include S
-
-  let make_z3_solver () = make_solver ~name:"Z3-SMT" Config.z3_binary_path z3_opts
-
-  let make_yices_solver () =
-    match Utils.Config.yices_binary_path with
-    | Some yices -> make_solver ~name:"Yices-SMT2" yices yices_opts
-    | None ->
-      Log.error_msg "Yices not found. Using z3 instead.";
-      make_z3_solver ()
-  ;;
-
-  (** Create a process with a CVC4 solver. *)
-  let make_cvc_solver () =
-    let cvc_path = Config.cvc_binary_path () in
-    let using_cvc5 = Config.using_cvc5 () in
-    let name = if using_cvc5 then "CVC5-SMT" else "CVC4-SMT" in
-    make_solver ~name cvc_path cvc_opts
-  ;;
-
-  (** Create a process given some solver name. *)
-  let make_solver (name : string) =
-    match name with
-    | "cvc" | "cvc4" | "cvc5" -> make_cvc_solver ()
-    | "yices" -> make_yices_solver ()
-    | _ -> make_z3_solver ()
+    | "cvc" | "cvc4" | "cvc5" -> make_cvc_solver ~hint ()
+    | "yices" -> make_yices_solver ~hint ()
+    | _ -> make_z3_solver ~hint ()
   ;;
 end
 
@@ -596,27 +577,29 @@ let request_different_models
     ~(ctx : Context.t)
     (model : term_model)
     (num_models : int)
-    (solver : SyncSmt.online_solver)
+    (solver : AsyncSmt.solver)
   =
-  let open SyncSmt in
+  let open AsyncSmt in
   let rec req_loop model i models =
     (* Assert all variables different. *)
-    List.iter
-      ~f:(fun (varname, value) ->
-        let smt_val = smt_of_term ~ctx value in
-        smt_assert solver (mk_not (mk_eq (mk_var varname) smt_val)))
-      (Map.to_alist model);
-    match check_sat solver with
+    let%lwt _ =
+      Lwt_list.iter_p
+        (fun (varname, value) ->
+          let smt_val = smt_of_term ~ctx value in
+          smt_assert solver (mk_not (mk_eq (mk_var varname) smt_val)))
+        (Map.to_alist model)
+    in
+    match%lwt check_sat solver with
     | Sat ->
-      (match get_model solver with
+      (match%lwt get_model solver with
       | SExps s ->
         (* New model has been found, recursively find new ones. *)
         let new_model = model_to_constmap ~ctx ~fctx (SExps s) in
         if i > 0
         then req_loop new_model (i - 1) (new_model :: models)
-        else new_model :: models
-      | _ -> models)
-    | _ -> models
+        else Lwt.return (new_model :: models)
+      | _ -> Lwt.return models)
+    | _ -> Lwt.return models
   in
   req_loop model num_models []
 ;;

@@ -7,6 +7,7 @@ open Rewriter
 open Utils
 open Fmt
 open Option.Let_syntax
+open Lwt.Syntax
 
 let as_unknown_app ?(match_functions = fun _ -> false) ~unknowns t : term list option =
   let rec aux t =
@@ -357,10 +358,13 @@ module Solver = struct
       (eqns : (term * term option * term * term) list)
       (guesses : Expression.t option list)
       : [> `First of string * variable list * term | `Second of Skeleton.t | `Third ]
+      Lwt.t
     =
     let validate_guess guess =
-      let validate_via_solver guess =
-        let open SmtInterface in
+      let open SmtInterface in
+      let validate_via_solver guess (solver, binder) =
+        let open AsyncSmt in
+        let* _ = binder in
         let equations_to_check =
           let eqns' =
             List.concat_map eqns ~f:(fun (_, pre, lhs, rhs) ->
@@ -376,9 +380,8 @@ module Solver = struct
           | Some eqns'' -> eqns''
           | None -> failwith "UNSAT"
         in
-        let solver = SyncSmt.make_z3_solver () in
-        let () =
-          SyncSmt.exec_all
+        let* () =
+          AsyncSmt.exec_all
             solver
             (Commands.mk_preamble
                ~logic:
@@ -387,28 +390,46 @@ module Solver = struct
                     (List.map ~f:snd equations_to_check))
                ())
         in
-        List.for_all equations_to_check ~f:(fun (pre, constr) ->
-            SyncSmt.spush solver;
-            let fv = Analysis.free_variables ~ctx:ctx.parent constr in
-            SyncSmt.exec_all solver (Commands.decls_of_vars ~ctx:ctx.parent fv);
-            (match pre with
-            | Some precond ->
-              SyncSmt.smt_assert solver (smt_of_term ~ctx:ctx.parent precond)
-            | None -> ());
-            SyncSmt.smt_assert solver (smt_of_term ~ctx:ctx.parent constr);
-            match SyncSmt.check_sat solver with
+        Lwt_list.for_all_s
+          (fun (pre, constr) ->
+            let* () = spush solver in
+            let fv =
+              Set.union
+                (Analysis.free_variables ~ctx:ctx.parent constr)
+                Option.(
+                  value
+                    ~default:VarSet.empty
+                    (pre >>| Analysis.free_variables ~ctx:ctx.parent))
+            in
+            let* () = exec_all solver (Commands.decls_of_vars ~ctx:ctx.parent fv) in
+            let* () =
+              match pre with
+              | Some precond -> smt_assert solver (smt_of_term ~ctx:ctx.parent precond)
+              | None -> Lwt.return ()
+            in
+            let* () = smt_assert solver (smt_of_term ~ctx:ctx.parent constr) in
+            match%lwt check_sat solver with
             | Unsat ->
-              SyncSmt.spop solver;
-              true
+              let* () = spop solver in
+              Lwt.return true
             | _ ->
-              SyncSmt.close_solver solver;
-              false)
+              let* () = close_solver solver in
+              Lwt.return false)
+          equations_to_check
       in
       if List.for_all guesses ~f:(Option.value_map ~default:false ~f:(Poly.equal guess))
-      then true
+      then Lwt.return true
       else (
-        try validate_via_solver guess with
-        | _ -> false)
+        try%lwt
+          let p, r =
+            AsyncSmt.cancellable_task
+              (AsyncSmt.make_solver ~hint:"deductive-check " "z3")
+              (validate_via_solver guess)
+          in
+          Lwt.wakeup r 1;
+          p
+        with
+        | _ -> Lwt.return false)
     in
     let build_soln guess =
       let arg_types, _ = RType.fun_typ_unpack (Variable.vtype_or_new ctx.parent xi) in
@@ -447,16 +468,17 @@ module Solver = struct
     in
     match maybe_guess with
     | Some guess_1 ->
-      if validate_guess guess_1
+      let%lwt is_valid_guess = validate_guess guess_1 in
+      if is_valid_guess
       then (
         match build_soln guess_1 with
-        | Some (fname, args, body) -> `First (fname, args, body)
+        | Some (fname, args, body) -> Lwt.return (`First (fname, args, body))
         | None ->
           (match Skeleton.of_expression ~ctx guess_1 with
-          | Some sk -> `Second sk
-          | None -> `Third))
-      else `Third
-    | _ -> `Third
+          | Some sk -> Lwt.return (`Second sk)
+          | None -> Lwt.return `Third))
+      else Lwt.return `Third
+    | _ -> Lwt.return `Third
   ;;
 
   let solve_eqn
@@ -501,6 +523,7 @@ module Solver = struct
       ~(xi : variable)
       (eqns : (term * term option * term * term) list)
       : [> `First of string * variable list * term | `Second of Skeleton.t | `Third ]
+      Lwt.t
     =
     let f (_, pre, lhs, rhs) = solve_eqn ~orig_ctx ~ctx ~xi pre lhs rhs in
     let guesses = List.map ~f eqns in

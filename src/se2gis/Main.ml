@@ -90,8 +90,9 @@ let rec refinement_loop
 
 and success_case ~ctx ~p ~synth_time lstate_in (tsize, usize) lifting (eqns, sol) =
   (* The solution is verified with a bounded check.  *)
-  let verif_time, check_r =
-    Stats.timed (fun () -> Verify.check_solution ~ctx ~p lstate_in sol)
+  let%lwt verif_time, check_r =
+    Stats.lwt_timed (fun a ->
+        Lwt.bind a (fun _ -> Verify.check_solution ~ctx ~p lstate_in sol))
   in
   match check_r with
   | `witnesss (t_set, u_set) ->

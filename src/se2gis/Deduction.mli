@@ -20,6 +20,7 @@ module Solver : sig
        | `Second of Skeleton.t
        | `Third
        ]
+       Lwt.t
 
   val functional_equation
     :  ctx:Common.Env.env

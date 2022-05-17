@@ -10,7 +10,6 @@ open Smtlib
 open SmtInterface
 open Syguslib
 open SygusInterface
-module Solvers = SyncSmt
 module S = Smtlib.SmtLib
 
 let _NUM_POSIIVE_EXAMPLES_ = 30
@@ -28,58 +27,74 @@ let get_positive_examples (f : Variable.t) : term list =
   different possible outputs.
   *)
 let gen_pmrs_positive_examples ~(ctx : env) (p : PMRS.t) =
+  let open AsyncSmt in
   let ref_typ_out = List.last_exn p.pinput_typ in
   let reference t = ctx_reduce ctx (ctx >>- Reduce.reduce_pmrs p t) in
   let out_term = ctx >- mk_composite_base_type (get_alpha ctx) in
   let atoms = ctx >- Analysis.free_variables out_term in
   let iterations = ref 0 in
-  let z3 = Solvers.make_z3_solver () in
-  Solvers.load_min_max_defs z3;
-  Solvers.exec_all
-    z3
-    (List.map ~f:snd (ctx >- SmtInterface.declare_datatype_of_rtype (get_alpha ctx)));
-  Solvers.exec_all z3 (ctx >- Commands.decls_of_vars atoms);
-  let mk_ex _ t =
-    let t' = reference t in
-    let fv = ctx >- Analysis.free_variables t' in
-    Solvers.spush z3;
-    Solvers.exec_all z3 (ctx >- Commands.decls_of_vars fv);
-    Solvers.smt_assert z3 (ctx >- smt_of_term (mk_bin Binop.Eq t' out_term));
-    let resp =
-      match Solvers.check_sat z3 with
-      | SmtLib.Sat ->
-        (* SAT: get the model. *)
-        let mmap = ctx >>- model_to_varmap atoms (Solvers.get_model z3) in
-        let value = ctx >- Eval.in_model mmap out_term in
-        (* Add the positive example for the current function. *)
-        add_positive_example p.pvar value;
-        (* Pop the current stack. *)
-        Solvers.spop z3;
-        (* Make the values forbidden in subsequent solver calls. *)
-        Solvers.smt_assert
-          z3
-          SmtLib.(mk_not (mk_eq (ctx >- smt_of_term out_term) (ctx >- smt_of_term value)));
-        SmtLib.Sat
-      | _ as t ->
-        (* UNSAT: the loop will stop, but pop the current stack before.  *)
-        Solvers.spop z3;
-        t
+  let task (z3, _b) =
+    let%lwt _ = _b in
+    let%lwt () = load_min_max_defs z3 in
+    let%lwt () =
+      exec_all
+        z3
+        (List.map ~f:snd (ctx >- SmtInterface.declare_datatype_of_rtype (get_alpha ctx)))
     in
-    resp
+    let%lwt () = exec_all z3 (ctx >- Commands.decls_of_vars atoms) in
+    let mk_ex _ t =
+      let t' = reference t in
+      let fv = ctx >- Analysis.free_variables t' in
+      let%lwt () = spush z3 in
+      let%lwt () = exec_all z3 (ctx >- Commands.decls_of_vars fv) in
+      let%lwt () = smt_assert z3 (ctx >- smt_of_term (mk_bin Binop.Eq t' out_term)) in
+      let resp =
+        match%lwt check_sat z3 with
+        | SmtLib.Sat ->
+          (* SAT: get the model. *)
+          let%lwt model = get_model z3 in
+          let mmap = ctx >>- model_to_varmap atoms model in
+          let value = ctx >- Eval.in_model mmap out_term in
+          (* Add the positive example for the current function. *)
+          add_positive_example p.pvar value;
+          (* Pop the current stack. *)
+          let%lwt () = spop z3 in
+          (* Make the values forbidden in subsequent solver calls. *)
+          let%lwt () =
+            smt_assert
+              z3
+              SmtLib.(
+                mk_not (mk_eq (ctx >- smt_of_term out_term) (ctx >- smt_of_term value)))
+          in
+          Lwt.return SmtLib.Sat
+        | _ as t ->
+          (* UNSAT: the loop will stop, but pop the current stack before.  *)
+          let%lwt () = spop z3 in
+          Lwt.return t
+      in
+      resp
+    in
+    let _ =
+      ctx
+      >- Expand.lwt_expand_loop
+           iterations (* Stop at _NUM_POSITIVES_EXAMEPLES_ examples. *)
+           ~r_stop:(fun _ -> !iterations > _NUM_POSIIVE_EXAMPLES_)
+           mk_ex
+           (Lwt.return
+              (TermSet.singleton
+                 (mk_var
+                    ctx.ctx
+                    (Variable.mk
+                       ctx.ctx
+                       ~t:(Some ref_typ_out)
+                       (Alpha.fresh ctx.ctx.names)))))
+    in
+    close_solver z3
   in
-  let _ =
-    ctx
-    >- Expand.expand_loop
-         iterations (* Stop at _NUM_POSITIVES_EXAMEPLES_ examples. *)
-         ~r_stop:(fun _ -> !iterations > _NUM_POSIIVE_EXAMPLES_)
-         mk_ex
-         (TermSet.singleton
-            (mk_var
-               ctx.ctx
-               (Variable.mk ctx.ctx ~t:(Some ref_typ_out) (Alpha.fresh ctx.ctx.names))))
-  in
-  Solvers.close_solver z3;
-  get_positive_examples p.pvar
+  let task, r = cancellable_task (make_solver "z3") task in
+  Lwt.wakeup r 1;
+  let%lwt () = task in
+  Lwt.return (get_positive_examples p.pvar)
 ;;
 
 let set_up_bounded_solver
@@ -467,7 +482,7 @@ let verify_ensures_candidate
     ~(p : PsiDef.t)
     (maybe_ensures : term option)
     (var : variable)
-    : SmtInterface.SyncSmt.solver_response Lwt.t
+    : S.solver_response Lwt.t
   =
   match maybe_ensures with
   | None -> failwith "Cannot verify ensures candidate; there is none."
@@ -542,10 +557,10 @@ let rec synthesize
   =
   Log.(info (wrap "Synthesize predicates.."));
   ctx >- AlgoLog.violates_ensures p negatives;
-  let new_positives =
+  let%lwt new_positives =
     match prev_positives with
     | [] -> gen_pmrs_positive_examples ~ctx p.PsiDef.reference
-    | _ -> prev_positives
+    | _ -> Lwt.return prev_positives
   in
   ctx >- AlgoLog.positives_ensures p new_positives;
   let id = 0 in

@@ -423,7 +423,7 @@ let image_witness_class
   =
   Stats.update_counterexample_classification_method vmethod;
   Log.verbose (fun frmt () ->
-      if SmtInterface.SyncSmt.is_unsat resp
+      if SmtInterface.is_unsat resp
       then
         Fmt.(
           pf
@@ -435,7 +435,7 @@ let image_witness_class
             p.PsiDef.reference.pvar.vname
             (box (pp_witness ~ctx))
             witness)
-      else if SmtInterface.SyncSmt.is_sat resp
+      else if SmtInterface.is_sat resp
       then
         Fmt.(
           pf
@@ -469,7 +469,7 @@ let requires_witness_class
   =
   Stats.update_counterexample_classification_method vmethod;
   Log.verbose (fun frmt () ->
-      if SmtInterface.SyncSmt.is_unsat resp
+      if SmtInterface.is_unsat resp
       then
         Fmt.(
           pf
@@ -481,7 +481,7 @@ let requires_witness_class
             tinv.PMRS.pvar.vname
             (box (pp_witness ~ctx))
             witness)
-      else if SmtInterface.SyncSmt.is_sat resp
+      else if SmtInterface.is_sat resp
       then
         Fmt.(
           pf

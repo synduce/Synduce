@@ -466,7 +466,7 @@ let verify_lemma_candidate
     (det : term_info)
     (cl : cond_lemma)
     (candidate : term)
-    : (Stats.verif_method * SyncSmt.solver_response) Lwt.t
+    : (Stats.verif_method * S.solver_response) Lwt.t
   =
   Log.verbose (fun f () -> Fmt.(pf f "Checking lemma candidate..."));
   try

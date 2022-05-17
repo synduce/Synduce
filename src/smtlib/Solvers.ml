@@ -261,7 +261,8 @@ module Synchronous (Log : Logger) (Stats : Statistics) = struct
 
   let () = Caml.Sys.set_signal Caml.Sys.sigchld (Caml.Sys.Signal_handle handle_sigchild)
 
-  let make_solver ~(name : string) (path : string) (options : string list) : online_solver
+  let make_solver ?(hint = "") ~(name : string) (path : string) (options : string list)
+      : online_solver
     =
     let open Core_unix in
     let pinfo = create_process ~prog:path ~args:options in
@@ -296,7 +297,8 @@ module Synchronous (Log : Logger) (Stats : Statistics) = struct
         fun fmt () ->
           pf
             fmt
-            "Solver %s started:  pid: %i log: %a"
+            "%sSolver %s started:  pid: %i log: %a"
+            hint
             solver.s_name
             solver.s_pid
             pp_link
@@ -544,7 +546,7 @@ module Asyncs (Log : Logger) (Stats : Statistics) = struct
     else return (Error (Fmt.str "Variable already declared"))
   ;;
 
-  let make_solver ~(name : string) (path : string) (options : string list)
+  let make_solver ?(hint = "") ~(name : string) (path : string) (options : string list)
       : solver * int t * int u
     =
     let pinfo = Lwt_process.open_process (path, Array.of_list options) in
@@ -576,7 +578,8 @@ module Asyncs (Log : Logger) (Stats : Statistics) = struct
           fun fmt () ->
             pf
               fmt
-              "Solver %s started:  pid: %i log: %a"
+              "%sSolver %s started:  pid: %i log: %a"
+              hint
               solver.s_name
               solver.s_pid
               pp_link
@@ -591,6 +594,26 @@ module Asyncs (Log : Logger) (Stats : Statistics) = struct
     with
     | Sys_error s ->
       failwith ("couldn't talk to solver, double-check path. Sys_error " ^ s)
+  ;;
+
+  let close_solver (solver : solver) : unit t =
+    Stats.log_proc_quit solver.s_pid;
+    let elapsed = Stats.get_elapsed solver.s_pid in
+    solver_verbose_pp_last_resp_count solver;
+    OC.close solver.s_log_outc;
+    Log.debug
+      Fmt.(
+        fun fmt () ->
+          pf
+            fmt
+            "Closing %s (spent %.3fs), log can be found in %a"
+            solver.s_name
+            elapsed
+            pp_link
+            solver.s_log_file);
+    let%lwt _ = exec_command solver mk_exit in
+    let%lwt () = Lwt_io.close solver.s_outputc in
+    return (OC.close solver.s_log_outc)
   ;;
 
   let solver_make_cancellable (s : solver) (p : 'a t) : unit =
@@ -610,26 +633,8 @@ module Asyncs (Log : Logger) (Stats : Statistics) = struct
                   s.s_pid
                   pp_link
                   s.s_log_file);
-          s.s_pinfo#terminate)
-  ;;
-
-  let close_solver (solver : solver) : unit t =
-    Stats.log_proc_quit solver.s_pid;
-    let elapsed = Stats.get_elapsed solver.s_pid in
-    solver_verbose_pp_last_resp_count solver;
-    Log.debug
-      Fmt.(
-        fun fmt () ->
-          pf
-            fmt
-            "Closing %s (spent %.3fs), log can be found in %a"
-            solver.s_name
-            elapsed
-            pp_link
-            solver.s_log_file);
-    let%lwt _ = exec_command solver mk_exit in
-    let%lwt () = Lwt_io.close solver.s_outputc in
-    return (OC.close solver.s_log_outc)
+          s.s_pinfo#terminate;
+          Lwt.(async (fun () -> map (fun _ -> ()) s.s_pinfo#close)))
   ;;
 
   let check_sat s : response = exec_command s mk_check_sat
