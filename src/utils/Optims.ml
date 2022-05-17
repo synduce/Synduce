@@ -54,15 +54,21 @@ let bound_after_verif = ref false
 
 (**
   Not an optimization. Set to true to use the base abstract cegis algorithm.
-  Option --use-segis sets this flag to true.
+  Option --segis sets this flag to true.
   *)
 let use_segis = ref false
 
 (**
   Not an optimization. Set to true to use the base concrete cegis algorithm.
-  Option --use-cegis sets this flag to true.
+  Option --cegis sets this flag to true.
   *)
 let use_cegis = ref false
+
+(**
+  Not an optimization. Set to true to use the SE2GIS algorithm *only*.
+  Option --se2gis sets this flag to true.
+  *)
+let use_se2gis = ref false
 
 (**
   Simplify equations before feeding them to equations solver.
@@ -217,6 +223,7 @@ let turn_off_eager_optims () =
 ;;
 
 let reuse_predicates = ref true
+let shuffle_configurations = ref false
 
 (* ============================================================================================= *)
 (*                                                    MULTITHREADING                             *)

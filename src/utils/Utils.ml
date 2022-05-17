@@ -1,6 +1,7 @@
 open Base
 open Sexplib
 module Config = Config
+module Concurrency = Concurrency
 module Stats = Stats
 module Log = Log
 module LogJson = LogJson

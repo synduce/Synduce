@@ -52,17 +52,18 @@ def all_proved_by_induction(data: dict):
     refinement_steps = data.get("refinement-steps")
     if refinement_steps is not None and not refinement_steps == "unknown":
         for step in refinement_steps.values():
-            for failure in step["failures"].values():
+            failures = step.get("failures")
+            if failures:
+                for failure in failures.values():
+                    classif_with = failure.get('cex_classification_with')
+                    if classif_with:
+                        if classif_with.startswith("bounded"):
+                            cex_classif_flag = False
 
-                classif_with = failure.get('cex_classification_with')
-                if classif_with:
-                    if classif_with.startswith("bounded"):
-                        cex_classif_flag = False
-
-                proved_by = failure.get('proved_by')
-                if proved_by:
-                    if proved_by.startswith("bounded"):
-                        lemma_proof_flag = False
+                    proved_by = failure.get('proved_by')
+                    if proved_by:
+                        if proved_by.startswith("bounded"):
+                            lemma_proof_flag = False
 
     return cex_classif_flag, lemma_proof_flag
 
@@ -124,11 +125,13 @@ class DataObj:
                 str_summary += f"<{t}:{u}>"
             else:
                 str_summary += "+"
-            for failure_step in step.get("failures").values():
-                if bool(failure_step.get("lifted")):
-                    str_summary += "^"
-                else:
-                    str_summary += "."
+            failures = step.get("failures")
+            if failures:
+                for failure_step in failures.values():
+                    if bool(failure_step.get("lifted")):
+                        str_summary += "^"
+                    else:
+                        str_summary += "."
             if verified:
                 str_summary += "✓"
 

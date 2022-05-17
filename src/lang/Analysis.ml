@@ -290,7 +290,7 @@ let terms_of_max_depth ~(ctx : Context.t) (depth : int) (typ : RType.t) : term l
       let subterms = List.map ~f:(constr_t (d + 1)) cargs in
       let choices =
         List.map (Utils.cartesian_nary_product subterms) ~f:(fun cargs ->
-            mk_data ctx cname (List.rev cargs))
+            mk_data ctx cname cargs)
       in
       choices
   in

@@ -162,8 +162,9 @@ let print_usage () =
     \       --no-detupling              Turn off detupling.\n\
     \    -c --simple-init               Initialize T naively.\n\
     \    -l --lemma-sketch              Sketch lemmas in synthesis.\n\
-    \       --segis                    Use the Abstract CEGIS algorithm. Turns bmc on.\n\
-    \       --cegis                    Use the Concrete CEGIS algorithm. Turns bmc on.\n\
+    \       --segis                     Use the Abstract CEGIS algorithm. Turns bmc on.\n\
+    \       --se2gis                    Use only the SE2GIS algorithm.\n\
+    \       --cegis                     Use the Concrete CEGIS algorithm. Turns bmc on.\n\
     \       --no-assumptions            Don't  partial correctness assumptions.\n\
     \       --no-simplify               Don't simplify equations with partial evaluation.\n\
     \       --no-gropt                  Don't optimize grammars (level 0)\n\

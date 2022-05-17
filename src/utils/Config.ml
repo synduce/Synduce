@@ -299,6 +299,7 @@ let options print_usage parse_only =
   ; 'n', "verification", None, Some set_num_expansions_check
   ; 'N', "no-sat-as-unsat", set no_bounded_sat_as_unsat true, None
   ; 'o', "output", None, Some set_output_folder
+  ; 'O', "shuffle-configs", set shuffle_configurations true, None
   ; 'p', "num-threads", None, Some set_num_threads
   ; 'P', "reuse-predicates-off", set reuse_predicates false, None
   ; 's', "max-solutions", None, Some set_max_solutions
@@ -307,6 +308,7 @@ let options print_usage parse_only =
   ; 'v', "verbose", set verbose true, None
   ; 'X', "classify-witness", set classify_witness true, None
   ; '\000', "segis", set use_segis true, None
+  ; '\000', "se2gis", set use_se2gis true, None
   ; '\000', "cegis", set use_cegis true, None
   ; '\000', "cvc4", set use_cvc4 true, None
   ; '\000', "cvc5", set use_cvc4 false, None

@@ -369,9 +369,8 @@ let get_variants (env : env) (typ : t) : (string * t list) list =
         | Some (typ', tl') ->
           (match typ' with
           | TParam (params', _) when List.length params' > 0 ->
-            (match unify (List.zip_exn in_params params') with
-            | Ok subs -> List.map ~f:(sub_all (mkv subs)) tl'
-            | Error _ ->
+            (match List.zip in_params params' with
+            | Unequal_lengths ->
               Log.error_msg
                 Fmt.(
                   str
@@ -380,7 +379,14 @@ let get_variants (env : env) (typ : t) : (string * t list) list =
                     pp
                     typ
                     tname);
-              failwith "Type error.")
+              failwith "Type error : same variant with different number of args."
+            | Ok l ->
+              (match unify l with
+              | Ok subs -> List.map ~f:(sub_all (mkv subs)) tl'
+              | Error _ ->
+                Log.error_msg
+                  Fmt.(str "Internal type error: %a and %s should unify." pp typ tname);
+                failwith "Type error."))
           | TNamed _ -> tl'
           | _ -> failwith "Unexpexcted")
         | None -> []
@@ -488,7 +494,14 @@ let is_recursive (env : env) =
   reduce ~case ~init:false ~join:( || )
 ;;
 
-let is_datatype (env : env) t = List.length (get_variants env t) > 0
+let is_datatype (env : env) t =
+  match t with
+  | TNamed tname | TParam (_, TNamed tname) ->
+    (match Hashtbl.find env.typenames_variants tname with
+    | Some (_ :: _) -> true
+    | _ -> false)
+  | _ -> false
+;;
 
 let rec is_user_defined t =
   match t with

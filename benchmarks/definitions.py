@@ -60,8 +60,8 @@ kick_the_tires_set = [
     ["constraints/sortedlist/count_lt.ml", ""],
     ["constraints/bst/count_lt.ml", "-NB"],
     ["constraints/ensures/mps_no_ensures.ml", "-B"],
-    ["list/largest_diff_sorted_list_nohead.ml", ""],
-    ["list/poly_no_fac.ml", ""],
+    ["list/largest_diff_sorted_list_nohead.ml", "--se2gis"],
+    ["list/poly_no_fac.ml", "--se2gis"],
     ["unrealizable/po_sorted.ml", "", False]
 ]
 
