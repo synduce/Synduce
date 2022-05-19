@@ -67,6 +67,7 @@ let rec sort_of_rtype ~(ctx : Context.t) (t : RType.t) : sygus_sort =
   | RType.TBool -> E.bool_sort
   | RType.TString -> E.sort "String"
   | RType.TChar -> E.sort "Char"
+  | RType.TSet s -> mk_sort_app (mk_id_simple "Set") [ sort_of_rtype ~ctx s ]
   | RType.TNamed s -> E.sort s
   | RType.TTup tl ->
     if !Config.using_cvc4_tuples
@@ -95,7 +96,7 @@ let requires_dt_theory ~(ctx : Context.t) (t : RType.t) =
     let open RType in
     match t with
     | TTup _ -> true
-    | TInt | TBool | TChar | TString | TVar _ -> false
+    | TSet _ | TInt | TBool | TChar | TString | TVar _ -> false
     | TFun (a, b) -> aux a || aux b
     | TParam (tl, t) -> List.exists ~f:aux tl || aux t
     | TNamed _ -> is_datatype ctx.types t

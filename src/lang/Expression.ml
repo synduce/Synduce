@@ -330,13 +330,21 @@ let of_term ?(ctx = RContext.empty ()) t0 : t option =
         | Eq -> mk_e_bin Eq (f t1) (f t2)
         | Mod -> mk_e_bin Mod (f t1) (f t2)
         | Minus -> mk_e_assoc (Binary Plus) [ f t1; mk_e_un Neg (f t2) ]
+        | SetIntersection -> mk_e_assoc (Binary SetIntersection) [ f t1; f t2 ]
+        | SetUnion -> mk_e_assoc (Binary SetUnion) [ f t1; f t2 ]
+        | SetMinus -> mk_e_bin SetMinus (f t1) (f t2)
+        | SetInsert -> mk_e_bin SetInsert (f t1) (f t2)
+        | SetMem -> mk_e_bin SetMem (f t1) (f t2)
+        | SetSubset -> mk_e_bin SetSubset (f t1) (f t2)
         | Implies -> failwith "=> is only for expressions"))
     | TUn (op, t) ->
       Unop.(
         (match op with
         | Neg -> mk_e_un Neg (f t)
         | Not -> mk_e_un Not (f t)
-        | Abs -> mk_e_un Abs (f t)))
+        | Abs -> mk_e_un Abs (f t)
+        | SetCard -> mk_e_un SetCard (f t)
+        | SetComplement -> mk_e_un SetComplement (f t)))
     | TSel (t, i) -> mk_e_sel (f t) i
     | TApp (func, args) ->
       (match f func with

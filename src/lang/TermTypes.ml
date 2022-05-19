@@ -78,6 +78,13 @@ module Binop = struct
     | And
     | Or
     | Implies
+    (* Set theory (CVC5) *)
+    | SetUnion
+    | SetIntersection
+    | SetMinus
+    | SetMem
+    | SetSubset
+    | SetInsert
   [@@deriving hash]
 
   let compare = Poly.compare
@@ -100,6 +107,13 @@ module Binop = struct
     | And -> "&&"
     | Or -> "||"
     | Implies -> "=>"
+    (*  *)
+    | SetUnion -> "union"
+    | SetIntersection -> "inter"
+    | SetMinus -> "minus"
+    | SetMem -> "member"
+    | SetSubset -> "subset"
+    | SetInsert -> "insert"
   ;;
 
   let to_string (op : t) =
@@ -119,6 +133,13 @@ module Binop = struct
     | And -> "and"
     | Or -> "or"
     | Implies -> "=>"
+    (*  *)
+    | SetUnion -> "union"
+    | SetIntersection -> "inter"
+    | SetMinus -> "minus"
+    | SetMem -> "member"
+    | SetSubset -> "subset"
+    | SetInsert -> "insert"
   ;;
 
   let of_string (s : string) : t option =
@@ -136,7 +157,13 @@ module Binop = struct
     | "/" -> Some Div
     | "mod" -> Some Mod
     | "and" | "&&" -> Some And
-    | "or" | "||" -> Some Or
+    | "or" | "||" -> Some Or (*  *)
+    | "union" -> Some SetUnion
+    | "inter" -> Some SetIntersection
+    | "minus" -> Some SetMinus
+    | "member" -> Some SetMem
+    | "subset" -> Some SetSubset
+    | "insert" -> Some SetInsert
     | _ -> None
   ;;
 
@@ -146,7 +173,13 @@ module Binop = struct
       | Lt | Gt | Ge | Le -> [ TInt, TInt ]
       | Eq -> [ TInt, TInt; TBool, TBool ]
       | Max | Min | Plus | Minus | Times | Div | Mod -> [ TInt, TInt ]
-      | Implies | And | Or -> [ TBool, TBool ])
+      | Implies | And | Or -> [ TBool, TBool ] (*  *)
+      | SetUnion -> [ TSet (TVar 0), TSet (TVar 0) ]
+      | SetIntersection -> [ TSet (TVar 0), TSet (TVar 0) ]
+      | SetMinus -> [ TSet (TVar 0), TSet (TVar 0) ]
+      | SetMem -> [ TVar 0, TSet (TVar 0) ]
+      | SetSubset -> [ TSet (TVar 0), TSet (TVar 0) ]
+      | SetInsert -> [ TVar 0, TSet (TVar 0) ])
   ;;
 
   let result_type (op : t) =
@@ -155,7 +188,13 @@ module Binop = struct
       | Lt | Gt | Ge | Le -> TBool
       | Eq -> TBool
       | Max | Min | Plus | Minus | Times | Div | Mod -> TInt
-      | Implies | And | Or -> TBool)
+      | Implies | And | Or -> TBool
+      | SetUnion -> TSet (TVar 0)
+      | SetIntersection -> TSet (TVar 0)
+      | SetMinus -> TSet (TVar 0)
+      | SetMem -> TBool
+      | SetSubset -> TBool
+      | SetInsert -> TSet (TVar 0))
   ;;
 
   let pp (frmt : Formatter.t) (op : t) = Fmt.string frmt (to_pp_string op)
@@ -172,6 +211,8 @@ module Unop = struct
     | Neg
     | Not
     | Abs
+    | SetCard (** Set cardinality.  *)
+    | SetComplement (** Set complement. *)
   [@@deriving hash]
 
   let compare = Poly.compare
@@ -182,6 +223,8 @@ module Unop = struct
     | Neg -> RType.TInt
     | Not -> RType.TBool
     | Abs -> RType.TInt
+    | SetCard -> RType.TSet (TVar 0)
+    | SetComplement -> RType.TSet (TVar 0)
   ;;
 
   let result_type (op : t) =
@@ -189,6 +232,8 @@ module Unop = struct
     | Neg -> RType.TInt
     | Not -> RType.TBool
     | Abs -> RType.TInt
+    | SetCard -> RType.TInt
+    | SetComplement -> RType.TSet (TVar 0)
   ;;
 
   let to_pp_string (op : t) =
@@ -196,6 +241,8 @@ module Unop = struct
     | Neg -> "-"
     | Not -> "¬"
     | Abs -> "abs"
+    | SetCard -> "card"
+    | SetComplement -> "complement"
   ;;
 
   let to_string (op : t) =
@@ -203,6 +250,8 @@ module Unop = struct
     | Neg -> "-"
     | Not -> "not"
     | Abs -> "abs"
+    | SetCard -> "card"
+    | SetComplement -> "complement"
   ;;
 
   let of_string (s : string) : t option =
@@ -210,6 +259,7 @@ module Unop = struct
     | "abs" -> Some Abs
     | "~-" | "-" -> Some Neg
     | "not" -> Some Not
+    | "card" -> Some SetCard
     | _ -> None
   ;;
 

@@ -10,6 +10,7 @@ let rec theory_of (t : RType.t) =
     | TString -> Logics.Strings
     | TBool -> Logics.Core
     | TNamed _s -> Logics.Core
+    | TSet _ -> Logics.All
     | TTup tl ->
       List.fold ~f:(fun a b -> Logics.join_theories a (theory_of b)) ~init:Logics.Core tl
     | TVar _ -> Logics.Core

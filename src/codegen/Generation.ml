@@ -89,6 +89,7 @@ let rec convert_otyp_to_dfy (typ : t) : d_domain_type =
   | TBool -> mk_bool_type
   | TString -> mk_string_type
   | TChar -> mk_char_type
+  | TSet t -> mk_set_type (convert_otyp_to_dfy t)
   | TNamed name -> mk_named_type name
   | TTup el -> mk_tuple_type (List.map convert_otyp_to_dfy el)
   | TParam (params, typ) ->
@@ -176,6 +177,7 @@ let rec convert_t_tkind (typ : t) : type_term =
   | TString -> mk_t_string dummy_loc
   | TChar -> mk_t_char dummy_loc
   | TNamed name -> mk_t_typ dummy_loc name
+  | TSet t -> mk_t_set dummy_loc (convert_t_tkind t)
   | TTup _ -> failwith "Unsupported Type"
   | TFun (t1, t2) -> mk_t_fun dummy_loc (convert_t_tkind t1) (convert_t_tkind t2)
   | TParam (params, term) ->

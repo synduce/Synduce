@@ -132,6 +132,7 @@ let rec sort_of_rtype (t : RType.t) : smtSort =
   | RType.TBool -> SmtSort (Id (SSimple "Bool"))
   | RType.TString -> SmtSort (Id (SSimple "String"))
   | RType.TChar -> SmtSort (Id (SSimple "Char"))
+  | RType.TSet s -> Comp (Id (SSimple "Set"), [ sort_of_rtype s ])
   | RType.TNamed s -> SmtSort (Id (SSimple s))
   | RType.TTup tl -> SmtSort (Id (SSimple (Tuples.type_name_of_types tl)))
   | RType.TFun (tin, tout) ->

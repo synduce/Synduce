@@ -721,6 +721,7 @@ let mk_int_type = DTyInt
 let mk_bool_type = DTyBool
 let mk_char_type = DTyChar
 let mk_string_type = DTyString
+let mk_set_type t = DTyFiniteSet t
 let mk_tuple_type (el : d_domain_type list) = DTyTuple el
 let mk_named_type ?(params = []) name : d_domain_type = DTyNamed (name, params)
 

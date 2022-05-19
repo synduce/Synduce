@@ -14,6 +14,9 @@ type typekind =
   | TyString (** The string type. *)
   | TyChar (** The char type. *)
   | TyFun of type_term * type_term (** The function type. *)
+  (* Non-standard *)
+  | TySet of type_term
+  (* User defined*)
   | TyTyp of ident
   | TyParam of ident
   | TyConstr of type_term list * type_term
@@ -30,6 +33,7 @@ let mk_t_int pos = { pos; tkind = TyInt }
 let mk_t_bool pos = { pos; tkind = TyBool }
 let mk_t_string pos = { pos; tkind = TyString }
 let mk_t_char pos = { pos; tkind = TyChar }
+let mk_t_set pos t = { pos; tkind = TySet t }
 let mk_t_typ pos t = { pos; tkind = TyTyp t }
 let mk_t_param pos t = { pos; tkind = TyParam t }
 let mk_t_constr pos tl t = { pos; tkind = TyConstr (tl, t) }
@@ -44,6 +48,7 @@ type t =
   | TChar
   | TNamed of string
   | TTup of t list
+  | TSet of t
   | TFun of t * t
   | TParam of t list * t
   | TVar of int
@@ -59,6 +64,10 @@ let rec pp (frmt : Formatter.t) (typ : t) =
   | TNamed s -> Fmt.(pf frmt "%s" s)
   | TTup tl -> Fmt.(pf frmt "%a" (parens (list ~sep:Utils.ast pp)) tl)
   | TFun (tin, tout) -> Fmt.(pf frmt "(%a ⟶  %a)" pp tin pp tout)
+  | TSet t' ->
+    if !Config.math_display
+    then Fmt.(pf frmt "{%a}" pp t')
+    else Fmt.(pf frmt "@[%a@;set@]" pp t')
   | TParam (alpha, t') ->
     (match alpha with
     | [] ->
@@ -193,6 +202,7 @@ let substitute ~(old : t) ~(by : t) ~(in_ : t) =
       match ty with
       | TInt | TBool | TChar | TString | TNamed _ | TVar _ -> ty
       | TTup tl -> TTup (List.map ~f:s tl)
+      | TSet a -> s a
       | TFun (a, b) -> TFun (s a, s b)
       | TParam (params, t) -> TParam (List.map ~f:s params, s t))
   in
@@ -225,6 +235,7 @@ let rec occurs (x : int) (typ : t) : bool =
   match typ with
   | TInt | TBool | TString | TChar | TNamed _ -> false
   | TTup tl -> List.exists ~f:(occurs x) tl
+  | TSet a -> occurs x a
   | TFun (tin, tout) -> occurs x tin || occurs x tout
   | TParam (param, te) -> List.exists ~f:(occurs x) param || occurs x te
   | TVar y -> x = y
@@ -262,6 +273,7 @@ let rec unify_one (s : t) (t : t) : (substitution, Sexp.t) Result.t =
         Fmt.(str "Type unification: Tuples %a and %a have different sizes" pp s pp t)
       in
       Error (Sexp.Atom emsg))
+  | TSet t1, TSet t2 -> unify_one t1 t2
   | TVar x, t' | t', TVar x ->
     if occurs x t'
     then (
@@ -318,6 +330,7 @@ let instantiate_variant (vargs : type_term list) (instantiator : (ident * int) l
     | TyChar | TyTyp "char" -> TChar
     | TyString | TyTyp "string" -> TString
     | TyFun (tin, tout) -> TFun (variant_arg tin, variant_arg tout)
+    | TySet telt -> TSet (variant_arg telt)
     | TyTyp e -> TNamed e
     | TyParam x ->
       (match List.Assoc.find instantiator ~equal:String.equal x with
@@ -466,6 +479,7 @@ let reduce ~(case : (t -> 'a) -> t -> 'a option) ~(init : 'a) ~(join : 'a -> 'a 
       | TInt | TBool | TString | TChar -> init
       | TNamed _ -> init
       | TVar _ -> init
+      | TSet t -> aux t
       | TTup tl -> List.fold ~init ~f:(fun acc t' -> join acc (aux t')) tl
       | TFun (tin, tout) -> join (aux tin) (aux tout)
       | TParam (_, t) -> aux t)
@@ -473,9 +487,10 @@ let reduce ~(case : (t -> 'a) -> t -> 'a option) ~(init : 'a) ~(join : 'a -> 'a 
   aux t
 ;;
 
-let is_base t =
+let rec is_base t =
   match t with
   | TInt | TBool | TChar | TString -> true
+  | TSet t -> is_base t
   | _ -> false
 ;;
 
@@ -507,6 +522,7 @@ let rec is_user_defined t =
   match t with
   | TBool | TInt | TString | TChar | TVar _ -> false
   | TNamed _ | TTup _ | TParam _ -> true
+  | TSet a -> is_user_defined a
   | TFun (a, b) -> is_user_defined a || is_user_defined b
 ;;
 
