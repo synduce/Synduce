@@ -79,12 +79,12 @@ module Binop = struct
     | Or
     | Implies
     (* Set theory (CVC5) *)
-    | SetUnion
-    | SetIntersection
-    | SetMinus
-    | SetMem
-    | SetSubset
-    | SetInsert
+    | SetUnion of RType.t
+    | SetIntersection of RType.t
+    | SetMinus of RType.t
+    | SetMem of RType.t
+    | SetSubset of RType.t
+    | SetInsert of RType.t
   [@@deriving hash]
 
   let compare = Poly.compare
@@ -108,12 +108,12 @@ module Binop = struct
     | Or -> "||"
     | Implies -> "=>"
     (*  *)
-    | SetUnion -> "union"
-    | SetIntersection -> "inter"
-    | SetMinus -> "minus"
-    | SetMem -> "member"
-    | SetSubset -> "subset"
-    | SetInsert -> "insert"
+    | SetUnion _ -> "union"
+    | SetIntersection _ -> "inter"
+    | SetMinus _ -> "minus"
+    | SetMem _ -> "member"
+    | SetSubset _ -> "subset"
+    | SetInsert _ -> "insert"
   ;;
 
   let to_string (op : t) =
@@ -134,12 +134,12 @@ module Binop = struct
     | Or -> "or"
     | Implies -> "=>"
     (*  *)
-    | SetUnion -> "union"
-    | SetIntersection -> "inter"
-    | SetMinus -> "minus"
-    | SetMem -> "member"
-    | SetSubset -> "subset"
-    | SetInsert -> "insert"
+    | SetUnion _ -> "union"
+    | SetIntersection _ -> "inter"
+    | SetMinus _ -> "minus"
+    | SetMem _ -> "member"
+    | SetSubset _ -> "subset"
+    | SetInsert _ -> "insert"
   ;;
 
   let of_string (s : string) : t option =
@@ -158,12 +158,12 @@ module Binop = struct
     | "mod" -> Some Mod
     | "and" | "&&" -> Some And
     | "or" | "||" -> Some Or (*  *)
-    | "union" -> Some SetUnion
-    | "inter" -> Some SetIntersection
-    | "minus" -> Some SetMinus
-    | "member" -> Some SetMem
-    | "subset" -> Some SetSubset
-    | "insert" -> Some SetInsert
+    | "union" -> Some (SetUnion TInt)
+    | "inter" -> Some (SetIntersection TInt)
+    | "minus" -> Some (SetMinus TInt)
+    | "member" -> Some (SetMem TInt)
+    | "subset" -> Some (SetSubset TInt)
+    | "insert" -> Some (SetInsert TInt)
     | _ -> None
   ;;
 
@@ -174,12 +174,12 @@ module Binop = struct
       | Eq -> [ TInt, TInt; TBool, TBool ]
       | Max | Min | Plus | Minus | Times | Div | Mod -> [ TInt, TInt ]
       | Implies | And | Or -> [ TBool, TBool ] (*  *)
-      | SetUnion -> [ TSet (TVar 0), TSet (TVar 0) ]
-      | SetIntersection -> [ TSet (TVar 0), TSet (TVar 0) ]
-      | SetMinus -> [ TSet (TVar 0), TSet (TVar 0) ]
-      | SetMem -> [ TVar 0, TSet (TVar 0) ]
-      | SetSubset -> [ TSet (TVar 0), TSet (TVar 0) ]
-      | SetInsert -> [ TVar 0, TSet (TVar 0) ])
+      | SetUnion typ -> [ TSet typ, TSet typ ]
+      | SetIntersection typ -> [ TSet typ, TSet typ ]
+      | SetMinus typ -> [ TSet typ, TSet typ ]
+      | SetMem typ -> [ typ, TSet typ ]
+      | SetSubset typ -> [ TSet typ, TSet typ ]
+      | SetInsert typ -> [ typ, TSet typ ])
   ;;
 
   let result_type (op : t) =
@@ -189,12 +189,12 @@ module Binop = struct
       | Eq -> TBool
       | Max | Min | Plus | Minus | Times | Div | Mod -> TInt
       | Implies | And | Or -> TBool
-      | SetUnion -> TSet (TVar 0)
-      | SetIntersection -> TSet (TVar 0)
-      | SetMinus -> TSet (TVar 0)
-      | SetMem -> TBool
-      | SetSubset -> TBool
-      | SetInsert -> TSet (TVar 0))
+      | SetUnion typ -> TSet typ
+      | SetIntersection typ -> TSet typ
+      | SetMinus typ -> TSet typ
+      | SetMem _ -> TBool
+      | SetSubset _ -> TBool
+      | SetInsert typ -> TSet typ)
   ;;
 
   let pp (frmt : Formatter.t) (op : t) = Fmt.string frmt (to_pp_string op)

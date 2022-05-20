@@ -58,7 +58,11 @@ let rec fterm_of_expr (expr : expression) : term =
   | Pexp_ident locid ->
     (match simple_ident_of_longident locid.txt with
     | Some id -> mk_var (sloc locid) id
-    | None -> failwith "Longident not supported.")
+    | None ->
+      failwith
+        (Fmt.str
+           "Longident %s not supported."
+           (String.concat ~sep:"." (Longident.flatten locid.txt))))
   | Pexp_constant const -> mk_const cur_loc (fconst_of_constant const)
   | Pexp_ifthenelse (c, tt, otf) ->
     (match otf with

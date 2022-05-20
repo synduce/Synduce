@@ -489,7 +489,33 @@ let declare_synt_obj (assert_expr : expression) =
     ()
 ;;
 
-let parse_ocaml (input_file_name : string) =
+(** Parse set defintions.  *)
+let define_module (binding : module_binding) : unit =
+  match binding.pmb_expr.pmod_desc with
+  | Pmod_apply (f, arg) ->
+    (match binding.pmb_name.txt, f.pmod_desc, arg.pmod_desc with
+    | Some module_name, Pmod_ident fid, Pmod_ident b ->
+      (match Longident.flatten fid.txt with
+      | [ "Set"; "Make" ] ->
+        (* TODO: extend supported types in sets. *)
+        (match Longident.flatten b.txt with
+        | [ "Int" ] ->
+          let t = TSet TInt in
+          Fmt.(pf stdout "@[Recognized %s is %a@]@." module_name pp t);
+          ()
+        | [ "Bool" ] ->
+          let t = TSet TBool in
+          Fmt.(pf stdout "@[Recognized %s is %a@]@." module_name pp t);
+          ()
+        | _ -> ())
+      | _ -> ())
+    | _ -> ())
+  | _ -> ()
+;;
+
+let parse_ocaml (input_file_name : string)
+    : definition list * (string * string * string) option
+  =
   let input_folder_name = FilePath.dirname input_file_name in
   let definitions = read_sig input_file_name in
   let seek_options def =
@@ -518,6 +544,9 @@ let parse_ocaml (input_file_name : string) =
     | Pstr_eval ({ pexp_desc = Pexp_assert maybe_synt_obj; _ }, _) ->
       (* match assert ... for declaration of synthesis objectives. *)
       declare_synt_obj maybe_synt_obj;
+      []
+    | Pstr_module mod_binding ->
+      define_module mod_binding;
       []
     | Pstr_include _include_declaration -> []
     | Pstr_open _include_declaration -> []
