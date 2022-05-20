@@ -499,14 +499,8 @@ let define_module (binding : module_binding) : unit =
       | [ "Set"; "Make" ] ->
         (* TODO: extend supported types in sets. *)
         (match Longident.flatten b.txt with
-        | [ "Int" ] ->
-          let t = TSet TInt in
-          Fmt.(pf stdout "@[Recognized %s is %a@]@." module_name pp t);
-          ()
-        | [ "Bool" ] ->
-          let t = TSet TBool in
-          Fmt.(pf stdout "@[Recognized %s is %a@]@." module_name pp t);
-          ()
+        | [ "Int" ] -> add_module module_name (TSet TInt)
+        | [ "Bool" ] -> add_module module_name (TSet TBool)
         | _ -> ())
       | _ -> ())
     | _ -> ())

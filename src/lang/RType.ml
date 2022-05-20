@@ -202,7 +202,7 @@ let substitute ~(old : t) ~(by : t) ~(in_ : t) =
       match ty with
       | TInt | TBool | TChar | TString | TNamed _ | TVar _ -> ty
       | TTup tl -> TTup (List.map ~f:s tl)
-      | TSet a -> s a
+      | TSet a -> TSet (s a)
       | TFun (a, b) -> TFun (s a, s b)
       | TParam (params, t) -> TParam (List.map ~f:s params, s t))
   in

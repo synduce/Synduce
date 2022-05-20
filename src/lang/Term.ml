@@ -66,10 +66,12 @@ let ext_var_or_none (t : term) : variable list option =
 
 let mk_const ?(pos = dummy_loc) (c : Constant.t) =
   let ctyp =
-    match c with
-    | Constant.CInt _ -> RType.TInt
-    | Constant.CChar _ -> RType.TChar
-    | Constant.CTrue | Constant.CFalse -> RType.TBool
+    Constant.(
+      match c with
+      | CInt _ -> RType.TInt
+      | CChar _ -> RType.TChar
+      | CTrue | CFalse -> RType.TBool
+      | CEmptySet t -> RType.TSet t)
   in
   { tpos = pos; tkind = TConst c; ttyp = ctyp }
 ;;
@@ -1192,6 +1194,9 @@ module Terms = struct
 
   (** Create a term from a variable.  *)
   let ( ~^ ) : variable -> t = mk_var_no_ctx
+
+  (** Create a constant: an emptyset of elements of a given type. *)
+  let emptyset typ = mk_const (Constant.CEmptySet typ)
 
   (**
     Infers the type of the term, and returns the term with the correct types

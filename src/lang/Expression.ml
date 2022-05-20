@@ -26,6 +26,7 @@ type t =
   | EApp of int * t list
   | EInt of int
   | EChar of char
+  | EEmptySet of RType.t
   | EVar of int
   | EBox of boxkind
   | ETup of t list
@@ -54,6 +55,7 @@ let rec pp ?(ctx = RContext.empty ()) (f : Formatter.t) (expr : t) : unit =
     | EFalse -> pf f "#f"
     | EApp (fid, args) ->
       pf f "%a(%a)" (pp_ivar ~ctx) fid (list ~sep:comma (pp ~ctx)) args
+    | EEmptySet _ -> pf f "{}"
     | EInt i -> pf f "%i" i
     | EChar c -> pf f "%c" c
     | EVar i -> pp_ivar ~ctx f i
@@ -126,6 +128,7 @@ let mk_e_false = EFalse
 let mk_e_int i = EInt i
 let mk_e_char i = EChar i
 let mk_e_bool b = if b then mk_e_true else mk_e_false
+let mk_e_emptyset t = EEmptySet t
 let mk_e_var id = EVar id
 let mk_e_tup tl = ETup tl
 let mk_e_sel t i = ESel (t, i)
@@ -181,7 +184,7 @@ let reduce
     | Some c -> c
     | None ->
       (match e with
-      | ETrue | EFalse | EChar _ | EInt _ | EVar _ | EBox _ -> init
+      | ETrue | EFalse | EChar _ | EInt _ | EEmptySet _ | EVar _ | EBox _ -> init
       | EIte (a, b, c) -> join (aux a) (join (aux b) (aux c))
       | ESel (t, _) -> aux t
       | EApp (_, tl) | EOp (_, tl) | EData (_, tl) | ETup tl ->
@@ -196,7 +199,7 @@ let transform (case : (t -> t) -> t -> t option) (e : t) =
     | Some c -> c
     | None ->
       (match e with
-      | ETrue | EFalse | EChar _ | EInt _ | EVar _ | EBox _ -> e
+      | ETrue | EFalse | EChar _ | EInt _ | EEmptySet _ | EVar _ | EBox _ -> e
       | EIte (a, b, c) -> mk_e_ite (aux a) (aux b) (aux c)
       | EOp (op, tl) -> mk_e_assoc op (List.map ~f:aux tl)
       | ESel (t, i) -> mk_e_sel (aux t) i
@@ -305,7 +308,8 @@ let of_term ?(ctx = RContext.empty ()) t0 : t option =
         | CInt i -> mk_e_int i
         | CChar c -> mk_e_char c
         | CTrue -> mk_e_true
-        | CFalse -> mk_e_false))
+        | CFalse -> mk_e_false
+        | CEmptySet t -> mk_e_emptyset t))
     | TVar v ->
       RContext.register_var ctx v;
       mk_e_var v.vid
@@ -343,8 +347,9 @@ let of_term ?(ctx = RContext.empty ()) t0 : t option =
         | Neg -> mk_e_un Neg (f t)
         | Not -> mk_e_un Not (f t)
         | Abs -> mk_e_un Abs (f t)
-        | SetCard -> mk_e_un SetCard (f t)
-        | SetComplement -> mk_e_un SetComplement (f t)))
+        | SetCard typ -> mk_e_un (SetCard typ) (f t)
+        | SetSingleton typ -> mk_e_un (SetSingleton typ) (f t)
+        | SetComplement typ -> mk_e_un (SetComplement typ) (f t)))
     | TSel (t, i) -> mk_e_sel (f t) i
     | TApp (func, args) ->
       (match f func with
@@ -363,6 +368,7 @@ let to_term ~(ctx : RContext.t) (e : t) : term option =
     | EFalse -> Some (Terms.bool false)
     | EInt i -> Some (Terms.int i)
     | EChar c -> Some (Terms.char c)
+    | EEmptySet t -> Some (Terms.emptyset t)
     | EApp (i, l) ->
       let%bind func = f (EVar i) in
       let%map args = Option.all (List.map ~f l) in

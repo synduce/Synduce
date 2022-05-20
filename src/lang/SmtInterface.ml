@@ -265,6 +265,8 @@ let term_of_const (c : Constant.t) : smtTerm =
   | Constant.CChar c -> SmtTSpecConst (SCString (String.of_char c))
   | Constant.CTrue -> mk_true
   | Constant.CFalse -> mk_false
+  | Constant.CEmptySet t ->
+    SmtTQualdId (QIas (Id (SSimple "set.empty"), sort_of_rtype (TSet t)))
 ;;
 
 let rec smt_of_term ~(ctx : Context.t) (t : term) : smtTerm =

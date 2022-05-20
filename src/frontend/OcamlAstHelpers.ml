@@ -3,12 +3,14 @@ open Base
 open Parsetree
 open Utils
 module T = Lang.Term
+module Typ = Lang.RType
 
 let synt_extension = "synt"
 
 (* Synthesis objectives *)
 let _synt_objects : (string, int) Hashtbl.t = Hashtbl.create (module String)
 let reset_synt_objects () = Hashtbl.clear _synt_objects
+let _modules : (string, Typ.t) Hashtbl.t = Hashtbl.create (module String)
 
 let add_synt_payload s =
   match Hashtbl.find _synt_objects s with
@@ -17,6 +19,8 @@ let add_synt_payload s =
 ;;
 
 let get_objects () = Hashtbl.to_alist _synt_objects
+let add_module (s : string) (mt : Typ.t) = Hashtbl.set _modules ~key:s ~data:mt
+let get_module (s : string) = Hashtbl.find _modules s
 
 (* ============================================================================================= *)
 
@@ -56,9 +60,17 @@ let rec fterm_of_expr (expr : expression) : term =
   let cur_loc = wloc expr.pexp_loc in
   match expr.pexp_desc with
   | Pexp_ident locid ->
-    (match simple_ident_of_longident locid.txt with
-    | Some id -> mk_var (sloc locid) id
-    | None ->
+    (match Longident.flatten locid.txt with
+    | [ id ] -> mk_var (sloc locid) id
+    | [ maybe_module_name; id ] ->
+      (match get_module maybe_module_name, id with
+      | Some (TSet t), "empty" -> mk_const cur_loc (T.Constant.CEmptySet t)
+      | _ ->
+        failwith
+          (Fmt.str
+             "Longident %s not supported."
+             (String.concat ~sep:"." (Longident.flatten locid.txt))))
+    | _ ->
       failwith
         (Fmt.str
            "Longident %s not supported."
@@ -137,16 +149,21 @@ and op_fterm_of_args
     (name : Longident.t)
     (args : (Asttypes.arg_label * expression) list)
   =
-  let maybe_ident = simple_ident_of_longident name in
-  let of_ident ident =
-    match T.Binop.of_string ident, args with
+  let of_single_ident typ_param ident =
+    match T.Binop.of_string ~typ_param ident, args with
     | Some bop, [ (Asttypes.Nolabel, arg1); (Asttypes.Nolabel, arg2) ] ->
       Some (mk_bin loc bop (fterm_of_expr arg1) (fterm_of_expr arg2))
     | _ ->
-      (match T.Unop.of_string ident, args with
+      (match T.Unop.of_string ~typ_param ident, args with
       | Some uop, [ (Asttypes.Nolabel, arg) ] -> Some (mk_un loc uop (fterm_of_expr arg))
       | Some uop, _ -> failwith Fmt.(str "%a has more than one argument." T.Unop.pp uop)
       | _ -> None)
   in
-  Option.bind ~f:of_ident maybe_ident
+  match Longident.flatten name with
+  | [ single_ident ] -> of_single_ident None single_ident
+  | [ maybe_module_name; module_function ] ->
+    (match get_module maybe_module_name with
+    | Some (TSet typ_param) -> of_single_ident (Some typ_param) module_function
+    | _ -> None)
+  | _ -> None
 ;;

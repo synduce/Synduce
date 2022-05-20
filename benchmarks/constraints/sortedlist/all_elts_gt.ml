@@ -23,21 +23,17 @@ let repr x = x
 
 module ISet = Set.Make (Int)
 
-let spec x t =
-  let rec f = function
-    | Leaf a -> if a > x then ISet.singleton a else ISet.empty
-    | Node (a, l, r) ->
-      if a > x then ISet.add a (ISet.union (f l) (f r)) else ISet.union (f l) (f r)
-  in
-  f t
-  [@@ensures fun x -> x >= 0]
+let rec spec = function
+  | Leaf a -> ISet.singleton a
+  | Node (a, l, r) ->
+    if a > 0
+    then ISet.add a (ISet.union (spec l) (spec r))
+    else ISet.union (spec l) (spec r)
 ;;
 
-let target y t =
-  let rec g = function
-    | Leaf a -> [%synt xi_0] y a
-    | Node (a, l, r) -> if a < y then [%synt xi_1] (g l) (g r) else [%synt xi_2] (g l)
-  in
-  g t
+let rec target = function
+  | Leaf a -> [%synt xi_0] a
+  | Node (a, l, r) ->
+    if a < 0 then [%synt xi_1] (target l) (target r) else [%synt xi_2] (target l)
   [@@requires is_bst]
 ;;

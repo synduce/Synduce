@@ -113,12 +113,13 @@ let dt_extend_base_logic (base_logic : string) : string = "DT" ^ base_logic
 
 (* ======= TERM CONVERSION  ======= *)
 
-let sygus_term_of_const (c : Constant.t) : sygus_term =
+let sygus_term_of_const ~(ctx : Context.t) (c : Constant.t) : sygus_term =
   match c with
   | Constant.CInt i -> if i >= 0 then E.int i else E.neg (E.int (-i))
   | Constant.CChar c -> mk_t_lit (mk_lit_string (String.of_char c))
   | Constant.CTrue -> E.mk_true
   | Constant.CFalse -> E.mk_false
+  | Constant.CEmptySet t -> mk_t_id (mk_id_qual "set.empty" (sort_of_rtype ~ctx (TSet t)))
 ;;
 
 let rec sygus_of_term ~(ctx : Context.t) (t : term) : sygus_term =
@@ -131,7 +132,7 @@ let rec sygus_of_term ~(ctx : Context.t) (t : term) : sygus_term =
       (List.map ~f:(sygus_of_term ~ctx) [ t1; t2 ])
   | TUn (op, t1) ->
     mk_t_app (mk_id_simple (Unop.to_string op)) [ (sygus_of_term ~ctx) t1 ]
-  | TConst c -> sygus_term_of_const c
+  | TConst c -> sygus_term_of_const ~ctx c
   | TVar x -> E.var x.vname
   | TIte (c, a, b) ->
     E.ite ((sygus_of_term ~ctx) c) ((sygus_of_term ~ctx) a) ((sygus_of_term ~ctx) b)

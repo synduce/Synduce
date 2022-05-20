@@ -142,7 +142,7 @@ module Binop = struct
     | SetInsert _ -> "insert"
   ;;
 
-  let of_string (s : string) : t option =
+  let of_string ?(typ_param = None) (s : string) : t option =
     match s with
     | "<" -> Some Lt
     | ">" -> Some Gt
@@ -158,12 +158,12 @@ module Binop = struct
     | "mod" -> Some Mod
     | "and" | "&&" -> Some And
     | "or" | "||" -> Some Or (*  *)
-    | "union" -> Some (SetUnion TInt)
-    | "inter" -> Some (SetIntersection TInt)
-    | "minus" -> Some (SetMinus TInt)
-    | "member" -> Some (SetMem TInt)
-    | "subset" -> Some (SetSubset TInt)
-    | "insert" -> Some (SetInsert TInt)
+    | "union" -> O.map ~f:(fun typ -> SetUnion typ) typ_param
+    | "inter" -> O.map ~f:(fun typ -> SetIntersection typ) typ_param
+    | "diff" -> O.map ~f:(fun typ -> SetMinus typ) typ_param
+    | "mem" -> O.map ~f:(fun typ -> SetMem typ) typ_param
+    | "subset" -> O.map ~f:(fun typ -> SetSubset typ) typ_param
+    | "add" -> O.map ~f:(fun typ -> SetInsert typ) typ_param
     | _ -> None
   ;;
 
@@ -211,29 +211,34 @@ module Unop = struct
     | Neg
     | Not
     | Abs
-    | SetCard (** Set cardinality.  *)
-    | SetComplement (** Set complement. *)
+    | SetCard of RType.t (** Set cardinality.  *)
+    | SetComplement of RType.t (** Set complement. *)
+    | SetSingleton of RType.t (** Set singleton *)
   [@@deriving hash]
 
   let compare = Poly.compare
   let equal = Poly.equal
 
   let operand_type (op : t) =
-    match op with
-    | Neg -> RType.TInt
-    | Not -> RType.TBool
-    | Abs -> RType.TInt
-    | SetCard -> RType.TSet (TVar 0)
-    | SetComplement -> RType.TSet (TVar 0)
+    RType.(
+      match op with
+      | Neg -> TInt
+      | Not -> TBool
+      | Abs -> TInt
+      | SetCard t -> TSet t
+      | SetComplement t -> TSet t
+      | SetSingleton t -> t)
   ;;
 
   let result_type (op : t) =
-    match op with
-    | Neg -> RType.TInt
-    | Not -> RType.TBool
-    | Abs -> RType.TInt
-    | SetCard -> RType.TInt
-    | SetComplement -> RType.TSet (TVar 0)
+    RType.(
+      match op with
+      | Neg -> TInt
+      | Not -> TBool
+      | Abs -> TInt
+      | SetCard _ -> TInt
+      | SetComplement t -> TSet t
+      | SetSingleton t -> TSet t)
   ;;
 
   let to_pp_string (op : t) =
@@ -241,8 +246,9 @@ module Unop = struct
     | Neg -> "-"
     | Not -> "¬"
     | Abs -> "abs"
-    | SetCard -> "card"
-    | SetComplement -> "complement"
+    | SetCard _ -> "card"
+    | SetComplement _ -> "complement"
+    | SetSingleton _ -> "singleton"
   ;;
 
   let to_string (op : t) =
@@ -250,16 +256,19 @@ module Unop = struct
     | Neg -> "-"
     | Not -> "not"
     | Abs -> "abs"
-    | SetCard -> "card"
-    | SetComplement -> "complement"
+    | SetCard _ -> "card"
+    | SetComplement _ -> "complement"
+    | SetSingleton _ -> "singleton"
   ;;
 
-  let of_string (s : string) : t option =
+  let of_string ?(typ_param = None) (s : string) : t option =
     match s with
     | "abs" -> Some Abs
     | "~-" | "-" -> Some Neg
     | "not" -> Some Not
-    | "card" -> Some SetCard
+    | "card" -> O.map ~f:(fun x -> SetCard x) typ_param
+    | "complement" -> O.map ~f:(fun x -> SetComplement x) typ_param
+    | "singleton" -> O.map ~f:(fun x -> SetSingleton x) typ_param
     | _ -> None
   ;;
 
@@ -346,6 +355,7 @@ module Constant = struct
     | CChar of char
     | CTrue
     | CFalse
+    | CEmptySet of RType.t
   [@@deriving hash]
 
   let compare c1 c2 =
@@ -356,6 +366,9 @@ module Constant = struct
     | CTrue, CFalse -> 1
     | CFalse, CTrue -> -1
     | CFalse, CFalse -> 0
+    | CEmptySet t1, CEmptySet t2 -> Poly.compare t1 t2
+    | CEmptySet _, _ -> 1
+    | _, CEmptySet _ -> -1
     | CInt _, _ -> 1
     | _, CInt _ -> -1
     | CChar _, _ -> 1
@@ -378,6 +391,7 @@ module Constant = struct
     | CInt _ -> RType.TInt
     | CChar _ -> RType.TChar
     | CTrue | CFalse -> RType.TBool
+    | CEmptySet t0 -> RType.TSet t0
   ;;
 
   let pp (frmt : Formatter.t) (c : t) =
@@ -386,6 +400,7 @@ module Constant = struct
     | CChar c -> Fmt.char frmt c
     | CTrue -> Fmt.bool frmt true
     | CFalse -> Fmt.bool frmt false
+    | CEmptySet _ -> Fmt.string frmt "empty"
   ;;
 end
 

@@ -35,6 +35,7 @@ let rec of_expression ~(ctx : RContext.t) : Expression.t -> t option = function
   | EInt _ -> Some (SType RType.TInt)
   | EChar _ -> Some (SType RType.TChar)
   | EFalse | ETrue -> Some (SType RType.TBool)
+  | EEmptySet t -> Some (SType (RType.TSet t))
   | EApp (_, _) -> None
   | EVar v ->
     Option.(
