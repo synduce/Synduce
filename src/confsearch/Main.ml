@@ -111,6 +111,7 @@ let find_and_solve_problem
       with
       | Some sub_conf ->
         Int.incr num_attempts;
+        (* Apply sub-configuration to configuration and problem components. *)
         let conf = Subconf.to_conf mc sub_conf in
         let new_target, new_ctx =
           apply_configuration ctx conf top_userdef_problem.target

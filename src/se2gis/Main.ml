@@ -52,8 +52,11 @@ let rec refinement_loop
       Log.error_msg "Solution cannot be proved correct, solver failed.";
       Lwt.return (Failed RFail)
     | e -> raise e)
+  (* Synthesis returned unknown, which is interpreted as failure. *)
   | RUnknown, _ -> Lwt.return (Failed RUnknown)
+  (* Synthesis failed, the loop returns failure. *)
   | RFail, Second [] -> Lwt.return (Failed RFail)
+  (* Synthesis returns some information about unrealizability. *)
   | _ as synt_failure_info ->
     (* On synthesis failure, start by trying to synthesize lemmas. *)
     (match%lwt
@@ -61,32 +64,42 @@ let rec refinement_loop
            Lwt.bind a (fun _ ->
                LemmaSynthesis.synthesize_lemmas ~ctx ~p synt_failure_info lstate_in))
      with
+    (* Some unrealizability witnesses were spurious and lemmas were synthesized.
+     The refinement loop continues. *)
     | lsynt_time, Ok (First new_lstate) ->
       Stats.log_minor_step ~synth_time ~auxtime:lsynt_time false;
       refinement_loop ~ctx ~major:false p (Lwt.return new_lstate)
-    | lsynt_time, Ok (Second witnesss)
-      when !Config.Optims.attempt_lifting
-           && Lifting.lifting_count ~ctx p < !Config.Optims.max_lifting_attempts ->
-      (* If all no counterexample is spurious, lemma synthesis fails, we need lifting. *)
-      (match Lifting.scalar ~ctx ~p lstate_in synt_failure_info with
-      | Ok (p', lstate') ->
-        Lifting.msg_lifting ();
-        Stats.log_minor_step ~synth_time ~auxtime:lsynt_time true;
-        refinement_loop ~ctx ~major:false p' (Lwt.return lstate')
-      | Error r' ->
-        (* Infeasible is not a failure! *)
-        (match r' with
-        | RInfeasible ->
-          Stats.log_major_step_end ~synth_time ~verif_time:0. ~t:tsize ~u:usize false;
-          Lwt.return (Unrealizable witnesss)
-        | _ -> Lwt.return (Failed r')))
-    | _, Ok (Second witnesss) ->
-      (* Infeasible is not a failure! When the sygus solver answers infeasible,
+    (* The witnesses were not spurious, so the problem is unrealizable. We can attempt lifting.
+      *)
+    | lsynt_time, Ok (Second witnesses) ->
+      (match RootCausing.find_repair ~ctx ~p witnesses with
+      | RootCausing.Lift
+        when !Config.Optims.attempt_lifting
+             && Lifting.lifting_count ~ctx p < !Config.Optims.max_lifting_attempts ->
+        (match Lifting.scalar ~ctx ~p lstate_in synt_failure_info with
+        | Ok (p', lstate') ->
+          Lifting.msg_lifting ();
+          Stats.log_minor_step ~synth_time ~auxtime:lsynt_time true;
+          refinement_loop ~ctx ~major:false p' (Lwt.return lstate')
+        | Error r' ->
+          (* Infeasible is not a failure! *)
+          (match r' with
+          | RInfeasible ->
+            infeasible_w_witnesses_case (synth_time, 0.) (tsize, usize) witnesses
+          | _ -> failure_case r'))
+      | _ ->
+        (* The problem is infeasible, and we have witnesses for it. *)
+        infeasible_w_witnesses_case (synth_time, 0.) (tsize, usize) witnesses)
+      (* The problem is infeasible. When the sygus solver answers infeasible,
         we do not have witnesses of unrealizability.
        *)
-      Stats.log_major_step_end ~synth_time ~verif_time:0. ~t:tsize ~u:usize false;
-      Lwt.return (Unrealizable witnesss)
-    | _ -> Lwt.return (Failed RFail))
+    | _ -> failure_case RFail)
+
+and failure_case r = Lwt.return (Failed r)
+
+and infeasible_w_witnesses_case (synth_time, verif_time) (tsize, usize) witnesses =
+  Stats.log_major_step_end ~synth_time ~verif_time ~t:tsize ~u:usize false;
+  Lwt.return (Unrealizable witnesses)
 
 and success_case ~ctx ~p ~synth_time lstate_in (tsize, usize) lifting (eqns, sol) =
   (* The solution is verified with a bounded check.  *)

@@ -4,8 +4,8 @@
 *)
 
 open Base
-open Configuration
 open Common
+open Configuration
 open Env
 open ProblemDefs
 open Lang

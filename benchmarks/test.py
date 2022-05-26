@@ -238,7 +238,7 @@ if __name__ == "__main__":
         algos = [["se2gis", cvc]] + other_alg
 
         if run_lifting_benchmarks:
-            optims = [["all", ""]]
+            optims = [["all", "--se2gis"]]
             bench_set += lifting_benchmarks
 
         if run_constraint_benchmarks:

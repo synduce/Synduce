@@ -4,7 +4,6 @@
 *)
 
 open Base
-open Common
 open Env
 open Lang
 open Term
