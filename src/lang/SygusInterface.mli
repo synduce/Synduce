@@ -40,6 +40,12 @@ val sort_of_rtype : ctx:Context.t -> RType.t -> Sygus.sygus_sort
 val requires_dt_theory : ctx:Context.t -> RType.t -> bool
 
 (**
+    Returns true if the type argument requires the logic to include sets to reason about
+    objects of that type.
+ *)
+val requires_set_theory : ctx:Context.t -> RType.t -> bool
+
+(**
     Returns a string corresponding to the logic that allows to reason about all the operators
     in the set. Does not include the "DT" prefix required for reasoning about datatypes (see [requires_dt_theory]).
  *)

@@ -416,7 +416,7 @@ let verify_lemma_bounded
     let* () = AsyncSmt.close_solver solver in
     return (Utils.Stats.BoundedChecking, res)
   in
-  AsyncSmt.(cancellable_task (make_solver "z3") task)
+  AsyncSmt.(cancellable_task (make_solver !Config.verification_solver) task)
 ;;
 
 let verify_lemma_unbounded

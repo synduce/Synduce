@@ -44,6 +44,9 @@ let rec rtype_of_sort ~(ctx : Context.t) (s : sygus_sort) : RType.t option =
     (match all_or_none (List.map ~f:(rtype_of_sort ~ctx) sorts) with
     | Some l -> Some (RType.TTup l)
     | _ -> None)
+  | SApp (_, IdSimple (_, "Set"), [ sort ]) ->
+    let%bind t = rtype_of_sort ~ctx sort in
+    Some (RType.TSet t)
   | SApp (_, IdSimple (_, sname), sort_params) ->
     let%bind x = RType.get_type ctx.types sname in
     let%bind y = all_or_none (List.map ~f:(rtype_of_sort ~ctx) sort_params) in
@@ -104,6 +107,20 @@ let requires_dt_theory ~(ctx : Context.t) (t : RType.t) =
   aux t
 ;;
 
+let requires_set_theory ~(ctx : Context.t) (t : RType.t) =
+  let rec aux t =
+    let open RType in
+    match t with
+    | TSet _ -> true
+    | TInt | TBool | TChar | TString | TVar _ -> false
+    | TFun (a, b) -> aux a || aux b
+    | TParam (tl, t) -> List.exists ~f:aux tl || aux t
+    | TTup tl -> List.exists ~f:aux tl
+    | TNamed _ -> is_datatype ctx.types t
+  in
+  aux t
+;;
+
 let logic_of_operators ?(nonlinear = false) (opset : OpSet.t) : string =
   if (not nonlinear) && Set.for_all opset ~f:Operator.is_lia then "LIA" else "NIA"
 ;;
@@ -119,7 +136,7 @@ let sygus_term_of_const ~(ctx : Context.t) (c : Constant.t) : sygus_term =
   | Constant.CChar c -> mk_t_lit (mk_lit_string (String.of_char c))
   | Constant.CTrue -> E.mk_true
   | Constant.CFalse -> E.mk_false
-  | Constant.CEmptySet t -> mk_t_id (mk_id_qual "set.empty" (sort_of_rtype ~ctx (TSet t)))
+  | Constant.CEmptySet t -> mk_t_id (mk_id_qual "emptyset" (sort_of_rtype ~ctx (TSet t)))
 ;;
 
 let rec sygus_of_term ~(ctx : Context.t) (t : term) : sygus_term =
@@ -231,7 +248,7 @@ type id_kind =
   | ITupleCstr
   | IIte
 
-let id_kind_of_s ~ctx env s =
+let id_kind_of_s ?(typ_param = None) ~ctx env s =
   let string_case s =
     match s with
     | "ite" -> IIte
@@ -250,10 +267,10 @@ let id_kind_of_s ~ctx env s =
   match Map.find env s with
   | Some v -> IVar v
   | None ->
-    (match Binop.of_string s with
+    (match Binop.of_string ~typ_param s with
     | Some bop -> IBinop bop
     | None ->
-      (match Unop.of_string s with
+      (match Unop.of_string ~typ_param s with
       | Some unop -> IUnop unop
       | None ->
         (match RType.type_of_variant ctx s with
@@ -273,10 +290,22 @@ let rec term_of_sygus
     (match Map.find env s with
     | Some v -> mk_var ctx v
     | None -> failwith Fmt.(str "term_of_sygus: variable %s not found." s))
+  | SyId (_, IdQual (_, "emptyset", sort)) ->
+    (match rtype_of_sort ~ctx sort with
+    | Some RType.(TSet telt) -> mk_const (CEmptySet telt)
+    | _ -> failwith Fmt.(str "emptyset type not recognized"))
   | SyLit (_, l) -> mk_const (constant_of_literal l)
   | SyApp (_, IdSimple (_, s), args) ->
     let args' = List.map ~f:(term_of_sygus ~fctx ~ctx env) args in
-    (match id_kind_of_s ~ctx:ctx.types env s with
+    let typ_param =
+      match args' with
+      | hd :: _ ->
+        (match type_of (fst (infer_type ctx hd)) with
+        | RType.TSet t -> Some t
+        | _ -> None)
+      | _ -> None
+    in
+    (match id_kind_of_s ~typ_param ~ctx:ctx.types env s with
     | ICstr c -> mk_data ctx c args'
     | IVar v -> mk_app (mk_var ctx v) args'
     | IBinop op ->
@@ -308,7 +337,9 @@ let rec term_of_sygus
   (* TODO: add let-conversion. *)
   | SyLet (_, syg_bindings, syg_term) ->
     let_bindings_of_sygus ~ctx ~fctx env syg_bindings syg_term
-  | _ -> failwith "Sygus term not supported."
+  | _ ->
+    let se = Syguslib.Serializer.sexp_of_sygus_term st in
+    failwith Fmt.(str "Sygus term %a not supported." Sexp.pp_hum se)
 
 and let_bindings_of_sygus
     ~(ctx : Context.t)

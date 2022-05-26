@@ -759,7 +759,17 @@ module Solve = struct
           ~f:(fun v -> ctx >- requires_dt_theory (Variable.vtype_or_new ctx.ctx v))
           (Set.elements free_vars @ Set.elements unknowns)
       in
-      (if needs_dt then dt_extend_base_logic base_logic else base_logic), nonlinear
+      let needs_sets =
+        List.exists
+          ~f:(fun v -> ctx >- requires_set_theory (Variable.vtype_or_new ctx.ctx v))
+          (Set.elements free_vars @ Set.elements unknowns)
+      in
+      ( (if needs_sets
+        then "ALL"
+        else if needs_dt
+        then dt_extend_base_logic base_logic
+        else base_logic)
+      , nonlinear )
     in
     let partial_soln =
       synthfuns_of_unknowns

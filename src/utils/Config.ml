@@ -306,6 +306,7 @@ let options print_usage parse_only =
   ; 'S', "all-solutions-config", None, Some set_default_config_confsearch
   ; 't', "solve-timeout", None, Some set_wait_parallel_tlimit
   ; 'v', "verbose", set verbose true, None
+  ; 'W', "verif-with", None, Some set_verification_solver
   ; 'X', "classify-witness", set classify_witness true, None
   ; '\000', "segis", set use_segis true, None
   ; '\000', "se2gis", set use_se2gis true, None
@@ -337,7 +338,6 @@ let options print_usage parse_only =
   ; '\000', "sysfe-opt-off", set sysfe_opt false, None
   ; '\000', "use-bmc", set use_bmc true, None
   ; '\000', "use-dfs", set next_algo_bfs false, None
-  ; '\000', "verif-with", None, Some set_verification_solver
   ; (* Background solver parameters *)
     '\000', "ind-tlimit", None, Some set_induction_proof_tlimit
   ]

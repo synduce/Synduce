@@ -55,7 +55,7 @@ let smt_unsatisfiability_check
         mk_forall (sorted_vars_of_vars ~ctx free_vars) (mk_assoc_and eqns_constraints))
     , List.map ~f:(fun eqn -> Terms.(eqn.elhs == eqn.erhs)) eqns )
   in
-  let task (z3, binder) =
+  let task (solver, binder) =
     let open AsyncSmt in
     let* _ = binder in
     let preamble =
@@ -69,9 +69,9 @@ let smt_unsatisfiability_check
              terms_for_logic_deduction)
         ()
     in
-    let* () = exec_all z3 (preamble @ Commands.decls_of_vars ~ctx unknowns) in
-    let* () = smt_assert z3 constraint_of_eqns in
-    let* resp = check_sat z3 in
+    let* () = exec_all solver (preamble @ Commands.decls_of_vars ~ctx unknowns) in
+    let* () = smt_assert solver constraint_of_eqns in
+    let* resp = check_sat solver in
     (match resp with
     | Unsat ->
       Log.debug
@@ -87,10 +87,13 @@ let smt_unsatisfiability_check
         Fmt.(
           fun fmt () ->
             pf fmt "Z3 unsat check failed with %a@." SmtLib.pp_solver_response x));
-    close_solver z3
+    close_solver solver
   in
   let p, r =
-    AsyncSmt.(cancellable_task (make_solver ~hint:"smt-unsat-check " "z3") task)
+    AsyncSmt.(
+      cancellable_task
+        (make_solver ~hint:"smt-unsat-check " !Config.verification_solver)
+        task)
   in
   Lwt.wakeup r 1;
   p
@@ -260,6 +263,8 @@ let check_unrealizable
   let task (solver, binder) =
     let open AsyncSmt in
     let* _ = binder in
+    let* () = set_logic solver Logics.ALL in
+    let* () = set_option solver "produce-models" "true" in
     let* () = load_min_max_defs solver in
     (* Main part of the check, applied to each equation in eqns. *)
     let check_eqn_accum (witnesses : unrealizability_witness list) ((i, eqn_i), (j, eqn_j))
@@ -375,7 +380,7 @@ let check_unrealizable
     AlgoLog.show_unrealizability_witnesses ~ctx unknowns eqns new_witnesses;
     new_witnesses
   in
-  AsyncSmt.(cancellable_task (make_solver "z3") task)
+  AsyncSmt.(cancellable_task (make_solver !Config.verification_solver) task)
 ;;
 
 (* ============================================================================================= *)
@@ -460,7 +465,7 @@ let check_image_sat ~(ctx : env) ~(p : PsiDef.t) witness
     let* () = AsyncSmt.close_solver solver_instance in
     return (res, Stats.BoundedChecking)
   in
-  AsyncSmt.(cancellable_task (make_solver "z3") build_task)
+  AsyncSmt.(cancellable_task (make_solver !Config.verification_solver) build_task)
 ;;
 
 let check_image_unsat ~(ctx : env) ~(p : PsiDef.t) witness
@@ -792,7 +797,7 @@ let check_tinv_sat ~(ctx : env) ~(p : PsiDef.t) (tinv : PMRS.t) (witness : witne
     let* () = AsyncSmt.close_solver solver in
     return (res, Stats.BoundedChecking)
   in
-  AsyncSmt.(cancellable_task (make_solver "z3") task)
+  AsyncSmt.(cancellable_task (make_solver !Config.verification_solver) task)
 ;;
 
 let satisfies_tinv ~(ctx : env) ~(p : PsiDef.t) (tinv : PMRS.t) (witness : witness)

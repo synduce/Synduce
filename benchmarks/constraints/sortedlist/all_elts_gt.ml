@@ -1,4 +1,4 @@
-(** @synduce -NB -n 30 *)
+(** @synduce -NB -n 30 -W cvc4  *)
 
 type 'a tree =
   | Leaf of 'a
@@ -16,7 +16,7 @@ let rec tree_max = function
 
 let rec is_bst = function
   | Leaf x -> true
-  | Node (a, l, r) -> a >= tree_max l && a <= tree_min r && is_bst l && is_bst r
+  | Node (a, l, r) -> a > tree_max l && a < tree_min r && is_bst l && is_bst r
 ;;
 
 let repr x = x
@@ -24,7 +24,7 @@ let repr x = x
 module ISet = Set.Make (Int)
 
 let rec spec = function
-  | Leaf a -> ISet.singleton a
+  | Leaf a -> if a > 0 then ISet.singleton a else ISet.empty
   | Node (a, l, r) ->
     if a > 0
     then ISet.add a (ISet.union (spec l) (spec r))
@@ -34,6 +34,6 @@ let rec spec = function
 let rec target = function
   | Leaf a -> [%synt xi_0] a
   | Node (a, l, r) ->
-    if a < 0 then [%synt xi_1] (target l) (target r) else [%synt xi_2] (target l)
+    if a < 0 then [%synt xi_1] (target r) else [%synt xi_2] a (target r) (target l)
   [@@requires is_bst]
 ;;

@@ -423,7 +423,7 @@ module Solver = struct
         try%lwt
           let p, r =
             AsyncSmt.cancellable_task
-              (AsyncSmt.make_solver ~hint:"deductive-check " "z3")
+              (AsyncSmt.make_solver ~hint:"deductive-check " !Config.verification_solver)
               (validate_via_solver guess)
           in
           Lwt.wakeup r 1;

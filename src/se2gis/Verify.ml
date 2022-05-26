@@ -126,6 +126,8 @@ let check_solution
         ()
       @ (ctx >- Commands.decls_of_vars free_vars)
     in
+    (* Execute the preamble. *)
+    let%lwt () = exec_all solver preamble in
     let expand_and_check i (t0 : term) =
       let t_set, u_set = ctx >>- Expand.to_maximally_reducible p t0 in
       let t_set, _ = partial_bounding_checker ~ctx ~p lstate t_set in
@@ -185,8 +187,6 @@ let check_solution
           then Lwt.return (Some (Set.union lstate.t_set t_set, elts))
           else find_witness num_checks elts)
     in
-    (* Execute the preamble. *)
-    let%lwt () = exec_all solver preamble in
     (* Check that the solution is correct on current set T. If it is not, this is because of some wrong
   assumption made for optimization. *)
     match%lwt find_witness 0 lstate.t_set with
@@ -248,6 +248,25 @@ let bounded_check
   let init_vardecls = ctx >- Commands.decls_of_vars free_vars in
   let task (solver, binder) =
     let%lwt _ = binder in
+    let preamble =
+      let logic =
+        ctx
+        >- SmtLogic.infer_logic
+             ~quantifier_free:true
+             ~with_uninterpreted_functions:false
+             ~logic_infos:[ p.PsiDef.reference.plogic; p.PsiDef.target.plogic ]
+             []
+      in
+      Commands.mk_preamble
+        ~incremental:(String.is_prefix ~prefix:"CVC" solver.s_name)
+        ~logic
+        ~models:true
+        ()
+      @ (ctx >- Commands.decls_of_vars free_vars)
+    in
+    (* Execute the preamble. *)
+    let%lwt () = exec_all solver preamble in
+    let%lwt () = load_min_max_defs solver in
     let tset =
       List.sort
         ~compare:term_size_compare
@@ -256,7 +275,6 @@ let bounded_check
              (!Config.Optims.check_depth - 1)
              (get_theta ctx))
     in
-    let%lwt () = load_min_max_defs solver in
     let check term =
       let sys_eqns, _ =
         Equations.make
