@@ -878,13 +878,22 @@ let infer_type (ctx : Context.t) (t : term) : term * RType.substitution =
       let possible_opty = Binop.operand_types op in
       (* Find a pair of operaand types that work. *)
       let maybe_t =
-        List.find_map possible_opty ~f:(fun (ta, tb) ->
-            match RType.unify [ t_t1.ttyp, ta; t_t2.ttyp, tb ] with
-            | Ok subs ->
-              Some
-                ( mk_bin ~pos:t0.tpos ~typ:(Some (Binop.result_type op)) op t_t1 t_t2
-                , merge_subs subs (merge_subs c_t1 c_t2) )
-            | Error _ -> None)
+        match op with
+        | Binop.Eq ->
+          (match RType.unify [ t_t1.ttyp, t_t2.ttyp ] with
+          | Ok subs ->
+            Some
+              ( mk_bin ~pos:t0.tpos ~typ:(Some (Binop.result_type op)) op t_t1 t_t2
+              , merge_subs subs (merge_subs c_t1 c_t2) )
+          | Error _ -> None)
+        | _ ->
+          List.find_map possible_opty ~f:(fun (ta, tb) ->
+              match RType.unify [ t_t1.ttyp, ta; t_t2.ttyp, tb ] with
+              | Ok subs ->
+                Some
+                  ( mk_bin ~pos:t0.tpos ~typ:(Some (Binop.result_type op)) op t_t1 t_t2
+                  , merge_subs subs (merge_subs c_t1 c_t2) )
+              | Error _ -> None)
       in
       (match maybe_t with
       | Some x -> x

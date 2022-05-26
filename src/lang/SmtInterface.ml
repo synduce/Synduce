@@ -109,6 +109,9 @@ let rec rtype_of_smtSort ~(ctx : Context.t) (s : smtSort) : RType.t option =
     (match x with
     | RType.TParam (_, maint) -> Some maint
     | _ -> Some x)
+  | Comp (Id (SSimple "Set"), [ sort ]) ->
+    let%map telt = rtype_of_smtSort ~ctx sort in
+    RType.TSet telt
   | Comp (Id sname, sort_params) ->
     let%bind x = RType.get_type ctx.types (string_of_smtSymbol sname) in
     let%bind y = all_or_none (List.map ~f:(rtype_of_smtSort ~ctx) sort_params) in
@@ -415,6 +418,7 @@ type id_kind =
   | INotDef
 
 let id_kind_of_s
+    ?(typ_param = None)
     ~(ctx : Context.t)
     ~(functions : PMRS.Functions.ctx)
     (env : (string, Variable.t, String.comparator_witness) Map.t)
@@ -423,10 +427,10 @@ let id_kind_of_s
   match Map.find env s with
   | Some v -> IVar v
   | None ->
-    (match Binop.of_string s with
+    (match Binop.of_string ~typ_param s with
     | Some bop -> IBinop bop
     | None ->
-      (match Unop.of_string s with
+      (match Unop.of_string ~typ_param s with
       | Some unop -> IUnop unop
       | None ->
         (match RType.type_of_variant ctx.types s with
@@ -454,6 +458,10 @@ let rec term_of_smt
     : term
   =
   match st with
+  | SmtTQualdId (QIas (Id (SSimple "emptyset"), sort)) ->
+    (match rtype_of_smtSort ~ctx sort with
+    | Some (RType.TSet t) -> mk_const (Constant.CEmptySet t)
+    | _ -> failwith "Unrecognized emptyset term")
   | SmtTQualdId (QIas (Id (SSimple s), _)) | SmtTQualdId (QI (Id (SSimple s))) ->
     (match id_kind_of_s ~ctx ~functions:fctx env s with
     | IVar v -> Term.mk_var ctx v
@@ -462,13 +470,49 @@ let rec term_of_smt
     | ICstr c -> mk_data ctx c []
     | _ -> failwith Fmt.(str "Smt: undefined variable %s" s))
   | SmtTSpecConst l -> mk_const (constant_of_smtConst l)
-  | SmtTApp (QIas (Id (SSimple s), _), args) | SmtTApp (QI (Id (SSimple s)), args) ->
+  | SmtTApp (QIas (Id (SSimple s), sort), args) ->
     let args' = List.map ~f:(term_of_smt ~ctx ~fctx env) args in
+    let typ_param =
+      match rtype_of_smtSort ~ctx sort with
+      | Some (RType.TSet t) -> Some t
+      | _ -> None
+    in
     (* The line below is a hack! Make a real fix *)
     if String.(equal s "mkTuple_int_int")
     then mk_tup ctx args'
     else (
-      match id_kind_of_s ~ctx ~functions:fctx env s with
+      match id_kind_of_s ~typ_param ~ctx ~functions:fctx env s with
+      | ICstr c -> mk_data ctx c args'
+      | ITupCstr -> mk_tup ctx args'
+      | IVar v -> mk_app (Term.mk_var ctx v) args'
+      | IBinop op ->
+        (match args' with
+        | [ t1; t2 ] -> mk_bin op t1 t2
+        | [ t1 ] when Operator.(equal (Binary op) (Binary Minus)) -> mk_un Unop.Neg t1
+        | _ ->
+          failwith Fmt.(str "Smt: %a operator with more than two arguments." Binop.pp op))
+      | IUnop op ->
+        (match args' with
+        | [ t1 ] -> mk_un op t1
+        | _ -> failwith "Smt: a unary operator with more than one argument.")
+      | IBool true -> mk_const Constant.CTrue
+      | IBool false -> mk_const Constant.CFalse
+      | INotDef -> failwith Fmt.(str "Smt: Undefined variable: %s" s))
+  | SmtTApp (QI (Id (SSimple s)), args) ->
+    let args' = List.map ~f:(term_of_smt ~ctx ~fctx env) args in
+    let typ_param =
+      match args' with
+      | hd :: _ ->
+        (match type_of (fst (infer_type ctx hd)) with
+        | RType.TSet t -> Some t
+        | t' -> Some t')
+      | _ -> None
+    in
+    (* The line below is a hack! Make a real fix *)
+    if String.(equal s "mkTuple_int_int")
+    then mk_tup ctx args'
+    else (
+      match id_kind_of_s ~typ_param ~ctx ~functions:fctx env s with
       | ICstr c -> mk_data ctx c args'
       | ITupCstr -> mk_tup ctx args'
       | IVar v -> mk_app (Term.mk_var ctx v) args'

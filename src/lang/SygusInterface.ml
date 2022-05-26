@@ -302,7 +302,7 @@ let rec term_of_sygus
       | hd :: _ ->
         (match type_of (fst (infer_type ctx hd)) with
         | RType.TSet t -> Some t
-        | _ -> None)
+        | t' -> Some t')
       | _ -> None
     in
     (match id_kind_of_s ~typ_param ~ctx:ctx.types env s with
@@ -313,8 +313,11 @@ let rec term_of_sygus
       | [ t1; t2 ] -> mk_bin op t1 t2
       | [ t1 ] when Operator.(equal (Binary op) (Binary Minus)) -> mk_un Unop.Neg t1
       | _ ->
-        Log.error_msg Fmt.(str "%a with %i arguments?" Binop.pp op (List.length args'));
-        failwith Fmt.(str "Sygus: %a with more than two arguments." Binop.pp op))
+        (match mk_assoc op args' with
+        | Some t -> t
+        | None ->
+          Log.error_msg Fmt.(str "%a with %i arguments?" Binop.pp op (List.length args'));
+          failwith Fmt.(str "Sygus: %a with more than two arguments." Binop.pp op)))
     | IUnop op ->
       (match args' with
       | [ t1 ] -> mk_un op t1

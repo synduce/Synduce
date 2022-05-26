@@ -203,17 +203,24 @@ let synthfun_of_det
       | Some pmrs -> PMRS.func_of_pmrs ~ctx pmrs)
   in
   let gen_of_guess t guess =
-    let grammar =
-      Grammars.generate_grammar
-        ~ctx
-        ~short_predicate:t
-        ~guess
-        ~bools:true
-        opset
-        det.ti_formals
-        RType.TBool
+    let lemma_requires_set_theory =
+      List.exists det.ti_formals ~f:(fun v ->
+          requires_set_theory ~ctx (Variable.vtype_or_new ctx v))
     in
-    let logic = logic_of_operators opset in
+    let grammar =
+      if lemma_requires_set_theory
+      then None
+      else
+        Grammars.generate_grammar
+          ~ctx
+          ~short_predicate:t
+          ~guess
+          ~bools:true
+          opset
+          det.ti_formals
+          RType.TBool
+    in
+    let logic = if lemma_requires_set_theory then "ALL" else logic_of_operators opset in
     mk_synthinv ~ctx det.ti_func.vname det.ti_formals grammar, logic
   in
   if !Config.Optims.make_partial_lemma_sketches
