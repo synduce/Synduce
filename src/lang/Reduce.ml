@@ -395,7 +395,7 @@ let instantiate_with_solution
     List.concat (List.map ~f soln)
   in
   let target_inst = PMRS.subst_rule_rhs ~ctx xi_substs ~p in
-  reduce_rules ~fctx ~ctx target_inst
+  PMRS.subst_rule_rhs ~ctx xi_substs ~p:(reduce_rules ~fctx ~ctx target_inst)
 ;;
 
 let is_identity ~(fctx : PMRS.Functions.ctx) ~(ctx : Context.t) (p : PMRS.t) =

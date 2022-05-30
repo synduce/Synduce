@@ -1,18 +1,21 @@
 type nat =
-  | Z
-  | S of nat
+  | Zero
+  | Succ of nat
 
-let rec query x = odd x && odd (S (S x))
+let rec f = function
+  | Zero -> g Zero
+  | Succ n -> f n + g (Succ n)
 
-and odd = function
-  | Z -> false
-  | S x -> even x
-
-and even = function
-  | Z -> true
-  | S x -> odd x
+and g = function
+  | Zero -> 1
+  | Succ n -> [%synt h] (g n)
 ;;
 
-let rec f x = [%synt fi];;
+let rec t = function
+  | Zero -> 1
+  | Succ n -> (2 * t n) + 1
+;;
 
-assert (f = query)
+let id a = a;;
+
+assert (f = id @@ t)
