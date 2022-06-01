@@ -76,6 +76,47 @@ let extract_params decl =
 ;;
 
 [%%endif]
+[%%if ocaml_version < (4, 12, 0)]
+
+(** Parse set defintions.  *)
+let define_module (binding : module_binding) : unit =
+  match binding.pmb_expr.pmod_desc with
+  | Pmod_apply (f, arg) ->
+    (match binding.pmb_name.txt, f.pmod_desc, arg.pmod_desc with
+    | module_name, Pmod_ident fid, Pmod_ident b ->
+      (match Longident.flatten fid.txt with
+      | [ "Set"; "Make" ] ->
+        (* TODO: extend supported types in sets. *)
+        (match Longident.flatten b.txt with
+        | [ "Int" ] -> add_module module_name (TSet TInt)
+        | [ "Bool" ] -> add_module module_name (TSet TBool)
+        | _ -> ())
+      | _ -> ())
+    | _ -> ())
+  | _ -> ()
+;;
+
+[%%else]
+
+(** Parse set defintions.  *)
+let define_module (binding : module_binding) : unit =
+  match binding.pmb_expr.pmod_desc with
+  | Pmod_apply (f, arg) ->
+    (match binding.pmb_name.txt, f.pmod_desc, arg.pmod_desc with
+    | Some module_name, Pmod_ident fid, Pmod_ident b ->
+      (match Longident.flatten fid.txt with
+      | [ "Set"; "Make" ] ->
+        (* TODO: extend supported types in sets. *)
+        (match Longident.flatten b.txt with
+        | [ "Int" ] -> add_module module_name (TSet TInt)
+        | [ "Bool" ] -> add_module module_name (TSet TBool)
+        | _ -> ())
+      | _ -> ())
+    | _ -> ())
+  | _ -> ()
+;;
+
+[%%endif]
 [%%if ocaml_version < (4, 13, 0)]
 
 let constructor_arguments args =
@@ -487,24 +528,6 @@ let declare_synt_obj (assert_expr : expression) =
   | _ ->
     Log.debug_msg Fmt.(str "Ignore (assert %a)" pp_fterm t);
     ()
-;;
-
-(** Parse set defintions.  *)
-let define_module (binding : module_binding) : unit =
-  match binding.pmb_expr.pmod_desc with
-  | Pmod_apply (f, arg) ->
-    (match binding.pmb_name.txt, f.pmod_desc, arg.pmod_desc with
-    | Some module_name, Pmod_ident fid, Pmod_ident b ->
-      (match Longident.flatten fid.txt with
-      | [ "Set"; "Make" ] ->
-        (* TODO: extend supported types in sets. *)
-        (match Longident.flatten b.txt with
-        | [ "Int" ] -> add_module module_name (TSet TInt)
-        | [ "Bool" ] -> add_module module_name (TSet TBool)
-        | _ -> ())
-      | _ -> ())
-    | _ -> ())
-  | _ -> ()
 ;;
 
 let parse_ocaml (input_file_name : string)
