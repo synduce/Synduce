@@ -58,6 +58,15 @@ module Subconf = struct
         Map.set m ~key:key.vid ~data:(List.mapi ~f:(fun i _ -> i) data))
   ;;
 
+  (** Create a subconfiguration without arguments but where each unknown is associated
+      with a list of arguments.  *)
+  let zero_of_conf (conf : conf) : t =
+    Map.fold
+      conf
+      ~init:(Map.empty (module Int))
+      ~f:(fun ~key ~data:_ m -> Map.set m ~key:key.vid ~data:[])
+  ;;
+
   (** Return the subconf as a configuration, given the configuration it refines. *)
   let to_conf (conf : conf) (sub : t) : conf =
     Map.mapi conf ~f:(fun ~key:v ~data:args ->
@@ -69,20 +78,69 @@ module Subconf = struct
   (**
   Create as many subconfigurations as possible from dropping an argument for an unknown.
  *)
-  let drop_arg (conf : t) : t list =
+  let drop_arg (conf : t) : ((int * int) * t) list =
     let drop_one (unknown, args) =
       match args with
       | [] -> []
-      | [ _ ] -> [ Map.set ~key:unknown ~data:[] conf ]
+      | [ x ] -> [ (unknown, x), Map.set ~key:unknown ~data:[] conf ]
       | _ ->
         (* Configurations with all possible ways to drop one argument *)
         List.mapi args ~f:(fun i _ ->
             (* new args is current args without ith element *)
             let data = List.filteri ~f:(fun j _ -> not (j = i)) args in
-            Map.set ~key:unknown ~data conf)
+            (unknown, i), Map.set ~key:unknown ~data conf)
     in
     List.concat_map (Map.to_alist conf) ~f:drop_one
   ;;
+
+  (**
+  Create as many subconfigurations as possible from adding an argument for an unknown.
+ *)
+  let add_arg ~(sup : t) (conf : t) : ((int * int) * t) list =
+    let pick_in_sup unknown filter =
+      match Map.find sup unknown with
+      | Some l -> List.find ~f:(fun x -> not (filter x)) l
+      | None -> None
+    in
+    let add_one (unknown, args) =
+      match args with
+      | [] ->
+        (match pick_in_sup unknown (fun _ -> false) with
+        | None -> []
+        | Some a -> [ (unknown, a), Map.set ~key:unknown ~data:[ a ] conf ])
+      | [ x ] ->
+        (match pick_in_sup unknown (fun y -> y = x) with
+        | None -> []
+        | Some a -> [ (unknown, a), Map.set ~key:unknown ~data:[ x; a ] conf ])
+      | _ ->
+        let others =
+          match Map.find sup unknown with
+          | Some all ->
+            List.filter all ~f:(fun x -> not (List.mem ~equal:Int.equal args x))
+          | None -> []
+        in
+        (match others with
+        | [] -> []
+        | _ :: _ ->
+          (* Configurations with all possible ways to add one argument *)
+          List.map others ~f:(fun new_arg ->
+              (unknown, new_arg), Map.set ~key:unknown ~data:(new_arg :: args) conf))
+    in
+    List.concat_map (Map.to_alist conf) ~f:add_one
+  ;;
+end
+
+module SubconfEdge = struct
+  type t = Subconf.t * Subconf.t
+
+  let compare ((a, a') : t) ((b, b') : t) : int =
+    let c = Subconf.compare a b in
+    if c = 0 then Subconf.compare a' b' else c
+  ;;
+
+  let equal ((a, a') : t) ((b, b') : t) : bool = Subconf.equal a b && Subconf.equal a' b'
+  let hash ((a, a') : t) = Subconf.hash a + Subconf.hash a'
+  let sexp_of_t ((a, a') : t) = Sexp.List [ Subconf.sexp_of_t a; Subconf.sexp_of_t a' ]
 end
 
 (** Create an empty configuration of a set of variables.  *)

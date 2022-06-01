@@ -299,10 +299,10 @@ let options print_usage parse_only =
   ; 'n', "verification", None, Some set_num_expansions_check
   ; 'N', "no-sat-as-unsat", set no_bounded_sat_as_unsat true, None
   ; 'o', "output", None, Some set_output_folder
-  ; 'O', "shuffle-configs", set shuffle_configurations true, None
+  ; 'O', "multi-shuffle-configs", set shuffle_configurations true, None
   ; 'p', "num-threads", None, Some set_num_threads
   ; 'P', "reuse-predicates-off", set reuse_predicates false, None
-  ; 's', "max-solutions", None, Some set_max_solutions
+  ; 's', "multi-max-solutions", None, Some set_max_solutions
   ; 'S', "all-solutions-config", None, Some set_default_config_confsearch
   ; 't', "solve-timeout", None, Some set_wait_parallel_tlimit
   ; 'v', "verbose", set verbose true, None
@@ -324,6 +324,10 @@ let options print_usage parse_only =
   ; '\000', "interactive-check-lemma", set interactive_check_lemma true, None
   ; '\000', "json-progress", set json_progressive true, None
   ; '\000', "max-lifting", None, Some set_max_lifting_attempts
+  ; '\000', "multi-use-dfs", set next_algo_bfs false, None
+  ; '\000', "multi-rstar-limit", None, Some set_rstar_limit
+  ; '\000', "multi-no-rstar", set use_rstar_caching false, None
+  ; '\000', "multi-set-strategy", None, Some set_exploration_strategy
   ; '\000', "no-assumptions", set make_partial_correctness_assumption false, None
   ; '\000', "no-detupling", set detupling_on false, None
   ; '\000', "no-gropt", set optimize_grammars 0, None
@@ -333,11 +337,9 @@ let options print_usage parse_only =
   ; '\000', "no-simplify", set simplify_eqns false, None
   ; '\000', "no-syndef", set use_syntactic_definitions false, None
   ; '\000', "parse-only", set parse_only true, None
-  ; '\000', "rstar-limit", None, Some set_rstar_limit
   ; '\000', "show-vars", set show_vars true, None
   ; '\000', "sysfe-opt-off", set sysfe_opt false, None
   ; '\000', "use-bmc", set use_bmc true, None
-  ; '\000', "use-dfs", set next_algo_bfs false, None
   ; (* Background solver parameters *)
     '\000', "ind-tlimit", None, Some set_induction_proof_tlimit
   ]

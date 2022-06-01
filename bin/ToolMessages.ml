@@ -153,7 +153,7 @@ let print_usage () =
     \       --fuzzing=NUM               Fuzz SMT solutions on some problems.(Default=0, \
      no fuzzing).\n\
     \  Features off/on:\n\
-    \    -s --max-solutions             Set maximum number of solutions\n\
+    \    -s --multi-max-solutions       Set maximum number of solutions\n\
     \                                   must be > 0 (no option means solve sketch \
      directly)\n\
     \       --no-splitting              Do not split systems into subsystems.\n\
@@ -175,6 +175,12 @@ let print_usage () =
      functionally realizable.\n\
     \       --sysfe-opt-off             Turn off optimizations to solve systems of \
      equations in parallel\n\
+    \  Multiple solution search:\n\
+    \   -O  --multi-shuffle-configs     Shuffle choices when multiple configs to solve.\n\
+    \       --multi-use-dfs             Use DFS instead of BFS for configuration search.\n\
+    \       --multi-rstar-limit         Set the limit of rstar rounds to use in cache.\n\
+    \       --multi-no-rstar            Do not use rstar to check for unrelizability \
+     cache.\n\
     \  Bounded checking:\n\
     \       --use-bmc                   Use segis bounded model checking (bmc mode).\n\
     \    -b --bmc=MAX_DEPTH             Maximum depth of terms for bounded model \

@@ -165,6 +165,10 @@ let set_fuzzing_count (s : string) =
   | _ -> ()
 ;;
 
+(* ============================================================================================= *)
+(*                        PARAMETERS FOR FINDING MULTIPLE SOLUTIONS                              *)
+(* ============================================================================================= *)
+
 (**
   Attempt to lift the function if there is no solution.
 *)
@@ -212,6 +216,36 @@ let set_rstar_limit (s : string) =
   | _ -> ()
 ;;
 
+(** Use the deterministic algorithm to precompute sets of equations that might have unrealizable
+    sets.
+*)
+let use_rstar_caching = ref true
+
+(** Reuse predicates across different configurations. *)
+let reuse_predicates = ref true
+
+(** Shuffle configurations when choosing the next configuration to solve. *)
+let shuffle_configurations = ref false
+
+type exploration_strategy =
+  | ESTopDown
+  | ESBottomUp
+
+let exploration_strategy = ref ESTopDown
+
+let set_exploration_strategy (s : string) =
+  match s with
+  | "td" | "top-down" -> exploration_strategy := ESTopDown
+  | "bu" | "bottom-up" -> exploration_strategy := ESBottomUp
+  | _ ->
+    failwith
+      "Did not recognize exploration strategy, should be top-down (td) or bottom-up (bu)"
+;;
+
+(* ============================================================================================= *)
+(*                        OTHER                                                                  *)
+(* ============================================================================================= *)
+
 let some_eager_optim_on () =
   !simplify_eqns || !use_syntactic_definitions || !make_partial_correctness_assumption
 ;;
@@ -221,9 +255,6 @@ let turn_off_eager_optims () =
   turn_off use_syntactic_definitions;
   turn_off make_partial_correctness_assumption
 ;;
-
-let reuse_predicates = ref true
-let shuffle_configurations = ref false
 
 (* ============================================================================================= *)
 (*                                                    MULTITHREADING                             *)
