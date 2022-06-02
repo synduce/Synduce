@@ -110,17 +110,26 @@ let main () =
           @ results)
     in
     if n_out > 1
-    then
+    then (
+      Log.info Fmt.(fun fmt () -> pf fmt "%i configurations solved" n_out);
       Log.info
         Fmt.(
           fun fmt () ->
             pf
               fmt
-              "%i configurations solved, %i solutions, %i unrealizable (%i failed)."
-              n_out
+              "%i solutions | %i unrealizable  | %i failed"
               (n_out - !u_count)
               !u_count
               !f_count);
+      Log.info
+        Fmt.(
+          fun fmt () ->
+            pf
+              fmt
+              "R* cache hits: %i | Orig. config solved: %b | Reused lemmas: %i"
+              !Stats.num_unr_cache_hits
+              !Stats.orig_solution_hit
+              !Stats.num_foreign_lemma_uses));
     json
   in
   (if !Config.json_out
