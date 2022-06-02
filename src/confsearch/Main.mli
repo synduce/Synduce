@@ -1,4 +1,12 @@
 open Common
+open ProblemDefs
+open Env
+
+type multi_soln_result =
+  { r_best : env * PsiDef.t * Syguslib.Sygus.solver_response segis_response
+  ; r_all : (env * PsiDef.t * Syguslib.Sygus.solver_response segis_response) list
+  ; r_subconf_count : int
+  }
 
 (** [find_and_solver_problem (target,spec,repr) globals] finds the PMRS
     components in the top-level functions [globals] with names [target], [spec]
@@ -9,12 +17,7 @@ open Common
     of results that are either solutions, unrealizablity results or failures.
 *)
 val find_and_solve_problem
-  :  ctx:Env.env
+  :  ctx:env
   -> (string * string * string) option
   -> (string, Lang.PMRS.t, Base.String.comparator_witness) Base.Map.t
-  -> (int
-     * (Env.env
-       * ProblemDefs.PsiDef.t
-       * Syguslib.Sygus.solver_response ProblemDefs.segis_response)
-       list)
-     Lwt.t
+  -> multi_soln_result Lwt.t

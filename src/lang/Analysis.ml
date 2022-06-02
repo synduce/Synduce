@@ -91,6 +91,9 @@ let is_constant =
   reduce ~init:false ~join:( && ) ~case
 ;;
 
+(** `is_norec ~ctx x` returns `true` when there is no recursive typed variable in `x` in
+    context `ctx`.
+*)
 let is_norec ~(ctx : Context.t) =
   let case _ t =
     match t.tkind with

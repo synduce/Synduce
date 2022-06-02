@@ -327,7 +327,7 @@ let options print_usage parse_only =
   ; '\000', "multi-use-dfs", set next_algo_bfs false, None
   ; '\000', "multi-rstar-limit", None, Some set_rstar_limit
   ; '\000', "multi-no-rstar", set use_rstar_caching false, None
-  ; '\000', "multi-set-strategy", None, Some set_exploration_strategy
+  ; '\000', "multi-strategy", None, Some set_exploration_strategy
   ; '\000', "no-assumptions", set make_partial_correctness_assumption false, None
   ; '\000', "no-detupling", set detupling_on false, None
   ; '\000', "no-gropt", set optimize_grammars 0, None

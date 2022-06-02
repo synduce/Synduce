@@ -54,10 +54,10 @@ let main () =
   in
   if !parse_only then Caml.exit 1;
   (* Solve the problem proper. *)
-  let num_configurations, outputs =
+  let multi_soln_result =
     Lwt_main.run (ctx >>> Many.find_and_solve_problem psi_comps all_pmrs)
   in
-  let n_out = List.length outputs in
+  let n_out = List.length multi_soln_result.r_all in
   let print_unrealizable = !Config.print_unrealizable_configs || n_out < 2 in
   let check_output (u_count, f_count) (ctx, pb, soln) =
     Common.ProblemDefs.(
@@ -86,17 +86,23 @@ let main () =
     let u_count = ref 0
     and f_count = ref 0 in
     let json =
-      match outputs with
+      match multi_soln_result.r_all with
       | [ a ] when !Config.Optims.max_solutions <= 0 ->
         snd (check_output (u_count, f_count) a)
       | _ ->
-        let subproblem_jsons = List.map ~f:(check_output (u_count, f_count)) outputs in
+        let subproblem_jsons =
+          List.map ~f:(check_output (u_count, f_count)) multi_soln_result.r_all
+        in
+        let _ =
+          Log.info Fmt.(fun fmt () -> pf fmt "Best solution:");
+          check_output (ref 0, ref 0) multi_soln_result.r_best
+        in
         let results =
           List.map subproblem_jsons ~f:(fun (psi_id, json) ->
               Fmt.(str "problem_%i" psi_id), json)
         in
         `Assoc
-          ([ "total-configurations", `Int num_configurations
+          ([ "total-configurations", `Int multi_soln_result.r_subconf_count
            ; "unr-cache-hits", `Int !Stats.num_unr_cache_hits
            ; "orig-conf-hit", `Bool !Stats.orig_solution_hit
            ; "foreign-lemma-uses", `Int !Stats.num_foreign_lemma_uses

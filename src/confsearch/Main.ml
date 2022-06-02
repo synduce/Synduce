@@ -7,6 +7,12 @@ open Utils
 module G = ConfGraph
 module CO = Config.Optims
 
+type multi_soln_result =
+  { r_best : env * PsiDef.t * Syguslib.Sygus.solver_response segis_response
+  ; r_all : (env * PsiDef.t * Syguslib.Sygus.solver_response segis_response) list
+  ; r_subconf_count : int
+  }
+
 let total_configurations = ref 0
 
 let is_realizable = function
@@ -79,12 +85,15 @@ let single_configuration_solver ~(ctx : env) (p : PsiDef.t)
 ;;
 
 let find_multiple_solutions
-    (ctx : env)
+    ~(ctx : env)
+    ~score:(score_func : Env.env -> PsiDef.t -> soln -> Configuration.conf -> int)
     (top_userdef_problem : PsiDef.t)
-    (mc : Configuration.conf)
-    : (env * PsiDef.t * 'a segis_response) list Lwt.t
+    (sup : Configuration.conf)
+    : multi_soln_result Lwt.t
   =
   let num_attempts = ref 0 in
+  let best_score = ref 1000 in
+  let best_solution = ref (ctx, top_userdef_problem, Failed Syguslib.Sygus.RFail) in
   let open Configuration in
   let rstate =
     G.generate_configurations
@@ -106,8 +115,10 @@ let find_multiple_solutions
     | Some sub_conf ->
       Int.incr num_attempts;
       (* Apply sub-configuration to configuration and problem components. *)
-      let conf = Subconf.to_conf mc sub_conf in
-      let new_target, new_ctx = apply_configuration ctx conf top_userdef_problem.target in
+      let conf = Subconf.to_conf ~sup sub_conf in
+      let new_target, new_ctx =
+        apply_configuration ~ctx conf top_userdef_problem.target
+      in
       Log.sep ~i:(Some !num_attempts) ();
       let new_pdef =
         { top_userdef_problem with target = new_target; id = !num_attempts }
@@ -132,6 +143,12 @@ let find_multiple_solutions
         | new_ctx', Realizable s ->
           G.mark_realizable rstate sub_conf;
           expand_func ~mark:G.Realizable rstate sub_conf;
+          (* Looking for the best solution according to some metric. *)
+          let score = score_func ctx top_userdef_problem s conf in
+          if score < !best_score
+          then (
+            best_score := score;
+            best_solution := new_ctx, new_pdef, Realizable s);
           find_sols ((new_ctx', new_pdef, Realizable s) :: a)
         | new_ctx', Unrealizable u ->
           G.mark_unrealizable rstate sub_conf;
@@ -144,14 +161,15 @@ let find_multiple_solutions
           find_sols ((new_ctx', new_pdef, Failed f) :: a))
     | None -> Lwt.return a
   in
-  find_sols []
+  let%lwt all_solns = find_sols [] in
+  Lwt.return { r_best = !best_solution; r_all = all_solns; r_subconf_count = -1 }
 ;;
 
 let find_and_solve_problem
     ~(ctx : env)
     (psi_comps : (string * string * string) option)
     (pmrs : (string, PMRS.t, Base.String.comparator_witness) Map.t)
-    : (int * (env * PsiDef.t * Syguslib.Sygus.solver_response segis_response) list) Lwt.t
+    : multi_soln_result Lwt.t
   =
   (*  Find problem components *)
   let target_fname, spec_fname, repr_fname =
@@ -185,11 +203,17 @@ let find_and_solve_problem
     total_configurations := subconf_count;
     Log.info (fun fmt () -> Fmt.pf fmt "%i configurations possible." subconf_count);
     let%lwt multi_sols =
-      find_multiple_solutions ctx top_userdef_problem max_configuration
+      (* TODO: multiple scoring functions. *)
+      let score_func ctx _p _soln conf = Configuration.num_rec_calls ~ctx conf in
+      find_multiple_solutions ~ctx ~score:score_func top_userdef_problem max_configuration
     in
-    Lwt.return (subconf_count, multi_sols))
+    Lwt.return { multi_sols with r_subconf_count = subconf_count })
   else (
     (* Only solve the top-level skeleton, i.e. the problem specified by the user. *)
     let%lwt ctx', top_soln = single_configuration_solver ~ctx top_userdef_problem in
-    Lwt.return (1, [ ctx', top_userdef_problem, top_soln ]))
+    Lwt.return
+      { r_best = ctx', top_userdef_problem, top_soln
+      ; r_all = [ ctx', top_userdef_problem, top_soln ]
+      ; r_subconf_count = 1
+      })
 ;;

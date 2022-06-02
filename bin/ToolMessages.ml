@@ -178,10 +178,11 @@ let print_usage () =
     \  Multiple solution search:\n\
     \   -O  --multi-shuffle-configs     Shuffle choices when multiple configs to solve.\n\
     \       --multi-use-dfs             Use DFS instead of BFS for configuration search.\n\
-    \       --multi-rstar-limit         Set the limit of rstar rounds to use in cache.\n\
+    \       --multi-rstar-limit=NUM     Set the limit of rstar rounds to use in cache.\n\
     \       --multi-no-rstar            Do not use rstar to check for unrelizability \
      cache.\n\
-    \  Bounded checking:\n\
+    \       --multi-strategy=(td|bu)    Set top-down (td) or bottom-up (bu) strategy.\n\n\
+    \      Bounded checking:\n\
     \       --use-bmc                   Use segis bounded model checking (bmc mode).\n\
     \    -b --bmc=MAX_DEPTH             Maximum depth of terms for bounded model \
      checking, in bmc mode.\n\

@@ -68,11 +68,11 @@ module Subconf = struct
   ;;
 
   (** Return the subconf as a configuration, given the configuration it refines. *)
-  let to_conf (conf : conf) (sub : t) : conf =
-    Map.mapi conf ~f:(fun ~key:v ~data:args ->
+  let to_conf ~(sup : conf) (sub : t) : conf =
+    Map.mapi sup ~f:(fun ~key:v ~data:args ->
         match Map.find sub v.vid with
         | Some indexes -> sub_list args indexes
-        | None -> failwith "supconf should only be used on a proper subconfiguration.")
+        | None -> failwith "(supconf) should only be used on a proper subconfiguration.")
   ;;
 
   (**
@@ -247,7 +247,7 @@ let same_conf (p1 : PMRS.t) (p2 : PMRS.t) : bool =
 (** Apply a configuration to a given PMRS. The environment is copied before the type
   information for the unknowns is changed. The copied environment is then returned.
 *)
-let apply_configuration (ctx : env) (config : conf) (p : PMRS.t) : PMRS.t * env =
+let apply_configuration ~(ctx : env) (config : conf) (p : PMRS.t) : PMRS.t * env =
   let ctx = env_copy ctx in
   Set.iter p.psyntobjs ~f:(fun u -> (ctx @>- Variable.clear_type) u);
   let repl_in_rhs =
@@ -270,6 +270,11 @@ let apply_configuration (ctx : env) (config : conf) (p : PMRS.t) : PMRS.t * env 
                    nt, args, pat, repl_in_rhs rhs)
            })
   , ctx )
+;;
+
+let num_rec_calls ~(ctx : env) (c : conf) : int =
+  let count_rec l = List.count l ~f:(fun x -> not (ctx >- Analysis.is_norec x)) in
+  Map.fold c ~init:0 ~f:(fun ~key:_ ~data:args accum -> accum + count_rec args)
 ;;
 
 let get_rstar (ctx : env) (p : ProblemDefs.PsiDef.t) (k : int) =
