@@ -18,6 +18,7 @@ module Subconf : sig
     *)
   type t = int list Utils.IntMap.t
 
+  val to_string : t -> string
   val sexp_of_t : t -> Sexplib0.Sexp.t
   val equal : t -> t -> bool
   val compare : t -> t -> int

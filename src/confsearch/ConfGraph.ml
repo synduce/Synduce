@@ -14,6 +14,23 @@ module G = Graph.Imperative.Digraph.Concrete (Subconf)
 module O = Config.Optims
 include G
 
+module XG = Graph.Graphviz.Dot (struct
+  include G
+  (* use the graph module from above *)
+
+  let edge_attributes (e1, _) =
+    let s1 = Subconf.to_string e1 in
+    [ `Label s1; `Color 4711 ]
+  ;;
+
+  let default_edge_attributes _ = []
+  let get_subgraph _ = None
+  let vertex_attributes _ = [ `Shape `Box ]
+  let vertex_name v = Subconf.to_string v
+  let default_vertex_attributes _ = []
+  let graph_attributes _ = []
+end)
+
 type mark =
   | Realizable
   | Unrealizable
@@ -47,6 +64,12 @@ type state =
   ; st_cache : ECache.t
   ; st_strategy : Config.Optims.exploration_strategy
   }
+
+let out_graph (s : state) (filename : string) =
+  let oc = Stdio.Out_channel.create filename in
+  XG.output_graph oc s.st_graph;
+  Stdio.Out_channel.close oc
+;;
 
 let mark_unrealizable (s : state) (conf : Subconf.t) =
   Hashtbl.set s.st_marks ~key:conf ~data:Unrealizable

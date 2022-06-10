@@ -36,6 +36,15 @@ module Subconf = struct
 *)
   type t = int list IntMap.t
 
+  let to_string (s : t) =
+    String.concat
+      ~sep:"-"
+      (List.map
+         ~f:(fun (i, l) ->
+           Int.to_string i ^ String.concat ~sep:"." (List.map ~f:Int.to_string l))
+         (Map.to_alist s))
+  ;;
+
   let sexp_of_t (m : t) : Sexp.t =
     List.sexp_of_t
       (fun (a, b) -> Sexp.(List [ Int.sexp_of_t a; List.sexp_of_t Int.sexp_of_t b ]))
