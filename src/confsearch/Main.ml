@@ -54,6 +54,7 @@ let single_configuration_solver ~(ctx : env) (p : PsiDef.t)
   then (
     let elapsed = Stats.get_glob_elapsed ()
     and verif = !Stats.verif_time in
+    AlgoLog.log_solution ~ctx ~p resp;
     match resp with
     | Realizable s ->
       AlgoLog.show_stat_intermediate_solution
@@ -206,6 +207,7 @@ let find_and_solve_problem
     in
     total_configurations := subconf_count;
     Log.info (fun fmt () -> Fmt.pf fmt "%i configurations possible." subconf_count);
+    AlgoLog.log_confsearch_problem ~ctx ~p:top_userdef_problem subconf_count;
     let%lwt multi_sols =
       (* TODO: multiple scoring functions. *)
       let score_func ctx _p _soln conf = Configuration.num_rec_calls ~ctx conf in

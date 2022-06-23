@@ -78,7 +78,8 @@ let pp_eqn_count = ref 20
 (* ============================================================================================= *)
 
 (**
-  Prompt user to input a precondition (lemma) for each equation, while the equations are being generated from a set of terms in Equations.make.
+  Prompt user to input a precondition (lemma) for each equation, while the equations are being
+  generated from a set of terms in Equations.make.
 *)
 let interactive_lemmas = ref false
 
@@ -299,7 +300,6 @@ let options print_usage parse_only =
   ; 'n', "verification", None, Some set_num_expansions_check
   ; 'N', "no-sat-as-unsat", set no_bounded_sat_as_unsat true, None
   ; 'o', "output", None, Some set_output_folder
-  ; 'O', "multi-shuffle-configs", set shuffle_configurations true, None
   ; 'p', "num-threads", None, Some set_num_threads
   ; 'P', "reuse-predicates-off", set reuse_predicates false, None
   ; 's', "multi-max-solutions", None, Some set_max_solutions
@@ -308,6 +308,7 @@ let options print_usage parse_only =
   ; 'v', "verbose", set verbose true, None
   ; 'W', "verif-with", None, Some set_verification_solver
   ; 'X', "classify-witness", set classify_witness true, None
+  ; 'Z', "multi-shuffle-configs", set shuffle_configurations true, None
   ; '\000', "segis", set use_segis true, None
   ; '\000', "se2gis", set use_se2gis true, None
   ; '\000', "cegis", set use_cegis true, None

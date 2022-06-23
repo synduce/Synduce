@@ -505,3 +505,52 @@ let requires_witness_class
             (box (pp_witness ~ctx))
             witness))
 ;;
+
+(* ============================================================================================= *)
+(*                  Logging into files                                                           *)
+(* ============================================================================================= *)
+
+let log_confsearch_problem ~(ctx : env) ~(p : PsiDef.t) (n : int) =
+  let f folder_name =
+    let filename = FilePath.make_filename [ folder_name; "summary.txt" ] in
+    FileUtil.touch ~create:true filename;
+    let out = Stdio.Out_channel.create filename in
+    let frmt = Caml.Format.formatter_of_out_channel out in
+    Fmt.pf frmt "configurations:%i@." n;
+    Fmt.pf frmt "%a@." (ctx >- PMRS.pp ~short:false) p.target;
+    Stdio.Out_channel.close out
+  in
+  match !Config.output_folder with
+  | Some folder_name -> f folder_name
+  | None -> ()
+;;
+
+let log_solution
+    ~(ctx : env)
+    ~(p : PsiDef.t)
+    (resp : Syguslib.Sygus.solver_response segis_response)
+  =
+  let f folder_name =
+    let filename_s = Fmt.str "configuration_%i.txt" p.id in
+    let filename = FilePath.make_filename [ folder_name; filename_s ] in
+    FileUtil.touch ~create:true filename;
+    let out = Stdio.Out_channel.create filename in
+    let frmt = Caml.Format.formatter_of_out_channel out in
+    let () =
+      match resp with
+      | Realizable soln ->
+        Fmt.pf frmt "REALIZABLE@.";
+        Fmt.(pf frmt "%a@." (box (ctx >- Pretty.pp_soln ~use_ocaml_syntax:true)) soln)
+      | Unrealizable _u ->
+        Fmt.(pf frmt "UNREALIZABLE@.");
+        Fmt.pf frmt "%a@." (ctx >- PMRS.pp ~short:false) p.target
+      | _ ->
+        Fmt.(pf frmt "FAILURE@.");
+        Fmt.pf frmt "%a@." (ctx >- PMRS.pp ~short:false) p.target
+    in
+    Stdio.Out_channel.close out
+  in
+  match !Config.output_folder with
+  | Some folder_name -> f folder_name
+  | None -> ()
+;;

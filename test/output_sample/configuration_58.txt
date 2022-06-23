@@ -1,0 +1,13 @@
+REALIZABLE
+
+let xi_0 z13 w13 = z13 = w13 ? 1 : 0
+
+let xi_1 u13 = u13
+
+let xi_2 v13 a b14 = v13 = a ? 1 : b14
+
+let rec g =
+  function Leaf(a) -> xi_0 x a
+  | Node(a, l, r) -> x < a ? xi_1 (g l) : xi_2 x a (g r)
+
+
