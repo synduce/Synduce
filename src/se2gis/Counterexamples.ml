@@ -276,7 +276,7 @@ let check_unrealizable
       | Some (rhs_args_ij, (lhs_i, lhs_j)) ->
         let lhs_diff =
           let projs = projection_eqns lhs_i (substitution sub lhs_j) in
-          List.map ~f:(fun (ei, ej) -> Terms.(~!(ei == ej))) projs
+          List.map ~f:(fun (ei, ej) -> Terms.(not (ei == ej))) projs
         in
         (* (push). *)
         let* () = spush solver in

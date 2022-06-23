@@ -44,7 +44,8 @@ kick_the_tires_set = [
     ["tree/sum.ml", ""],
     ["tailopt/sum.ml", ""],
     ["treepaths/sum.ml", ""],
-    ["treepaths/height.ml", ""],
+    # output reading fails without the option
+    ["treepaths/height.ml", "--se2gis"],
     ["treepaths/maxPathWeight.ml", ""],
     ["ptree/mul.ml", ""],
     ["tree/max.ml", ""],

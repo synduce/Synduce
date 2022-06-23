@@ -244,14 +244,11 @@ let expand_once ~(ctx : Context.t) (t : term) : term list =
       let cstr_args =
         List.map cstr_arg_types ~f:(fun ty -> mk_composite_base_type ~ctx ty)
       in
-      let t, _ =
-        infer_type ctx (substitution [ mk_var ctx v, mk_data ctx cstr_name cstr_args ] t)
-      in
-      t
+      Terms.typed ctx (substitution [ mk_var ctx v, mk_data ctx cstr_name cstr_args ] t)
     in
     List.map ~f v_constrs
   in
-  List.rev (List.concat (List.map ~f:aux expandables))
+  List.concat (List.map ~f:aux expandables)
 ;;
 
 (**

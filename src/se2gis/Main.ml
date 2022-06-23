@@ -36,7 +36,14 @@ let rec refinement_loop
     else ()
   in
   (* First, generate the set of constraints corresponding to the set of terms t_set. *)
-  let eqns, lifting = Equations.make ~ctx ~p ~lifting:lstate_in.lifting lstate_in.t_set in
+  let eqns, lifting =
+    Equations.make
+      ~count_reused_predicates:true
+      ~ctx
+      ~p
+      ~lifting:lstate_in.lifting
+      lstate_in.t_set
+  in
   (* The solve the set of constraints with the assumption equations. *)
   let%lwt synth_time, (s_resp, solution) =
     Stats.lwt_timed (fun a ->

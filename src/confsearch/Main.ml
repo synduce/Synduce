@@ -123,6 +123,10 @@ let find_multiple_solutions
       let new_pdef =
         { top_userdef_problem with target = new_target; id = !num_attempts }
       in
+      Log.verbose
+        Fmt.(
+          fun fmt () ->
+            pf fmt "New target:@[%a@]" (ctx >- PMRS.pp ~short:false) new_target);
       (* Update stat: whether we have hit the original configuration. *)
       Stats.orig_solution_hit
         := !Stats.orig_solution_hit

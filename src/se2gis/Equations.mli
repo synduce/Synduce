@@ -4,7 +4,8 @@ open Common
 open ProblemDefs
 
 val compute_preconds
-  :  ctx:Env.env
+  :  ?count_reuse:bool
+  -> ctx:Env.env
   -> p:PsiDef.t
   -> (Term.term -> Term.term)
   -> Term.term
@@ -17,7 +18,9 @@ val filter_elims
   -> (Term.term * 'a) list
 
 val make
-  :  ?force_replace_off:bool
+  :  ?silent:bool
+  -> ?force_replace_off:bool
+  -> ?count_reused_predicates:bool
   -> ctx:Env.env
   -> p:PsiDef.t
   -> lifting:Common.ProblemDefs.lifting

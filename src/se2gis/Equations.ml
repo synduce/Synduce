@@ -135,8 +135,8 @@ let compute_rhs ?(force_replace_off = false) ~ctx p t =
   elimination. The lemmas should be stored in terms that do not have recursion elimination
   applied.
 *)
-let compute_preconds ~ctx ~p subst eterm =
-  match Predicates.get ~ctx ~p eterm with
+let compute_preconds ?(count_reuse = true) ~ctx ~p subst eterm =
+  match Predicates.get ~count_reuse ~ctx ~p eterm with
   | Some lemma_for_eterm ->
     let t = ctx >>- Reduce.reduce_term (subst lemma_for_eterm) in
     Some t
@@ -169,7 +169,9 @@ let filter_elims ~ctx all_subs t =
 ;;
 
 let make
+    ?(silent = false)
     ?(force_replace_off = false)
+    ?(count_reused_predicates = true)
     ~(ctx : env)
     ~(p : PsiDef.t)
     ~(lifting : lifting)
@@ -216,7 +218,9 @@ let make
       *)
       let eelim = (ctx >- filter_elims) all_subs eterm in
       (* Get the precondition, from the lemmas in the term state, *)
-      let precond = compute_preconds ~ctx ~p applic eterm in
+      let precond =
+        compute_preconds ~count_reuse:count_reused_predicates ~ctx ~p applic eterm
+      in
       let lifting' =
         let eprecond =
           match (ctx >- invar) invariants lhs'' rhs'' with
@@ -254,7 +258,7 @@ let make
     in
     List.fold ~init:([], lifting) ~f eqns
   in
-  (ctx >- show_equations) tset pure_eqns;
+  if not silent then (ctx >- show_equations) tset pure_eqns;
   (* Phase 2 of the equation generation.
      Generate the equations corresponding to the lifting constraints. *)
   let lifting_eqns =
@@ -266,7 +270,9 @@ let make
         |> Lifting.replace_boxed_expressions ~ctx ~p lifting
         |> ctx_reduce ctx ~unboxing:true
       in
-      let precond = compute_preconds ~ctx ~p (fun x -> x) t0 in
+      let precond =
+        compute_preconds ~count_reuse:count_reused_predicates ~ctx ~p (fun x -> x) t0
+      in
       let eprecond =
         match ctx >- invar invariants elhs erhs with
         | Some im_f ->
@@ -280,7 +286,7 @@ let make
     in
     List.map ~f:constraint_of_lift_expr lifting.tmap
   in
-  ctx >- show_lifting_constraints lifting_eqns;
+  if not silent then ctx >- show_lifting_constraints lifting_eqns;
   match
     List.find ~f:(fun eq -> not (check_equation ~p eq)) (pure_eqns @ lifting_eqns)
   with
@@ -657,7 +663,7 @@ module Solve = struct
     in
     let eqn_to_constraint (pre, lhs, rhs) =
       match pre with
-      | Some precondition -> Terms.(~!precondition || lhs == rhs)
+      | Some precondition -> Terms.((not precondition) || lhs == rhs)
       | None -> Terms.(lhs == rhs)
     in
     List.map ~f:eqn_to_constraint detupled_equations

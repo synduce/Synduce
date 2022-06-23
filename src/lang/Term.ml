@@ -1196,7 +1196,7 @@ module Terms = struct
   let bool (b : bool) : t = mk_const (Constant.of_bool b)
 
   (** Create a negation of a term. *)
-  let ( ~! ) (t : term) : t = mk_un Unop.Not t
+  let not (t : term) : t = mk_un Unop.Not t
 
   (** Create an if-then-else term. *)
   let ite : t -> t -> t -> t = mk_ite

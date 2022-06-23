@@ -126,7 +126,13 @@ let check_unrealizable_from_cache (ctx : env) (p : PsiDef.t) (s : state) =
   let rstar_t, _ = get_rstar ctx p !Utils.Config.Optims.rstar_limit in
   let eset =
     let eqns, _ =
-      Se2gis.Equations.make ~ctx ~p ~lifting:Se2gis.Lifting.empty_lifting rstar_t
+      Se2gis.Equations.make
+        ~silent:true
+        ~count_reused_predicates:false
+        ~ctx
+        ~p
+        ~lifting:Se2gis.Lifting.empty_lifting
+        rstar_t
     in
     ExpressionSet.of_list (List.filter_opt (List.map ~f:ECache.norm eqns))
   in

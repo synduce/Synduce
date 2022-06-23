@@ -9,7 +9,7 @@ val find_lemma_info
   -> term * term option
   -> (term_info * cond_lemma option) option
 
-val get : ctx:Env.env -> p:Psi.t -> term -> term option
+val get : ?count_reuse:bool -> ctx:Env.env -> p:Psi.t -> term -> term option
 val get_with_precond : ctx:Env.env -> p:Psi.t -> key:term * term option -> term option
 
 val change

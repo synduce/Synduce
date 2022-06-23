@@ -543,7 +543,7 @@ module Asyncs (Log : Logger) (Stats : Statistics) = struct
       if Log.log_queries then log ~solver:(Some solver) c;
       let%lwt () = solver_write solver c in
       solver_read solver)
-    else return (Error (Fmt.str "Variable already declared"))
+    else return Success
   ;;
 
   let make_solver ?(hint = "") ~(name : string) (path : string) (options : string list)
@@ -642,8 +642,10 @@ module Asyncs (Log : Logger) (Stats : Statistics) = struct
   let exec_all (s : solver) (decls : command list) : unit t =
     List.fold
       ~f:(fun _ decl ->
-        let%lwt _ = exec_command s decl in
-        return ())
+        let%lwt resp = exec_command s decl in
+        match resp with
+        | Error s -> raise (Failure s)
+        | _ -> return ())
       decls
       ~init:(return ())
   ;;
