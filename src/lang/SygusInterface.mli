@@ -141,3 +141,8 @@ module HLSolver : sig
 
   val to_file : ctx:Context.t -> string -> t -> unit
 end
+
+(**
+  [pp_response] pretty prints Sygus solver responses.
+*)
+val pp_response : Formatter.t -> Sygus.solver_response -> unit

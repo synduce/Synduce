@@ -35,7 +35,7 @@ let on_success
     ~(ctx : env)
     (source_filename : string ref)
     (pb : PsiDef.t)
-    (result : (soln, unrealizability_witness list) Either.t)
+    (result : Syguslib.Sygus.solver_response segis_response)
     : Yojson.t
   =
   let elapsed, verif_time =
@@ -46,7 +46,7 @@ let on_success
   let verif_ratio = 100.0 *. (verif_time /. elapsed) in
   (* Print the solution. *)
   (match result with
-  | Either.First soln ->
+  | Realizable soln ->
     Log.(
       info (print_solvers_summary pb.id);
       info (fun frmt () ->
@@ -57,7 +57,7 @@ let on_success
             verif_ratio
             (box (ctx >- Common.Pretty.pp_soln ~use_ocaml_syntax:is_ocaml_syntax))
             soln))
-  | Either.Second witnesss ->
+  | Unrealizable witnesss ->
     if print_unrealizable
     then (
       Log.(
@@ -70,10 +70,11 @@ let on_success
       Log.(
         info (fun frmt () -> pf frmt "%a" (ctx >- Lang.PMRS.pp ~short:false) pb.target));
       ctx >>> ToolExplain.when_unrealizable pb witnesss)
-    else ());
+    else ()
+  | _ -> ());
   (* If output specified, write the solution in file. *)
   (match result with
-  | Either.First soln ->
+  | Realizable soln ->
     (match Config.get_output_file !source_filename with
     | Some out_file ->
       Utils.Log.to_file out_file (fun frmt () ->
@@ -98,7 +99,7 @@ let on_success
   >>> Common.AlgoLog.single_configuration_json
         ~is_ocaml_syntax
         pb
-        (Some result)
+        result
         elapsed
         !Stats.verif_time
 ;;
@@ -129,7 +130,7 @@ let on_failure ?(is_ocaml_syntax = true) ~(ctx : env) (pb : PsiDef.t) : Yojson.t
   >>> Common.AlgoLog.single_configuration_json
         ~is_ocaml_syntax
         pb
-        None
+        (Failed ("unknown", Syguslib.Sygus.RFail))
         elapsed
         !Stats.verif_time
 ;;

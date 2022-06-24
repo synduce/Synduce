@@ -15,9 +15,10 @@ type multi_soln_result =
 
 let total_configurations = ref 0
 
-let is_realizable = function
+let is_definite = function
   | Realizable _ -> true
-  | _ -> false
+  | Unrealizable _ -> true
+  | Failed _ -> false
 ;;
 
 let pw ctx = Lwt.map (fun x -> ctx, x)
@@ -25,10 +26,10 @@ let pw ctx = Lwt.map (fun x -> ctx, x)
 let portfolio_solver ~(ctx : env) (p : PsiDef.t) =
   let counter = ref 2 in
   Lwt.pick
-    [ Concurrency.pwait is_realizable counter ctx (Se2gis.Main.solve_problem ~ctx p)
+    [ Concurrency.pwait is_definite counter ctx (Se2gis.Main.solve_problem ~ctx p)
     ; (let ctx' = env_copy ctx in
        Concurrency.pwait
-         is_realizable
+         is_definite
          counter
          ctx'
          (Se2gis.Baselines.algo_segis ~ctx:ctx' p))
@@ -55,31 +56,13 @@ let single_configuration_solver ~(ctx : env) (p : PsiDef.t)
     let elapsed = Stats.get_glob_elapsed ()
     and verif = !Stats.verif_time in
     AlgoLog.log_solution ~ctx ~p resp;
-    match resp with
-    | Realizable s ->
-      AlgoLog.show_stat_intermediate_solution
-        ~ctx
-        p
-        (Some (Either.first s))
-        elapsed
-        verif
-        !total_configurations
-    | Unrealizable u ->
-      AlgoLog.show_stat_intermediate_solution
-        ~ctx
-        p
-        (Some (Either.second u))
-        elapsed
-        verif
-        !total_configurations
-    | Failed _ ->
-      AlgoLog.show_stat_intermediate_solution
-        ~ctx
-        p
-        None
-        elapsed
-        verif
-        !total_configurations);
+    AlgoLog.show_stat_intermediate_solution
+      ~ctx
+      p
+      resp
+      elapsed
+      verif
+      !total_configurations);
   (* Save stats an restart counters. *)
   LogJson.save_stats_and_restart p.id;
   Lwt.return (ctx, resp)
@@ -94,7 +77,9 @@ let find_multiple_solutions
   =
   let num_attempts = ref 0 in
   let best_score = ref 1000 in
-  let best_solution = ref (ctx, top_userdef_problem, Failed Syguslib.Sygus.RFail) in
+  let best_solution =
+    ref (ctx, top_userdef_problem, Failed ("unsolved", Syguslib.Sygus.RFail))
+  in
   let open Configuration in
   let rstate =
     G.generate_configurations
@@ -160,10 +145,10 @@ let find_multiple_solutions
           expand_func ~mark:G.Unrealizable rstate sub_conf;
           G.cache rstate u;
           find_sols ((new_ctx', new_pdef, Unrealizable u) :: a)
-        | new_ctx', Failed f ->
+        | new_ctx', Failed (s, f) ->
           G.mark_failed rstate sub_conf;
           expand_func rstate sub_conf;
-          find_sols ((new_ctx', new_pdef, Failed f) :: a))
+          find_sols ((new_ctx', new_pdef, Failed (s, f)) :: a))
     | None -> Lwt.return a
   in
   let%lwt all_solns = find_sols [] in

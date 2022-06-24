@@ -57,12 +57,12 @@ let rec refinement_loop
     | Failure s ->
       Log.error_msg Fmt.(str "Failure: %s" s);
       Log.error_msg "Solution cannot be proved correct, solver failed.";
-      Lwt.return (Failed RFail)
+      Lwt.return (Failed ("proving step", RFail))
     | e -> raise e)
   (* Synthesis returned unknown, which is interpreted as failure. *)
-  | RUnknown, _ -> Lwt.return (Failed RUnknown)
+  | RUnknown, _ -> failure_case "candidate solution synthesis" RUnknown
   (* Synthesis failed, the loop returns failure. *)
-  | RFail, Second [] -> Lwt.return (Failed RFail)
+  | RFail, Second [] -> failure_case "candidate solution synthesis" RFail
   (* Synthesis returns some information about unrealizability. *)
   | _ as synt_failure_info ->
     (* On synthesis failure, start by trying to synthesize lemmas. *)
@@ -93,16 +93,16 @@ let rec refinement_loop
           (match r' with
           | RInfeasible ->
             infeasible_w_witnesses_case (synth_time, 0.) (tsize, usize) witnesses
-          | _ -> failure_case r'))
+          | _ -> failure_case "lifting" r'))
       | _ ->
         (* The problem is infeasible, and we have witnesses for it. *)
         infeasible_w_witnesses_case (synth_time, 0.) (tsize, usize) witnesses)
       (* The problem is infeasible. When the sygus solver answers infeasible,
         we do not have witnesses of unrealizability.
        *)
-    | _ -> failure_case RFail)
+    | _ -> failure_case "lemma synthesis" RFail)
 
-and failure_case r = Lwt.return (Failed r)
+and failure_case s r = Lwt.return (Failed (s, r))
 
 and infeasible_w_witnesses_case (synth_time, verif_time) (tsize, usize) witnesses =
   Stats.log_major_step_end ~synth_time ~verif_time ~t:tsize ~u:usize false;
@@ -144,7 +144,7 @@ and success_case ~ctx ~p ~synth_time lstate_in (tsize, usize) lifting (eqns, sol
         false;
       Config.Optims.turn_off_eager_optims ();
       refinement_loop ~ctx ~major:true p (Lwt.return lstate_in))
-    else Lwt.return (Failed RFail)
+    else failure_case "candidate solution verification" RFail
   | `Correct ->
     (* This case happens when verification succeeded.
                   Store the equation system, return the solution. *)
@@ -187,7 +187,7 @@ let se2gis ~(ctx : env) (p : PsiDef.t) : solver_response segis_response Lwt.t =
   if Set.is_empty t_set
   then (
     Log.error_msg "Empty set of terms for equation system.";
-    Lwt.return (Failed RFail))
+    Lwt.return (Failed ("empty set of terms", RFail)))
   else (
     ctx.refinement_steps := 0;
     refinement_loop

@@ -128,4 +128,4 @@ in which case it provides a list of counterexamples, or failure.
 type 'a segis_response =
   | Realizable of soln
   | Unrealizable of unrealizability_witness list
-  | Failed of 'a
+  | Failed of string * 'a

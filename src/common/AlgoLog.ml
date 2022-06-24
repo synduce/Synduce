@@ -39,7 +39,7 @@ let single_configuration_json
     ~(is_ocaml_syntax : bool)
     ~(ctx : env)
     (pb : PsiDef.t)
-    (soln : (soln, unrealizability_witness list) Either.t option)
+    (soln : Syguslib.Sygus.solver_response segis_response)
     (elapsed : float)
     (verif : float)
     : Yojson.t
@@ -59,7 +59,7 @@ let single_configuration_json
   in
   let soln_or_refutation =
     match soln with
-    | Some (Either.First soln) ->
+    | Realizable soln ->
       [ ( "solution"
         , `String
             (Fmt.str
@@ -68,8 +68,8 @@ let single_configuration_json
                soln) )
       ; "unrealizable", `Bool false
       ]
-    | Some (Either.Second _) -> [ "unrealizable", `Bool true ]
-    | None -> [ "failure", `Bool true ]
+    | Unrealizable _ -> [ "unrealizable", `Bool true ]
+    | _ -> [ "failure", `Bool true ]
   in
   `Assoc
     ([ "algorithm", `String algo
@@ -85,7 +85,7 @@ let single_configuration_json
 let show_stat_intermediate_solution
     ~(ctx : env)
     (pb : PsiDef.t)
-    (soln : (soln, unrealizability_witness list) Either.t option)
+    (soln : Syguslib.Sygus.solver_response segis_response)
     (elapsed : float)
     (verif : float)
     (total_configurations : int)
@@ -94,13 +94,15 @@ let show_stat_intermediate_solution
   (* *)
   let () =
     match soln with
-    | Some (Either.First soln) ->
+    | Realizable soln ->
       Log.info
         Fmt.(
           fun fmt () ->
             pf fmt "%a" (box (ctx >- Pretty.pp_soln ~use_ocaml_syntax:true)) soln)
-    | Some (Either.Second _) -> Log.info Fmt.(fun fmt () -> pf fmt "Unrealizable.")
-    | None -> Log.info Fmt.(fun fmt () -> pf fmt "Failure.")
+    | Unrealizable _ -> Log.info Fmt.(fun fmt () -> pf fmt "Unrealizable.")
+    | Failed (s, r) ->
+      Log.info
+        Fmt.(fun fmt () -> pf fmt "Failure: %s - %a" s SygusInterface.pp_response r)
   in
   (* Json output *)
   if !Config.json_progressive && !Config.json_out

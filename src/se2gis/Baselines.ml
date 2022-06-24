@@ -93,11 +93,11 @@ let rec segis_loop ~(ctx : env) (p : PsiDef.t) (t_set : TermSet.t)
     Lwt.return (Unrealizable witnesss)
   | RFail, _ ->
     Log.error_msg "<SEGIS> SyGuS solver failed to find a solution.";
-    Lwt.return (Failed RFail)
+    Lwt.return (Failed ("segis", RFail))
   | RUnknown, _ ->
     Log.error_msg "<SEGIS> SyGuS solver returned unknown.";
-    Lwt.return (Failed RUnknown)
-  | _ -> Lwt.return (Failed s_resp)
+    Lwt.return (Failed ("segis", RUnknown))
+  | _ -> Lwt.return (Failed ("segis", s_resp))
 ;;
 
 let algo_segis ~(ctx : env) (p : PsiDef.t) =
@@ -187,11 +187,11 @@ let rec cegis_loop ~(ctx : Env.env) (p : PsiDef.t) (t_set : TermSet.t)
     Lwt.return (Unrealizable witnesss)
   | RFail, _ ->
     Log.error_msg "<CEGIS> SyGuS solver failed to find a solution.";
-    Lwt.return (Failed RFail)
+    Lwt.return (Failed ("cegis", RFail))
   | RUnknown, _ ->
     Log.error_msg "<CEGIS> SyGuS solver returned unknown.";
-    Lwt.return (Failed RUnknown)
-  | _ -> Lwt.return (Failed s_resp)
+    Lwt.return (Failed ("cegis", RUnknown))
+  | _ -> Lwt.return (Failed ("cegis", s_resp))
 ;;
 
 let algo_cegis ~(ctx : Env.env) (p : PsiDef.t) : solver_response segis_response Lwt.t =
