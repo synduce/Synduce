@@ -214,7 +214,14 @@ let declare_datatype_of_rtype ~(ctx : Context.t) (t0 : RType.t)
     | _ when RType.is_base t0 -> []
     | RType.TTup tl ->
       let s, decl = decl_of_tup_type tl in
-      [ [ s ], decl ]
+      let deps = RType.get_datatype_depends ctx.types t0 in
+      let decls =
+        List.fold
+          ~init:(([ s ], decl) :: declared_types)
+          ~f:(fun d newt -> aux d newt)
+          deps
+      in
+      List.rev decls
     | _ ->
       (match RType.base_name t0 with
       | Some tname ->
@@ -231,7 +238,7 @@ let declare_datatype_of_rtype ~(ctx : Context.t) (t0 : RType.t)
             List.fold ~init:(decl_one @ declared_types) ~f:(fun d newt -> aux d newt) deps
           in
           List.rev decls)
-      | None -> [])
+      | None -> declared_types)
   in
   aux [] t0
 ;;
@@ -331,6 +338,7 @@ let rec smt_of_term ~(ctx : Context.t) (t : term) : smtTerm =
           let%map fbody' = aux (substitution subs fbody) in
           mk_let bindings fbody'
         | Unequal_lengths -> Error "Smt: unexpected malformed term.")
+      | TConst _ when List.length args = 0 -> aux func
       | _ ->
         Log.error_msg Fmt.(str "Smt of term %a impossible." (pp_term ctx) t);
         Error "Smt: application function can only be variable.")

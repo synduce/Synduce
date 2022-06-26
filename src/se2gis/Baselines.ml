@@ -96,9 +96,10 @@ let rec segis_loop ~(ctx : env) (p : PsiDef.t) (t_set : TermSet.t)
     Lwt.return (Failed ("segis", RFail))
   | RUnknown, _ ->
     Log.error_msg "<SEGIS> SyGuS solver returned unknown.";
-    Lwt.return (Failed ("segis", RUnknown))
-  | _ -> Lwt.return (Failed ("segis", s_resp))
-;;
+    failure_case "segis" RUnknown
+  | _ -> failure_case "segis" s_resp
+
+and failure_case s r = Lwt.return (Failed (s, r))
 
 let algo_segis ~(ctx : env) (p : PsiDef.t) =
   let t_set =

@@ -1,0 +1,23 @@
+type 'a clist = CNil | Single of 'a | Concat of 'a clist * 'a clist
+
+type 'a list = Nil | Cons of 'a * 'a list
+
+pmrs spec l =
+    main l -> f l
+    | f Nil -> 0
+    | f Cons(hd,tl) -> 1 + (main tl)
+
+pmrs (odot,f_0,s_0) target t =
+    main t           -> h t
+    | h CNil          -> s_0
+    | h Single(a)    -> f_0 a
+    | h Concat(x, y) -> odot (h x) (h y)
+
+pmrs repr l =
+    repr l -> c l
+    | c CNil -> Nil
+    | c Single(a) -> Cons(a, Nil)
+    | c Concat(x, y) -> dec y x
+    | dec l CNil -> c l
+    | dec l Single(a) -> Cons(a, c l)
+    | dec l Concat(x, y) -> dec (Concat(l, y)) x

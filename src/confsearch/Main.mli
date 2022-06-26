@@ -3,7 +3,7 @@ open ProblemDefs
 open Env
 
 type multi_soln_result =
-  { r_best : env * PsiDef.t * Syguslib.Sygus.solver_response segis_response
+  { r_best : (env * PsiDef.t * Syguslib.Sygus.solver_response segis_response) option
   ; r_all : (env * PsiDef.t * Syguslib.Sygus.solver_response segis_response) list
   ; r_subconf_count : int
   }

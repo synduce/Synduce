@@ -1,0 +1,19 @@
+// The type of non-empty concat-lists
+type clist = Single of int | Concat of clist * clist
+// The type of non-empty lists
+type list = Elt of int | Cons of int * list
+
+pmrs spec l =
+    first Elt(a) -> a
+    | first Cons(hd,tl) -> hd
+
+pmrs (odot,f_0,s_0) target t =
+    h Single(a)    -> f_0 a
+    | h Concat(x, y) -> odot (h x) (h y)
+
+pmrs repr l =
+    repr l -> c l
+    | c Single(a) -> Elt(a)
+    | c Concat(x, y) -> dec y x
+    | dec l Single(a) -> Cons(a, repr l)
+    | dec l Concat(x, y) -> dec (Concat(y, l)) x

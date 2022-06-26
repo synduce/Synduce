@@ -497,7 +497,7 @@ let check_image_unsat ~(ctx : env) ~(p : PsiDef.t) witness
     in
     (* Declare Tinv, repr and reference functions. *)
     let* () =
-      Lwt_list.iter_p
+      Lwt_list.iter_s
         (fun x ->
           let* _ = AsyncSmt.exec_command solver x in
           return ())
@@ -845,7 +845,7 @@ let classify_witnesss ~(ctx : env) ~(p : PsiDef.t) (witnesss : witness list)
     Lwt_list.map_p f witnesss
   in
   let classify_wrt_ref b =
-    Lwt_list.map_p (check_witness_in_image ~ctx ~ignore_unknown:b ~p)
+    Lwt_list.map_s (check_witness_in_image ~ctx ~ignore_unknown:b ~p)
   in
   Log.start_section "Classify counterexamples...";
   (* First pass ignoring unknowns. *)

@@ -1,0 +1,60 @@
+(* In the PMRS syntax, comments have the same syntax as OCaml comments. *)
+// Line comments can also be written like this.
+(* You can compare this file to the mps.ml file, which specifies
+    the same problem.
+ *)
+
+(*
+    Type declarations have the same syntax as in Ocaml.
+    Let us declare a polymorphic type 'a clist with three constructors:
+    - CNil constructs an empty list.
+    - Single constructs a singleton list.
+    - Concat constructs a list by "concatenation"
+*)
+type 'a clist = CNil | Single of 'a | Concat of 'a clist * 'a clist
+
+(*
+    This type is the more usual type defining cons-lists.
+*)
+type 'a list = Nil | Cons of 'a * 'a list
+
+(*
+    This is the reference function. The tool looks for a reference function
+    called spec.
+    The function is specified as a pattern-matching recursion scheme, with the
+    syntax described in the README.
+    Here, the function spec is a function from int list to int * int, with the
+    invariant that the first element of the pair it returns is positive.
+*)
+pmrs spec {fun (x,y) -> x >= 0} =
+    f Nil -> (0, 0) // Base case
+    | f Cons(hd, tl) -> (fun (mps, sum) -> max (mps + hd) 0, sum + hd) (f tl)
+
+(*
+    This is the recursion skeleton. The tool looks for a recursion skeleton
+    called target.
+    A recursion skeleton is simply a pattern-matching recursion scheme with
+    some unknowns: odot, s0 and f0 are the unknowns in this case.
+    The unknowns must have scalar function as solutions.
+*)
+pmrs (odot, s0, f0) target =
+    h CNil          -> s0
+    | h Single(a)    -> f0 a
+    | h Concat(y, z) -> odot (h y) (h z)
+
+(*
+    Finally, the tool requires a representation function from the target type
+    (here, 'a clist) to the reference type ('a list).
+    Remark that a pattern matching recursion scheme can be composed of several
+    mutually recursive functions.
+    Here, this pattern matching recursion scheme is composed of two functions
+    with symbols c and dec.
+    It is equivalent to the function repr in the sum.ml benchmark in this folder.
+*)
+pmrs repr l =
+    c CNil -> Nil
+    | c Single(a) -> Cons(a, Nil)
+    | c Concat(x, y) -> dec y x
+    | dec l CNil -> c l
+    | dec l Single(a) -> Cons(a, c l)
+    | dec l Concat(x, y) -> dec (Concat(y, l)) x

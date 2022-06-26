@@ -1,0 +1,27 @@
+type 'a clist = CNil | Single of 'a | Concat of 'a clist * 'a clist
+
+type 'a list = Nil | Cons of 'a * 'a list
+
+
+pmrs spec {fun (sum, mps, mts) -> mts >= 0 && mps >= 0 && mps >= sum && mts >= sum } =
+    main l -> f l
+    | f Nil -> 0, 0, 0
+    | f Cons(hd, tl) ->
+        (fun (sum, mps, mts) -> sum + hd, max (mps + hd) 0, max mts (sum + hd))
+            (f tl)
+
+
+pmrs (odot, f0, s0) target =
+    main t           -> h t
+    | h CNil          -> s0
+    | h Single(a)    -> f0 a
+    | h Concat(y, z) -> odot (h y) (h z)
+
+pmrs repr l =
+    main l -> c l
+    | c CNil -> Nil
+    | c Single(a) -> Cons(a, Nil)
+    | c Concat(x, y) -> dec y x
+    | dec l CNil -> main l
+    | dec l Single(a) -> Cons(a, main l)
+    | dec l Concat(x, y) -> dec (Concat(y, l)) x

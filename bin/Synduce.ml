@@ -92,9 +92,12 @@ let main () =
         let subproblem_jsons =
           List.map ~f:(check_output (u_count, f_count)) multi_soln_result.r_all
         in
-        let _ =
-          Log.info Fmt.(fun fmt () -> pf fmt "Best solution:");
-          check_output (ref 0, ref 0) multi_soln_result.r_best
+        let () =
+          match multi_soln_result.r_best with
+          | Some best_solution ->
+            Log.info Fmt.(fun fmt () -> pf fmt "Best solution:");
+            ignore (check_output (ref 0, ref 0) best_solution)
+          | _ -> ()
         in
         let results =
           List.map subproblem_jsons ~f:(fun (psi_id, json) ->

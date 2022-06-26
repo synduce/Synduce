@@ -1,4 +1,4 @@
-(** @synduce --no-lifting -NB *)
+(** @synduce -s 2 --no-lifting -NB --se2gis *)
 
 type itree =
   | Leaf of int

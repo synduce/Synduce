@@ -136,22 +136,23 @@ let compute_rhs ?(force_replace_off = false) ~ctx p t =
   applied.
 *)
 let compute_preconds ?(count_reuse = true) ~ctx ~p subst eterm =
-  match Predicates.get ~count_reuse ~ctx ~p eterm with
-  | Some lemma_for_eterm ->
-    let t = ctx >>- Reduce.reduce_term (subst lemma_for_eterm) in
-    Some t
-  | None ->
-    (* If the term is bounded and there is a invariant, add a precondition.
-         This will avoid calls to the lemma synthesis.
-      *)
-    if ctx >- Analysis.is_bounded eterm
-    then
-      Option.map
-        ~f:(fun req ->
-          let t = ctx >>- Reduce.reduce_term (mk_app req [ eterm ]) in
-          t)
-        (ctx >- Specifications.get_requires p.PsiDef.target.PMRS.pvar)
-    else None
+  (* If the term is bounded and there is a invariant, add a precondition.
+    This will avoid calls to the lemma synthesis.
+  *)
+  if ctx >- Analysis.is_bounded eterm
+  then
+    Option.map
+      ~f:(fun req ->
+        let t = ctx >>- Reduce.reduce_term (mk_app req [ eterm ]) in
+        t)
+      (ctx >- Specifications.get_requires p.PsiDef.target.PMRS.pvar)
+  else (
+    (* Otherwise find a predicate.*)
+    match Predicates.get ~count_reuse ~ctx ~p eterm with
+    | Some lemma_for_eterm ->
+      let t = ctx >>- Reduce.reduce_term (subst lemma_for_eterm) in
+      Some t
+    | None -> None)
 ;;
 
 let filter_elims ~ctx all_subs t =
@@ -882,7 +883,7 @@ module Solve = struct
     if !Config.check_unrealizable
     then
       Some
-        (let t, r = ctx >>- Counterexamples.check_unrealizable unknowns eqns in
+        (let t, r = ctx >>- Witnesses.check_unrealizable unknowns eqns in
          let task =
            let* witnesss = t in
            match witnesss with
@@ -896,7 +897,7 @@ module Solve = struct
              then ignore (core_solve ~ctx ~gen_only:true unknowns eqns);
              let%lwt () =
                if !Config.check_unrealizable_smt_unsatisfiable
-               then ctx >- Counterexamples.smt_unsatisfiability_check unknowns eqns
+               then ctx >- Witnesses.smt_unsatisfiability_check unknowns eqns
                else Lwt.return ()
              in
              Lwt.return (Sygus.RInfeasible, Either.Second witnesss)

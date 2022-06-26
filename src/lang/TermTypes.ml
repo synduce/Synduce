@@ -154,7 +154,7 @@ module Binop = struct
     | "+" -> Some Plus
     | "-" -> Some Minus
     | "*" -> Some Times
-    | "/" -> Some Div
+    | "div" | "/" -> Some Div
     | "mod" -> Some Mod
     | "and" | "&&" -> Some And
     | "or" | "||" -> Some Or (*  *)

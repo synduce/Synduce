@@ -57,12 +57,16 @@ let rec refinement_loop
     | Failure s ->
       Log.error_msg Fmt.(str "Failure: %s" s);
       Log.error_msg "Solution cannot be proved correct, solver failed.";
-      Lwt.return (Failed ("proving step", RFail))
+      failure_case "proving step" RFail
     | e -> raise e)
   (* Synthesis returned unknown, which is interpreted as failure. *)
-  | RUnknown, _ -> failure_case "candidate solution synthesis" RUnknown
+  | RUnknown, _ ->
+    Log.error_msg Fmt.(str "Unknown");
+    failure_case "candidate solution synthesis" RUnknown
   (* Synthesis failed, the loop returns failure. *)
-  | RFail, Second [] -> failure_case "candidate solution synthesis" RFail
+  | RFail, Second [] ->
+    Log.error_msg Fmt.(str "Failure.");
+    failure_case "candidate solution synthesis" RFail
   (* Synthesis returns some information about unrealizability. *)
   | _ as synt_failure_info ->
     (* On synthesis failure, start by trying to synthesize lemmas. *)

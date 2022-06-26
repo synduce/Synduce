@@ -1,0 +1,22 @@
+type 'a clist = CTwo of 'a * 'a | Concat of 'a clist * 'a clist
+
+type 'a list = Two of 'a * 'a | Cons of 'a * 'a list
+
+pmrs spec l {fun (x, y) -> x <= y} =
+    main l -> f l
+    | f Two(a, b) -> (min a b, max a b)
+    | f Cons(hd,tl) ->
+        (fun (amin, sec_min) ->
+            min hd amin, min sec_min (max hd amin)) (f tl)
+
+pmrs (odot,f_0) target t =
+    target t           -> h t
+    | h CTwo(a, b)    -> f_0 a b
+    | h Concat(x, y) -> odot (h x) (h y)
+
+pmrs repr l =
+    repr l -> c l
+    | c CTwo(a, b) -> Two(a, b)
+    | c Concat(x, y) -> dec y x
+    | dec l CTwo(a, b) -> Cons(a, Cons(b, repr l))
+    | dec l Concat(x, y) -> dec (Concat(l, y)) x

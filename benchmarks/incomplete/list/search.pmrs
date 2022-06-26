@@ -1,0 +1,28 @@
+type 'a clist = CNil | Single of 'a | Concat of 'a clist * 'a clist
+
+type 'a list = Nil | Cons of 'a * 'a list
+
+(*
+    This pmrs has a non-recursible input argument x, which in this
+    case reprsents the integer the function is searching for.
+    The type of the spec function is int -> int list -> bool
+*)
+pmrs spec x =
+    main l -> f l
+    | f Nil -> false
+    | f Cons(hd,tl) -> (x = hd) || (f tl)
+
+pmrs (odot,f_0,s_0) target x =
+    target t           -> h t
+    | h CNil          -> s_0
+    | h Single(a)    -> f_0 x a
+    | h Concat(x, y) -> odot (h x) (h y)
+
+pmrs repr l =
+    repr l -> c l
+    | c CNil -> Nil
+    | c Single(a) -> Cons(a, Nil)
+    | c Concat(x, y) -> dec y x
+    | dec l CNil -> repr l
+    | dec l Single(a) -> Cons(a, repr l)
+    | dec l Concat(x, y) -> dec (Concat(l, y)) x

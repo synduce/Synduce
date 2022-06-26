@@ -1,6 +1,6 @@
 open Base
 open Common
-open Counterexamples
+open Witnesses
 open Env
 open Lang
 open LemmaVerif

@@ -1,0 +1,34 @@
+(** @synduce --no-lifting -s 2 -NB *)
+
+type 'a clist =
+  | CNil
+  | Single of 'a
+  | Concat of 'a clist * 'a clist
+
+type 'a list =
+  | Nil
+  | Cons of 'a * 'a list
+
+let rec spec = function
+  | Nil -> 0, 1
+  | Cons (hd, tl) ->
+    let s, m = spec tl in
+    (10 * s) + hd, 10 * m
+;;
+
+let rec repr = function
+  | CNil -> Nil
+  | Single a -> Cons (a, Nil)
+  | Concat (x, y) -> dec y x
+
+and dec l = function
+  | CNil -> repr l
+  | Single a -> Cons (a, repr l)
+  | Concat (x, y) -> dec (Concat (y, l)) x
+;;
+
+let rec target = function
+  | CNil -> [%synt s0]
+  | Single a -> [%synt f0]
+  | Concat (y, z) -> [%synt odot]
+;;

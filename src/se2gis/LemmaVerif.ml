@@ -1,6 +1,5 @@
 open Base
 open Common
-open Counterexamples
 open Elim
 open Lang
 open Lwt
@@ -9,6 +8,7 @@ open ProblemDefs
 open Term
 open SmtInterface
 open Utils
+open Witnesses
 module S = Smtlib.SmtLib
 
 let placeholder_witness ?(pre = None) (det : term_info) : witness =

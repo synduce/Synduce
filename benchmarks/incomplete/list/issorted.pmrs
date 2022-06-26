@@ -1,0 +1,19 @@
+type 'a clist = Single of 'a | Concat of 'a clist * 'a clist
+
+type 'a slist = Elt of 'a | Cons of 'a * 'a slist
+
+pmrs spec =
+    main Elt(a) -> a, a, true
+    | main Cons(hd, tl) -> (fun (next, last, iss) -> hd, last, iss && hd < next) (main tl)
+
+pmrs (odot) target =
+    main t           -> h t
+    | h Single(a)    -> (a, a, true)
+    | h Concat(y, z) -> odot (h y) (h z)
+
+pmrs repr l =
+    main l -> c l
+    | c Single(a) -> Elt(a)
+    | c Concat(x, y) -> dec y x
+    | dec l Single(a) -> Cons(a, main l)
+    | dec l Concat(x, y) -> dec (Concat(y, l)) x

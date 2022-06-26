@@ -8,7 +8,7 @@ module G = ConfGraph
 module CO = Config.Optims
 
 type multi_soln_result =
-  { r_best : env * PsiDef.t * Syguslib.Sygus.solver_response segis_response
+  { r_best : (env * PsiDef.t * Syguslib.Sygus.solver_response segis_response) option
   ; r_all : (env * PsiDef.t * Syguslib.Sygus.solver_response segis_response) list
   ; r_subconf_count : int
   }
@@ -77,9 +77,7 @@ let find_multiple_solutions
   =
   let num_attempts = ref 0 in
   let best_score = ref 1000 in
-  let best_solution =
-    ref (ctx, top_userdef_problem, Failed ("unsolved", Syguslib.Sygus.RFail))
-  in
+  let best_solution = ref None in
   let open Configuration in
   let rstate =
     G.generate_configurations
@@ -138,7 +136,7 @@ let find_multiple_solutions
           if score < !best_score
           then (
             best_score := score;
-            best_solution := new_ctx, new_pdef, Realizable s);
+            best_solution := Some (new_ctx, new_pdef, Realizable s));
           find_sols ((new_ctx', new_pdef, Realizable s) :: a)
         | new_ctx', Unrealizable u ->
           G.mark_unrealizable rstate sub_conf;
@@ -203,7 +201,7 @@ let find_and_solve_problem
     (* Only solve the top-level skeleton, i.e. the problem specified by the user. *)
     let%lwt ctx', top_soln = single_configuration_solver ~ctx top_userdef_problem in
     Lwt.return
-      { r_best = ctx', top_userdef_problem, top_soln
+      { r_best = Some (ctx', top_userdef_problem, top_soln)
       ; r_all = [ ctx', top_userdef_problem, top_soln ]
       ; r_subconf_count = 1
       })

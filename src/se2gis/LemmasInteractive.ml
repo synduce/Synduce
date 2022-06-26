@@ -1,6 +1,6 @@
 open Base
 open Common
-open Counterexamples
+open Witnesses
 open Elim
 open Env
 open Lang
