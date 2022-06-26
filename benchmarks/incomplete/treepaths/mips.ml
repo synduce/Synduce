@@ -1,4 +1,4 @@
-(** @synduce -s 2 -NB *)
+(** @synduce -s 2  -NB *)
 
 type 'a btree =
   | Empty
@@ -12,14 +12,13 @@ type 'c zipper =
   | Top
   | Zip of sel * 'c * 'c btree * 'c zipper
 
-let rec spec t = mips (0, 0) t
+let rec spec t = mips (0, 0) t [@@ensures fun (x, y) -> y >= 0 && y >= x]
 
 and mips s = function
   | Empty -> s
   | Node (a, l, r) ->
     let sum1, m1 = mips s l in
     mips (sum1 + a, max (sum1 + a) m1) r
-  [@@ensures fun (x, y) -> y >= 0 && y >= x]
 ;;
 
 let rec target = function
@@ -29,6 +28,14 @@ let rec target = function
 and aux a child z = function
   | Left -> [%synt joinl] a (spec child) (target z)
   | Right -> [%synt joinr] a (spec child) (target z)
+
+and spec t = mips (0, 0) t
+
+and mips s = function
+  | Empty -> s
+  | Node (a, l, r) ->
+    let sum1, m1 = mips s l in
+    mips (sum1 + a, max (sum1 + a) m1) r
 ;;
 
 let rec repr = function

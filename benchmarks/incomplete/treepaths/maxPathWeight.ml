@@ -21,6 +21,10 @@ let rec main = function
   | Top -> 0
   | Zip (x, a, child, z) -> [%synt join]
 
+and recall = function
+  | Empty -> 0
+  | Node (a, l, r) -> a + max (recall l) (recall r)
+
 and color = function
   | Left -> true
   | Right -> false

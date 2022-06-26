@@ -26,8 +26,14 @@ let rec target = function
   | Zip (c, a, child, z) -> aux a child z c
 
 and aux a child z = function
-  | Left -> [%synt joinl] a (spec child) (target z)
-  | Right -> [%synt joinr] a (spec child) (target z)
+  | Left -> [%synt joinl]
+  | Right -> [%synt joinr]
+
+and og = function
+  | Empty -> false, 1
+  | Node (a, l, r) ->
+    let b1, x1 = og l in
+    if b1 then b1, x1 else if a mod 2 = 1 then true, a else og r
 ;;
 
 let rec repr = function

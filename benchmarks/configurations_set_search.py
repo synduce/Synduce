@@ -181,14 +181,10 @@ incomplete_benchmarks_set0 = [
 
     # TREE PATHS
     ["incomplete/treepaths/height.ml", "", True, 1],  # blocks
-    # Problem: datatype is almost scalar
-    ["incomplete/treepaths/leftmostodd.ml", "", True, 1],
-    # Problem: datatype is almost scalar
-    ["incomplete/treepaths/maxPathWeight.ml", "", True, 1],
-    # Problem: datatype is almost scalar
-    ["incomplete/treepaths/maxPathWeight2.ml", "", True, 1],
-    ["incomplete/treepaths/mips.ml", "", True, 1],
-    ["incomplete/treepaths/sum.ml", "", True, 1],
+    ["incomplete/treepaths/leftmostodd.ml", "", True, 1],  # ??
+    ["incomplete/treepaths/maxPathWeight.ml", "", True, 1],  # OK
+    ["incomplete/treepaths/mips.ml", "", True, 1],  # blocks?
+    ["incomplete/treepaths/sum.ml", "", True, 1],  # OK
 
     # UNIMODAL
     ["incomplete/unimodal_list/max_logn_v2.ml", "", True, 1],  # OK - 1 failure

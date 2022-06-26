@@ -19,7 +19,11 @@ let rec sum = function
 
 let rec main = function
   | Top -> [%synt s0]
-  | Zip (x, a, child, z) -> [%synt join] a (sum child) (main z)
+  | Zip (x, a, child, z) -> [%synt join]
+
+and aux = function
+  | Empty -> 0
+  | Node (a, l, r) -> a + sum l + sum r
 ;;
 
 let rec repr = function

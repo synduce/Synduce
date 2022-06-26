@@ -529,12 +529,19 @@ let constraint_of_neg ~(ctx : Context.t) (id : int) ~(p : PsiDef.t) (witness : w
     : term
   =
   ignore p;
-  let params =
-    List.concat_map
-      ~f:(fun (_, elimv) -> [ Eval.in_model ~ctx witness.witness_model elimv ])
+  let conjs =
+    List.map
+      ~f:(fun (_, elimv) ->
+        mk_un
+          Unop.Not
+          (mk_app
+             (mk_var ctx (Variable.mk ctx (make_ensures_name id)))
+             [ Eval.in_model ~ctx witness.witness_model elimv ]))
       witness.witness_eqn.eelim
   in
-  mk_un Unop.Not (mk_app (mk_var ctx (Variable.mk ctx (make_ensures_name id))) params)
+  match mk_assoc Binop.And conjs with
+  | Some _constraint -> _constraint
+  | None -> Terms.bool true
 ;;
 
 let constraint_of_pos ~(ctx : Context.t) (id : int) (term : term) : term =

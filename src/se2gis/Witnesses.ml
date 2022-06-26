@@ -471,10 +471,17 @@ let check_image_sat ~(ctx : env) ~(p : PsiDef.t) witness
 let check_image_unsat ~(ctx : env) ~(p : PsiDef.t) witness
     : (SmtLib.solver_response * Stats.verif_method) t * int u
   =
+  let ref_tin = PMRS.extract_rec_input_typ p.reference in
   let f_compose_r t =
     let repr_of_v =
-      if p.PsiDef.repr_is_identity then t else mk_app_v ctx.ctx p.PsiDef.repr.pvar [ t ]
+      if p.PsiDef.repr_is_identity
+      then t
+      else (
+        match RType.unify_one ref_tin (type_of (Terms.typed ctx.ctx t)) with
+        | Ok _ -> t
+        | _ -> mk_app_v ctx.ctx p.PsiDef.repr.pvar [ t ])
     in
+    (* Don't add the PMRS pargs in the application, they are declared "globally" in the problem. *)
     mk_app_v ctx.ctx p.PsiDef.reference.pvar [ repr_of_v ]
   in
   let build_task (solver, task_start) =
@@ -641,6 +648,7 @@ let mk_model_sat_asserts ~fctx ~ctx witness f_o_r instantiate =
 let check_tinv_unsat ~(ctx : env) ~(p : PsiDef.t) (tinv : PMRS.t) (witness : witness)
     : (SmtLib.solver_response * Stats.verif_method) t * int Lwt.u
   =
+  let ref_tin = PMRS.extract_rec_input_typ p.reference in
   let build_task (cvc4_instance, task_start) =
     let* _ = task_start in
     (* Problem components. *)
@@ -652,7 +660,12 @@ let check_tinv_unsat ~(ctx : env) ~(p : PsiDef.t) (tinv : PMRS.t) (witness : wit
     in
     let f_compose_r t =
       let repr_of_v =
-        if p.PsiDef.repr_is_identity then t else mk_app_v ctx.ctx p.PsiDef.repr.pvar [ t ]
+        if p.PsiDef.repr_is_identity
+        then t
+        else (
+          match RType.unify_one ref_tin (type_of (Terms.typed ctx.ctx t)) with
+          | Ok _ -> t
+          | _ -> mk_app_v ctx.ctx p.PsiDef.repr.pvar [ t ])
       in
       (* Don't add the PMRS pargs in the application, they are declared "globally" in the problem. *)
       mk_app_v ctx.ctx p.PsiDef.reference.pvar [ repr_of_v ]

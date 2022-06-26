@@ -169,7 +169,7 @@ let check_pmrs (p : PMRS.t) =
 let base_type_args (ctx : env) (p : PMRS.t) (vs : VarSet.t) =
   let base_type_vars =
     let on_var v =
-      if RType.is_recursive ctx.ctx.types ((ctx @>- Variable.vtype_or_new) v)
+      if RType.is_datatype ctx.ctx.types ((ctx @>- Variable.vtype_or_new) v)
       then []
       else [ (ctx @>- mk_var) v ]
     in

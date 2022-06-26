@@ -221,7 +221,7 @@ let declare_datatype_of_rtype ~(ctx : Context.t) (t0 : RType.t)
           ~f:(fun d newt -> aux d newt)
           deps
       in
-      List.rev decls
+      decls
     | _ ->
       (match RType.base_name t0 with
       | Some tname ->
@@ -234,10 +234,7 @@ let declare_datatype_of_rtype ~(ctx : Context.t) (t0 : RType.t)
             | Some orig_t -> declare_orig tname orig_t
             | None -> []
           in
-          let decls =
-            List.fold ~init:(decl_one @ declared_types) ~f:(fun d newt -> aux d newt) deps
-          in
-          List.rev decls)
+          List.fold ~init:(decl_one @ declared_types) ~f:(fun d newt -> aux d newt) deps)
       | None -> declared_types)
   in
   aux [] t0
