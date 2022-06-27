@@ -469,16 +469,30 @@ let verify_lemma_candidate
     : (Stats.verif_method * S.solver_response) Lwt.t
   =
   Log.verbose (fun f () -> Fmt.(pf f "Checking lemma candidate..."));
-  try
-    let pr1, resolver1 = verify_lemma_bounded ~fctx ~ctx ~p det cl candidate in
-    let pr2, resolver2 = verify_lemma_unbounded ~fctx ~ctx ~p det cl candidate in
-    Lwt.wakeup resolver2 1;
-    Lwt.wakeup resolver1 1;
-    (* The first call to return is kept, the other one is ignored. *)
-    Lwt.pick [ pr1; pr2 ]
-  with
-  | End_of_file ->
-    Log.error_msg "Solvers terminated unexpectedly  ⚠️ .";
-    Log.error_msg "Please inspect logs.";
-    Lwt.return (Stats.BoundedChecking, S.Unknown)
+  let parallel_checks () =
+    try
+      let pr1, resolver1 = verify_lemma_bounded ~fctx ~ctx ~p det cl candidate in
+      let pr2, resolver2 = verify_lemma_unbounded ~fctx ~ctx ~p det cl candidate in
+      Lwt.wakeup resolver2 1;
+      Lwt.wakeup resolver1 1;
+      (* The first call to return is kept, the other one is ignored. *)
+      Lwt.pick [ pr1; pr2 ]
+    with
+    | End_of_file ->
+      Log.error_msg "Solvers terminated unexpectedly  ⚠️ .";
+      Log.error_msg "Please inspect logs.";
+      Lwt.return (Stats.BoundedChecking, S.Unknown)
+  and bounded_check () =
+    try
+      let pr1, resolver1 = verify_lemma_bounded ~fctx ~ctx ~p det cl candidate in
+      Lwt.wakeup resolver1 1;
+      (* The first call to return is kept, the other one is ignored. *)
+      pr1
+    with
+    | End_of_file ->
+      Log.error_msg "Solvers terminated unexpectedly  ⚠️ .";
+      Log.error_msg "Please inspect logs.";
+      Lwt.return (Stats.BoundedChecking, S.Unknown)
+  in
+  if !Config.only_bounded_check then bounded_check () else parallel_checks ()
 ;;

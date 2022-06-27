@@ -108,6 +108,13 @@ let check_unrealizable_smt_unsatisfiable = ref false
 let no_bounded_sat_as_unsat = ref false
 
 let bounded_lemma_check = ref false
+let only_bounded_check = ref false
+
+let set_bounded_only () =
+  no_bounded_sat_as_unsat := true;
+  bounded_lemma_check := true;
+  only_bounded_check := true
+;;
 
 (**
   Run with the optimizations used to synthesize solutions for systems of equations.
@@ -255,17 +262,10 @@ let set_included_files (s : string) =
 ;;
 
 (** A set of options to search for multiple solutions. *)
-let set_default_config_confsearch (s : string) =
-  try
-    let i = Float.of_string s in
-    if Float.(i > 0. && i <= 3200.) then Optims.wait_parallel_tlimit := i;
-    Optims.max_solutions := 2;
-    Optims.attempt_lifting := false;
-    no_bounded_sat_as_unsat := true;
-    bounded_lemma_check := true;
-    Optims.num_expansions_check := 20
-  with
-  | _ -> ()
+let set_default_config_confsearch () =
+  Optims.max_solutions := 2;
+  Optims.attempt_lifting := false;
+  set_bounded_only () (* Optims.num_expansions_check := 20 *)
 ;;
 
 (* ============================================================================================= *)
@@ -280,7 +280,8 @@ open Optims
 (* ============================================================================================= *)
 
 let options print_usage parse_only =
-  [ 'b', "bmc", None, Some set_check_depth
+  [ 'A', "all-solutions-config", Some set_default_config_confsearch, None
+  ; 'b', "bmc", None, Some set_check_depth
   ; 'B', "bounded-lemma-check", set bounded_lemma_check true, None
   ; 'c', "simple-init", set simple_init true, None
   ; 'C', "check-smt-unrealizable", set check_unrealizable_smt_unsatisfiable true, None
@@ -303,7 +304,6 @@ let options print_usage parse_only =
   ; 'p', "num-threads", None, Some set_num_threads
   ; 'P', "reuse-predicates-off", set reuse_predicates false, None
   ; 's', "multi-max-solutions", None, Some set_max_solutions
-  ; 'S', "all-solutions-config", None, Some set_default_config_confsearch
   ; 't', "solve-timeout", None, Some set_wait_parallel_tlimit
   ; 'v', "verbose", set verbose true, None
   ; 'W', "verif-with", None, Some set_verification_solver

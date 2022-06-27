@@ -1,4 +1,3 @@
-open Lwt
 open Common
 open ProblemDefs
 open Base
@@ -272,7 +271,8 @@ let check_unrealizable
       let vseti, vsetj, vsetj', sub, var_subst = gen_info ~ctx (eqn_i, eqn_j) unknowns in
       (* Extract the arguments of the rhs, if it is a proper skeleton. *)
       match components_of_unrealizability ~ctx ~unknowns eqn_i eqn_j with
-      | None -> return witnesses (* If we cannot match the expected structure, skip it. *)
+      | None ->
+        Lwt.return witnesses (* If we cannot match the expected structure, skip it. *)
       | Some (rhs_args_ij, (lhs_i, lhs_j)) ->
         let lhs_diff =
           let projs = projection_eqns lhs_i (substitution sub lhs_j) in
@@ -294,7 +294,7 @@ let check_unrealizable
                 (Commands.decls_of_vars ~ctx (Analysis.free_variables ~ctx pre_i))
             in
             AsyncSmt.smt_assert solver (smt_of_term ~ctx pre_i)
-          | None -> return ()
+          | None -> Lwt.return ()
         in
         (* Assert the precondition for j *)
         let* () =
@@ -306,7 +306,7 @@ let check_unrealizable
                 (Commands.decls_of_vars ~ctx (Analysis.free_variables ~ctx pre_j))
             in
             smt_assert solver (smt_of_term ~ctx (substitution sub pre_j))
-          | None -> return ()
+          | None -> Lwt.return ()
         in
         (* Assert that the lhs of i and j must be different. **)
         let* () =
@@ -343,10 +343,10 @@ let check_unrealizable
                   request_different_models_async
                     ~ctx
                     ~fctx
-                    (return model)
+                    (Lwt.return model)
                     !Config.Optims.fuzzing_count
                     solver
-                else return []
+                else Lwt.return []
               in
               let new_witnesss =
                 List.map
@@ -359,9 +359,9 @@ let check_unrealizable
                        var_subst)
                   (model :: other_models)
               in
-              return (new_witnesss @ witnesses)
-            | _ -> return witnesses)
-          | _ -> return witnesses
+              Lwt.return (new_witnesss @ witnesses)
+            | _ -> Lwt.return witnesses)
+          | _ -> Lwt.return witnesses
         in
         let+ () = spop solver in
         new_witnesses
@@ -397,8 +397,11 @@ let add_cause (ctx : witness_stat) (cause : spurious_cause) =
 
 (*               CLASSIFYING SPURIOUS COUNTEREXAMPLES - NOT IN REFERENCE IMAGE                   *)
 
+(**
+    Check that some witness is in the image of the function using bounded checking.
+    *)
 let check_image_sat ~(ctx : env) ~(p : PsiDef.t) witness
-    : (SmtLib.solver_response * Stats.verif_method) Lwt.t * int u
+    : (SmtLib.solver_response * Stats.verif_method) Lwt.t * int Lwt.u
   =
   let f_compose_r t =
     let repr_of_v =
@@ -428,15 +431,15 @@ let check_image_sat ~(ctx : env) ~(p : PsiDef.t) witness
           let* () = AsyncSmt.smt_assert solver_instance (ctx >- smt_of_term eqn) in
           let* res = AsyncSmt.check_sat solver_instance in
           let* () = AsyncSmt.spop solver_instance in
-          return res
+          Lwt.return res
         in
         match tlist with
         | [] -> accum
         | t0 :: tl ->
           let* accum' = f accum t0 in
           (match accum' with
-          | Unsat -> return SmtLib.Unsat
-          | _ -> aux (return accum') tl)
+          | Unsat -> Lwt.return SmtLib.Unsat
+          | _ -> aux (Lwt.return accum') tl)
       in
       aux accum term_eqs
     in
@@ -460,16 +463,16 @@ let check_image_sat ~(ctx : env) ~(p : PsiDef.t) witness
           ctx.ctx
           (Variable.mk ~t:(Some (List.hd_exn p.target.pinput_typ)) ctx.ctx "_x")
       in
-      ctx >- Expand.lwt_expand_loop steps t_check (return (TermSet.singleton x))
+      ctx >- Expand.lwt_expand_loop steps t_check (Lwt.return (TermSet.singleton x))
     in
     let* () = AsyncSmt.close_solver solver_instance in
-    return (res, Stats.BoundedChecking)
+    Lwt.return (res, Stats.BoundedChecking)
   in
   AsyncSmt.(cancellable_task (make_solver !Config.verification_solver) build_task)
 ;;
 
 let check_image_unsat ~(ctx : env) ~(p : PsiDef.t) witness
-    : (SmtLib.solver_response * Stats.verif_method) t * int u
+    : (SmtLib.solver_response * Stats.verif_method) Lwt.t * int Lwt.u
   =
   let ref_tin = PMRS.extract_rec_input_typ p.reference in
   let f_compose_r t =
@@ -507,7 +510,7 @@ let check_image_unsat ~(ctx : env) ~(p : PsiDef.t) witness
       Lwt_list.iter_s
         (fun x ->
           let* _ = AsyncSmt.exec_command solver x in
-          return ())
+          Lwt.return ())
         ((ctx >>- smt_of_pmrs p.PsiDef.reference)
         @ if p.PsiDef.repr_is_identity then [] else ctx >>- smt_of_pmrs p.PsiDef.repr)
     in
@@ -544,7 +547,7 @@ let check_image_unsat ~(ctx : env) ~(p : PsiDef.t) witness
     in
     let* resp = AsyncSmt.check_sat solver in
     let* () = AsyncSmt.close_solver solver in
-    return (resp, Stats.Induction)
+    Lwt.return (resp, Stats.Induction)
   in
   AsyncSmt.(cancellable_task (AsyncSmt.make_solver "cvc") build_task)
 ;;
@@ -565,37 +568,69 @@ let check_witness_in_image
       str
         "Checking whether witness is in the image of %s..."
         p.PsiDef.reference.pvar.vname);
-  let task_counter = ref 2 in
-  let%lwt resp, vmethod =
-    if ctx >- Analysis.is_bounded witness.witness_eqn.eterm
-    then Lwt.return (SmtLib.Sat, Stats.Induction)
-    else (
-      try
-        (* This call is expected to respond "unsat" when terminating. *)
-        let pr1, resolver1 = check_image_sat ~ctx ~p witness in
-        let pr1 = wait_on_failure task_counter pr1 in
-        (* This call is expected to respond "sat" when terminating. *)
-        let pr2, resolver2 = check_image_unsat ~ctx ~p witness in
-        let pr2 = wait_on_failure task_counter pr2 in
-        Lwt.wakeup resolver2 1;
-        Lwt.wakeup resolver1 1;
-        (* The first call to return is kept, the other one is ignored. *)
-        Lwt.pick [ pr1; pr2 ]
-      with
-      | End_of_file ->
-        Log.error_msg "Solvers terminated unexpectedly  ⚠️ .";
-        Log.error_msg "Please inspect logs.";
-        Lwt.return (SmtLib.Unknown, Stats.Induction))
+  (* Parallel calls to induction solver and bounded checking procedure. *)
+  let parallel_solver_calls () =
+    let task_counter = ref 2 in
+    let%lwt resp, vmethod =
+      if ctx >- Analysis.is_bounded witness.witness_eqn.eterm
+      then Lwt.return (SmtLib.Sat, Stats.Induction)
+      else (
+        try
+          (* This call is expected to respond "unsat" when terminating. *)
+          let pr1, resolver1 = check_image_sat ~ctx ~p witness in
+          let pr1 = wait_on_failure task_counter pr1 in
+          (* This call is expected to respond "sat" when terminating. *)
+          let pr2, resolver2 = check_image_unsat ~ctx ~p witness in
+          let pr2 = wait_on_failure task_counter pr2 in
+          Lwt.wakeup resolver2 1;
+          Lwt.wakeup resolver1 1;
+          (* The first call to return is kept, the other one is ignored. *)
+          Lwt.pick [ pr1; pr2 ]
+        with
+        | End_of_file ->
+          Log.error_msg "Solvers terminated unexpectedly  ⚠️ .";
+          Log.error_msg "Please inspect logs.";
+          Lwt.return (SmtLib.Unknown, Stats.Induction))
+    in
+    ctx >- AlgoLog.image_witness_class p witness resp vmethod;
+    match resp with
+    | Sat -> Lwt.return { witness with witness_stat = Valid }
+    | Unsat ->
+      Lwt.return
+        { witness with witness_stat = add_cause witness.witness_stat NotInReferenceImage }
+    | _ ->
+      Lwt.return
+        (if ignore_unknown then witness else { witness with witness_stat = Unknown })
   in
-  ctx >- AlgoLog.image_witness_class p witness resp vmethod;
-  match resp with
-  | Sat -> Lwt.return { witness with witness_stat = Valid }
-  | Unsat ->
-    Lwt.return
-      { witness with witness_stat = add_cause witness.witness_stat NotInReferenceImage }
-  | _ ->
-    Lwt.return
-      (if ignore_unknown then witness else { witness with witness_stat = Unknown })
+  (* Onyl call bounded checking procedure. Saves calling a solver. *)
+  let only_bounded_call () =
+    let%lwt resp, vmethod =
+      if ctx >- Analysis.is_bounded witness.witness_eqn.eterm
+      then Lwt.return (SmtLib.Sat, Stats.BoundedChecking)
+      else (
+        try
+          (* This call is expected to respond "unsat" when terminating. *)
+          let pr1, resolver1 = check_image_sat ~ctx ~p witness in
+          Lwt.wakeup resolver1 1;
+          (* The first call to return is kept, the other one is ignored. *)
+          pr1
+        with
+        | End_of_file ->
+          Log.error_msg "Solvers terminated unexpectedly  ⚠️ .";
+          Log.error_msg "Please inspect logs.";
+          Lwt.return (SmtLib.Unknown, Stats.BoundedChecking))
+    in
+    ctx >- AlgoLog.image_witness_class p witness resp vmethod;
+    match resp with
+    | Sat -> Lwt.return { witness with witness_stat = Valid }
+    | Unsat ->
+      Lwt.return
+        { witness with witness_stat = add_cause witness.witness_stat NotInReferenceImage }
+    | _ ->
+      Lwt.return
+        (if ignore_unknown then witness else { witness with witness_stat = Unknown })
+  in
+  if !Config.only_bounded_check then only_bounded_call () else parallel_solver_calls ()
 ;;
 
 (* ============================================================================================= *)
@@ -646,7 +681,7 @@ let mk_model_sat_asserts ~fctx ~ctx witness f_o_r instantiate =
   stalls or returns unknown.
 *)
 let check_tinv_unsat ~(ctx : env) ~(p : PsiDef.t) (tinv : PMRS.t) (witness : witness)
-    : (SmtLib.solver_response * Stats.verif_method) t * int Lwt.u
+    : (SmtLib.solver_response * Stats.verif_method) Lwt.t * int Lwt.u
   =
   let ref_tin = PMRS.extract_rec_input_typ p.reference in
   let build_task (cvc4_instance, task_start) =
@@ -718,7 +753,7 @@ let check_tinv_unsat ~(ctx : env) ~(p : PsiDef.t) (tinv : PMRS.t) (witness : wit
     in
     let* resp = AsyncSmt.check_sat cvc4_instance in
     let* () = AsyncSmt.close_solver cvc4_instance in
-    return (resp, Stats.Induction)
+    Lwt.return (resp, Stats.Induction)
   in
   AsyncSmt.(cancellable_task (AsyncSmt.make_solver "cvc") build_task)
 ;;
@@ -728,7 +763,7 @@ let check_tinv_unsat ~(ctx : env) ~(p : PsiDef.t) (tinv : PMRS.t) (witness : wit
     response and a resolver for that promise. The promise is cancellable.
  *)
 let check_tinv_sat ~(ctx : env) ~(p : PsiDef.t) (tinv : PMRS.t) (witness : witness)
-    : (SmtLib.solver_response * Stats.verif_method) t * int Lwt.u
+    : (SmtLib.solver_response * Stats.verif_method) Lwt.t * int Lwt.u
   =
   let f_compose_r t =
     let repr_of_v =
@@ -786,7 +821,7 @@ let check_tinv_sat ~(ctx : env) ~(p : PsiDef.t) (tinv : PMRS.t) (witness : witne
       (* Assert that preconditions hold. *)
       let* resp = AsyncSmt.check_sat solver in
       let* () = AsyncSmt.spop solver in
-      return resp
+      Lwt.return resp
     in
     let* _ = starter in
     let* () =
@@ -805,10 +840,10 @@ let check_tinv_sat ~(ctx : env) ~(p : PsiDef.t) (tinv : PMRS.t) (witness : witne
       >- Expand.lwt_expand_loop
            steps
            t_check
-           (return (TermSet.singleton witness.witness_eqn.eterm))
+           (Lwt.return (TermSet.singleton witness.witness_eqn.eterm))
     in
     let* () = AsyncSmt.close_solver solver in
-    return (res, Stats.BoundedChecking)
+    Lwt.return (res, Stats.BoundedChecking)
   in
   AsyncSmt.(cancellable_task (make_solver !Config.verification_solver) task)
 ;;
@@ -816,34 +851,56 @@ let check_tinv_sat ~(ctx : env) ~(p : PsiDef.t) (tinv : PMRS.t) (witness : witne
 let satisfies_tinv ~(ctx : env) ~(p : PsiDef.t) (tinv : PMRS.t) (witness : witness)
     : witness Lwt.t
   =
-  let task_counter = ref 2 in
-  let%lwt resp, vmethod =
-    try
-      (* This call is expected to respond "unsat" when terminating. *)
-      let pr1, resolver1 = check_tinv_unsat ~ctx ~p tinv witness in
-      let pr1 = wait_on_failure task_counter pr1 in
-      (* This call is expected to respond "sat" when terminating. *)
-      let pr2, resolver2 = check_tinv_sat ~ctx ~p tinv witness in
-      let pr2 = wait_on_failure task_counter pr2 in
-      Lwt.wakeup resolver2 1;
-      Lwt.wakeup resolver1 1;
-      Lwt.pick [ pr1; pr2 ]
-    with
-    | End_of_file ->
-      Log.error_msg "Solvers terminated unexpectedly  ⚠️";
-      Log.error_msg "Please inspect logs.";
-      Lwt.return (SmtLib.Unknown, Stats.Induction)
+  let resp_handler resp =
+    Lwt.return
+      Smtlib.SmtLib.(
+        match resp with
+        | Sat -> { witness with witness_stat = Valid }
+        | Unsat ->
+          { witness with
+            witness_stat = add_cause witness.witness_stat ViolatesTargetRequires
+          }
+        | Error _ | Unknown -> { witness with witness_stat = Unknown }
+        | _ -> failwith "Unexpected response.")
   in
-  ctx >- AlgoLog.requires_witness_class tinv witness resp vmethod;
-  Lwt.return
-    (match resp with
-    | Sat -> { witness with witness_stat = Valid }
-    | Unsat ->
-      { witness with
-        witness_stat = add_cause witness.witness_stat ViolatesTargetRequires
-      }
-    | Error _ | Unknown -> { witness with witness_stat = Unknown }
-    | _ -> failwith "Unexpected response.")
+  let parallel_solver_calls () =
+    let task_counter = ref 2 in
+    let%lwt resp, vmethod =
+      try
+        (* This call is expected to respond "unsat" when terminating. *)
+        let pr1, resolver1 = check_tinv_unsat ~ctx ~p tinv witness in
+        let pr1 = wait_on_failure task_counter pr1 in
+        (* This call is expected to respond "sat" when terminating. *)
+        let pr2, resolver2 = check_tinv_sat ~ctx ~p tinv witness in
+        let pr2 = wait_on_failure task_counter pr2 in
+        Lwt.wakeup resolver2 1;
+        Lwt.wakeup resolver1 1;
+        Lwt.pick [ pr1; pr2 ]
+      with
+      | End_of_file ->
+        Log.error_msg "Solvers terminated unexpectedly  ⚠️";
+        Log.error_msg "Please inspect logs.";
+        Lwt.return (SmtLib.Unknown, Stats.Induction)
+    in
+    ctx >- AlgoLog.requires_witness_class tinv witness resp vmethod;
+    resp_handler resp
+  in
+  let only_bounded_call () =
+    let%lwt resp, vmethod =
+      try
+        let pr1, resolver1 = check_tinv_sat ~ctx ~p tinv witness in
+        Lwt.wakeup resolver1 1;
+        pr1
+      with
+      | End_of_file ->
+        Log.error_msg "Solvers terminated unexpectedly  ⚠️";
+        Log.error_msg "Please inspect logs.";
+        Lwt.return (SmtLib.Unknown, Stats.Induction)
+    in
+    ctx >- AlgoLog.requires_witness_class tinv witness resp vmethod;
+    resp_handler resp
+  in
+  if !Config.only_bounded_check then only_bounded_call () else parallel_solver_calls ()
 ;;
 
 (** Classify counterexamples into positive or negative counterexamples with respect
@@ -872,7 +929,7 @@ let classify_witnesss ~(ctx : env) ~(p : PsiDef.t) (witnesss : witness list)
     if Option.is_some p.tinv
     then (* TODO find a way to do both classifications efficiently. *)
       witnesss_c1
-    else bind witnesss_c1 (classify_wrt_ref false)
+    else Lwt.bind witnesss_c1 (classify_wrt_ref false)
   in
   Log.end_section ();
   witnesss_c2

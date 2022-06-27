@@ -550,11 +550,8 @@ module Asyncs (Log : Logger) (Stats : Statistics) = struct
       : solver * int t * int u
     =
     let pinfo = Lwt_process.open_process (path, Array.of_list options) in
-    (* If the ocaml ends of the pipes aren't marked close-on-exec, they
-       will remain open in the fork/exec'd solver process, and the solver won't exit
-       when our main ocaml process ends. *)
-    (* set_close_on_exec pinfo#stdout; *)
-    (* set_close_on_exec pinfo.stderr; *)
+    (* Lwt_unix.set_close_on_exec;
+    Lwt_unix.set_close_on_exec pinfo#stderr; *)
     let log_file = Caml.Filename.temp_file (name ^ "_") ".smt2" in
     let solver =
       { s_name = name
@@ -613,28 +610,34 @@ module Asyncs (Log : Logger) (Stats : Statistics) = struct
             solver.s_log_file);
     let%lwt _ = exec_command solver mk_exit in
     let%lwt () = Lwt_io.close solver.s_outputc in
-    return (OC.close solver.s_log_outc)
+    let%lwt () = Lwt_io.close solver.s_inputc in
+    return ()
   ;;
 
   let solver_make_cancellable (s : solver) (p : 'a t) : unit =
     (* IF task is cancelled, kill the solver.  *)
-    Lwt.on_cancel p (fun () ->
-        match s.s_pinfo#state with
-        | Lwt_process.Exited _ -> ()
-        | Running ->
-          Stats.log_proc_quit s.s_pid;
-          Log.debug
-            Fmt.(
-              fun fmt () ->
-                pf
-                  fmt
-                  "Terminating solver %s (PID : %i) (log: %a)"
-                  s.s_name
-                  s.s_pid
-                  pp_link
-                  s.s_log_file);
-          s.s_pinfo#terminate;
-          Lwt.(async (fun () -> map (fun _ -> ()) s.s_pinfo#close)))
+    let callc () =
+      match s.s_pinfo#state with
+      | Lwt_process.Exited _ -> ()
+      | Running ->
+        Stats.log_proc_quit s.s_pid;
+        Log.debug
+          Fmt.(
+            fun fmt () ->
+              pf
+                fmt
+                "Terminating solver %s (PID : %i) (log: %a)"
+                s.s_name
+                s.s_pid
+                pp_link
+                s.s_log_file);
+        s.s_pinfo#terminate;
+        Lwt.(async (fun () -> map (fun _ -> ()) s.s_pinfo#close));
+        Lwt.(async (fun () -> Lwt_io.close s.s_outputc));
+        Lwt.(async (fun () -> Lwt_io.close s.s_inputc));
+        ()
+    in
+    Lwt.on_cancel p callc
   ;;
 
   let check_sat s : response = exec_command s mk_check_sat
