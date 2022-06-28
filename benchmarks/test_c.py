@@ -59,7 +59,7 @@ class ResultObject(object):
             self.runs += other.runs
 
     def pretty_str(self, optim):
-        s = f"{self.name : <25s} {optim: <10s} Comp:{self.finished} "
+        s = f"{self.name : <25s} {optim: <30s} Comp:{self.finished} "
         s += f"T: {self.elapsed :4.3f}"
         s += f" ({int(self.num_attempts)} / {int(self.total_confs)}) "
         s += f" [S:{int(self.num_solutions)}+U:{int(self.num_unrealizable)}+F:{int(self.num_failures)}]"
@@ -251,6 +251,7 @@ if __name__ == "__main__":
         ["all", f"--solve-timeout={solve_timeout}"]]
 
     optims_set_0 = [
+        ["all", f"--solve-timeout={solve_timeout}"],
         ["no-rstar", f"--multi-no-rstar --solve-timeout={solve_timeout}"],
         ["no-predicate-reuse",
             f"--reuse-predicates-off --solve-timeout={solve_timeout}"],
