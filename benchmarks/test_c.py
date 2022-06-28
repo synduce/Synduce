@@ -260,14 +260,14 @@ if __name__ == "__main__":
             f"--multi-strategy=bu --multi-use-dfs --solve-timeout={solve_timeout}"],
     ]
 
-    if args.benchmarks == "all":
+    if "all" in args.benchmarks:
         run_benchmarks(incomplete_benchmarks_set0, optims, csv_output=csv_output,
                        num_runs=args.num_runs)
-    elif args.benchmarks == "options0":
+    elif "options0" in args.benchmarks:
         tmp_outfile = "benchmarks/tmp0.txt"
         run_benchmarks(incomplete_benchmarks_set0, optims_set_0, csv_output=csv_output,
                        num_runs=args.num_runs)
-    elif args.benchmarks == "options1":
+    elif "options1" in args.benchmarks:
         tmp_outfile = "benchmarks/tmp1.txt"
         run_benchmarks(incomplete_benchmarks_set0, optims_set_1, csv_output=csv_output,
                        num_runs=args.num_runs)
