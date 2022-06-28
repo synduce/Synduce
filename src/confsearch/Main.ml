@@ -155,6 +155,7 @@ let find_multiple_solutions
 
 let find_and_solve_problem
     ~(ctx : env)
+    ~(filename : string)
     (psi_comps : (string * string * string) option)
     (pmrs : (string, PMRS.t, Base.String.comparator_witness) Map.t)
     : multi_soln_result Lwt.t
@@ -168,7 +169,11 @@ let find_and_solve_problem
       "target", "spec", "repr"
   in
   let top_userdef_problem =
-    ProblemFinder.find_problem_components ~ctx (target_fname, spec_fname, repr_fname) pmrs
+    ProblemFinder.find_problem_components
+      ~filename
+      ~ctx
+      (target_fname, spec_fname, repr_fname)
+      pmrs
   in
   (* Check that the user want more than one solution, and that the problem defined
         is well-formed. Otherwise, just try to solve the user-defined configuration.

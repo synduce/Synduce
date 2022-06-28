@@ -213,6 +213,7 @@ let solve_problem ~(ctx : env) (synthesis_problem : PsiDef.t)
 
 let find_and_solve_problem
     ~(ctx : env)
+    ~(filename : string)
     (psi_comps : (string * string * string) option)
     (pmrs : (string, PMRS.t, Base.String.comparator_witness) Map.t)
     : (PsiDef.t * Syguslib.Sygus.solver_response segis_response) list Lwt.t
@@ -227,6 +228,7 @@ let find_and_solve_problem
   in
   let top_userdef_problem =
     Common.ProblemFinder.find_problem_components
+      ~filename
       ~ctx
       (target_fname, spec_fname, repr_fname)
       pmrs

@@ -6,7 +6,8 @@ open Lang
   that target = orig ∘ repr
 *)
 type t =
-  { id : int (** An identifier for the problem. *)
+  { filename : string (** The original file of the problem. *)
+  ; id : int (** An identifier for the problem. *)
   ; target : PMRS.t (**
 The target recursion skeleton in the problem.
 *)

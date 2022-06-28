@@ -38,8 +38,8 @@ type mark =
   | Unsolved
 
 type edge_mark =
-  | EAddArg of int * int
-  | ERemArg of int * int
+  | EAddArg of bool * int * int
+  | ERemArg of bool * int * int
 
 (** A type to represent the state of the configuration graph exploration.
   We need to remember the graph and mark configurations as solved or not.
@@ -56,6 +56,9 @@ type state =
   ; st_root : Subconf.t (**
   The maximum configuration of the graph.
       *)
+  ; st_recs : Subconf.t
+        (** A subconfiguration mapping to the
+      recursive call arguments. *)
   ; st_super : conf
         (** A configuration with more information that must
       be larger than any configuration in the graph. *)
@@ -64,6 +67,14 @@ type state =
   ; st_cache : ECache.t
   ; st_strategy : Config.Optims.exploration_strategy
   }
+
+(** Return true if the pair of integer identifies an argument with
+     a recursive call. *)
+let is_rec_arg (s : state) ((u_id, a_id) : int * int) =
+  match Map.find s.st_recs u_id with
+  | Some l -> List.mem ~equal l a_id
+  | None -> false
+;;
 
 let out_graph (s : state) (filename : string) =
   let oc = Stdio.Out_channel.create filename in
@@ -93,9 +104,9 @@ let mark_add_arg
     (s : state)
     (conf_orig : Subconf.t)
     (conf_dest : Subconf.t)
-    ((a, b) : int * int)
+    ((kind, a, b) : bool * int * int)
   =
-  Hashtbl.set s.st_emarks ~key:(conf_orig, conf_dest) ~data:(EAddArg (a, b))
+  Hashtbl.set s.st_emarks ~key:(conf_orig, conf_dest) ~data:(EAddArg (kind, a, b))
 ;;
 
 let cache (s : state) (u : unrealizability_witness list) =
@@ -147,18 +158,25 @@ let check_unrealizable_from_cache (ctx : env) (p : PsiDef.t) (s : state) =
   `use_po` is `true` by default.
 *)
 let expand_down ?(mark = Unsolved) (s : state) (conf : Subconf.t) : unit =
-  List.iter (Subconf.drop_arg conf) ~f:(fun ((unknown, added_arg), c) ->
+  let drop_arg_choices =
+    if !Config.Optims.search_constant_variations
+    then Subconf.drop_arg conf
+    else Subconf.drop_arg ~filter:(Some s.st_recs) conf
+  in
+  List.iter drop_arg_choices ~f:(fun ((unknown, added_arg), c) ->
       match Hashtbl.find s.st_marks c with
       (* Already solved: no need to add new edge. *)
       | Some Realizable | Some Unrealizable | Some Failed -> ()
       | Some Unsolved ->
-        Hashtbl.set s.st_emarks ~key:(conf, c) ~data:(ERemArg (unknown, added_arg));
+        let b = is_rec_arg s (unknown, added_arg) in
+        Hashtbl.set s.st_emarks ~key:(conf, c) ~data:(ERemArg (b, unknown, added_arg));
         add_edge s.st_graph conf c
       | None ->
         (match mark with
         | Unsolved | Unrealizable -> Hashtbl.set s.st_marks ~key:c ~data:mark
         | _ -> ());
-        Hashtbl.set s.st_emarks ~key:(conf, c) ~data:(ERemArg (unknown, added_arg));
+        let b = is_rec_arg s (unknown, added_arg) in
+        Hashtbl.set s.st_emarks ~key:(conf, c) ~data:(ERemArg (b, unknown, added_arg));
         add_edge s.st_graph conf c)
 ;;
 
@@ -176,13 +194,15 @@ let expand_up ?(mark = Unsolved) (s : state) (conf : Subconf.t) : unit =
       (* Already solved: no need to add new edge. *)
       | Some Realizable | Some Unrealizable | Some Failed -> ()
       | Some Unsolved ->
-        Hashtbl.set s.st_emarks ~key:(conf, c) ~data:(EAddArg (unknown, added_arg));
+        let b = is_rec_arg s (unknown, added_arg) in
+        Hashtbl.set s.st_emarks ~key:(conf, c) ~data:(EAddArg (b, unknown, added_arg));
         add_edge s.st_graph conf c
       | None ->
         (match mark with
         | Unsolved | Realizable -> Hashtbl.set s.st_marks ~key:c ~data:mark
         | _ -> ());
-        Hashtbl.set s.st_emarks ~key:(conf, c) ~data:(EAddArg (unknown, added_arg));
+        let b = is_rec_arg s (unknown, added_arg) in
+        Hashtbl.set s.st_emarks ~key:(conf, c) ~data:(EAddArg (b, unknown, added_arg));
         add_edge s.st_graph conf c)
 ;;
 
@@ -266,7 +286,15 @@ let generate_configurations ?(strategy = O.ESTopDown) (ctx : env) (p : PMRS.t) :
   let root =
     match strategy with
     | ESTopDown -> Subconf.of_conf super
-    | ESBottomUp -> Subconf.zero_of_conf super
+    | ESBottomUp ->
+      if !Config.Optims.search_constant_variations
+      then (* Start from configuration with zero args. *)
+        Subconf.zero_of_conf super
+      else
+        (* Start from configuration with no recursive calls, but otherwise
+          all constant-time arguments.
+         *)
+        Subconf.largest_ctime_conf super
   in
   let size = subconf_count super in
   let st_graph = create ~size () in
@@ -282,6 +310,7 @@ let generate_configurations ?(strategy = O.ESTopDown) (ctx : env) (p : PMRS.t) :
   ; st_emarks
   ; st_root = root
   ; st_super = super
+  ; st_recs = Subconf.rec_calls_conf super
   ; st_super_subc = Subconf.of_conf super
   ; st_ctx = ctx
   ; st_cache

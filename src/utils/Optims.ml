@@ -242,6 +242,9 @@ let set_exploration_strategy (s : string) =
       "Did not recognize exploration strategy, should be top-down (td) or bottom-up (bu)"
 ;;
 
+(** Set to false if solution with only variying constants are not wanted. *)
+let search_constant_variations = ref true
+
 (* ============================================================================================= *)
 (*                        OTHER                                                                  *)
 (* ============================================================================================= *)

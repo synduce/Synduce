@@ -30,13 +30,19 @@ module Subconf : sig
   (** Create the minimum sub-configuration: a map where all argument lists are empty. *)
   val zero_of_conf : conf -> t
 
+  (** Create the largest subconfiguration that has no recursive call in it.  *)
+  val largest_ctime_conf : conf -> t
+
+  (** Create the subconfiguration mapping to the ids of function calls.  *)
+  val rec_calls_conf : conf -> t
+
   (** Create a configuration from a sup-configuration and a subconfiguration by
       filtering the unused arguments in the sup-configuration. *)
   val to_conf : sup:conf -> t -> conf
 
   (** `drop_arg x` creates the list of all the sub-configurations than can be obtained
         by dropping an argument for one of the unknowns. *)
-  val drop_arg : t -> ((int * int) * t) list
+  val drop_arg : ?filter:t option -> t -> ((int * int) * t) list
 
   (** `add_arg x` creates the list of all the sub-configurations than can be obtained
         by adding an argument for one of the unknowns. This requires having acess to the
@@ -56,6 +62,9 @@ end
 val of_varset : Variables.VarSet.t -> 'a list Term.VarMap.t
 val check_pmrs : Lang.PMRS.t -> bool
 
+(** Generate the base type arguments given a set of variables and
+  a PMRS that defines a set of recursive functions (nonterminals).
+*)
 val base_type_args
   :  Env.env
   -> PMRS.t
@@ -87,4 +96,7 @@ val apply_configuration : ctx:Env.env -> conf -> PMRS.t -> PMRS.t * Env.env
 (** Count the number of recursive calls in a configuration.  *)
 val num_rec_calls : ctx:Env.env -> conf -> int
 
+(** [get_rstar e p k] returns a pair [t,u] where [t] is the set of maximally reducible
+    terms after [k] rounds of R*.
+*)
 val get_rstar : Env.env -> Psi.t -> int -> TermSet.t * TermSet.t
