@@ -76,6 +76,40 @@ module Subconf = struct
       ~f:(fun ~key ~data:_ m -> Map.set m ~key:key.vid ~data:[])
   ;;
 
+  (** Create the largest subconfiguration that has no recursive call in it.  *)
+  let largest_ctime_conf (conf : conf) : t =
+    Map.fold
+      conf
+      ~init:(Map.empty (module Int))
+      ~f:(fun ~key ~data m ->
+        let const_args =
+          let f i t =
+            match t.tkind with
+            | TVar _ -> Some i
+            | _ -> None
+          in
+          List.filter_mapi ~f data
+        in
+        Map.set m ~key:key.vid ~data:const_args)
+  ;;
+
+  (** Create the subconfiguration mapping to the ids of function calls.  *)
+  let rec_calls_conf (conf : conf) : t =
+    Map.fold
+      conf
+      ~init:(Map.empty (module Int))
+      ~f:(fun ~key ~data m ->
+        let const_args =
+          let f i t =
+            match t.tkind with
+            | TVar _ -> None
+            | _ -> Some i
+          in
+          List.filter_mapi ~f data
+        in
+        Map.set m ~key:key.vid ~data:const_args)
+  ;;
+
   (** Return the subconf as a configuration, given the configuration it refines. *)
   let to_conf ~(sup : conf) (sub : t) : conf =
     Map.mapi sup ~f:(fun ~key:v ~data:args ->
@@ -86,18 +120,27 @@ module Subconf = struct
 
   (**
   Create as many subconfigurations as possible from dropping an argument for an unknown.
+  Optional filter is a map from unknown id to a list of ids that are to be dropped.
  *)
-  let drop_arg (conf : t) : ((int * int) * t) list =
+  let drop_arg ?(filter = None) (conf : t) : ((int * int) * t) list =
     let drop_one (unknown, args) =
+      let in_filter i =
+        match Option.bind ~f:(fun flt -> Map.find flt unknown) filter with
+        | Some l -> List.mem l ~equal:Int.equal i
+        | None -> true
+      in
       match args with
       | [] -> []
       | [ x ] -> [ (unknown, x), Map.set ~key:unknown ~data:[] conf ]
       | _ ->
         (* Configurations with all possible ways to drop one argument *)
-        List.mapi args ~f:(fun i _ ->
-            (* new args is current args without ith element *)
-            let data = List.filteri ~f:(fun j _ -> not (j = i)) args in
-            (unknown, i), Map.set ~key:unknown ~data conf)
+        List.filter_mapi args ~f:(fun i k ->
+            if in_filter k
+            then (
+              (* new args is current args without ith element *)
+              let data = List.filteri ~f:(fun j _ -> not (j = i)) args in
+              Some ((unknown, i), Map.set ~key:unknown ~data conf))
+            else None)
     in
     List.concat_map (Map.to_alist conf) ~f:drop_one
   ;;
@@ -246,7 +289,7 @@ let configuration_of (p : PMRS.t) : conf =
       join accum (from_rhs rhs))
 ;;
 
-(** `same_conf p1 p2` is true if `p1` and `p2` are in the same configuration. *)
+(** [same_conf p1 p2] is true if [p1] and [p2] are in the same configuration. *)
 let same_conf (p1 : PMRS.t) (p2 : PMRS.t) : bool =
   let c1 = configuration_of p1
   and c2 = configuration_of p2 in
@@ -270,15 +313,13 @@ let apply_configuration ~(ctx : env) (config : conf) (p : PMRS.t) : PMRS.t * env
     in
     transform ~case
   in
-  ( PMRS.(
-      ctx
-      >- infer_pmrs_types
-           { p with
-             prules =
-               Map.map p.prules ~f:(fun (nt, args, pat, rhs) ->
-                   nt, args, pat, repl_in_rhs rhs)
-           })
-  , ctx )
+  let new_p =
+    { p with
+      prules =
+        Map.map p.prules ~f:(fun (nt, args, pat, rhs) -> nt, args, pat, repl_in_rhs rhs)
+    }
+  in
+  PMRS.(ctx >- infer_pmrs_types new_p), ctx
 ;;
 
 let num_rec_calls ~(ctx : env) (c : conf) : int =

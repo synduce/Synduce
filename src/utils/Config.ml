@@ -61,6 +61,12 @@ let get_output_file s =
       Caml.Filename.concat o_f base)
 ;;
 
+(** Optional output file for logging.
+*)
+let output_log : string option ref = ref None
+
+let set_output_log s = output_log := Some s
+
 (** Turn of all output except json. *)
 let set_json_out () =
   verbose := false;
@@ -301,6 +307,7 @@ let options print_usage parse_only =
   ; 'n', "verification", None, Some set_num_expansions_check
   ; 'N', "no-sat-as-unsat", set no_bounded_sat_as_unsat true, None
   ; 'o', "output", None, Some set_output_folder
+  ; 'O', "log-output", None, Some set_output_log
   ; 'p', "num-threads", None, Some set_num_threads
   ; 'P', "reuse-predicates-off", set reuse_predicates false, None
   ; 's', "multi-max-solutions", None, Some set_max_solutions
@@ -329,6 +336,7 @@ let options print_usage parse_only =
   ; '\000', "multi-rstar-limit", None, Some set_rstar_limit
   ; '\000', "multi-no-rstar", set use_rstar_caching false, None
   ; '\000', "multi-strategy", None, Some set_exploration_strategy
+  ; '\000', "multi-reconly", set search_constant_variations false, None
   ; '\000', "no-assumptions", set make_partial_correctness_assumption false, None
   ; '\000', "no-detupling", set detupling_on false, None
   ; '\000', "no-gropt", set optimize_grammars 0, None

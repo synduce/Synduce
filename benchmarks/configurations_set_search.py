@@ -41,14 +41,14 @@ incomplete_benchmarks_set0 = [
     ["incomplete/empty_right_subtree/sum.ml", "", True, 1],  # OK
 
     # EVEN LISTS
-    ["incomplete/evenlist/first_odd.ml", ""],  # OK
-    ["incomplete/evenlist/parity_of_first.ml", ""],  # OK - 4 failed
-    ["incomplete/evenlist/parity_of_last.ml", ""],  # OK
-    ["incomplete/evenlist/parity_of_sum.ml", ""],  # Error ?
+    ["incomplete/evenlist/first_odd.ml", "", True, 1],  # OK
+    ["incomplete/evenlist/parity_of_first.ml", "", True, 1],  # OK - 4 failed
+    ["incomplete/evenlist/parity_of_last.ml", "", True, 1],  # OK
+    ["incomplete/evenlist/parity_of_sum.ml", "", True, 1],  # Error ?
 
     # EVEN TREE
-    ["incomplete/eventree/sum_of_parities.ml", ""],  # 2 Failures
-    ["incomplete/eventree/parity_of_max.ml", ""],  # Error
+    ["incomplete/eventree/sum_of_parities.ml", "", True, 1],  # 2 Failures
+    ["incomplete/eventree/parity_of_max.ml", "", True, 1],  # Error
 
     # EXPRESSIONS
     ["incomplete/expressions/norm_arith.ml", "", True, 1],  # OK
@@ -198,8 +198,22 @@ incomplete_benchmarks_set0 = [
 
 
 incomplete_benchmarks_set1 = [
-    ["constraints/bst/check_included_comb.ml", "", True, 1],
-
+    ["incomplete/combine/mts_and_mps.ml", "", True, 1],  # OK
+    # ["incomplete/combine/mss_with_sum.ml", "", True, 1],  # OK
+    # ["incomplete/misc/composed_unkwns.ml", "", True, 1],  # OK
+    # ["incomplete/misc/unknowns_are_ids.ml", "", True, 1],  # OK
+    # ["incomplete/misc/simple_nnf.ml", "", True, 1],  # OK
+    # ["incomplete/misc/unknowns_are_ids.ml", "", True, 1],  # OK
+    # ["incomplete/misc/count_between.ml", "", True, 1],  # OK
+    # ["incomplete/memo/minmax.ml", "", True, 1],  # OK
+    # ["incomplete/memo/mts_memo_sum.ml", "", True, 1],  # OK
+    ["incomplete/evenlist/first_odd.ml", ""],  # OK
+    ["incomplete/evenlist/parity_of_first.ml", "", True, 1],  # OK - 4 failed
+    #   ["incomplete/tree/mips.ml", "", True, 1],  # OK
+    ["incomplete/symmetric_tree/height.ml", "", True, 1],  # OK
+    ["incomplete/symmetric_tree/min.ml", "", True, 1],  # OK
+    ["incomplete/symmetric_tree/sum.ml", "", True, 1],  # OK
+    ["incomplete/bst/sum_gt_by_key.ml", "", True, 1],  # OK
 ]
 
-incomplete_benchmarks = incomplete_benchmarks_set0 + incomplete_benchmarks_set1
+incomplete_benchmarks = incomplete_benchmarks_set1

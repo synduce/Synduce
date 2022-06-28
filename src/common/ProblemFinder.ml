@@ -30,6 +30,7 @@ let sync_args ~(ctx : Context.t) p : PsiDef.t =
 
 let find_problem_components
     ~(ctx : env)
+    ~(filename : string)
     ((target_fname, spec_fname, repr_fname) : string * string * string)
     (pmrs_map : (string, PMRS.t, String.comparator_witness) Map.t)
     : PsiDef.t
@@ -133,7 +134,8 @@ let find_problem_components
     ctx
     >- sync_args
          PsiDef.
-           { id = ProblemDefs.PsiDef.new_psi_id ()
+           { filename
+           ; id = ProblemDefs.PsiDef.new_psi_id ()
            ; target = target_f
            ; reference = reference_f
            ; repr = repr_pmrs

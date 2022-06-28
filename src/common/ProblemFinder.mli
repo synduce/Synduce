@@ -3,6 +3,7 @@ open Lang
 
 val find_problem_components
   :  ctx:Env.env
+  -> filename:string
   -> string * string * string
   -> (string, PMRS.t, String.comparator_witness) Map.t
   -> ProblemDefs.PsiDef.t

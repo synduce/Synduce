@@ -82,6 +82,30 @@ let single_configuration_json
     @ soln_or_refutation)
 ;;
 
+let single_configuration_csv_string
+    (soln : Syguslib.Sygus.solver_response segis_response)
+    ~(elapsed : float)
+    ~(verif : float)
+    : string
+  =
+  let algo =
+    if !Config.Optims.use_segis
+    then "SEGIS"
+    else if !Config.Optims.use_cegis
+    then "CEGIS"
+    else if !Config.Optims.use_se2gis
+    then "SE2GIS"
+    else "PORTFOLIO"
+  in
+  let kind =
+    match soln with
+    | Realizable _ -> 0
+    | Unrealizable _ -> 1
+    | _ -> 2
+  in
+  Fmt.str "algo:%s,elapsed:%f,verif:%f,kind:%i" algo elapsed verif kind
+;;
+
 let show_stat_intermediate_solution
     ~(ctx : env)
     (pb : PsiDef.t)
@@ -104,22 +128,38 @@ let show_stat_intermediate_solution
       Log.info
         Fmt.(fun fmt () -> pf fmt "Failure: %s - %a" s SygusInterface.pp_response r)
   in
-  (* Json output *)
+  let json =
+    `Assoc
+      [ ( "intermediate-result"
+        , single_configuration_json ~is_ocaml_syntax:true ~ctx pb soln elapsed verif )
+      ; "id", `Int pb.id
+      ; "total-configurations", `Int total_configurations
+      ; "unr-cache-hits", `Int !Stats.num_unr_cache_hits
+      ; "orig-conf-hit", `Bool !Stats.orig_solution_hit
+      ; "foreign-lemma-uses", `Int !Stats.num_foreign_lemma_uses
+      ]
+  in
+  (* Json output to stdout?  *)
   if !Config.json_progressive && !Config.json_out
-  then (
-    let json =
-      `Assoc
-        [ ( "intermediate-result"
-          , single_configuration_json ~is_ocaml_syntax:true ~ctx pb soln elapsed verif )
-        ; "id", `Int pb.id
-        ; "total-configurations", `Int total_configurations
-        ; "unr-cache-hits", `Int !Stats.num_unr_cache_hits
-        ; "orig-conf-hit", `Bool !Stats.orig_solution_hit
-        ; "foreign-lemma-uses", `Int !Stats.num_foreign_lemma_uses
-        ]
-    in
-    pf stdout "%s@." (Yojson.to_string ~std:false json))
-  else ()
+  then pf stdout "%s@." (Yojson.to_string ~std:false json);
+  (* Log to file? *)
+  let info_line =
+    Fmt.str
+      "id:%i,rstar-hits:%i,lemma-reuse:%i,%s"
+      pb.id
+      !Stats.num_unr_cache_hits
+      !Stats.num_foreign_lemma_uses
+      (single_configuration_csv_string soln ~elapsed ~verif)
+  in
+  match !Config.output_log with
+  | Some filename ->
+    (try
+       let chan = Stdio.Out_channel.create ~append:true filename in
+       Stdio.Out_channel.output_lines chan [ info_line ];
+       Stdio.Out_channel.close_no_err chan
+     with
+    | _ -> ())
+  | None -> ()
 ;;
 
 let show_steps algo env tsize usize =
@@ -524,7 +564,19 @@ let log_confsearch_problem ~(ctx : env) ~(p : PsiDef.t) (n : int) =
   in
   match !Config.output_folder with
   | Some folder_name -> f folder_name
-  | None -> ()
+  | None ->
+    ();
+    (* Log into output log? *)
+    let l = Fmt.str "problem-file:%s,total-configurations:%i" p.filename n in
+    (match !Config.output_log with
+    | Some filename ->
+      (try
+         let chan = Stdio.Out_channel.create ~append:true filename in
+         Stdio.Out_channel.output_lines chan [ l ];
+         Stdio.Out_channel.close_no_err chan
+       with
+      | _ -> ())
+    | None -> ())
 ;;
 
 let log_solution

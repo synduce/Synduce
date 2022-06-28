@@ -182,6 +182,8 @@ let print_usage () =
     \       --multi-rstar-limit=NUM     Set the limit of rstar rounds to use in cache.\n\
     \       --multi-no-rstar            Do not use rstar to check for unrelizability \
      cache.\n\
+    \       --multi-reconly            Only search solution that vary in number of \n\
+    \                                   recursive calls, use all constant args always.\n\
     \       --multi-strategy=(td|bu)    Set top-down (td) or bottom-up (bu) strategy.\n\n\
     \      Bounded checking:\n\
     \       --use-bmc                   Use segis bounded model checking (bmc mode).\n\
@@ -210,7 +212,6 @@ let print_usage () =
     \       --interactive-check-lemma   Manually set if a lemma is true and, if not, \
      give counterexample.\n\
     \       --parse-only                Just parse the input.\n\
-    \       --rstar-limit               Set the rstar limit.\n\
     \       --show-vars                 Print variables and their types at the end.\n\
     \       --generate-benchmarks=DIR   Save SyGuS problems in DIR, including problems \
      that are provably unrealizable.\n\

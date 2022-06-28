@@ -9,6 +9,7 @@ open Common.Env
 let parse_only = ref false
 
 let main () =
+  let start_time = Unix.gettimeofday () in
   let filename = ref None in
   let options = Config.options ToolMessages.print_usage parse_only in
   Getopt.parse_cmdline options (fun s -> filename := Some s);
@@ -55,7 +56,8 @@ let main () =
   if !parse_only then Caml.exit 1;
   (* Solve the problem proper. *)
   let multi_soln_result =
-    Lwt_main.run (ctx >>> Many.find_and_solve_problem psi_comps all_pmrs)
+    Lwt_main.run
+      (ctx >>> Many.find_and_solve_problem ~filename:!filename psi_comps all_pmrs)
   in
   let n_out = List.length multi_soln_result.r_all in
   let print_unrealizable = !Config.print_unrealizable_configs || n_out < 2 in
@@ -81,7 +83,7 @@ let main () =
         Log.error_msg "Failed to find a solution or a witness of unrealizability";
         pb.PsiDef.id, ctx >>> ToolMessages.on_failure pb)
   in
-  let json_out =
+  let json_out, u_count, f_count =
     let u_count = ref 0
     and f_count = ref 0 in
     let json =
@@ -132,8 +134,29 @@ let main () =
               !Stats.num_unr_cache_hits
               !Stats.orig_solution_hit
               !Stats.num_foreign_lemma_uses));
-    json
+    json, !u_count, !f_count
   in
+  (* Write to log if defined. *)
+  (match !Config.output_log with
+  | Some filename ->
+    let info_line =
+      Fmt.str
+        "finished:%f,solutions:%i,unrealizable:%i,failure:%i,rstar-hits:%i,lemma-reuse:%i"
+        (Unix.gettimeofday () -. start_time)
+        (n_out - u_count)
+        u_count
+        f_count
+        !Stats.num_unr_cache_hits
+        !Stats.num_foreign_lemma_uses
+    in
+    (try
+       let chan = Stdio.Out_channel.create ~append:true filename in
+       Stdio.Out_channel.output_lines chan [ info_line ];
+       Stdio.Out_channel.close_no_err chan
+     with
+    | _ -> ())
+  | None -> ());
+  (* Write json messages to stdout if set. *)
   (if !Config.json_out
   then
     if !Config.compact
