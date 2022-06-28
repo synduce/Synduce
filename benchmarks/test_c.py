@@ -58,9 +58,9 @@ class ResultObject(object):
                 na, self.finished, nb, other.finished)
             self.runs += other.runs
 
-    def pretty_str(self):
-        s = f"{self.name : <25s} Completed:{self.finished} "
-        s += f"Time: {self.elapsed :4.3f}"
+    def pretty_str(self, optim):
+        s = f"{self.name : <25s} {optim: <10s} Comp:{self.finished} "
+        s += f"T: {self.elapsed :4.3f}"
         s += f" ({int(self.num_attempts)} / {int(self.total_confs)}) "
         s += f" [S:{int(self.num_solutions)}+U:{int(self.num_unrealizable)}+F:{int(self.num_failures)}]"
         s += f" R*:{self.rstar_hits}, P*:{self.lemma_reuse}"
@@ -122,19 +122,22 @@ def run_once(name, command):
         time.sleep(0.1)
 
     res = ResultObject(name)
-    with open(tmp_outfile, 'r') as input_file:
 
-        for line in input_file.readlines():
-            cells = line.split(",")
-            # This should be the first line
-            if cells[0].startswith("problem-file:"):
-                res.set_init(cells)
-            # This shoud be an intermediate result line
-            elif cells[0].startswith("id:"):
-                res.set_partial_result(cells)
-            # This is the final line
-            elif cells[0].startswith("finished:"):
-                res.set_final_result(cells)
+    try:
+        with open(tmp_outfile, 'r') as input_file:
+            for line in input_file.readlines():
+                cells = line.split(",")
+                # This should be the first line
+                if cells[0].startswith("problem-file:"):
+                    res.set_init(cells)
+                # This shoud be an intermediate result line
+                elif cells[0].startswith("id:"):
+                    res.set_partial_result(cells)
+                # This is the final line
+                elif cells[0].startswith("finished:"):
+                    res.set_final_result(cells)
+    except:
+        pass
 
     return res
 
@@ -144,7 +147,6 @@ def run_n_times(n, name, command):
     res.runs = 0
     for _ in range(n):
         res.merge(run_once(name, command))
-    print(res.pretty_str())
     return res
 
 
@@ -177,6 +179,8 @@ def run_benchmarks(input_files, optims, num_runs=1, csv_output=None, exit_err=Fa
             # Run the benchmark n times.
             benchname = filename.split("/")[-1]
             res = run_n_times(num_runs, benchname, command)
+
+            print(res.pretty_str(optim[0]))
 
             if csv_output:
                 csv_output.write(res.csvline(benchfile, optim[0]) + "\n")
