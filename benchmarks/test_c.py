@@ -32,6 +32,7 @@ class ResultObject(object):
         self.num_failures = 0
         self.elapsed = 0.0
         self.finished = 0
+        self.optims = "all"
 
     def merge(self, other):
         na = self.runs
@@ -59,6 +60,7 @@ class ResultObject(object):
             self.runs += other.runs
 
     def pretty_str(self, optim):
+        self.optims = optim
         s = f"{self.name : <25s} {optim: <30s} Comp:{self.finished} "
         s += f"T: {self.elapsed :4.3f}"
         s += f" ({int(self.num_attempts)} / {int(self.total_confs)}) "
@@ -73,6 +75,34 @@ class ResultObject(object):
         s += f"{int(self.num_solutions)},{int(self.num_unrealizable)},{int(self.num_failures)},"
         s += f"{self.rstar_hits},{self.lemma_reuse}"
         return s
+
+    def hit_ratio(self,):
+        if self.num_attempts > 0:
+            return (self.rstar_hits / (self.num_attempts + self.rstar_hits))
+        else:
+            return 0
+
+    def parse(csvline):
+        cells = csvline.split(",")
+        if len(cells) < 11:
+            return None
+        else:
+            try:
+                res = ResultObject(str(cells[0]))
+                res.optims = str(cells[1])
+                res.finished = float(cells[2])
+                res.elapsed = float(cells[3])
+                res.num_attempts = int(cells[4])
+                res.total_confs = int(cells[5])
+                res.num_solutions = int(cells[6])
+                res.num_unrealizable = int(cells[7])
+                res.num_failures = int(cells[8])
+                res.rstar_hits = float(cells[9])
+                res.lemma_reuse = float(cells[10])
+                return res
+            except Exception as e:
+                print(e)
+                return None
 
     def set_init(self, cells):
         self.runs = 1

@@ -124,6 +124,7 @@ let find_multiple_solutions
         expand_func ~mark:G.Unrealizable rstate sub_conf;
         (* Update stats: number of cache hits. *)
         Int.incr Stats.num_unr_cache_hits;
+        AlgoLog.log_solution ~ctx ~p:new_pdef (Unrealizable []);
         find_sols (a @ [ new_ctx, new_pdef, Unrealizable [] ]))
       else (
         (* Call the single configuration solver. *)
