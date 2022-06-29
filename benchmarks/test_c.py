@@ -240,7 +240,7 @@ if __name__ == "__main__":
         "-o", "--output", help="Dump Synduce output in -i mode to file (appending to file).", type=str, default=-1)
     aparser.add_argument(
         "-b", "--benchmarks", help="Run a set of benchmarks.", type=str,
-        choices=["all", "options0", "options1"], nargs="+", default=None)
+        choices=["all", "options0", "options1", "options2"], nargs="+", default=None)
     aparser.add_argument(
         "-c", "--compare", help="Compare with segis or cegis", type=str,
         choices=["segis", "cegis", "segis0"], default=None, nargs="+")
@@ -312,6 +312,10 @@ if __name__ == "__main__":
     elif "options1" in args.benchmarks:
         tmp_outfile = "benchmarks/tmp1.txt"
         run_benchmarks(incomplete_benchmarks_set0, optims_set_1, csv_output=csv_output,
+                       num_runs=args.num_runs)
+    elif "options2" in args.benchmarks:
+        tmp_outfile = "benchmarks/tmp2.txt"
+        run_benchmarks(incomplete_benchmarks_set0, optims_set_2, csv_output=csv_output,
                        num_runs=args.num_runs)
     else:
         tmp_outfile = "benchmarks/tmpsmall.txt"
