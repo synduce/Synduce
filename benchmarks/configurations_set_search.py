@@ -1,4 +1,4 @@
-
+# REQ; share ref function invariant
 incomplete_benchmarks_set0 = [
     # BALANCED TREE
     ["incomplete/balanced/height.ml", "", True, 1],  # OK
@@ -159,9 +159,9 @@ incomplete_benchmarks_set0 = [
     ["incomplete/symmetric_tree/sum.ml", "", True, 1],  # OK
 
     # TAIL OPTIMIZATION
-    # ["incomplete/tailopt/mts.ml", "", True, 1],  # Blocks
-    # ["incomplete/tailopt/mps.ml", "", True, 1],  # Blocks
-    # ["incomplete/tailopt/sum.ml", "", True, 1],  # Blocks
+    ["incomplete/tailopt/mts.ml", "", True, 1],  # OK
+    ["incomplete/tailopt/mps.ml", "", True, 1],  # OK
+    ["incomplete/tailopt/sum.ml", "", True, 1],  # OK
 
     # TREES
     ["incomplete/tree/maxPathWeight.pmrs", "", True, 1],  # OK

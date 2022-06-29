@@ -209,7 +209,7 @@ let check_pmrs (p : PMRS.t) =
 (** Generate the base type arguments given a set of variables and
   a PMRS that defines a set of recursive functions (nonterminals).
 *)
-let base_type_args (ctx : env) (p : PMRS.t) (vs : VarSet.t) =
+let base_type_args (ctx : env) ~(rule : PMRS.rewrite_rule) (p : PMRS.t) (vs : VarSet.t) =
   let base_type_vars =
     let on_var v =
       if RType.is_datatype ctx.ctx.types ((ctx @>- Variable.vtype_or_new) v)
@@ -217,6 +217,13 @@ let base_type_args (ctx : env) (p : PMRS.t) (vs : VarSet.t) =
       else [ (ctx @>- mk_var) v ]
     in
     List.concat_map (Set.elements vs) ~f:on_var
+  in
+  let is_allowed_app x =
+    let nont, lhs_args, p, _ = rule in
+    match p with
+    | None ->
+      not (Terms.equal (mk_app_v ctx.ctx nont (List.map ~f:(mk_var ctx.ctx) lhs_args)) x)
+    | Some _ -> true
   in
   let rec_function_applications =
     let on_nonterminal f_var =
@@ -231,7 +238,8 @@ let base_type_args (ctx : env) (p : PMRS.t) (vs : VarSet.t) =
     in
     List.concat_map (VarSet.elements p.pnon_terminals) ~f:on_nonterminal
   in
-  TermSet.of_list (base_type_vars @ rec_function_applications)
+  let allowed_rec_func_apps = List.filter ~f:is_allowed_app rec_function_applications in
+  TermSet.of_list (base_type_vars @ allowed_rec_func_apps)
 ;;
 
 (** Build the argument map of the PMRS.
@@ -240,7 +248,8 @@ let base_type_args (ctx : env) (p : PMRS.t) (vs : VarSet.t) =
 *)
 let max_configuration (ctx : env) (p : PMRS.t) : conf =
   let empty_conf = of_varset p.psyntobjs in
-  let set_args_in_rule ~key:_ruleid ~data:(_, lhs_args, lhs_pat, rhs) vmap =
+  let set_args_in_rule ~key:_ruleid ~data:(f, lhs_args, lhs_pat, rhs) vmap =
+    (* Compute the set of local variables in the rule. *)
     let lhs_argset =
       Set.union
         (VarSet.of_list lhs_args)
@@ -250,7 +259,13 @@ let max_configuration (ctx : env) (p : PMRS.t) : conf =
     (* TODO: collect let-bound variables? Technically cannot provide more info,
       but has subexpression elim. simplification advantage.
     *)
-    let args = base_type_args ctx p (Set.union lhs_argset (VarSet.of_list p.pargs)) in
+    let args =
+      base_type_args
+        ctx
+        p
+        ~rule:(f, lhs_args, lhs_pat, rhs)
+        (Set.union lhs_argset (VarSet.of_list p.pargs))
+    in
     Set.fold
       (* The local unknowns *)
       (Set.inter (ctx >- Analysis.free_variables rhs) p.psyntobjs)

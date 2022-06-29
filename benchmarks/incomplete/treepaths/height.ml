@@ -1,16 +1,16 @@
 (** @synduce -s 2 -NB *)
 
-type 'a btree =
+type btree =
   | Empty
-  | Node of 'a * 'a btree * 'a btree
+  | Node of int * btree * btree
 
 type sel =
   | Left
   | Right
 
-type 'c zipper =
+type zipper =
   | Top
-  | Zip of sel * 'c * 'c btree * 'c zipper
+  | Zip of sel * int * btree * zipper
 
 let rec height = function
   | Empty -> 0
@@ -22,8 +22,13 @@ let rec target = function
   | Zip (x, a, child, z) -> sel_deconstr a child z x
 
 and sel_deconstr a child z = function
-  | Left -> [%synt joinl] a (height child) (target z)
-  | Right -> [%synt joinr] a (height child) (target z)
+  | Left -> [%synt joinl]
+  | Right -> [%synt joinr]
+
+(* Copy of height here so it can be used in synthesis. *)
+and h = function
+  | Empty -> 0
+  | Node (a, l, r) -> 1 + max (h l) (h r)
 ;;
 
 let rec repr = function

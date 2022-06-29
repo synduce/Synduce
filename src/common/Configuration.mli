@@ -67,6 +67,7 @@ val check_pmrs : Lang.PMRS.t -> bool
 *)
 val base_type_args
   :  Env.env
+  -> rule:PMRS.rewrite_rule
   -> PMRS.t
   -> Variables.VarSet.t
   -> (term, Term.Terms.comparator_witness) Base.Set.t
