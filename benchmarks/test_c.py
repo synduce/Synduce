@@ -285,14 +285,21 @@ if __name__ == "__main__":
         ["no-rstar", f"--multi-no-rstar --solve-timeout={solve_timeout}"],
         ["no-predicate-reuse",
             f"--reuse-predicates-off --solve-timeout={solve_timeout}"],
-        ["no-predicate-reuse-no-rstar",
-            f"--reuse-predicates-off --multi-no-rstar --solve-timeout={solve_timeout}"],
     ]
     optims_set_1 = [
         ["bottom-up", f"--multi-strategy=bu --solve-timeout={solve_timeout}"],
         ["dfs", f"--multi-use-dfs --solve-timeout={solve_timeout}"],
         ["bottom-up-dfs",
             f"--multi-strategy=bu --multi-use-dfs --solve-timeout={solve_timeout}"],
+    ]
+
+    optims_set_2 = [
+        ["bu-no-rstar",
+            f"--multi-strategy=bu --multi-no-rstar --solve-timeout={solve_timeout}"],
+        ["bu-no-predicate-reuse",
+            f"--multi-strategy=bu --reuse-predicates-off --solve-timeout={solve_timeout}"],
+        ["bu-no-predicate-reuse-no-rstar",
+            f"--multi-strategy=bu --reuse-predicates-off --multi-no-rstar --solve-timeout={solve_timeout}"],
     ]
 
     if "all" in args.benchmarks:
