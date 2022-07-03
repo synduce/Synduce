@@ -38,7 +38,7 @@ let portfolio_solver ~(ctx : env) (p : PsiDef.t) =
 ;;
 
 let single_configuration_solver ~(ctx : env) (p : PsiDef.t)
-    : (env * Syguslib.Sygus.solver_response segis_response) Lwt.t
+    : (env * float * float * Syguslib.Sygus.solver_response segis_response) Lwt.t
   =
   let%lwt ctx, resp =
     if !CO.use_segis (* Symbolic CEGIS. *)
@@ -51,22 +51,23 @@ let single_configuration_solver ~(ctx : env) (p : PsiDef.t)
       (* Default algorithm: best combination of techniques (TODO) *)
     else portfolio_solver ~ctx p
   in
-  (* Print intermediate result if we are looking for more than one solution *)
-  if !CO.max_solutions > 0
-  then (
-    let elapsed = Stats.get_glob_elapsed ()
-    and verif = !Stats.verif_time in
-    AlgoLog.log_solution ~ctx ~p resp;
-    AlgoLog.show_stat_intermediate_solution
-      ~ctx
-      p
-      resp
-      elapsed
-      verif
-      !total_configurations);
+  let elapsed = Stats.get_glob_elapsed ()
+  and verif = !Stats.verif_time in
   (* Save stats an restart counters. *)
   LogJson.save_stats_and_restart p.id;
-  Lwt.return (ctx, resp)
+  Lwt.return (ctx, elapsed, verif, resp)
+;;
+
+let log_step ctx p resp (elapsed, verif) s =
+  AlgoLog.log_solution ~ctx ~p resp;
+  AlgoLog.show_stat_intermediate_solution
+    ~ctx
+    p
+    resp
+    elapsed
+    verif
+    !total_configurations
+    (G.get_coverage_percentage s)
 ;;
 
 let find_multiple_solutions
@@ -138,7 +139,7 @@ let find_multiple_solutions
       else (
         (* Call the single configuration solver. *)
         match%lwt single_configuration_solver ~ctx:new_ctx new_pdef with
-        | new_ctx', Realizable s ->
+        | new_ctx', elapsed, verif, Realizable s ->
           G.mark_realizable rstate sub_conf;
           expand_func ~mark:G.Realizable rstate sub_conf;
           (* Update the coverage *)
@@ -149,8 +150,9 @@ let find_multiple_solutions
           then (
             best_score := score;
             best_solution := Some (new_ctx, new_pdef, Realizable s));
+          log_step new_ctx' new_pdef (Realizable s) (elapsed, verif) rstate;
           find_sols ((new_ctx', new_pdef, Realizable s) :: a)
-        | new_ctx', Unrealizable u ->
+        | new_ctx', elapsed, verif, Unrealizable u ->
           G.mark_unrealizable rstate sub_conf;
           expand_func ~mark:G.Unrealizable rstate sub_conf;
           (* Cache the unrealizable configuration for R*. *)
@@ -158,12 +160,14 @@ let find_multiple_solutions
           (* Update the coverage. *)
           update_coverage_func rstate sub_conf G.Unrealizable;
           (* Continue *)
+          log_step new_ctx' new_pdef (Unrealizable u) (elapsed, verif) rstate;
           find_sols ((new_ctx', new_pdef, Unrealizable u) :: a)
-        | new_ctx', Failed (s, f) ->
+        | new_ctx', elapsed, verif, Failed (s, f) ->
           G.mark_failed rstate sub_conf;
           expand_func rstate sub_conf;
           (* Update the coverage. *)
           update_coverage_func rstate sub_conf G.Failed;
+          log_step new_ctx' new_pdef (Failed (s, f)) (elapsed, verif) rstate;
           find_sols ((new_ctx', new_pdef, Failed (s, f)) :: a))
     | None -> Lwt.return a
   in
@@ -224,15 +228,17 @@ let find_and_solve_problem
     Lwt.return { multi_sols with r_subconf_count = subconf_count })
   else (
     (* Only solve the top-level skeleton, i.e. the problem specified by the user. *)
-    let%lwt ctx', top_soln = single_configuration_solver ~ctx top_userdef_problem in
+    let placeholder_state =
+      G.generate_configurations
+        ~strategy:!CO.exploration_strategy
+        ctx
+        top_userdef_problem.target
+    in
+    let%lwt ctx', _, _, top_soln = single_configuration_solver ~ctx top_userdef_problem in
     Lwt.return
       { r_best = Some (ctx', top_userdef_problem, top_soln)
       ; r_all = [ ctx', top_userdef_problem, top_soln ]
       ; r_subconf_count = 1
-      ; r_final_state =
-          G.generate_configurations
-            ~strategy:!CO.exploration_strategy
-            ctx
-            top_userdef_problem.target
+      ; r_final_state = placeholder_state
       })
 ;;

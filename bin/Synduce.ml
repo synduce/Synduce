@@ -83,6 +83,9 @@ let main () =
         Log.error_msg "Failed to find a solution or a witness of unrealizability";
         pb.PsiDef.id, ctx >>> ToolMessages.on_failure pb)
   in
+  let cov_ratio =
+    Confsearch.ConfGraph.get_coverage_percentage multi_soln_result.r_final_state
+  in
   let json_out, u_count, f_count =
     let u_count = ref 0
     and f_count = ref 0 in
@@ -110,6 +113,7 @@ let main () =
            ; "unr-cache-hits", `Int !Stats.num_unr_cache_hits
            ; "orig-conf-hit", `Bool !Stats.orig_solution_hit
            ; "foreign-lemma-uses", `Int !Stats.num_foreign_lemma_uses
+           ; "coverage", `Float cov_ratio
            ]
           @ results)
     in
@@ -121,13 +125,14 @@ let main () =
   | Some filename ->
     let info_line =
       Fmt.str
-        "finished:%f,solutions:%i,unrealizable:%i,failure:%i,rstar-hits:%i,lemma-reuse:%i"
+        "finished:%f,solutions:%i,unrealizable:%i,failure:%i,rstar-hits:%i,lemma-reuse:%i,covratio:%3.2f"
         (Unix.gettimeofday () -. start_time)
         (n_out - u_count)
         u_count
         f_count
         !Stats.num_unr_cache_hits
         !Stats.num_foreign_lemma_uses
+        cov_ratio
     in
     (try
        let chan = Stdio.Out_channel.create ~append:true filename in

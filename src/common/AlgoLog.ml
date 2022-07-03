@@ -113,6 +113,7 @@ let show_stat_intermediate_solution
     (elapsed : float)
     (verif : float)
     (total_configurations : int)
+    (coverage_ratio : float)
     : unit
   =
   (* *)
@@ -145,11 +146,12 @@ let show_stat_intermediate_solution
   (* Log to file? *)
   let info_line =
     Fmt.str
-      "id:%i,rstar-hits:%i,lemma-reuse:%i,%s"
+      "id:%i,rstar-hits:%i,lemma-reuse:%i,%s,covratio:%3.2f"
       pb.id
       !Stats.num_unr_cache_hits
       !Stats.num_foreign_lemma_uses
       (single_configuration_csv_string soln ~elapsed ~verif)
+      coverage_ratio
   in
   match !Config.output_log with
   | Some filename ->

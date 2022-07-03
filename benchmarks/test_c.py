@@ -32,6 +32,7 @@ class ResultObject(object):
         self.num_failures = 0
         self.elapsed = 0.0
         self.finished = 0
+        self.covratio = 0
         self.optims = "all"
 
     def merge(self, other):
@@ -63,7 +64,7 @@ class ResultObject(object):
         self.optims = optim
         s = f"{self.name : <25s} {optim: <30s} Comp:{self.finished} "
         s += f"T: {self.elapsed :4.3f}"
-        s += f" ({int(self.num_attempts)} / {int(self.total_confs)}) "
+        s += f" ({int(self.num_attempts)} / {int(self.total_confs)}) {self.covratio}% "
         s += f" [S:{int(self.num_solutions)}+U:{int(self.num_unrealizable)}+F:{int(self.num_failures)}]"
         s += f" R*:{self.rstar_hits}, P*:{self.lemma_reuse}"
         return s
@@ -73,7 +74,7 @@ class ResultObject(object):
         s += f"{self.elapsed :4.3f},"
         s += f"{int(self.num_attempts)},{int(self.total_confs)},"
         s += f"{int(self.num_solutions)},{int(self.num_unrealizable)},{int(self.num_failures)},"
-        s += f"{self.rstar_hits},{self.lemma_reuse}"
+        s += f"{self.rstar_hits},{self.lemma_reuse},{self.covratio}"
         return s
 
     def hit_ratio(self,):
@@ -99,6 +100,8 @@ class ResultObject(object):
                 res.num_failures = int(cells[8])
                 res.rstar_hits = float(cells[9])
                 res.lemma_reuse = float(cells[10])
+                if len(cells) > 11:
+                    res.covratio = float(cells[11])
                 return res
             except Exception as e:
                 print(e)
@@ -120,6 +123,9 @@ class ResultObject(object):
         # 5 verif elapsed
         # 6 solution kind
         kind = int(cells[6].split(":")[1])
+        if len(cells) >= 8:
+            self.covratio = float(cells[7].split(":")[1])
+
         if kind == 0:
             self.num_solutions += 1
         elif kind == 1:
@@ -141,6 +147,9 @@ class ResultObject(object):
         self.rstar_hits = int(cells[4].split(":")[1])
         # 5 lemma reuse
         self.lemma_reuse = int(cells[5].split(":")[1])
+        if len(cells) >= 7:
+            # 6 coverage ratio
+            self.covratio = float(cells[6].split(":")[1])
 
 
 def run_once(name, command):

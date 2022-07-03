@@ -88,6 +88,10 @@ let out_graph (s : state) (filename : string) =
   Stdio.Out_channel.close oc
 ;;
 
+let get_coverage_percentage (s : state) : float =
+  100.0 *. (Int.to_float s.st_covered /. Int.to_float s.st_total_confs)
+;;
+
 let mark_unrealizable (s : state) (conf : Subconf.t) =
   Hashtbl.set s.st_marks ~key:conf ~data:Unrealizable
 ;;
@@ -355,8 +359,8 @@ let generate_configurations ?(strategy = O.ESTopDown) (ctx : env) (p : PMRS.t) :
   ; st_ctx = ctx
   ; st_cache
   ; st_strategy = strategy
-  ; st_coverage_join = Subconf.of_conf super
-  ; st_coverage_meet = Subconf.zero_of_conf super
+  ; st_coverage_join = Subconf.zero_of_conf super
+  ; st_coverage_meet = Subconf.of_conf super
   ; st_covered = 0
   ; st_total_confs = Subconf.(Lattice.count_subs st_super_subc)
   }
