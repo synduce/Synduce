@@ -139,20 +139,12 @@ let print_stats_coverage multi_soln_result (n_out, u_count, f_count) =
   let open Confsearch.Main in
   let open Confsearch.ConfGraph in
   let total_confs = multi_soln_result.r_final_state.st_total_confs in
-  let cov_ratio =
-    Confsearch.ConfGraph.get_coverage_percentage multi_soln_result.r_final_state
-  in
   if n_out > 1
   then (
     Log.info
       Fmt.(
         fun fmt () ->
-          pf
-            fmt
-            "%3.2f%s configurations covered (%i possible configs)"
-            cov_ratio
-            "%"
-            total_confs);
+          pf fmt "%i configurations inspected (%i possible configs)" n_out total_confs);
     Log.info
       Fmt.(
         fun fmt () ->
