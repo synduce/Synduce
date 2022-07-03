@@ -302,20 +302,22 @@ if __name__ == "__main__":
             f"--multi-strategy=bu --reuse-predicates-off --multi-no-rstar --solve-timeout={solve_timeout}"],
     ]
 
+    bench_set = incomplete_benchmarks_set1
+
     if "all" in args.benchmarks:
-        run_benchmarks(incomplete_benchmarks_set0, optims, csv_output=csv_output,
+        run_benchmarks(bench_set, optims, csv_output=csv_output,
                        num_runs=args.num_runs)
     elif "options0" in args.benchmarks:
         tmp_outfile = "benchmarks/tmp0.txt"
-        run_benchmarks(incomplete_benchmarks_set0, optims_set_0, csv_output=csv_output,
+        run_benchmarks(bench_set, optims_set_0, csv_output=csv_output,
                        num_runs=args.num_runs)
     elif "options1" in args.benchmarks:
         tmp_outfile = "benchmarks/tmp1.txt"
-        run_benchmarks(incomplete_benchmarks_set0, optims_set_1, csv_output=csv_output,
+        run_benchmarks(bench_set, optims_set_1, csv_output=csv_output,
                        num_runs=args.num_runs)
     elif "options2" in args.benchmarks:
         tmp_outfile = "benchmarks/tmp2.txt"
-        run_benchmarks(incomplete_benchmarks_set0, optims_set_2, csv_output=csv_output,
+        run_benchmarks(bench_set, optims_set_2, csv_output=csv_output,
                        num_runs=args.num_runs)
     else:
         tmp_outfile = "benchmarks/tmpsmall.txt"
