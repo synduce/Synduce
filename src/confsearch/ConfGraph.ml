@@ -66,6 +66,12 @@ type state =
   ; st_ctx : env (** The orginal environment of the super configuration. *)
   ; st_cache : ECache.t
   ; st_strategy : Config.Optims.exploration_strategy
+        (** The exploration strategy used in n
+      the algorithm *)
+  ; mutable st_coverage_join : Subconf.t (** The join of the configuration covered. *)
+  ; mutable st_coverage_meet : Subconf.t (** The meet of the configurations covered. *)
+  ; mutable st_covered : int (** The number of configurations covered. *)
+  ; mutable st_total_confs : int (** The number of total configurations. *)
   }
 
 (** Return true if the pair of integer identifies an argument with
@@ -180,6 +186,25 @@ let expand_down ?(mark = Unsolved) (s : state) (conf : Subconf.t) : unit =
         add_edge s.st_graph conf c)
 ;;
 
+let update_coverage_down (s : state) (conf : Subconf.t) (m : mark) =
+  let cnt_subs = Subconf.Lattice.count_subs conf in
+  let cover_unr () =
+    let meet = Subconf.Lattice.meet s.st_coverage_meet conf in
+    let meet_cov = Subconf.Lattice.count_subs meet in
+    Fmt.(pf stdout "Conf: %s@." (Subconf.to_string conf));
+    Fmt.(pf stdout "Meet: %s@." (Subconf.to_string meet));
+    Fmt.(pf stdout "Meet cov: %i@." meet_cov);
+    Fmt.(pf stdout "Additional coverage: %i@." (cnt_subs - meet_cov));
+    s.st_covered <- s.st_covered + (cnt_subs - meet_cov);
+    s.st_coverage_meet <- meet
+  in
+  match m with
+  | Realizable -> s.st_covered <- s.st_covered + 1
+  | Unrealizable -> cover_unr ()
+  | Failed -> if !Utils.Config.node_failure_behavior then cover_unr () else ()
+  | _ -> ()
+;;
+
 (** `expand_down g conf` adds the edges from `conf` to all its expansions in `g`.
   If `~use_po` is set to false, then the expand algorithm does not check whether
   the configuration to expand is realizable or not (the partial order between
@@ -204,6 +229,20 @@ let expand_up ?(mark = Unsolved) (s : state) (conf : Subconf.t) : unit =
         let b = is_rec_arg s (unknown, added_arg) in
         Hashtbl.set s.st_emarks ~key:(conf, c) ~data:(EAddArg (b, unknown, added_arg));
         add_edge s.st_graph conf c)
+;;
+
+let update_coverage_up (s : state) (conf : Subconf.t) (m : mark) =
+  let cnt_sups = Subconf.Lattice.count_sups ~sup:s.st_super_subc conf in
+  let cover_real () =
+    let join = Subconf.Lattice.join s.st_coverage_join conf in
+    let join_cov = Subconf.Lattice.count_sups ~sup:s.st_super_subc join in
+    s.st_covered <- s.st_covered + (cnt_sups - join_cov);
+    s.st_coverage_join <- join
+  in
+  match m with
+  | Realizable -> cover_real ()
+  | Unrealizable -> s.st_covered <- s.st_covered + 1
+  | _ -> ()
 ;;
 
 let to_explore (s : state) (orig : Subconf.t) (dest : Subconf.t) =
@@ -305,15 +344,20 @@ let generate_configurations ?(strategy = O.ESTopDown) (ctx : env) (p : PMRS.t) :
   (* Edge marks*)
   let st_emarks = Hashtbl.create (module SubconfEdge) ~size in
   let st_cache = ctx >- ECache.create () in
+  let st_super_subc = Subconf.of_conf super in
   { st_graph
   ; st_marks
   ; st_emarks
   ; st_root = root
   ; st_super = super
   ; st_recs = Subconf.rec_calls_conf super
-  ; st_super_subc = Subconf.of_conf super
+  ; st_super_subc
   ; st_ctx = ctx
   ; st_cache
   ; st_strategy = strategy
+  ; st_coverage_join = Subconf.of_conf super
+  ; st_coverage_meet = Subconf.zero_of_conf super
+  ; st_covered = 0
+  ; st_total_confs = Subconf.(Lattice.count_subs st_super_subc)
   }
 ;;

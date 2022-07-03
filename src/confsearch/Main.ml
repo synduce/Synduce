@@ -11,6 +11,7 @@ type multi_soln_result =
   { r_best : (env * PsiDef.t * Syguslib.Sygus.solver_response segis_response) option
   ; r_all : (env * PsiDef.t * Syguslib.Sygus.solver_response segis_response) list
   ; r_subconf_count : int
+  ; r_final_state : G.state
   }
 
 let total_configurations = ref 0
@@ -90,6 +91,11 @@ let find_multiple_solutions
     | ESTopDown -> G.expand_down
     | ESBottomUp -> G.expand_up
   in
+  let update_coverage_func =
+    match !CO.exploration_strategy with
+    | ESTopDown -> G.update_coverage_down
+    | ESBottomUp -> G.update_coverage_up
+  in
   let rec find_sols a =
     match
       (if !Config.next_algo_bfs then G.next else G.next_dfs)
@@ -124,7 +130,10 @@ let find_multiple_solutions
         expand_func ~mark:G.Unrealizable rstate sub_conf;
         (* Update stats: number of cache hits. *)
         Int.incr Stats.num_unr_cache_hits;
+        (* Log an unrealizable solution (logged by single_configuration_solver in other branches) *)
         AlgoLog.log_solution ~ctx ~p:new_pdef (Unrealizable []);
+        (* Update the coverage. *)
+        update_coverage_func rstate sub_conf G.Unrealizable;
         find_sols (a @ [ new_ctx, new_pdef, Unrealizable [] ]))
       else (
         (* Call the single configuration solver. *)
@@ -132,6 +141,8 @@ let find_multiple_solutions
         | new_ctx', Realizable s ->
           G.mark_realizable rstate sub_conf;
           expand_func ~mark:G.Realizable rstate sub_conf;
+          (* Update the coverage *)
+          update_coverage_func rstate sub_conf G.Realizable;
           (* Looking for the best solution according to some metric. *)
           let score = score_func ctx top_userdef_problem s conf in
           if score < !best_score
@@ -142,16 +153,27 @@ let find_multiple_solutions
         | new_ctx', Unrealizable u ->
           G.mark_unrealizable rstate sub_conf;
           expand_func ~mark:G.Unrealizable rstate sub_conf;
+          (* Cache the unrealizable configuration for R*. *)
           G.cache rstate u;
+          (* Update the coverage. *)
+          update_coverage_func rstate sub_conf G.Unrealizable;
+          (* Continue *)
           find_sols ((new_ctx', new_pdef, Unrealizable u) :: a)
         | new_ctx', Failed (s, f) ->
           G.mark_failed rstate sub_conf;
           expand_func rstate sub_conf;
+          (* Update the coverage. *)
+          update_coverage_func rstate sub_conf G.Failed;
           find_sols ((new_ctx', new_pdef, Failed (s, f)) :: a))
     | None -> Lwt.return a
   in
   let%lwt all_solns = find_sols [] in
-  Lwt.return { r_best = !best_solution; r_all = all_solns; r_subconf_count = -1 }
+  Lwt.return
+    { r_best = !best_solution
+    ; r_all = all_solns
+    ; r_subconf_count = -1
+    ; r_final_state = rstate
+    }
 ;;
 
 let find_and_solve_problem
@@ -189,10 +211,7 @@ let find_and_solve_problem
     Utils.Log.verbose (fun fmt () ->
         Fmt.pf fmt "Max configuration:@;%a" (Configuration.ppm ctx) max_configuration);
     let subconf_count =
-      Map.fold
-        ~init:1
-        ~f:(fun ~key:_ ~data:l c -> c * (2 ** List.length l))
-        max_configuration
+      Configuration.Subconf.(Lattice.count_subs (of_conf max_configuration))
     in
     total_configurations := subconf_count;
     Log.info (fun fmt () -> Fmt.pf fmt "%i configurations possible." subconf_count);
@@ -210,5 +229,10 @@ let find_and_solve_problem
       { r_best = Some (ctx', top_userdef_problem, top_soln)
       ; r_all = [ ctx', top_userdef_problem, top_soln ]
       ; r_subconf_count = 1
+      ; r_final_state =
+          G.generate_configurations
+            ~strategy:!CO.exploration_strategy
+            ctx
+            top_userdef_problem.target
       })
 ;;

@@ -135,6 +135,44 @@ let on_failure ?(is_ocaml_syntax = true) ~(ctx : env) (pb : PsiDef.t) : Yojson.t
         !Stats.verif_time
 ;;
 
+let print_stats_coverage multi_soln_result (n_out, u_count, f_count) =
+  let open Confsearch.Main in
+  let open Confsearch.ConfGraph in
+  let total_confs = multi_soln_result.r_final_state.st_total_confs in
+  let cov_ratio =
+    Int.to_float multi_soln_result.r_final_state.st_covered /. Int.to_float total_confs
+  in
+  if n_out > 1
+  then (
+    Log.info
+      Fmt.(
+        fun fmt () ->
+          pf
+            fmt
+            "%3.2f%s configurations solved (out of %i)"
+            (100.0 *. cov_ratio)
+            "%"
+            total_confs);
+    Log.info
+      Fmt.(
+        fun fmt () ->
+          pf
+            fmt
+            "%i solutions | %i unrealizable  | %i failed"
+            (n_out - u_count)
+            u_count
+            f_count);
+    Log.info
+      Fmt.(
+        fun fmt () ->
+          pf
+            fmt
+            "R* cache hits: %i | Orig. config solved: %b | Reused lemmas: %i"
+            !Stats.num_unr_cache_hits
+            !Stats.orig_solution_hit
+            !Stats.num_foreign_lemma_uses))
+;;
+
 (** Print a summary of the options available. The options are in the Lib.Utils.Config module.  *)
 let print_usage () =
   pf stdout "Usage : Synduce [options] input_file@.";

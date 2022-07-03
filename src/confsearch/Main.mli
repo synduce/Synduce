@@ -6,6 +6,7 @@ type multi_soln_result =
   { r_best : (env * PsiDef.t * Syguslib.Sygus.solver_response segis_response) option
   ; r_all : (env * PsiDef.t * Syguslib.Sygus.solver_response segis_response) list
   ; r_subconf_count : int
+  ; r_final_state : ConfGraph.state
   }
 
 (** [find_and_solver_problem (target,spec,repr) globals] finds the PMRS

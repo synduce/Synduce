@@ -139,7 +139,7 @@ let force_nonlinear = ref false
   not be refined further. If `node_failure_behaviour` is set to `false`, the failure will only
   interpreted as realizable: subconfigurations will be explored.
 *)
-let node_failure_behavior = ref true
+let node_failure_behavior = ref false
 
 (** Use DFS or BFS when searching for next configuration (true for BFS, false for DFS)*)
 let next_algo_bfs = ref true

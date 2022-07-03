@@ -41,7 +41,7 @@ module Subconf = struct
       ~sep:"-"
       (List.map
          ~f:(fun (i, l) ->
-           Int.to_string i ^ String.concat ~sep:"." (List.map ~f:Int.to_string l))
+           Int.to_string i ^ ":" ^ String.concat ~sep:"." (List.map ~f:Int.to_string l))
          (Map.to_alist s))
   ;;
 
@@ -180,6 +180,45 @@ module Subconf = struct
     in
     List.concat_map (Map.to_alist conf) ~f:add_one
   ;;
+
+  module Lattice = struct
+    let count_subs (a : t) =
+      Map.fold ~init:1 ~f:(fun ~key:_ ~data accum -> accum * (2 ** List.length data)) a
+    ;;
+
+    let count_sups ~(sup : t) (a : t) =
+      Map.fold
+        ~init:1
+        ~f:(fun ~key ~data accum ->
+          let rem =
+            match Map.find sup key with
+            | Some r -> List.filter r ~f:(fun x -> not (List.mem data ~equal:Int.equal x))
+            | None -> []
+          in
+          accum * (2 ** List.length rem))
+        a
+    ;;
+
+    let join (a : t) (b : t) : t =
+      Map.mapi a ~f:(fun ~key ~data ->
+          let both_a_b =
+            match Map.find b key with
+            | Some bl -> bl @ data
+            | None -> data
+          in
+          List.dedup_and_sort ~compare:Int.compare both_a_b)
+    ;;
+
+    let meet (a : t) (b : t) =
+      Map.mapi a ~f:(fun ~key ~data ->
+          let both_a_b =
+            match Map.find b key with
+            | Some bl -> List.filter data ~f:(fun x -> List.mem bl ~equal:Int.equal x)
+            | None -> []
+          in
+          List.dedup_and_sort ~compare:Int.compare both_a_b)
+    ;;
+  end
 end
 
 module SubconfEdge = struct

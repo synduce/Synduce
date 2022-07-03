@@ -48,6 +48,22 @@ module Subconf : sig
         by adding an argument for one of the unknowns. This requires having acess to the
         sup-configuration. *)
   val add_arg : sup:t -> t -> ((int * int) * t) list
+
+  module Lattice : sig
+    (** Count the number of sub-configurations of a given configuration. *)
+    val count_subs : t -> int
+
+    (** Count the number of sup-configurations of a given configuration. The sup of
+      the lattice needs to be given in order to count this.
+    *)
+    val count_sups : sup:t -> t -> int
+
+    (** Returns the join of two configuration in the configuration lattice. *)
+    val join : t -> t -> t
+
+    (** Returns the meet of two configuration in the configuration lattice. *)
+    val meet : t -> t -> t
+  end
 end
 
 module SubconfEdge : sig

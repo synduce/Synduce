@@ -16,4 +16,5 @@ val on_failure
   -> Common.ProblemDefs.PsiDef.t
   -> Yojson.t
 
+val print_stats_coverage : Confsearch.Main.multi_soln_result -> int * int * int -> unit
 val print_usage : unit -> 'a
