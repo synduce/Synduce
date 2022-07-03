@@ -97,6 +97,7 @@ let find_multiple_solutions
     | ESTopDown -> G.update_coverage_down
     | ESBottomUp -> G.update_coverage_up
   in
+  let orig_target = top_userdef_problem.target in
   let rec find_sols a =
     match
       (if !Config.next_algo_bfs then G.next else G.next_dfs)
@@ -118,10 +119,6 @@ let find_multiple_solutions
         Fmt.(
           fun fmt () ->
             pf fmt "New target:@[%a@]" (ctx >- PMRS.pp ~short:false) new_target);
-      (* Update stat: whether we have hit the original configuration. *)
-      Stats.orig_solution_hit
-        := !Stats.orig_solution_hit
-           || same_conf new_pdef.target top_userdef_problem.target;
       (* Check unrealizability via cache first. *)
       if !CO.use_rstar_caching && G.check_unrealizable_from_cache new_ctx new_pdef rstate
       then (
@@ -144,6 +141,8 @@ let find_multiple_solutions
           expand_func ~mark:G.Realizable rstate sub_conf;
           (* Update the coverage *)
           update_coverage_func rstate sub_conf G.Realizable;
+          (* Update stat: whether we have hit the original configuration. *)
+          if same_conf new_pdef.target orig_target then Stats.orig_solution_hit := true;
           (* Looking for the best solution according to some metric. *)
           let score = score_func ctx top_userdef_problem s conf in
           if score < !best_score

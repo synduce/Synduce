@@ -146,6 +146,8 @@ let print_stats_coverage multi_soln_result (n_out, u_count, f_count) =
         fun fmt () ->
           pf fmt "%i configurations inspected (%i possible configs)" n_out total_confs);
     Log.info
+      Fmt.(fun fmt () -> pf fmt "Found best known solution: %b" !Stats.orig_solution_hit);
+    Log.info
       Fmt.(
         fun fmt () ->
           pf

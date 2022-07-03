@@ -125,14 +125,14 @@ let main () =
   | Some filename ->
     let info_line =
       Fmt.str
-        "finished:%f,solutions:%i,unrealizable:%i,failure:%i,rstar-hits:%i,lemma-reuse:%i,covratio:%3.2f"
+        "finished:%f,solutions:%i,unrealizable:%i,failure:%i,rstar-hits:%i,lemma-reuse:%i,found-best:%b"
         (Unix.gettimeofday () -. start_time)
         (n_out - u_count)
         u_count
         f_count
         !Stats.num_unr_cache_hits
         !Stats.num_foreign_lemma_uses
-        cov_ratio
+        !Stats.orig_solution_hit
     in
     (try
        let chan = Stdio.Out_channel.create ~append:true filename in

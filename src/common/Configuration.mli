@@ -95,9 +95,6 @@ val max_configuration : Env.env -> PMRS.t -> conf
 (** Returns the number of subconfigurations of a given configuration. *)
 val subconf_count : conf -> int
 
-(** Return the current configuration of a PMRS. *)
-val configuration_of : PMRS.t -> conf
-
 (** `same_conf p1 p2` is `true` iff `p1` and `p2` are in the same configuration:
     they have the same set of unknowns and the unknowns have the same set of arguments. *)
 val same_conf : PMRS.t -> PMRS.t -> bool

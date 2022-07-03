@@ -321,12 +321,12 @@ let subconf_count (c : conf) =
 ;;
 
 (** Return the configuration of a PMRS, assuming it has been checked. *)
-let configuration_of (p : PMRS.t) : conf =
+let conf_of (p : PMRS.t) : conf =
   let init = of_varset p.psyntobjs in
   let join m1 m2 =
     Map.merge m1 m2 ~f:(fun ~key:_ m ->
         match m with
-        | `Both (v1, _) -> Some v1
+        | `Both (v1, v2) -> Some (v1 @ v2)
         | `Left v1 -> Some v1
         | `Right v1 -> Some v1)
   in
@@ -345,9 +345,11 @@ let configuration_of (p : PMRS.t) : conf =
 
 (** [same_conf p1 p2] is true if [p1] and [p2] are in the same configuration. *)
 let same_conf (p1 : PMRS.t) (p2 : PMRS.t) : bool =
-  let c1 = configuration_of p1
-  and c2 = configuration_of p2 in
-  Subconf.(equal (of_conf c1) (of_conf c2))
+  let c1 = conf_of p1
+  and c2 = conf_of p2 in
+  let s1 = Subconf.of_conf c1
+  and s2 = Subconf.of_conf c2 in
+  Subconf.(equal s1 s2)
 ;;
 
 (** Apply a configuration to a given PMRS. The environment is copied before the type
