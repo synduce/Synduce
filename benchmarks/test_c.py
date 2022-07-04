@@ -319,7 +319,7 @@ if __name__ == "__main__":
 
     test_set = args.test_set
 
-    if "all" in args.benchmarks:
+    if args.benchmarks and "all" in args.benchmarks:
         run_benchmarks(bench_set, optims, csv_output=csv_output,
                        num_runs=args.num_runs)
     elif test_set == 1:
