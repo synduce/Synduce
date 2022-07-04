@@ -124,7 +124,9 @@ let show_stat_intermediate_solution
         Fmt.(
           fun fmt () ->
             pf fmt "%a" (box (ctx >- Pretty.pp_soln ~use_ocaml_syntax:true)) soln)
-    | Unrealizable _ -> Log.info Fmt.(fun fmt () -> pf fmt "Unrealizable.")
+    | Unrealizable (r, _) ->
+      Log.info Fmt.(fun fmt () -> pf fmt "Unrealizable.");
+      Log.info Fmt.(fun fmt () -> pf fmt "Possible repair: %s" (Pretty.str_of_repair r))
     | Failed (s, r) ->
       Log.info
         Fmt.(fun fmt () -> pf fmt "Failure: %s - %a" s SygusInterface.pp_response r)
@@ -597,7 +599,7 @@ let log_solution
       | Realizable soln ->
         Fmt.pf frmt "REALIZABLE@.";
         Fmt.(pf frmt "%a@." (box (ctx >- Pretty.pp_soln ~use_ocaml_syntax:true)) soln)
-      | Unrealizable _u ->
+      | Unrealizable _ ->
         Fmt.(pf frmt "UNREALIZABLE@.");
         Fmt.pf frmt "%a@." (ctx >- PMRS.pp ~short:false) p.target
       | _ ->

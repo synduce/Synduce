@@ -57,7 +57,7 @@ let on_success
             verif_ratio
             (box (ctx >- Common.Pretty.pp_soln ~use_ocaml_syntax:is_ocaml_syntax))
             soln))
-  | Unrealizable witnesss ->
+  | Unrealizable (_repair, witnesses) ->
     if print_unrealizable
     then (
       Log.(
@@ -69,7 +69,7 @@ let on_success
               elapsed));
       Log.(
         info (fun frmt () -> pf frmt "%a" (ctx >- Lang.PMRS.pp ~short:false) pb.target));
-      ctx >>> ToolExplain.when_unrealizable pb witnesss)
+      ctx >>> ToolExplain.when_unrealizable pb witnesses)
     else ()
   | _ -> ());
   (* If output specified, write the solution in file. *)

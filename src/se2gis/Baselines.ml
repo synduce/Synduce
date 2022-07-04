@@ -90,7 +90,7 @@ let rec segis_loop ~(ctx : env) (p : PsiDef.t) (t_set : TermSet.t)
             "@[<hov 2><SEGIS> This problem has no solution. Counterexample set:@;%a@]"
             (list ~sep:sp (pp_term ctx.ctx))
             (Set.elements t_set));
-    Lwt.return (Unrealizable witnesss)
+    Lwt.return (Unrealizable (NoRepair, witnesss))
   | RFail, _ ->
     Log.error_msg "<SEGIS> SyGuS solver failed to find a solution.";
     Lwt.return (Failed ("segis", RFail))
@@ -185,7 +185,7 @@ let rec cegis_loop ~(ctx : Env.env) (p : PsiDef.t) (t_set : TermSet.t)
             "@[<hov 2><CEGIS> This problem has no solution. Counterexample set:@;%a@]"
             (list ~sep:sp (pp_term ctx.ctx))
             (Set.elements t_set));
-    Lwt.return (Unrealizable witnesss)
+    Lwt.return (Unrealizable (NoRepair, witnesss))
   | RFail, _ ->
     Log.error_msg "<CEGIS> SyGuS solver failed to find a solution.";
     Lwt.return (Failed ("cegis", RFail))

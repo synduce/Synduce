@@ -5,6 +5,13 @@ open Syguslib.Sygus
 open Utils
 open ProblemDefs
 
+let str_of_repair (r : repair) =
+  match r with
+  | Lift -> "lift"
+  | AddRecursiveCalls _ -> "add recursive call"
+  | NoRepair -> "no repair"
+;;
+
 (* ============================================================================================= *)
 (*          Pretty printing functions.                                                           *)
 (* ============================================================================================= *)

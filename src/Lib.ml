@@ -31,7 +31,7 @@ let solve_file ?(print_info = false) (filename : string)
         let pd = pb_env >- problem_descr_of_psi_def problem in
         match result with
         | Realizable soln -> pd, Either.First (Some soln)
-        | Unrealizable soln -> pd, Either.Second soln
+        | Unrealizable (_, witnesses) -> pd, Either.Second witnesses
         | Failed _ -> pd, Either.First None)
   in
   Lwt.map final_step outputs

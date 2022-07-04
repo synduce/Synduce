@@ -432,16 +432,16 @@ let parse_positive_example_solver_model
       "Parse model failure: Positive example cannot be found during lemma refinement."
 ;;
 
-let synthesize_new_lemma ~(ctx : env) ~(p : PsiDef.t) (det : term_info) (cl : cond_lemma)
+let synthesize_new_lemma ~(ctx : env) ~(p : PsiDef.t) (ti : term_info) (cl : cond_lemma)
     : term option Lwt.t
   =
   let with_synth_obj i synth_obj logic =
-    ctx >- AlgoLog.announce_new_lemma_synthesis i det cl;
+    ctx >- AlgoLog.announce_new_lemma_synthesis i ti cl;
     let neg_constraints =
-      List.map ~f:(ctx >- constraint_of_neg_witness det) cl.cl_negatives
+      List.map ~f:(ctx >- constraint_of_neg_witness ti) cl.cl_negatives
     in
     let pos_constraints =
-      List.map ~f:(ctx >- constraint_of_pos_witness det) cl.cl_positives
+      List.map ~f:(ctx >- constraint_of_pos_witness ti) cl.cl_positives
     in
     let extra_defs = Sm.[ max_definition; min_definition ] in
     let commands =
@@ -455,7 +455,7 @@ let synthesize_new_lemma ~(ctx : env) ~(p : PsiDef.t) (det : term_info) (cl : co
     match%lwt
       ctx
       >>- handle_lemma_synth_response
-            det
+            ti
             (SygusInterface.SygusSolver.solve_commands
                ~timeout:(Some !Config.Optims.wait_parallel_tlimit)
                commands)
@@ -463,7 +463,7 @@ let synthesize_new_lemma ~(ctx : env) ~(p : PsiDef.t) (det : term_info) (cl : co
     | None -> Lwt.return None
     | Some solns -> Lwt.return (List.nth solns 0)
   in
-  match ctx >>- synthfun_of_det ~p det with
+  match ctx >>- synthfun_of_det ~p ti with
   | [ (synth_obj, logic) ] -> with_synth_obj 0 synth_obj logic
   | obj_choices ->
     let lwt_tasks =
@@ -486,11 +486,11 @@ let synthesize_new_lemma ~(ctx : env) ~(p : PsiDef.t) (det : term_info) (cl : co
 let rec lemma_refinement_loop
     ~(ctx : env)
     ~(p : PsiDef.t)
-    (det : term_info)
+    (ti : term_info)
     (cl : cond_lemma)
     : cond_lemma option Lwt.t
   =
-  match%lwt synthesize_new_lemma ~ctx ~p det cl with
+  match%lwt synthesize_new_lemma ~ctx ~p ti cl with
   | None ->
     Log.debug_msg "Lemma synthesis failure.";
     Lwt.return None
@@ -499,14 +499,14 @@ let rec lemma_refinement_loop
     then
       ctx
       >- LemmasInteractive.interactive_check_lemma
-           (lemma_refinement_loop ~ctx ~p det)
-           det.ti_func.vname
-           det.ti_formals
-           det
+           (lemma_refinement_loop ~ctx ~p ti)
+           ti.ti_func.vname
+           ti.ti_formals
+           ti
            cl
            lemma_term
     else (
-      match%lwt ctx >>- verify_lemma_candidate ~p det cl lemma_term with
+      match%lwt ctx >>- verify_lemma_candidate ~p ti cl lemma_term with
       (* The candidate lemma has been proved correct. *)
       | vmethod, Unsat ->
         let lemma =
@@ -514,13 +514,13 @@ let rec lemma_refinement_loop
           | None -> lemma_term
           | Some pre -> Terms.(pre => lemma_term)
         in
-        ctx >- AlgoLog.lemma_proved_correct vmethod det lemma;
+        ctx >- AlgoLog.lemma_proved_correct vmethod ti lemma;
         Lwt.return (Some { cl with cl_flag = true; cl_lemmas = lemma :: cl.cl_lemmas })
       (* The candidate lemmas has not been proved correct. *)
       | vmethod, S.SExps x ->
         AlgoLog.lemma_not_proved_correct vmethod;
         let new_positive_witnesss =
-          ctx >>- parse_positive_example_solver_model det (S.SExps x)
+          ctx >>- parse_positive_example_solver_model ti (S.SExps x)
         in
         List.iter
           ~f:(fun witness ->
@@ -535,7 +535,7 @@ let rec lemma_refinement_loop
         lemma_refinement_loop
           ~ctx
           ~p
-          det
+          ti
           { cl with cl_positives = cl.cl_positives @ new_positive_witnesss }
       | _, Sat ->
         Log.error_msg "Lemma verification returned Sat. This is unexpected.";

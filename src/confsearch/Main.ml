@@ -115,10 +115,10 @@ let find_multiple_solutions
       let new_pdef =
         { top_userdef_problem with target = new_target; id = !num_attempts }
       in
-      Log.verbose
+      Log.info
         Fmt.(
           fun fmt () ->
-            pf fmt "New target:@[%a@]" (ctx >- PMRS.pp ~short:false) new_target);
+            pf fmt "New target:@[%a@]" (ctx >- PMRS.pp_ocaml ~short:false) new_target);
       (* Check unrealizability via cache first. *)
       if !CO.use_rstar_caching && G.check_unrealizable_from_cache new_ctx new_pdef rstate
       then (
@@ -129,10 +129,10 @@ let find_multiple_solutions
         (* Update stats: number of cache hits. *)
         Int.incr Stats.num_unr_cache_hits;
         (* Log an unrealizable solution (logged by single_configuration_solver in other branches) *)
-        AlgoLog.log_solution ~ctx ~p:new_pdef (Unrealizable []);
+        AlgoLog.log_solution ~ctx ~p:new_pdef (Unrealizable (NoRepair, []));
         (* Update the coverage. *)
         update_coverage_func rstate sub_conf G.Unrealizable;
-        find_sols (a @ [ new_ctx, new_pdef, Unrealizable [] ]))
+        find_sols (a @ [ new_ctx, new_pdef, Unrealizable (NoRepair, []) ]))
       else (
         (* Call the single configuration solver. *)
         match%lwt single_configuration_solver ~ctx:new_ctx new_pdef with
@@ -151,7 +151,7 @@ let find_multiple_solutions
             best_solution := Some (new_ctx, new_pdef, Realizable s));
           log_step new_ctx' new_pdef (Realizable s) (elapsed, verif) rstate;
           find_sols ((new_ctx', new_pdef, Realizable s) :: a)
-        | new_ctx', elapsed, verif, Unrealizable u ->
+        | new_ctx', elapsed, verif, Unrealizable (r, u) ->
           G.mark_unrealizable rstate sub_conf;
           expand_func ~mark:G.Unrealizable rstate sub_conf;
           (* Cache the unrealizable configuration for R*. *)
@@ -159,8 +159,8 @@ let find_multiple_solutions
           (* Update the coverage. *)
           update_coverage_func rstate sub_conf G.Unrealizable;
           (* Continue *)
-          log_step new_ctx' new_pdef (Unrealizable u) (elapsed, verif) rstate;
-          find_sols ((new_ctx', new_pdef, Unrealizable u) :: a)
+          log_step new_ctx' new_pdef (Unrealizable (r, u)) (elapsed, verif) rstate;
+          find_sols ((new_ctx', new_pdef, Unrealizable (r, u)) :: a)
         | new_ctx', elapsed, verif, Failed (s, f) ->
           G.mark_failed rstate sub_conf;
           expand_func rstate sub_conf;

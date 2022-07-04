@@ -81,10 +81,11 @@ let rec refinement_loop
       Stats.log_minor_step ~synth_time ~auxtime:lsynt_time false;
       refinement_loop ~ctx ~major:false p (Lwt.return new_lstate)
     (* The witnesses were not spurious, so the problem is unrealizable. We can attempt lifting.
+        First, we root cause why the problem is unrealizable.
       *)
     | lsynt_time, Ok (Second witnesses) ->
       (match RootCausing.find_repair ~ctx ~p witnesses with
-      | RootCausing.Lift
+      | Lift
         when !Config.Optims.attempt_lifting
              && Lifting.lifting_count ~ctx p < !Config.Optims.max_lifting_attempts ->
         (match Lifting.scalar ~ctx ~p lstate_in synt_failure_info with
@@ -96,21 +97,23 @@ let rec refinement_loop
           (* Infeasible is not a failure! *)
           (match r' with
           | RInfeasible ->
-            infeasible_w_witnesses_case (synth_time, 0.) (tsize, usize) witnesses
+            unrealizable_w_witnesses_case (synth_time, 0.) (tsize, usize) Lift witnesses
           | _ -> failure_case "lifting" r'))
-      | _ ->
-        (* The problem is infeasible, and we have witnesses for it. *)
-        infeasible_w_witnesses_case (synth_time, 0.) (tsize, usize) witnesses)
+      | repair ->
+        (* The problem is infeasible, and we have witnesses for it (and possiblt a repair) *)
+        unrealizable_w_witnesses_case (synth_time, 0.) (tsize, usize) repair witnesses)
+    | _ ->
       (* The problem is infeasible. When the sygus solver answers infeasible,
         we do not have witnesses of unrealizability.
        *)
-    | _ -> failure_case "lemma synthesis" RFail)
+      failure_case "lemma synthesis" RFail)
 
 and failure_case s r = Lwt.return (Failed (s, r))
 
-and infeasible_w_witnesses_case (synth_time, verif_time) (tsize, usize) witnesses =
+and unrealizable_w_witnesses_case (synth_time, verif_time) (tsize, usize) repair witnesses
+  =
   Stats.log_major_step_end ~synth_time ~verif_time ~t:tsize ~u:usize false;
-  Lwt.return (Unrealizable witnesses)
+  Lwt.return (Unrealizable (repair, witnesses))
 
 and success_case ~ctx ~p ~synth_time lstate_in (tsize, usize) lifting (eqns, sol) =
   (* The solution is verified with a bounded check.  *)

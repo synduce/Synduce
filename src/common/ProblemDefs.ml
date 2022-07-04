@@ -53,6 +53,12 @@ type witness_stat =
   A counterexample is either valid, or spurious with some reason, or unknown.
 *)
 
+type repair =
+  | Lift
+  | AddRecursiveCalls of (variable * term) list
+  | NoRepair
+[@@deriving sexp]
+
 (** A counterexample related to an equation and some info on the validity of the counterexample.
 *)
 type witness =
@@ -127,5 +133,5 @@ in which case it provides a list of counterexamples, or failure.
 *)
 type 'a segis_response =
   | Realizable of soln
-  | Unrealizable of unrealizability_witness list
+  | Unrealizable of repair * unrealizability_witness list
   | Failed of string * 'a

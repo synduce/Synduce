@@ -68,7 +68,7 @@ let main () =
       | pb, Realizable soln ->
         ( pb.PsiDef.id
         , ctx >>> ToolMessages.on_success ~is_ocaml_syntax filename pb (Realizable soln) )
-      | pb, Unrealizable witnesss ->
+      | pb, Unrealizable (r, witnesses) ->
         Int.incr u_count;
         ( pb.PsiDef.id
         , ctx
@@ -77,7 +77,7 @@ let main () =
                 ~is_ocaml_syntax
                 filename
                 pb
-                (Unrealizable witnesss) )
+                (Unrealizable (r, witnesses)) )
       | _, Failed _ ->
         Int.incr f_count;
         Log.error_msg "Failed to find a solution or a witness of unrealizability";
