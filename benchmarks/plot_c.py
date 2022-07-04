@@ -4,6 +4,7 @@ import os
 from datetime import datetime
 import argparse
 import matplotlib.pyplot as plt
+import numpy as np
 import shutil
 from test_c import ResultObject, wmean
 # Local files
@@ -13,28 +14,39 @@ from definitions import *
 
 all_algos = [
     "all", "no-rstar", "no-predicate-reuse",
-    "no-predicate-reuse-no-rstar",
-    "bottom-up", "dfs", "bottom-up-dfs"
+    # "no-predicate-reuse-no-rstar",
+    "bottom-up", "dfs", "bottom-up-dfs",
+    "bu-no-rstar",
+    "bu-no-predicate-reuse",
+    "bu-no-predicate-reuse-no-rstar",
+
 ]
 
 algo_color = {
     "all": "red",
     "no-rstar": "blue",
     "no-predicate-reuse": "purple",
-    "no-predicate-reuse-no-rstar": "green",
+    # "no-predicate-reuse-no-rstar": "green",
     "bottom-up": "gray",
     "dfs": "black",
-    "bottom-up-dfs": "yellow"
+    "bottom-up-dfs": "yellow",
+    "bu-no-rstar": "magenta",
+    "bu-no-predicate-reuse": "deeppink",
+    "bu-no-predicate-reuse-no-rstar": "lightpink",
+
 }
 
 algo_label = {
     "all": "all",
     "no-rstar": "no rstar",
     "no-predicate-reuse": "no predicates",
-    "no-predicate-reuse-no-rstar": "no rstar, no predicates",
+    # "no-predicate-reuse-no-rstar": "no rstar, no predicates",
     "bottom-up": "bottom up",
     "dfs": "dfs",
-    "bottom-up-dfs": "bottom up, dfs"
+    "bottom-up-dfs": "bottom up, dfs",
+    "bu-no-rstar": "bottom up, no rstar",
+    "bu-no-predicate-reuse": "bot.up. no p-reuse",
+    "bu-no-predicate-reuse-no-rstar": "bot.up no rstar, no p-reuse",
 }
 
 
@@ -56,6 +68,22 @@ def fullly_solved_quantile_plot(series):
     ax.set_ylabel("Time", fontsize=plot_fontsize)
     ax.legend(fontsize=plot_fontsize)
     fig.savefig("fully_solved_quantile.pdf", bbox_inches='tight')
+
+
+def hist_plot(results):
+    fig = plt.figure()
+    ax = fig.add_axes([0, 0, 1, 1])
+    X = 0
+    for k, v in results.items():
+        ipos = 0.00
+        for rk in v:
+            algo = rk.optims
+            cnt = rk.rstar_hits + rk.num_attempts
+            ax.bar(X + ipos, cnt, color=algo_color[algo], width=1)
+            ipos += 0.1
+            X += 2
+
+    fig.savefig("bar_chart.pdf")
 
 
 def make_report(input_file, output_file):
@@ -82,7 +110,29 @@ def make_report(input_file, output_file):
     for k, v in results.items():
         algos = [res.optims for res in v]
         if sorted(algos) == sorted(all_algos):
-            complete_results[k] = v
+            complete_results[k] = sorted(v, key=lambda x: x.optims)
+
+    print(f"Total results: {len(complete_results)}")
+
+    hist_plot(complete_results)
+
+    # Which algorithm "solves more" ?
+    score = {}
+    for algo in all_algos:
+        score[algo] = 0
+    for k, v in complete_results.items():
+        mc = -1
+        balg = "all"
+        for result in v:
+            cc = result.rstar_hits + result.num_attempts
+            if cc > mc:
+                balg = result.optims
+                mc = cc
+        if mc >= 0:
+            score[balg] += 1
+    print("Best algo on # benchmarks:")
+    for algo in all_algos:
+        print(f"{algo} : {score[algo]}")
 
     # Series for quantile plot:
     series = {}
@@ -93,6 +143,7 @@ def make_report(input_file, output_file):
                 if result.optims == algo:
                     series[algo] += [result.elapsed]
     fullly_solved_quantile_plot(series)
+
     print(
         f"Average R* hits: {avg_rstar_hits * 100.0 : 3.1f}% (Max: {max_rstar_hit * 100.0 : 3.1f}%)")
 
