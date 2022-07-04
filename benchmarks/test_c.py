@@ -224,7 +224,8 @@ def run_benchmarks(input_files, optims, num_runs=1, csv_output=None, exit_err=Fa
             print(res.pretty_str(optim[0]))
 
             if csv_output:
-                csv_output.write(res.csvline(benchfile, optim[0]) + "\n")
+                with open(csv_output, 'a+', encoding='utf-8') as out:
+                    out.write(res.csvline(benchfile, optim[0]) + "\n")
 
     elapsed = time.time() - start
     if len(errors) <= 0:
@@ -280,10 +281,7 @@ if __name__ == "__main__":
 
     csv_output = None
     if args.output is not None:
-        try:
-            csv_output = open(args.output, 'a+', encoding='utf-8')
-        except:
-            pass
+        csv_output = args.output
 
     if args.solve_timeout > 0:
         solve_timeout = args.solve_timeout
