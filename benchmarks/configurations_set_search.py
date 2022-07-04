@@ -8,21 +8,23 @@ incomplete_benchmarks_set0 = [
     # BST
     ["incomplete/bst/count_lt_partial_2.ml", "", True, 1],  # OK +
     ["incomplete/bst/contains.ml", "", True, 1],  # OK +
-    # ["incomplete/bst/contains_v2.ml", "", True, 1],  # "Too many open files"
+    ["incomplete/bst/contains_v2.ml", "", True, 1],  # "Too many open files"
     ["incomplete/bst/contains_v3.ml", "", True, 1],  # OK +
     ["incomplete/bst/contains_bool_2.ml", "", True, 1],  # OK +
     ["incomplete/bst/contains_no_ensures.ml", "", True, 1],  # OK +
-    # ["incomplete/bst/count_between.ml", "", True, 1], "Too many open files"
+    ["incomplete/bst/count_between.ml", "", True, 1], "Too many open files"
     ["incomplete/bst/from_list_contains.ml", "", True, 1],  # OK +
     ["incomplete/bst/from_list_max.ml", "", True, 1],  # OK  +
     ["incomplete/bst/most_frequent_v1.ml", "", True, 1],  # OK +
-    # ["incomplete/bst/minmax_separate.ml", "", True, 1],  # "Too many open files"
-    # ["incomplete/bst/minmax_sim.ml", "", True, 1],  # "Too many open files"
-    # ["incomplete/bst/check_mem_included.ml", "", True, 1], "Too many open files"
-    # ["incomplete/bst/check_no_subtree_sum_gt2.ml", "", True, 1], "Too many open files"
-    # ["incomplete/bst/check_included_comb.ml", "", True, 1], # "Too many open files"
+    ["incomplete/bst/minmax_separate.ml", "", True, 1],  # "Too many open files"
+    ["incomplete/bst/minmax_sim.ml", "", True, 1],  # "Too many open files"
+    ["incomplete/bst/check_mem_included.ml", "", True, 1], "Too many open files"
+    ["incomplete/bst/check_no_subtree_sum_gt2.ml",
+     "", True, 1], "Too many open files"
+    ["incomplete/bst/check_included_comb.ml",
+     "", True, 1],  # "Too many open files"
     ["incomplete/bst/sum_gt_by_key.ml", "", True, 1],  # OK
-    # ["incomplete/bst/sum_between.ml", "", True, 1], "Too many open files"
+    ["incomplete/bst/sum_between.ml", "", True, 1], "Too many open files"
 
     # COMBINE TRAVERSALS
     # First config in top-down creates too much recursion
@@ -120,8 +122,8 @@ incomplete_benchmarks_set0 = [
 
 
     # SORTED LIST
-    # ["incomplete/sortedlist/count_lt_p1.ml", "", True, 1],  # Unknown error
-    # ["incomplete/sortedlist/exists_equal_elems.ml", "", True, 1],  # ??
+    ["incomplete/sortedlist/count_lt_p1.ml", "", True, 1],  # Unknown error
+    ["incomplete/sortedlist/exists_equal_elems.ml", "", True, 1],  # ??
     ["incomplete/list/sum_p1.ml", "", True, 1],  # OK
     ["incomplete/sortedlist/failing_slspplus.ml", ""],  # With 4 failures
     ["incomplete/list/sorted_min.ml", "", True, 1],  # OK

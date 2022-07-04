@@ -263,6 +263,8 @@ if __name__ == "__main__":
         "-n", "--num-runs", help="Run each benchmark NUM times.", type=int, default=1
     )
     aparser.add_argument(
+        "-t", "--test-set", help="Test set (1,2,3)", type=int, default=1)
+    aparser.add_argument(
         "-x", "--unrealizable", help="Benchmark is unrealizable.", default=True, action="store_false"
     )
 
@@ -299,36 +301,38 @@ if __name__ == "__main__":
     ]
     optims_set_1 = [
         ["bottom-up", f"--multi-strategy=bu --solve-timeout={solve_timeout}"],
+        ["bu-no-rstar",
+            f"--multi-strategy=bu --multi-no-rstar --solve-timeout={solve_timeout}"],
         ["dfs", f"--multi-use-dfs --solve-timeout={solve_timeout}"],
-        ["bottom-up-dfs",
-            f"--multi-strategy=bu --multi-use-dfs --solve-timeout={solve_timeout}"],
     ]
 
     optims_set_2 = [
-        ["bu-no-rstar",
-            f"--multi-strategy=bu --multi-no-rstar --solve-timeout={solve_timeout}"],
+        ["bottom-up-dfs",
+         f"--multi-strategy=bu --multi-use-dfs --solve-timeout={solve_timeout}"],
         ["bu-no-predicate-reuse",
             f"--multi-strategy=bu --reuse-predicates-off --solve-timeout={solve_timeout}"],
         ["bu-no-predicate-reuse-no-rstar",
             f"--multi-strategy=bu --reuse-predicates-off --multi-no-rstar --solve-timeout={solve_timeout}"],
     ]
 
-    bench_set = incomplete_benchmarks_set1
+    bench_set = incomplete_benchmarks_set0
+
+    test_set = args.test_set
 
     if "all" in args.benchmarks:
         run_benchmarks(bench_set, optims, csv_output=csv_output,
                        num_runs=args.num_runs)
-    elif "options0" in args.benchmarks:
+    elif test_set == 1:
         tmp_outfile = "benchmarks/tmp0.txt"
-        run_benchmarks(bench_set, optims_set_0, csv_output=csv_output,
+        run_benchmarks(bench_set, optims_set_0, csv_output="output0.csv",
                        num_runs=args.num_runs)
-    elif "options1" in args.benchmarks:
+    elif test_set == 2:
         tmp_outfile = "benchmarks/tmp1.txt"
-        run_benchmarks(bench_set, optims_set_1, csv_output=csv_output,
+        run_benchmarks(bench_set, optims_set_1, csv_output="output1.csv",
                        num_runs=args.num_runs)
-    elif "options2" in args.benchmarks:
+    elif test_set == 3:
         tmp_outfile = "benchmarks/tmp2.txt"
-        run_benchmarks(bench_set, optims_set_2, csv_output=csv_output,
+        run_benchmarks(bench_set, optims_set_2, csv_output="output2.csv",
                        num_runs=args.num_runs)
     else:
         tmp_outfile = "benchmarks/tmpsmall.txt"
