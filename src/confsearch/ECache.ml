@@ -9,6 +9,8 @@ type t =
   ; ectx : RContext.t
   }
 
+let is_empty (c : t) = Hash_set.is_empty c.exprs
+
 let dump (fmt : Formatter.t) (c : t) =
   Fmt.(list ExpressionSet.pp) fmt (Hash_set.to_list c.exprs)
 ;;

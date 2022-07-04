@@ -1,21 +1,21 @@
 # REQ; share ref function invariant
 incomplete_benchmarks_set0 = [
     # BALANCED TREE
-    ["incomplete/balanced/height.ml", "", True, 1],  # OK
-    ["incomplete/balanced/height_v2.ml", "", True, 1],  # OK
-    ["incomplete/balanced/node_count.ml", "", True, 1],  # OK
+    ["incomplete/balanced/height.ml", "", True, 1],  # OK +
+    ["incomplete/balanced/height_v2.ml", "", True, 1],  # OK +
+    ["incomplete/balanced/node_count.ml", "", True, 1],  # OK +
 
     # BST
-    ["incomplete/bst/count_lt_partial_2.ml", "", True, 1],  # OK
-    ["incomplete/bst/contains.ml", "", True, 1],  # OK
+    ["incomplete/bst/count_lt_partial_2.ml", "", True, 1],  # OK +
+    ["incomplete/bst/contains.ml", "", True, 1],  # OK +
     # ["incomplete/bst/contains_v2.ml", "", True, 1],  # "Too many open files"
-    ["incomplete/bst/contains_v3.ml", "", True, 1],  # OK
-    ["incomplete/bst/contains_bool_2.ml", "", True, 1],  # OK
-    ["incomplete/bst/contains_no_ensures.ml", "", True, 1],  # OK
+    ["incomplete/bst/contains_v3.ml", "", True, 1],  # OK +
+    ["incomplete/bst/contains_bool_2.ml", "", True, 1],  # OK +
+    ["incomplete/bst/contains_no_ensures.ml", "", True, 1],  # OK +
     # ["incomplete/bst/count_between.ml", "", True, 1], "Too many open files"
-    ["incomplete/bst/from_list_contains.ml", "", True, 1],  # OK
-    ["incomplete/bst/from_list_max.ml", "", True, 1],  # OK
-    ["incomplete/bst/most_frequent_v1.ml", "", True, 1],  # OK
+    ["incomplete/bst/from_list_contains.ml", "", True, 1],  # OK +
+    ["incomplete/bst/from_list_max.ml", "", True, 1],  # OK  +
+    ["incomplete/bst/most_frequent_v1.ml", "", True, 1],  # OK +
     # ["incomplete/bst/minmax_separate.ml", "", True, 1],  # "Too many open files"
     # ["incomplete/bst/minmax_sim.ml", "", True, 1],  # "Too many open files"
     # ["incomplete/bst/check_mem_included.ml", "", True, 1], "Too many open files"
@@ -25,26 +25,27 @@ incomplete_benchmarks_set0 = [
     # ["incomplete/bst/sum_between.ml", "", True, 1], "Too many open files"
 
     # COMBINE TRAVERSALS
-    ["incomplete/combine/mts.ml", "", True, 1],  # Unexpected blocking
-    ["incomplete/combine/mts_and_mps.ml", "", True, 1],  # OK
-    ["incomplete/combine/mss_with_sum.ml", "", True, 1],  # OK
+    # First config in top-down creates too much recursion
+    ["incomplete/combine/mts.ml", "", True, 1],
+    ["incomplete/combine/mts_and_mps.ml", "", True, 1],  # OK +
+    ["incomplete/combine/mss_with_sum.ml", "", True, 1],  # OK +
 
     # COMPRESSED LIST
-    ["incomplete/compressed_list/sum.ml", "", True, 1],  # OK
+    ["incomplete/compressed_list/sum.ml", "", True, 1],  # OK +
 
     # CONSTANT LIST
-    ["incomplete/constantlist/contains.ml", "", True, 1],  # OK
-    ["incomplete/constantlist/index_of.ml", "", True, 1],  # OK
+    ["incomplete/constantlist/contains.ml", "", True, 1],  # OK +
+    ["incomplete/constantlist/index_of.ml", "", True, 1],  # OK +
 
     # EMPTY RIGHT SUBTREE
-    ["incomplete/empty_right_subtree/contains.ml", "", True, 1],  # OK
-    ["incomplete/empty_right_subtree/sum.ml", "", True, 1],  # OK
+    ["incomplete/empty_right/contains.ml", "", True, 1],   # OK +
+    ["incomplete/empty_right/sum.ml", "", True, 1],        # OK +
 
     # EVEN LISTS
-    ["incomplete/evenlist/first_odd.ml", "", True, 1],  # OK
+    ["incomplete/evenlist/first_odd.ml", "", True, 1],  # OK +
     ["incomplete/evenlist/parity_of_first.ml", "", True, 1],  # OK - 4 failed
-    ["incomplete/evenlist/parity_of_last.ml", "", True, 1],  # OK
-    ["incomplete/evenlist/parity_of_sum.ml", "", True, 1],  # Error ?
+    ["incomplete/evenlist/parity_of_last.ml", "", True, 1],  # OK +
+    ["incomplete/evenlist/parity_of_sum.ml", "", True, 1],  # OK - 6 failed
 
     # EVEN TREE
     ["incomplete/eventree/sum_of_parities.ml", "", True, 1],  # 2 Failures

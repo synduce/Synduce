@@ -32,8 +32,8 @@ let spec x t =
 
 let target y t =
   let rec g = function
-    | Leaf a -> [%synt xi_0]
-    | Node (a, l, r) -> if y < a then [%synt xi_1] else [%synt xi_2]
+    | Leaf a -> [%synt xi_0] y a
+    | Node (a, l, r) -> if y < a then [%synt xi_1] (g l) else [%synt xi_2] y a (g r)
   in
   g t
   [@@requires is_bst]

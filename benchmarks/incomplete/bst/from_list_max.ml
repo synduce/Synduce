@@ -1,4 +1,4 @@
-(** @synduce -NB -s 2 *)
+(** @synduce -s 2 -NB *)
 
 type 'b list =
   | Elt of 'b
@@ -40,7 +40,7 @@ let rec spec = function
 ;;
 
 let rec target = function
-  | Leaf a -> [%synt xi_0]
-  | Node (a, l, r) -> [%synt xi_1]
+  | Leaf a -> [%synt xi_0] a
+  | Node (a, l, r) -> [%synt xi_1] (target r)
   [@@requires is_bst]
 ;;

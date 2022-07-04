@@ -60,11 +60,11 @@ and count x = function
 
 (* Synthesize a parallel version that is also linear time. *)
 let rec target = function
-  | KeyValue (k, v) -> [%synt s0]
-  | Node (hd_key, l, r) -> [%synt join]
+  | KeyValue (k, v) -> [%synt s0] k (int_of v)
+  | Node (hd_key, l, r) -> [%synt join] hd_key (target l) (target r)
   [@@requires is_imap]
 
 and int_of = function
-  | S n -> [%synt int_succ]
+  | S n -> [%synt int_succ] (int_of n)
   | One -> [%synt int_base]
 ;;

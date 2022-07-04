@@ -46,8 +46,9 @@ let spec key l =
 (* Synthesize a parallel version that is also linear time. *)
 let target key t =
   let rec g = function
-    | KeyValue (k, v) -> [%synt s0]
-    | Node (hd_key, l, r) -> if hd_key > key then [%synt join1] else [%synt join2]
+    | KeyValue (k, v) -> [%synt s0] key k v
+    | Node (hd_key, l, r) ->
+      if hd_key > key then [%synt join1] (g l) (g r) else [%synt join2] hd_key key (g r)
   in
   g t
   [@@requires is_imap]

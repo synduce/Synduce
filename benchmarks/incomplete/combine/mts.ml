@@ -1,4 +1,4 @@
-(** @synduce -s 2 -NB *)
+(** @synduce  -s 2 -NB *)
 
 type 'a list =
   | Nil
@@ -19,5 +19,5 @@ let rec target t = f [%synt s0] t
 
 and f s = function
   | Nil -> s
-  | Cons (hd, tl) -> f [%synt oplus] tl
+  | Cons (hd, tl) -> f ([%synt oplus] hd s) tl
 ;;

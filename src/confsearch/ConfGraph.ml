@@ -143,22 +143,25 @@ let cache (s : state) (u : unrealizability_witness list) =
 ;;
 
 let check_unrealizable_from_cache (ctx : env) (p : PsiDef.t) (s : state) =
-  (* Fmt.(pf stdout "@.== > CACHE:@;%a@." ECache.dump s.cache); *)
-  let rstar_t, _ = get_rstar ctx p !Utils.Config.Optims.rstar_limit in
-  let eset =
-    let eqns, _ =
-      Se2gis.Equations.make
-        ~silent:true
-        ~count_reused_predicates:false
-        ~ctx
-        ~p
-        ~lifting:Se2gis.Lifting.empty_lifting
-        rstar_t
+  if ECache.is_empty s.st_cache
+  then false
+  else (
+    (* Fmt.(pf stdout "@.== > CACHE:@;%a@." ECache.dump s.cache); *)
+    let rstar_t, _ = get_rstar ctx p !Utils.Config.Optims.rstar_limit in
+    let eset =
+      let eqns, _ =
+        Se2gis.Equations.make
+          ~silent:true
+          ~count_reused_predicates:false
+          ~ctx
+          ~p
+          ~lifting:Se2gis.Lifting.empty_lifting
+          rstar_t
+      in
+      ExpressionSet.of_list (List.filter_opt (List.map ~f:ECache.norm eqns))
     in
-    ExpressionSet.of_list (List.filter_opt (List.map ~f:ECache.norm eqns))
-  in
-  (* Fmt.(pf stdout "@.==> EXPRS:@;%a@." ExpressionSet.pp eset); *)
-  ECache.check_subset eset s.st_cache
+    (* Fmt.(pf stdout "@.==> EXPRS:@;%a@." ExpressionSet.pp eset); *)
+    ECache.check_subset eset s.st_cache)
 ;;
 
 (** `expand_down g conf` adds the edges from `conf` to all its refinements in `g`.

@@ -1,4 +1,4 @@
-(** @synduce -s 2 -NB *)
+(** @synduce -s 2 -NB --se2gis *)
 
 type 'a tree =
   | Nil of 'a
