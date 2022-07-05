@@ -74,6 +74,7 @@ let find_repair ~(ctx : env) ~(p : PsiDef.t) (witness : unrealizability_witness 
       in
       if not (Set.mem rhs_args v) (* Argument is not in function args. *)
       then (
+        let t0 = uw.ci.witness_eqn.eterm in
         match
           ( List.find uw.ci.witness_eqn.eelim ~f:(fun (_, tscalar) ->
                 Set.mem (ctx >- Analysis.free_variables tscalar) v)
@@ -81,8 +82,8 @@ let find_repair ~(ctx : env) ~(p : PsiDef.t) (witness : unrealizability_witness 
         with
         | Some (trec, _), Some xi ->
           AddRecursiveCalls
-            [ xi, mk_app (mk_var ctx.ctx p.PsiDef.target.pmain_symb) [ trec ] ]
-        | _, Some xi -> AddRecursiveCalls [ xi, mk_var ctx.ctx v ]
+            [ t0, xi, mk_app (mk_var ctx.ctx p.PsiDef.target.pmain_symb) [ trec ] ]
+        | _, Some xi -> AddRecursiveCalls [ t0, xi, mk_var ctx.ctx v ]
         | _ -> NoRepair)
       else Lift
     in

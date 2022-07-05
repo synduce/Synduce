@@ -55,7 +55,7 @@ type witness_stat =
 
 type repair =
   | Lift
-  | AddRecursiveCalls of (variable * term) list
+  | AddRecursiveCalls of (term * variable * term) list
   | NoRepair
 [@@deriving sexp]
 

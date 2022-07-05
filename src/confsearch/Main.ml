@@ -4,6 +4,7 @@ open Env
 open ProblemDefs
 open Lang
 open Utils
+module Sub = Configuration.Subconf
 module G = ConfGraph
 module CO = Config.Optims
 
@@ -23,6 +24,22 @@ let is_definite = function
 ;;
 
 let pw ctx = Lwt.map (fun x -> ctx, x)
+
+let log_step ctx p resp (elapsed, verif) s =
+  AlgoLog.log_solution ~ctx ~p resp;
+  AlgoLog.show_stat_intermediate_solution
+    ~ctx
+    p
+    resp
+    elapsed
+    verif
+    !total_configurations
+    (G.get_coverage_percentage s)
+;;
+
+(* ============================================================================================= *)
+(*                            SINGLE NODE (CONFIGURATION) SOLVERS                                *)
+(* ============================================================================================= *)
 
 let portfolio_solver ~(ctx : env) (p : PsiDef.t) =
   let counter = ref 2 in
@@ -59,17 +76,56 @@ let single_configuration_solver ~(ctx : env) (p : PsiDef.t)
   ctx, elapsed, verif, resp
 ;;
 
-let log_step ctx p resp (elapsed, verif) s =
-  AlgoLog.log_solution ~ctx ~p resp;
-  AlgoLog.show_stat_intermediate_solution
-    ~ctx
-    p
-    resp
-    elapsed
-    verif
-    !total_configurations
-    (G.get_coverage_percentage s)
+(* ============================================================================================= *)
+(*                            OTHER SUBROUTINES                                                  *)
+(* ============================================================================================= *)
+
+let analyze_witness_list
+    ~(ctx : env)
+    (s : G.state)
+    (c : Sub.t)
+    (wl : unrealizability_witness list)
+  =
+  let _ = ctx, s, c, wl in
+  ()
 ;;
+
+let analyze_witnesses
+    ~(ctx : env)
+    ~(g : PMRS.t)
+    (s : G.state)
+    (c : Sub.t)
+    (r : repair)
+    (wl : unrealizability_witness list)
+  =
+  match r with
+  | Lift ->
+    (* Lift repair should be handled by the single-configuration solver. *)
+    ()
+  | AddRecursiveCalls reqs ->
+    (* Local root causing has identified missing information.
+      This missing information must be related to precise recursive calls or
+      scalar arguments.
+    *)
+    List.iter reqs ~f:(fun (t_input, xi_v, t_req) ->
+        Fmt.(
+          pf
+            stdout
+            "@[REQ: on input @[%a@], %s should access@;@[%a@]@]@."
+            (Term.pp_term ctx.ctx)
+            t_input
+            xi_v.vname
+            (Term.pp_term ctx.ctx)
+            t_req);
+        let f_t = ctx >>- Reduce.reduce_pmrs g t_input in
+        Fmt.(pf stdout "g(t) = %a)@." (Term.pp_term ctx.ctx) f_t));
+    failwith "DEBUG"
+  | _ -> analyze_witness_list ~ctx s c wl
+;;
+
+(* ============================================================================================= *)
+(*                            MAIN CONFIGURATION GRAPH SOLVING ALGORITHM                         *)
+(* ============================================================================================= *)
 
 let find_multiple_solutions
     ~(ctx : env)
@@ -105,10 +161,10 @@ let find_multiple_solutions
         ~shuffle:!CO.shuffle_configurations
         rstate
     with
-    | Some sub_conf ->
+    | Some curr_conf ->
       Int.incr num_attempts;
       (* Apply sub-configuration to configuration and problem components. *)
-      let conf = Subconf.to_conf ~sup sub_conf in
+      let conf = Subconf.to_conf ~sup curr_conf in
       let new_target, new_ctx =
         apply_configuration ~ctx conf top_userdef_problem.target
       in
@@ -125,23 +181,23 @@ let find_multiple_solutions
       then (
         Log.info
           Fmt.(fun fmt () -> pf fmt "Configuration is unrealizable according to cache.");
-        G.mark_unrealizable rstate sub_conf;
-        expand_func ~mark:G.Unrealizable rstate sub_conf;
+        G.mark_unrealizable rstate curr_conf;
+        expand_func ~mark:G.Unrealizable rstate curr_conf;
         (* Update stats: number of cache hits. *)
         Int.incr Stats.num_unr_cache_hits;
         (* Log an unrealizable solution (logged by single_configuration_solver in other branches) *)
         AlgoLog.log_solution ~ctx ~p:new_pdef (Unrealizable (NoRepair, []));
         (* Update the coverage. *)
-        update_coverage_func rstate sub_conf G.Unrealizable;
+        update_coverage_func rstate curr_conf G.Unrealizable;
         find_sols (a @ [ new_ctx, new_pdef, Unrealizable (NoRepair, []) ]))
       else (
         (* Call the single configuration solver. *)
         match single_configuration_solver ~ctx:new_ctx new_pdef with
         | new_ctx', elapsed, verif, Realizable s ->
-          G.mark_realizable rstate sub_conf;
-          expand_func ~mark:G.Realizable rstate sub_conf;
+          G.mark_realizable rstate curr_conf;
+          expand_func ~mark:G.Realizable rstate curr_conf;
           (* Update the coverage *)
-          update_coverage_func rstate sub_conf G.Realizable;
+          update_coverage_func rstate curr_conf G.Realizable;
           (* Update stat: whether we have hit the original configuration. *)
           if same_conf new_pdef.target orig_target then Stats.orig_solution_hit := true;
           (* Looking for the best solution according to some metric. *)
@@ -153,20 +209,23 @@ let find_multiple_solutions
           log_step new_ctx' new_pdef (Realizable s) (elapsed, verif) rstate;
           find_sols ((new_ctx', new_pdef, Realizable s) :: a)
         | new_ctx', elapsed, verif, Unrealizable (r, u) ->
-          G.mark_unrealizable rstate sub_conf;
-          expand_func ~mark:G.Unrealizable rstate sub_conf;
+          G.mark_unrealizable rstate curr_conf;
+          expand_func ~mark:G.Unrealizable rstate curr_conf;
           (* Cache the unrealizable configuration for R*. *)
           G.cache rstate u;
           (* Update the coverage. *)
-          update_coverage_func rstate sub_conf G.Unrealizable;
+          update_coverage_func rstate curr_conf G.Unrealizable;
+          (* Analyze the witnesses and root cause to suggest next configuration
+             to solve. *)
+          analyze_witnesses ~ctx:new_ctx' ~g:new_target rstate curr_conf r u;
           (* Continue *)
           log_step new_ctx' new_pdef (Unrealizable (r, u)) (elapsed, verif) rstate;
           find_sols ((new_ctx', new_pdef, Unrealizable (r, u)) :: a)
         | new_ctx', elapsed, verif, Failed (s, f) ->
-          G.mark_failed rstate sub_conf;
-          expand_func rstate sub_conf;
+          G.mark_failed rstate curr_conf;
+          expand_func rstate curr_conf;
           (* Update the coverage. *)
-          update_coverage_func rstate sub_conf G.Failed;
+          update_coverage_func rstate curr_conf G.Failed;
           log_step new_ctx' new_pdef (Failed (s, f)) (elapsed, verif) rstate;
           find_sols ((new_ctx', new_pdef, Failed (s, f)) :: a))
     | None -> a
