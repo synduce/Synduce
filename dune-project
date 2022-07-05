@@ -59,6 +59,8 @@
    (>= v0.14.0))
   (stdio
    (>= v0.14.0))
+  (ppx_deriving
+   (>= 5.2))
   (ppx_sexp_conv
    (>= v0.14.0))
   (ppx_optcomp

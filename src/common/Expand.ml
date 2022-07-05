@@ -233,6 +233,8 @@ let replace_rhs_of_mains ~(ctx : Context.t) (p : PsiDef.t) (t0 : term) : term =
 (*                                   segis TERM EXPANSION                                       *)
 (* ============================================================================================= *)
 
+let _terms_of_type = Hashtbl.create (module RType)
+
 let simple
     ?(verbose = false)
     ?(max_height = !Config.Optims.expand_cut)
