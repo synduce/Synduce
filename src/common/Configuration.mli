@@ -113,4 +113,4 @@ val num_rec_calls : ctx:Env.env -> conf -> int
 (** [get_rstar e p k] returns a pair [t,u] where [t] is the set of maximally reducible
     terms after [k] rounds of R*.
 *)
-val get_rstar : Env.env -> Psi.t -> int -> TermSet.t * TermSet.t
+val get_rstar : fuel:float -> Env.env -> Psi.t -> int -> TermSet.t * TermSet.t

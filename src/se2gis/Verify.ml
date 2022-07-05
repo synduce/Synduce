@@ -131,7 +131,7 @@ let check_solution
     (* Execute the preamble. *)
     let%lwt () = exec_all solver preamble in
     let expand_and_check i (t0 : term) =
-      let t_set, u_set = ctx >>- Expand.to_maximally_reducible p t0 in
+      let t_set, u_set = Expand.to_maximally_reducible ~ctx p t0 in
       let t_set, _ = partial_bounding_checker ~ctx ~p lstate t_set in
       let num_terms_to_check = List.length t_set in
       if num_terms_to_check > 0

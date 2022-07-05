@@ -177,11 +177,11 @@ let se2gis ~(ctx : env) (p : PsiDef.t) : solver_response segis_response Lwt.t =
           (Variable.mk ctx.ctx ~t:(Some (get_theta ctx)) (Alpha.fresh ctx.ctx.names))
       in
       let s = TermSet.of_list (ctx >- Analysis.expand_once x0) in
-      Set.partition_tf ~f:(ctx >>- Expand.is_mr_all p) s)
+      Set.partition_tf ~f:(Expand.is_mr_all ~ctx p) s)
     else (
       let init_set = MGT.most_general_terms ctx p.PsiDef.target in
       Set.fold init_set ~init:(TermSet.empty, TermSet.empty) ~f:(fun (t, u) mgt ->
-          let t', u' = ctx >>- Expand.to_maximally_reducible p mgt in
+          let t', u' = Expand.to_maximally_reducible ~ctx p mgt in
           Set.union t t', Set.union u u'))
   in
   Log.debug (fun frmt () ->

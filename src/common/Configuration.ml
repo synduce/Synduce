@@ -383,16 +383,25 @@ let num_rec_calls ~(ctx : env) (c : conf) : int =
   Map.fold c ~init:0 ~f:(fun ~key:_ ~data:args accum -> accum + count_rec args)
 ;;
 
-let get_rstar (ctx : env) (p : ProblemDefs.PsiDef.t) (k : int) =
+let get_rstar ~(fuel : float) (ctx : env) (p : ProblemDefs.PsiDef.t) (k : int)
+    : TermSet.t * TermSet.t
+  =
+  let start_t = Unix.gettimeofday () in
+  let fuel_left () = Float.((100.0 * (Unix.gettimeofday () - start_t)) - fuel) in
   let x0 =
     mk_var
       ctx.ctx
       (Variable.mk ctx.ctx ~t:(Some (get_theta ctx)) (Alpha.fresh ctx.ctx.names))
   in
   let s = TermSet.of_list (ctx >- Analysis.expand_once x0) in
-  let set_t0, set_u0 = Set.partition_tf ~f:(ctx >>- Expand.is_mr_all p) s in
+  let set_t0, set_u0 = Set.partition_tf ~f:(Expand.is_mr_all ~ctx p) s in
   let rec aux k (t, u) =
-    if k <= 0 then t, u else aux (k - 1) (ctx >>- Expand.expand_all p (t, u))
+    if k <= 0 && Float.(fuel_left () > 0.)
+    then t, u
+    else (
+      match Expand.expand_all ~fuel:(fuel_left ()) ~ctx p (t, u) with
+      | Ok x -> aux (k - 1) x
+      | Error _ -> t, u)
   in
   aux k (set_t0, set_u0)
 ;;

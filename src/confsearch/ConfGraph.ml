@@ -147,7 +147,9 @@ let check_unrealizable_from_cache (ctx : env) (p : PsiDef.t) (s : state) =
   then false
   else (
     (* Fmt.(pf stdout "@.== > CACHE:@;%a@." ECache.dump s.cache); *)
-    let rstar_t, _ = get_rstar ctx p !Utils.Config.Optims.rstar_limit in
+    let rstar_t, _ =
+      get_rstar ~fuel:!Config.Optims.rstar_fuel ctx p !Utils.Config.Optims.rstar_limit
+    in
     let eset =
       let eqns, _ =
         Se2gis.Equations.make

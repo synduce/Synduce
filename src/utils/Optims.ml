@@ -216,6 +216,8 @@ let set_rstar_limit (s : string) =
   | _ -> ()
 ;;
 
+let rstar_fuel = ref 300.
+
 (** Use the deterministic algorithm to precompute sets of equations that might have unrealizable
     sets.
 *)
