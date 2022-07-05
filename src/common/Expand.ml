@@ -481,7 +481,7 @@ let to_maximally_reducible ~(ctx : Env.env) (p : PsiDef.t) (t0 : term)
     `p`. If the pair (t,u) is a boundary then the pair of sets returned will also be a boundary.
 *)
 let expand_all
-    ?(fuel = -1.0)
+    ?(fuel = 0.0)
     ~(ctx : Env.env)
     (p : PsiDef.t)
     ((t, u) : TermSet.t * TermSet.t)

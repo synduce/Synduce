@@ -308,18 +308,21 @@ let to_explore (s : state) (orig : Subconf.t) (dest : Subconf.t) =
     to [c].
 *)
 let add_next_candidate ~(origin : Subconf.t) (s : state) (c : Subconf.t) : unit =
-  let config_path = Subconf.diff origin c in
-  let final_conf =
-    List.fold config_path ~init:origin ~f:(fun curr (must_add, loc_id, arg_id) ->
-        let c' = Subconf.apply_diff (must_add, loc_id, arg_id) curr in
-        G.add_edge s.st_graph curr c';
-        if is_unmarked s c' then mark_unsolved s c';
-        if must_add
-        then mark_add_arg s curr c' (must_add, loc_id, arg_id)
-        else mark_rem_arg s curr c' (must_add, loc_id, arg_id);
-        c')
-  in
-  s.st_next_candidate <- Some final_conf
+  if not (is_unmarked s c)
+  then ()
+  else (
+    let config_path = Subconf.diff origin c in
+    let final_conf =
+      List.fold config_path ~init:origin ~f:(fun curr (must_add, loc_id, arg_id) ->
+          let c' = Subconf.apply_diff (must_add, loc_id, arg_id) curr in
+          G.add_edge s.st_graph curr c';
+          if is_unmarked s c' then mark_unsolved s c';
+          if must_add
+          then mark_add_arg s curr c' (must_add, loc_id, arg_id)
+          else mark_rem_arg s curr c' (must_add, loc_id, arg_id);
+          c')
+    in
+    s.st_next_candidate <- Some final_conf)
 ;;
 
 (**

@@ -106,7 +106,9 @@ type func_resolution =
   | FRNonT of PMRS.t
   | FRUnknown
 
-let resolve_func (fctx : PMRS.Functions.ctx) (ctx : Context.t) (func : term) =
+let resolve_func (fctx : PMRS.Functions.ctx) (ctx : Context.t) (func : term)
+    : func_resolution
+  =
   match func.tkind with
   | TVar x ->
     (match Hashtbl.find ctx.globals x.vname with

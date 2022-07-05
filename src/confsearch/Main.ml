@@ -3,6 +3,7 @@ open Common
 open Env
 open ProblemDefs
 open Lang
+open RootCauseAnalysis
 open Utils
 module Sub = Configuration.Subconf
 module G = ConfGraph
@@ -74,53 +75,6 @@ let single_configuration_solver ~(ctx : env) (p : PsiDef.t)
   (* Save stats an restart counters. *)
   LogJson.save_stats_and_restart p.id;
   ctx, elapsed, verif, resp
-;;
-
-(* ============================================================================================= *)
-(*                            OTHER SUBROUTINES                                                  *)
-(* ============================================================================================= *)
-
-let analyze_witness_list
-    ~(ctx : env)
-    (s : G.state)
-    (c : Sub.t)
-    (wl : unrealizability_witness list)
-  =
-  let _ = ctx, s, c, wl in
-  ()
-;;
-
-let analyze_witnesses
-    ~(ctx : env)
-    ~(g : PMRS.t)
-    (s : G.state)
-    (c : Sub.t)
-    (r : repair)
-    (wl : unrealizability_witness list)
-  =
-  match r with
-  | Lift ->
-    (* Lift repair should be handled by the single-configuration solver. *)
-    ()
-  | AddRecursiveCalls reqs ->
-    (* Local root causing has identified missing information.
-      This missing information must be related to precise recursive calls or
-      scalar arguments.
-    *)
-    List.iter reqs ~f:(fun (t_input, xi_v, t_req) ->
-        Fmt.(
-          pf
-            stdout
-            "@[REQ: on input @[%a@], %s should access@;@[%a@]@]@."
-            (Term.pp_term ctx.ctx)
-            t_input
-            xi_v.vname
-            (Term.pp_term ctx.ctx)
-            t_req);
-        let f_t = ctx >>- Reduce.reduce_pmrs g t_input in
-        Fmt.(pf stdout "g(t) = %a)@." (Term.pp_term ctx.ctx) f_t));
-    failwith "DEBUG"
-  | _ -> analyze_witness_list ~ctx s c wl
 ;;
 
 (* ============================================================================================= *)

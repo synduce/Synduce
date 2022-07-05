@@ -912,7 +912,7 @@ let classify_witnesss ~(ctx : env) ~(p : PsiDef.t) (witnesss : witness list)
   let classify_with_tinv tinv witnesss =
     (* TODO: DT_LIA for z3, DTLIA for cvc4... Should write a type to represent logics. *)
     let f (witness : witness) = satisfies_tinv ~ctx ~p tinv witness in
-    Lwt_list.map_p f witnesss
+    Lwt_list.map_s f witnesss
   in
   let classify_wrt_ref b =
     Lwt_list.map_s (check_witness_in_image ~ctx ~ignore_unknown:b ~p)
@@ -925,12 +925,12 @@ let classify_witnesss ~(ctx : env) ~(p : PsiDef.t) (witnesss : witness list)
     | Some tinv -> classify_with_tinv tinv witnesss
     | None -> Lwt.return witnesss
   in
-  let witnesss_c2 =
+  let%lwt witnesss_c2 =
     if Option.is_some p.tinv
     then (* TODO find a way to do both classifications efficiently. *)
       witnesss_c1
     else Lwt.bind witnesss_c1 (classify_wrt_ref false)
   in
   Log.end_section ();
-  witnesss_c2
+  Lwt.return witnesss_c2
 ;;
