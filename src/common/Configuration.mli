@@ -44,10 +44,25 @@ module Subconf : sig
         by dropping an argument for one of the unknowns. *)
   val drop_arg : ?filter:t option -> t -> ((int * int) * t) list
 
-  (** `add_arg x` creates the list of all the sub-configurations than can be obtained
+  (** [add_arg x] creates the list of all the sub-configurations than can be obtained
         by adding an argument for one of the unknowns. This requires having acess to the
         sup-configuration. *)
   val add_arg : sup:t -> t -> ((int * int) * t) list
+
+  (** [appply_diff diff c] applies the difference [diff] to [c] and returns a new
+      configuration. The [diff] is a triple as returned by [diff c c'] for another
+      [c']. If [diff] is not a well-formed triple, this functions returns [c].
+  *)
+  val apply_diff : bool * int * int -> t -> t
+
+  (** [diff c1 c2] eturns a list that represents the differences between the
+    configurations [c1] and [c2]. Each element of the list is a triple of a boolean,
+    a key that is the id of the unknown (location) and the id of the argument. If the
+    boolean is [true] it means the argument id needs to be added to the location id to
+    get from [c1] to [c2]. If the boolean is [false] then it means the argument id needs to
+    be removed from [c1] at the location to get to [c2].
+  *)
+  val diff : t -> t -> (bool * int * int) list
 
   module Lattice : sig
     (** Count the number of sub-configurations of a given configuration. *)

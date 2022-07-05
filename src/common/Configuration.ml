@@ -58,6 +58,8 @@ module Subconf = struct
     Hash.of_fold (Map.hash_fold_direct Int.hash_fold_t (List.hash_fold_t Int.hash_fold_t))
   ;;
 
+  (* ========= Constructing configurations =============== *)
+
   (** Return the configuration as a subconf. *)
   let of_conf (conf : conf) : t =
     Map.fold
@@ -179,6 +181,36 @@ module Subconf = struct
               (unknown, new_arg), Map.set ~key:unknown ~data:(new_arg :: args) conf))
     in
     List.concat_map (Map.to_alist conf) ~f:add_one
+  ;;
+
+  let apply_diff ((must_add, loc_id, arg_id) : bool * int * int) (c : t) =
+    let f ~key ~data =
+      if key = loc_id
+      then
+        if must_add (* Add the argument. *)
+        then data @ [ arg_id ] (* Remove the argument. *)
+        else List.filter ~f:(fun x -> not (x = arg_id)) data
+      else data
+    in
+    Map.mapi c ~f
+  ;;
+
+  let diff (c1 : t) (c2 : t) : (bool * int * int) list =
+    let f ~key ~data accum =
+      match Map.find c2 key with
+      | Some data' ->
+        accum
+        (* All the elements in data not in data' are args to remove from c1 to get to c2 *)
+        @ List.filter_map data ~f:(fun x ->
+              if List.mem ~equal:Int.equal data' x then None else Some (false, key, x))
+        @ (* All the elements in data' not in data are args to add to c1 to get to c2 *)
+        List.filter_map data' ~f:(fun x ->
+            if List.mem ~equal:Int.equal data x then None else Some (true, key, x))
+      | None ->
+        (* All the argument in c1 not in c2 must be removed. *)
+        accum @ List.map data ~f:(fun x -> false, key, x)
+    in
+    Map.fold c1 ~init:[] ~f
   ;;
 
   module Lattice = struct
@@ -396,7 +428,7 @@ let get_rstar ~(fuel : float) (ctx : env) (p : ProblemDefs.PsiDef.t) (k : int)
   let s = TermSet.of_list (ctx >- Analysis.expand_once x0) in
   let set_t0, set_u0 = Set.partition_tf ~f:(Expand.is_mr_all ~ctx p) s in
   let rec aux k (t, u) =
-    if k <= 0 && Float.(fuel_left () > 0.)
+    if k <= 0 || Float.(fuel_left () < 0.)
     then t, u
     else (
       match Expand.expand_all ~fuel:(fuel_left ()) ~ctx p (t, u) with

@@ -1,4 +1,5 @@
-(** @synduce -s 2 -NB --no-lifting  *)
+(** @synduce -s 2 -NB --no-lifting -n 20 --segis *)
+(* Bug with se2gis on this one ... *)
 
 type list =
   | Elt of int

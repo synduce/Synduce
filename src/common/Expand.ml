@@ -504,7 +504,6 @@ let expand_all
 (* ============================================================================================= *)
 (*                                   EXPAND TERM UTILS                                           *)
 (* ============================================================================================= *)
-open Lwt
 open Smtlib
 open SmtInterface
 
@@ -519,6 +518,7 @@ let lwt_expand_loop
     ~(ctx : Context.t)
     (u : TermSet.t Lwt.t)
   =
+  let open Lwt in
   let rec tlist_check accum terms =
     match terms with
     | [] -> accum

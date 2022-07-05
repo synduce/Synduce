@@ -53,9 +53,12 @@ type state =
     Otherwise, a mark of 0 means it has not been solved.
   *)
   ; st_emarks : edge_mark Hashtbl.M(SubconfEdge).t
-  ; st_root : Subconf.t (**
-  The maximum configuration of the graph.
-      *)
+        (** The edges of the configurations
+      are marked as either adding arguments or removing arguments. *)
+  ; st_root : Subconf.t (** The maximum configuration of the graph. *)
+  ; mutable st_next_candidate : Subconf.t option
+        (** The state can contain a candidate for
+            the next configuration to return.*)
   ; st_recs : Subconf.t
         (** A subconfiguration mapping to the
       recursive call arguments. *)
@@ -104,6 +107,10 @@ let mark_failed (s : state) (conf : Subconf.t) =
   Hashtbl.set s.st_marks ~key:conf ~data:Failed
 ;;
 
+let mark_unsolved (s : state) (conf : Subconf.t) =
+  Hashtbl.set s.st_marks ~key:conf ~data:Unsolved
+;;
+
 let is_unmarked (s : state) (conf : Subconf.t) =
   match Hashtbl.find s.st_marks conf with
   | Some Unsolved | None -> true
@@ -117,6 +124,15 @@ let mark_add_arg
     ((kind, a, b) : bool * int * int)
   =
   Hashtbl.set s.st_emarks ~key:(conf_orig, conf_dest) ~data:(EAddArg (kind, a, b))
+;;
+
+let mark_rem_arg
+    (s : state)
+    (conf_orig : Subconf.t)
+    (conf_dest : Subconf.t)
+    ((kind, a, b) : bool * int * int)
+  =
+  Hashtbl.set s.st_emarks ~key:(conf_orig, conf_dest) ~data:(ERemArg (kind, a, b))
 ;;
 
 let cache (s : state) (u : unrealizability_witness list) =
@@ -285,31 +301,57 @@ let to_explore (s : state) (orig : Subconf.t) (dest : Subconf.t) =
     false
 ;;
 
+(** During the graph exploration, root causing can suggest a configuration to solve next.
+    [add_next_candidate ~origin s c] adds the configuration [c] to the graph in the state [s],
+    with a sequence of edges starting from [origin].
+    Does nothing is there is no path that consists in edges only adding arguments to [origin] to get
+    to [c].
+*)
+let add_next_candidate ~(origin : Subconf.t) (s : state) (c : Subconf.t) : unit =
+  let config_path = Subconf.diff origin c in
+  let final_conf =
+    List.fold config_path ~init:origin ~f:(fun curr (must_add, loc_id, arg_id) ->
+        let c' = Subconf.apply_diff (must_add, loc_id, arg_id) curr in
+        G.add_edge s.st_graph curr c';
+        if is_unmarked s c' then mark_unsolved s c';
+        if must_add
+        then mark_add_arg s curr c' (must_add, loc_id, arg_id)
+        else mark_rem_arg s curr c' (must_add, loc_id, arg_id);
+        c')
+  in
+  s.st_next_candidate <- Some final_conf
+;;
+
 (**
   Find the next 0-marked configuration in the graph.
   Return None if there is no such configuration.
 *)
 let next ?(shuffle = false) (s : state) : Subconf.t option =
-  let q = Queue.create () in
-  let perm_opt x = if shuffle then List.permute x else x in
-  Queue.enqueue q s.st_root;
-  let rec loop () =
-    let explore_next curr =
-      let children = List.filter ~f:(to_explore s curr) (succ s.st_graph curr) in
-      Queue.enqueue_all q (perm_opt children);
-      loop ()
+  match s.st_next_candidate with
+  | Some next ->
+    s.st_next_candidate <- None;
+    Some next
+  | None ->
+    let q = Queue.create () in
+    let perm_opt x = if shuffle then List.permute x else x in
+    Queue.enqueue q s.st_root;
+    let rec loop () =
+      let explore_next curr =
+        let children = List.filter ~f:(to_explore s curr) (succ s.st_graph curr) in
+        Queue.enqueue_all q (perm_opt children);
+        loop ()
+      in
+      Option.bind (Queue.dequeue q) ~f:(fun curr ->
+          match Hashtbl.find s.st_marks curr with
+          | None ->
+            Hashtbl.set s.st_marks ~key:curr ~data:Unsolved;
+            Some curr
+          | Some Unsolved -> Some curr
+          | Some Failed ->
+            if !Utils.Config.node_failure_behavior then loop () else explore_next curr
+          | Some _ -> explore_next curr)
     in
-    Option.bind (Queue.dequeue q) ~f:(fun curr ->
-        match Hashtbl.find s.st_marks curr with
-        | None ->
-          Hashtbl.set s.st_marks ~key:curr ~data:Unsolved;
-          Some curr
-        | Some Unsolved -> Some curr
-        | Some Failed ->
-          if !Utils.Config.node_failure_behavior then loop () else explore_next curr
-        | Some _ -> explore_next curr)
-  in
-  loop ()
+    loop ()
 ;;
 
 (**
@@ -368,6 +410,7 @@ let generate_configurations ?(strategy = O.ESTopDown) (ctx : env) (p : PMRS.t) :
   ; st_marks
   ; st_emarks
   ; st_root = root
+  ; st_next_candidate = None
   ; st_super = super
   ; st_recs = Subconf.rec_calls_conf super
   ; st_super_subc
