@@ -26,28 +26,29 @@ let pw ctx = Lwt.map (fun x -> ctx, x)
 
 let portfolio_solver ~(ctx : env) (p : PsiDef.t) =
   let counter = ref 2 in
-  Lwt.pick
-    [ Concurrency.pwait is_definite counter ctx (Se2gis.Main.solve_problem ~ctx p)
-    ; (let ctx' = env_copy ctx in
-       Concurrency.pwait
-         is_definite
-         counter
-         ctx'
-         (Se2gis.Baselines.algo_segis ~ctx:ctx' p))
-    ]
+  Lwt_main.run
+    (Lwt.pick
+       [ Concurrency.pwait is_definite counter ctx (Se2gis.Main.solve_problem ~ctx p)
+       ; (let ctx' = env_copy ctx in
+          Concurrency.pwait
+            is_definite
+            counter
+            ctx'
+            (Se2gis.Baselines.algo_segis ~ctx:ctx' p))
+       ])
 ;;
 
 let single_configuration_solver ~(ctx : env) (p : PsiDef.t)
-    : (env * float * float * Syguslib.Sygus.solver_response segis_response) Lwt.t
+    : env * float * float * Syguslib.Sygus.solver_response segis_response
   =
-  let%lwt ctx, resp =
+  let ctx, resp =
     if !CO.use_segis (* Symbolic CEGIS. *)
-    then pw ctx (Se2gis.Baselines.algo_segis ~ctx p)
+    then Lwt_main.run (pw ctx (Se2gis.Baselines.algo_segis ~ctx p))
     else if !CO.use_cegis (* Concrete CEGIS. *)
-    then pw ctx (Se2gis.Baselines.algo_cegis ~ctx p)
+    then Lwt_main.run (pw ctx (Se2gis.Baselines.algo_cegis ~ctx p))
     else if !CO.use_se2gis
     then
-      pw ctx (Se2gis.Main.solve_problem ~ctx p)
+      Lwt_main.run (pw ctx (Se2gis.Main.solve_problem ~ctx p))
       (* Default algorithm: best combination of techniques (TODO) *)
     else portfolio_solver ~ctx p
   in
@@ -55,7 +56,7 @@ let single_configuration_solver ~(ctx : env) (p : PsiDef.t)
   and verif = !Stats.verif_time in
   (* Save stats an restart counters. *)
   LogJson.save_stats_and_restart p.id;
-  Lwt.return (ctx, elapsed, verif, resp)
+  ctx, elapsed, verif, resp
 ;;
 
 let log_step ctx p resp (elapsed, verif) s =
@@ -75,7 +76,7 @@ let find_multiple_solutions
     ~score:(score_func : Env.env -> PsiDef.t -> soln -> Configuration.conf -> int)
     (top_userdef_problem : PsiDef.t)
     (sup : Configuration.conf)
-    : multi_soln_result Lwt.t
+    : multi_soln_result
   =
   let num_attempts = ref 0 in
   let best_score = ref 1000 in
@@ -118,7 +119,7 @@ let find_multiple_solutions
       Log.info
         Fmt.(
           fun fmt () ->
-            pf fmt "New target:@[%a@]" (ctx >- PMRS.pp_ocaml ~short:false) new_target);
+            pf fmt "New target:@;@[%a@]" (ctx >- PMRS.pp_ocaml ~short:false) new_target);
       (* Check unrealizability via cache first. *)
       if !CO.use_rstar_caching && G.check_unrealizable_from_cache new_ctx new_pdef rstate
       then (
@@ -135,7 +136,7 @@ let find_multiple_solutions
         find_sols (a @ [ new_ctx, new_pdef, Unrealizable (NoRepair, []) ]))
       else (
         (* Call the single configuration solver. *)
-        match%lwt single_configuration_solver ~ctx:new_ctx new_pdef with
+        match single_configuration_solver ~ctx:new_ctx new_pdef with
         | new_ctx', elapsed, verif, Realizable s ->
           G.mark_realizable rstate sub_conf;
           expand_func ~mark:G.Realizable rstate sub_conf;
@@ -168,15 +169,14 @@ let find_multiple_solutions
           update_coverage_func rstate sub_conf G.Failed;
           log_step new_ctx' new_pdef (Failed (s, f)) (elapsed, verif) rstate;
           find_sols ((new_ctx', new_pdef, Failed (s, f)) :: a))
-    | None -> Lwt.return a
+    | None -> a
   in
-  let%lwt all_solns = find_sols [] in
-  Lwt.return
-    { r_best = !best_solution
-    ; r_all = all_solns
-    ; r_subconf_count = -1
-    ; r_final_state = rstate
-    }
+  let all_solns = find_sols [] in
+  { r_best = !best_solution
+  ; r_all = all_solns
+  ; r_subconf_count = -1
+  ; r_final_state = rstate
+  }
 ;;
 
 let find_and_solve_problem
@@ -184,7 +184,7 @@ let find_and_solve_problem
     ~(filename : string)
     (psi_comps : (string * string * string) option)
     (pmrs : (string, PMRS.t, Base.String.comparator_witness) Map.t)
-    : multi_soln_result Lwt.t
+    : multi_soln_result
   =
   (*  Find problem components *)
   let target_fname, spec_fname, repr_fname =
@@ -219,12 +219,12 @@ let find_and_solve_problem
     total_configurations := subconf_count;
     Log.info (fun fmt () -> Fmt.pf fmt "%i configurations possible." subconf_count);
     AlgoLog.log_confsearch_problem ~ctx ~p:top_userdef_problem subconf_count;
-    let%lwt multi_sols =
+    let multi_sols =
       (* TODO: multiple scoring functions. *)
       let score_func ctx _p _soln conf = Configuration.num_rec_calls ~ctx conf in
       find_multiple_solutions ~ctx ~score:score_func top_userdef_problem max_configuration
     in
-    Lwt.return { multi_sols with r_subconf_count = subconf_count })
+    { multi_sols with r_subconf_count = subconf_count })
   else (
     (* Only solve the top-level skeleton, i.e. the problem specified by the user. *)
     let placeholder_state =
@@ -233,11 +233,10 @@ let find_and_solve_problem
         ctx
         top_userdef_problem.target
     in
-    let%lwt ctx', _, _, top_soln = single_configuration_solver ~ctx top_userdef_problem in
-    Lwt.return
-      { r_best = Some (ctx', top_userdef_problem, top_soln)
-      ; r_all = [ ctx', top_userdef_problem, top_soln ]
-      ; r_subconf_count = 1
-      ; r_final_state = placeholder_state
-      })
+    let ctx', _, _, top_soln = single_configuration_solver ~ctx top_userdef_problem in
+    { r_best = Some (ctx', top_userdef_problem, top_soln)
+    ; r_all = [ ctx', top_userdef_problem, top_soln ]
+    ; r_subconf_count = 1
+    ; r_final_state = placeholder_state
+    })
 ;;

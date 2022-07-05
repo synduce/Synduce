@@ -1,6 +1,7 @@
 open Base
 open Common
 open Elim
+open Env
 open Lang
 open Lwt
 open Lwt.Syntax
@@ -104,12 +105,8 @@ let smt_of_lemma_app (det : term_info) =
     (List.map ~f:(fun var -> S.mk_var var.vname) det.ti_formals)
 ;;
 
-let smt_of_lemma_validity
-    ~(ctx : Context.t)
-    ~(p : PsiDef.t)
-    (det : term_info)
-    (cl : cond_lemma)
-  =
+let smt_of_lemma_validity ~(p : PsiDef.t) (ti : term_info) (cl : cond_lemma) =
+  let ctx = ti.ti_context.ctx in
   let mk_sort maybe_rtype =
     match maybe_rtype with
     | None -> S.mk_int_sort
@@ -118,10 +115,10 @@ let smt_of_lemma_validity
   let quants =
     List.map
       ~f:(fun var -> S.SSimple var.vname, mk_sort (Variable.vtype ctx var))
-      (Set.elements (Analysis.free_variables ~ctx det.ti_term)
+      (Set.elements (Analysis.free_variables ~ctx ti.ti_term)
       @ List.concat_map
           ~f:(fun (_, b) -> Set.elements (Analysis.free_variables ~ctx b))
-          det.ti_elim)
+          ti.ti_elim)
   in
   let preconds =
     match cl.cl_cond with
@@ -130,22 +127,17 @@ let smt_of_lemma_validity
   in
   let if_condition =
     S.mk_assoc_and
-      ([ smt_of_tinv_app ~ctx ~p det; smt_of_recurs_elim_eqns ~ctx det.ti_elim ~p ]
+      ([ smt_of_tinv_app ~ctx ~p ti; smt_of_recurs_elim_eqns ~ctx ti.ti_elim ~p ]
       @ preconds)
   in
-  let if_then = smt_of_lemma_app det in
+  let if_then = smt_of_lemma_app ti in
   [ S.mk_assert (S.mk_exists quants (S.mk_not (S.mk_or (S.mk_not if_condition) if_then)))
   ]
 ;;
 
-let inductive_solver_preamble
-    ~(fctx : PMRS.Functions.ctx)
-    ~(ctx : Context.t)
-    ~(p : PsiDef.t)
-    solver
-    (det : term_info)
-    (candidate : term)
-  =
+let inductive_solver_preamble ~(p : PsiDef.t) solver (ti : term_info) (candidate : term) =
+  let ctx = ti.ti_context.ctx in
+  let fctx = ti.ti_context.functions in
   let loc_smt_ = smt_of_pmrs ~fctx ~ctx in
   let preamble =
     Commands.mk_preamble
@@ -180,8 +172,8 @@ let inductive_solver_preamble
       (* Declare lemmas. *)
       @ [ Commands.mk_def_fun
             ~ctx
-            det.ti_func.vname
-            (List.map ~f:(fun v -> v.vname, Variable.vtype_or_new ctx v) det.ti_formals)
+            ti.ti_func.vname
+            (List.map ~f:(fun v -> v.vname, Variable.vtype_or_new ctx v) ti.ti_formals)
             RType.TBool
             candidate
         ])
@@ -203,28 +195,23 @@ let smt_of_disallow_witness_values ~(ctx : Context.t) (cl : cond_lemma) : S.smtT
        witnesss)
 ;;
 
-let set_up_to_get_model
-    ~(ctx : Context.t)
-    ~(p : PsiDef.t)
-    solver
-    (det : term_info)
-    (cl : cond_lemma)
-  =
+let set_up_to_get_model ~(p : PsiDef.t) solver (ti : term_info) (cl : cond_lemma) =
+  let ctx = ti.ti_context.ctx in
   (* Step 1. Declare vars for term, and assert that term satisfies tinv. *)
   let%lwt () =
     AsyncSmt.exec_all
       solver
-      (Commands.decls_of_vars ~ctx (Analysis.free_variables ~ctx det.ti_term))
+      (Commands.decls_of_vars ~ctx (Analysis.free_variables ~ctx ti.ti_term))
   in
-  let%lwt _ = AsyncSmt.smt_assert solver (smt_of_tinv_app ~ctx ~p det) in
+  let%lwt _ = AsyncSmt.smt_assert solver (smt_of_tinv_app ~ctx ~p ti) in
   (* Step 2. Declare scalars (vars for recursion elimination & spec param) and their constraints (preconds & recurs elim eqns) *)
   let%lwt () =
-    AsyncSmt.exec_all solver (Commands.decls_of_vars ~ctx (VarSet.of_list det.ti_formals))
+    AsyncSmt.exec_all solver (Commands.decls_of_vars ~ctx (VarSet.of_list ti.ti_formals))
   in
   let%lwt _ =
     AsyncSmt.exec_command
       solver
-      (S.mk_assert (smt_of_recurs_elim_eqns ~ctx det.ti_elim ~p))
+      (S.mk_assert (smt_of_recurs_elim_eqns ~ctx ti.ti_elim ~p))
   in
   let%lwt () =
     match cl.cl_cond with
@@ -238,7 +225,7 @@ let set_up_to_get_model
     else return ()
   in
   (* Step 4. Assert that lemma candidate is false. *)
-  AsyncSmt.smt_assert solver (S.mk_not (smt_of_lemma_app det))
+  AsyncSmt.smt_assert solver (S.mk_not (smt_of_lemma_app ti))
 ;;
 
 let mk_model_sat_asserts
@@ -273,14 +260,14 @@ let mk_model_sat_asserts
 ;;
 
 let verify_lemma_bounded
-    ~(fctx : PMRS.Functions.ctx)
-    ~(ctx : Context.t)
     ~(p : PsiDef.t)
-    (det : term_info)
+    (ti : term_info)
     (cl : cond_lemma)
     (candidate : term)
     : (Utils.Stats.verif_method * S.solver_response) Lwt.t * int Lwt.u
   =
+  let ctx = ti.ti_context.ctx in
+  let fctx = ti.ti_context.functions in
   let logic =
     SmtLogic.infer_logic ~ctx ~logic_infos:(Common.ProblemDefs.PsiDef.logics p) []
   in
@@ -294,15 +281,13 @@ let verify_lemma_bounded
             ~incremental:(String.is_prefix ~prefix:"CVC" solver.s_name)
             ~logic
             ()
-          @ decls_of_vars ~ctx (VarSet.of_list det.ti_formals))
+          @ decls_of_vars ~ctx (VarSet.of_list ti.ti_formals))
     in
     let steps = ref 0 in
     let rec check_bounded_sol accum terms =
       let f accum t =
         let rec_instantation =
-          Option.value
-            ~default:VarMap.empty
-            (Matching.matches ~ctx t ~pattern:det.ti_term)
+          Option.value ~default:VarMap.empty (Matching.matches ~ctx t ~pattern:ti.ti_term)
         in
         let%lwt _ = accum in
         let f_compose_r t =
@@ -323,14 +308,14 @@ let verify_lemma_bounded
               | TVar rec_var when Map.mem rec_instantation rec_var ->
                 elimv, f_compose_r (Map.find_exn rec_instantation rec_var)
               | _ -> failwith "all elimination variables should be substituted.")
-            det.ti_elim
+            ti.ti_elim
           (* Map.fold ~init:[] ~f:(fun ~key ~data acc -> (mk_var key, data) :: acc) rec_instantation *)
         in
         let preconds =
           Option.to_list (Option.map ~f:(fun t -> substitution subs t) cl.cl_cond)
         in
         let model_sat =
-          mk_model_sat_asserts ~fctx ~ctx det f_compose_r (Map.find rec_instantation)
+          mk_model_sat_asserts ~fctx ~ctx ti f_compose_r (Map.find rec_instantation)
         in
         let%lwt () = AsyncSmt.spush solver in
         (* Assert that preconditions hold and map original term's recurs elim variables to the variables that they reduce to for this concrete term. *)
@@ -412,7 +397,7 @@ let verify_lemma_bounded
         Log.debug_msg "Bounded lemma verification has reached limit.";
         if !Config.bounded_lemma_check then return S.Unsat else return S.Unknown
     in
-    let* res = expand_loop (TermSet.singleton det.ti_term) in
+    let* res = expand_loop (TermSet.singleton ti.ti_term) in
     let* () = AsyncSmt.close_solver solver in
     return (Utils.Stats.BoundedChecking, res)
   in
@@ -420,28 +405,26 @@ let verify_lemma_bounded
 ;;
 
 let verify_lemma_unbounded
-    ~(fctx : PMRS.Functions.ctx)
-    ~(ctx : Context.t)
     ~(p : PsiDef.t)
-    (det : term_info)
+    (ti : term_info)
     (cl : cond_lemma)
     (candidate : term)
     : (Utils.Stats.verif_method * S.solver_response) Lwt.t * int Lwt.u
   =
   let build_task (cvc4_instance, task_start) =
     let%lwt _ = task_start in
-    let%lwt () = inductive_solver_preamble cvc4_instance ~fctx ~ctx ~p det candidate in
+    let%lwt () = inductive_solver_preamble cvc4_instance ~p ti candidate in
     let%lwt () =
       (Lwt_list.iter_p (fun x ->
            let%lwt _ = AsyncSmt.exec_command cvc4_instance x in
            return ()))
-        (smt_of_lemma_validity ~ctx ~p det cl)
+        (smt_of_lemma_validity ~p ti cl)
     in
     let%lwt resp = AsyncSmt.check_sat cvc4_instance in
     let%lwt final_response =
       match resp with
       | Sat | Unknown ->
-        let%lwt _ = set_up_to_get_model cvc4_instance ~ctx ~p det cl in
+        let%lwt _ = set_up_to_get_model cvc4_instance ~p ti cl in
         let%lwt resp' = AsyncSmt.check_sat cvc4_instance in
         (match resp' with
         | Sat | Unknown -> AsyncSmt.get_model cvc4_instance
@@ -460,8 +443,6 @@ let verify_lemma_unbounded
   is correct while the smt solver attempt to find a counterexample.
 *)
 let verify_lemma_candidate
-    ~(fctx : PMRS.Functions.ctx)
-    ~(ctx : Context.t)
     ~(p : PsiDef.t)
     (det : term_info)
     (cl : cond_lemma)
@@ -471,8 +452,8 @@ let verify_lemma_candidate
   Log.verbose (fun f () -> Fmt.(pf f "Checking lemma candidate..."));
   let parallel_checks () =
     try
-      let pr1, resolver1 = verify_lemma_bounded ~fctx ~ctx ~p det cl candidate in
-      let pr2, resolver2 = verify_lemma_unbounded ~fctx ~ctx ~p det cl candidate in
+      let pr1, resolver1 = verify_lemma_bounded ~p det cl candidate in
+      let pr2, resolver2 = verify_lemma_unbounded ~p det cl candidate in
       Lwt.wakeup resolver2 1;
       Lwt.wakeup resolver1 1;
       (* The first call to return is kept, the other one is ignored. *)
@@ -484,7 +465,7 @@ let verify_lemma_candidate
       Lwt.return (Stats.BoundedChecking, S.Unknown)
   and bounded_check () =
     try
-      let pr1, resolver1 = verify_lemma_bounded ~fctx ~ctx ~p det cl candidate in
+      let pr1, resolver1 = verify_lemma_bounded ~p det cl candidate in
       Lwt.wakeup resolver1 1;
       (* The first call to return is kept, the other one is ignored. *)
       pr1

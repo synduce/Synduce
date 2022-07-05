@@ -56,8 +56,7 @@ let main () =
   if !parse_only then Caml.exit 1;
   (* Solve the problem proper. *)
   let multi_soln_result =
-    Lwt_main.run
-      (ctx >>> Many.find_and_solve_problem ~filename:!filename psi_comps all_pmrs)
+    ctx >>> Many.find_and_solve_problem ~filename:!filename psi_comps all_pmrs
   in
   let n_out = List.length multi_soln_result.r_all in
   let print_unrealizable = !Config.print_unrealizable_configs || n_out < 2 in

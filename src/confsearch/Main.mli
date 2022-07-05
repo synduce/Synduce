@@ -22,4 +22,4 @@ val find_and_solve_problem
   -> filename:string
   -> (string * string * string) option
   -> (string, Lang.PMRS.t, Base.String.comparator_witness) Base.Map.t
-  -> multi_soln_result Lwt.t
+  -> multi_soln_result

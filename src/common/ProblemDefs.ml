@@ -100,18 +100,6 @@ type cond_lemma =
       the lemma being true. *)
   }
 
-(** A type containing info about a term and lemmas associated to it. *)
-type term_info =
-  { ti_psi_id : int (** The id of the problem for which the term_info was introduced. *)
-  ; ti_flag : bool
-        (** Set to false if the info needs refinement (i.e. the
-      set of witnesses and the lemmas are not in sync). *)
-  ; ti_term : term (** The term the info is about. *)
-  ; ti_elim : (term * term) list (** The recursion elimination map for that term. *)
-  ; ti_func : variable (** A variable to model the lemma as a function. *)
-  ; ti_formals : variable list (** The argument list of the predicate, as a function.*)
-  }
-
 (**
   The type to describe liftings.
   tmap is a map from terms to the expression of the lifting.

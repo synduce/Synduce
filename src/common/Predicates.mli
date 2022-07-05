@@ -1,5 +1,6 @@
 open Lang
 open Term
+open Env
 open ProblemDefs
 
 val find : ctx:Env.env -> key:term -> (term_info * cond_lemma list) option
