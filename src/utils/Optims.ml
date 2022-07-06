@@ -247,6 +247,9 @@ let set_exploration_strategy (s : string) =
 (** Set to false if solution with only variying constants are not wanted. *)
 let search_constant_variations = ref true
 
+(** Set to [true] to use the root-causing algorithm during the search. *)
+let use_root_causing = ref true
+
 (* ============================================================================================= *)
 (*                        OTHER                                                                  *)
 (* ============================================================================================= *)

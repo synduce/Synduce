@@ -171,7 +171,8 @@ let find_multiple_solutions
           update_coverage_func rstate curr_conf G.Unrealizable;
           (* Analyze the witnesses and root cause to suggest next configuration
              to solve. *)
-          analyze_witnesses ~ctx:new_ctx' ~g:new_target rstate curr_conf r u;
+          if !Config.Optims.use_root_causing
+          then analyze_witnesses ~ctx:new_ctx' ~g:new_target rstate curr_conf r u;
           (* Continue *)
           log_step new_ctx' new_pdef (Unrealizable (r, u)) (elapsed, verif) rstate;
           find_sols ((new_ctx', new_pdef, Unrealizable (r, u)) :: a)

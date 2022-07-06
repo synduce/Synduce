@@ -13,7 +13,7 @@ let find_arg_with_subterm ~(fvar : variable) ~(sub : term) (t : term) =
   let case _ t =
     match t.tkind with
     | TApp ({ tkind = TVar v; _ }, args) when Variable.equal v fvar ->
-      (match List.find args ~f:(fun t -> Terms.equal t sub) with
+      (match List.find args ~f:(fun t -> Matching.is_simple_subterm t ~sub) with
       | Some t0 -> Some (TermSet.singleton t0)
       | None -> None)
     | _ -> None
@@ -46,9 +46,25 @@ let rule_lookup
           substitution (List.map ~f:(fun (v, t) -> mk_var ctx.ctx v, t) subst) rhs
         in
         (* Find where to obtain sub from *)
-        let s = find_arg_with_subterm ~fvar ~sub rhs' in
+        let possible_accessing_calls = find_arg_with_subterm ~fvar ~sub rhs' in
+        (* Fmt.(
+          pf
+            stdout
+            "Find %s(..%a..) in %a -> %a@."
+            fvar.vname
+            (pp_term ctx.ctx)
+            sub
+            (pp_term ctx.ctx)
+            rhs'
+            (list ~sep:comma (pp_term ctx.ctx))
+            (Set.to_list possible_accessing_calls)); *)
+        let can_access t =
+          Set.exists possible_accessing_calls ~f:(fun elt ->
+              Matching.is_simple_subterm ~sub:t elt)
+        in
         (* Add the variable to obtain sub from in memory. *)
-        List.iter subst ~f:(fun (v, t) -> if Set.mem s t then memory := Set.add !memory v);
+        List.iter subst ~f:(fun (v, t) ->
+            if can_access t then memory := Set.add !memory v);
         Some rhs'
       | _ -> None)
     | None -> None
@@ -225,11 +241,13 @@ let find_req_arg
   let memory = ref VarSet.empty in
   (* Populate memory with call to reduction with lookup *)
   let _ = reduce_pmrs_with_lookup ~memory ~ctx ~fvar:xi ~sub gmax input in
+  (* Fmt.(pf stdout "memory: %a@." (list (Variable.pp ctx.ctx)) (Set.to_list !memory)); *)
   match Map.find s.st_super xi with
   | Some arglist ->
     List.filter_mapi arglist ~f:(fun i arg ->
         if not (Set.are_disjoint (ctx >- Analysis.free_variables arg) !memory)
-        then Some (xi.vid, i)
+        then (* Fmt.(pf stdout "Add %i,%i.@." xi.vid i); *)
+          Some (xi.vid, i)
         else None)
   | None -> failwith "Not expected."
 ;;
@@ -246,8 +264,10 @@ let analyze_witness_list
   =
   (* TODO not implemented *)
   let _ = ctx, s, c, wl in
-  failwith "DEBUG"
+  ()
 ;;
+
+(* failwith "DEBUG" *)
 
 let analyze_reqs
     ~(ctx : env)
@@ -258,14 +278,10 @@ let analyze_reqs
     (reqs : (term * variable * term) list)
     : (int * int) list
   =
-  match
-    List.dedup_and_sort
-      ~compare:Poly.compare
-      (List.concat_map reqs ~f:(fun (t_input, xi_v, t_req) ->
-           find_req_arg ~ctx ~g ~xi:xi_v ~sub:t_req s c t_input))
-  with
-  | [] -> failwith "No repair found"
-  | _ :: _ as l -> l
+  List.dedup_and_sort
+    ~compare:Poly.compare
+    (List.concat_map reqs ~f:(fun (t_input, xi_v, t_req) ->
+         find_req_arg ~ctx ~g ~xi:xi_v ~sub:t_req s c t_input))
 ;;
 
 let analyze_witnesses
