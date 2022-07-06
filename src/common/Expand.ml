@@ -230,10 +230,8 @@ let replace_rhs_of_mains ~(ctx : Context.t) (p : PsiDef.t) (t0 : term) : term =
 ;;
 
 (* ============================================================================================= *)
-(*                                   segis TERM EXPANSION                                       *)
+(*                                   segis TERM EXPANSION                                        *)
 (* ============================================================================================= *)
-
-let _terms_of_type = Hashtbl.create (module RType)
 
 let simple
     ?(verbose = false)
@@ -503,6 +501,31 @@ let expand_all
   | _ -> (* No fuel left. *) Error ()
 ;;
 
+let expand_fast ~(ctx : Context.t) (initial_term : term) =
+  let vars_to_expand =
+    Set.to_list
+      (Set.filter
+         (Analysis.free_variables ~include_functions:false ~ctx initial_term)
+         ~f:(fun v -> Option.is_some (Analysis.is_expandable_var ~ctx v)))
+  in
+  let n =
+    let l = List.length vars_to_expand in
+    if l > 1
+    then
+      Int.of_float
+        Float.(of_int !Config.Optims.num_expansions_check ** (1.0 /. Float.of_int l))
+      + 1
+    else !Config.Optims.num_expansions_check
+  in
+  let subs =
+    List.map vars_to_expand ~f:(fun v ->
+        List.map
+          ~f:(fun t -> mk_var ctx v, t)
+          (Analysis.DType.gen_terms ~ctx (Variable.vtype_or_new ctx v) n))
+  in
+  List.map ~f:(fun subs -> substitution subs initial_term) (cartesian_nary_product subs)
+;;
+
 (* ============================================================================================= *)
 (*                                   EXPAND TERM UTILS                                           *)
 (* ============================================================================================= *)
@@ -518,29 +541,21 @@ let lwt_expand_loop
       | _ -> false)
     ?(r_complete = SmtLib.Unsat)
     ~(ctx : Context.t)
-    (u : TermSet.t Lwt.t)
+    (u : term Lwt.t)
   =
   let open Lwt in
-  let rec tlist_check accum terms =
-    match terms with
-    | [] -> accum
-    | t0 :: tl ->
-      let%lwt accum' = t_check accum t0 in
-      (match accum' with
-      | Sat -> return SmtLib.Sat
-      | _ -> tlist_check (return accum') tl)
-  in
+  let%lwt initial_term = u in
+  let terms_to_check () = expand_fast ~ctx initial_term in
   let rec aux u =
     let%lwt u = u in
-    match Set.min_elt u, !counter < !Config.Optims.num_expansions_check with
-    | Some t0, true ->
-      let tset, u' = simple ~ctx t0 in
-      let%lwt check_result = tlist_check (return SmtLib.Unknown) (Set.elements tset) in
-      counter := !counter + Set.length tset;
-      if r_stop check_result
-      then return check_result
-      else aux (return (Set.union (Set.remove u t0) u'))
-    | None, true ->
+    match u, !counter < !Config.Optims.num_expansions_check with
+    | t0 :: rest, true ->
+      (match%lwt t_check (return SmtLib.Unknown) t0 with
+      | Sat -> return SmtLib.Sat
+      | _ as check_result ->
+        Int.incr counter;
+        if r_stop check_result then return check_result else aux (return rest))
+    | [], true ->
       Log.verbose_msg "Bounded checking is complete.";
       (* All expansions have been checked. *)
       return r_complete
@@ -552,5 +567,5 @@ let lwt_expand_loop
       else (* Otherwise, it's unknown. *)
         return SmtLib.Unknown
   in
-  aux u
+  aux (Lwt.return (time terms_to_check))
 ;;

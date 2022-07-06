@@ -88,6 +88,8 @@ val expand_all
   -> TermSet.t * TermSet.t
   -> (TermSet.t * TermSet.t, unit) Result.t
 
+val expand_fast : ctx:Term.Context.t -> Term.term -> Term.term list
+
 (** [lwt_expand_loop] provides basic functionality for bounded checking.
     [lwt_expand_loop steps f start] will run a bounded checking loop, starting with the term
     set [start] and performing [!Lib.Config.num_expansions_check] steps, applying the
@@ -116,5 +118,5 @@ val lwt_expand_loop
   -> ?r_stop:(Smtlib.SmtLib.solver_response -> bool)
   -> ?r_complete:Smtlib.SmtLib.solver_response
   -> ctx:Term.Context.t
-  -> TermSet.t Lwt.t
+  -> Term.term Lwt.t
   -> AsyncSmt.response

@@ -81,13 +81,9 @@ let gen_pmrs_positive_examples ~(ctx : env) (p : PMRS.t) =
            ~r_stop:(fun _ -> !iterations > _NUM_POSIIVE_EXAMPLES_)
            mk_ex
            (Lwt.return
-              (TermSet.singleton
-                 (mk_var
-                    ctx.ctx
-                    (Variable.mk
-                       ctx.ctx
-                       ~t:(Some ref_typ_out)
-                       (Alpha.fresh ctx.ctx.names)))))
+              (mk_var
+                 ctx.ctx
+                 (Variable.mk ctx.ctx ~t:(Some ref_typ_out) (Alpha.fresh ctx.ctx.names))))
     in
     close_solver z3
   in

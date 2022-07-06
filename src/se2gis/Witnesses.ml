@@ -463,7 +463,7 @@ let check_image_sat ~(ctx : env) ~(p : PsiDef.t) witness
           ctx.ctx
           (Variable.mk ~t:(Some (List.hd_exn p.target.pinput_typ)) ctx.ctx "_x")
       in
-      ctx >- Expand.lwt_expand_loop steps t_check (Lwt.return (TermSet.singleton x))
+      ctx >- Expand.lwt_expand_loop steps t_check (Lwt.return x)
     in
     let* () = AsyncSmt.close_solver solver_instance in
     Lwt.return (res, Stats.BoundedChecking)
@@ -836,11 +836,7 @@ let check_tinv_sat ~(ctx : env) ~(p : PsiDef.t) (tinv : PMRS.t) (witness : witne
            ())
     in
     let* res =
-      ctx
-      >- Expand.lwt_expand_loop
-           steps
-           t_check
-           (Lwt.return (TermSet.singleton witness.witness_eqn.eterm))
+      ctx >- Expand.lwt_expand_loop steps t_check (Lwt.return witness.witness_eqn.eterm)
     in
     let* () = AsyncSmt.close_solver solver in
     Lwt.return (res, Stats.BoundedChecking)

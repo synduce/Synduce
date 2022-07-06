@@ -231,7 +231,7 @@ let find_req_arg
         if not (Set.are_disjoint (ctx >- Analysis.free_variables arg) !memory)
         then Some (xi.vid, i)
         else None)
-  | None -> []
+  | None -> failwith "Not expected."
 ;;
 
 (* ============================================================================================= *)
@@ -258,10 +258,14 @@ let analyze_reqs
     (reqs : (term * variable * term) list)
     : (int * int) list
   =
-  List.dedup_and_sort
-    ~compare:Poly.compare
-    (List.concat_map reqs ~f:(fun (t_input, xi_v, t_req) ->
-         find_req_arg ~ctx ~g ~xi:xi_v ~sub:t_req s c t_input))
+  match
+    List.dedup_and_sort
+      ~compare:Poly.compare
+      (List.concat_map reqs ~f:(fun (t_input, xi_v, t_req) ->
+           find_req_arg ~ctx ~g ~xi:xi_v ~sub:t_req s c t_input))
+  with
+  | [] -> failwith "No repair found"
+  | _ :: _ as l -> l
 ;;
 
 let analyze_witnesses

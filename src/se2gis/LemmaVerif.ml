@@ -284,7 +284,7 @@ let verify_lemma_bounded
           @ decls_of_vars ~ctx (VarSet.of_list ti.ti_formals))
     in
     let steps = ref 0 in
-    let rec check_bounded_sol accum terms =
+    let check_bounded_sol term =
       let f accum t =
         let rec_instantation =
           Option.value ~default:VarMap.empty (Matching.matches ~ctx t ~pattern:ti.ti_term)
@@ -366,30 +366,21 @@ let verify_lemma_bounded
         let%lwt () = AsyncSmt.spop solver in
         return (resp, result)
       in
-      match terms with
-      | [] -> accum
-      | t0 :: tl ->
-        let%lwt accum' = f accum t0 in
-        (match accum' with
-        | status, Some model -> return (status, Some model)
-        | _ -> check_bounded_sol (return accum') tl)
+      f term
     in
     let rec expand_loop u =
-      match Set.min_elt u, !steps < !Config.Optims.num_expansions_check with
-      | Some t0, true ->
-        let tset, u' = Expand.simple ~ctx t0 in
-        let%lwt check_result =
-          check_bounded_sol (return (S.Unknown, None)) (Set.elements tset)
-        in
-        steps := !steps + Set.length tset;
+      match u, !steps < !Config.Optims.num_expansions_check with
+      | t0 :: t_rest, true ->
+        let%lwt check_result = check_bounded_sol (return (S.Unknown, None)) t0 in
+        Int.incr steps;
         (match check_result with
         | _, Some model ->
           Log.debug_msg
             "Bounded lemma verification has found a counterexample to the lemma \
              candidate.";
           return model
-        | _ -> expand_loop (Set.union (Set.remove u t0) u'))
-      | None, true ->
+        | _ -> expand_loop t_rest)
+      | [], true ->
         (* All expansions have been checked. *)
         return S.Unsat
       | _, false ->
@@ -397,7 +388,7 @@ let verify_lemma_bounded
         Log.debug_msg "Bounded lemma verification has reached limit.";
         if !Config.bounded_lemma_check then return S.Unsat else return S.Unknown
     in
-    let* res = expand_loop (TermSet.singleton ti.ti_term) in
+    let* res = expand_loop (Expand.expand_fast ~ctx:ti.ti_context.ctx ti.ti_term) in
     let* () = AsyncSmt.close_solver solver in
     return (Utils.Stats.BoundedChecking, res)
   in
