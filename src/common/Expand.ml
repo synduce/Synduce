@@ -502,28 +502,31 @@ let expand_all
 ;;
 
 let expand_fast ~(ctx : Context.t) (initial_term : term) =
-  let vars_to_expand =
-    Set.to_list
-      (Set.filter
-         (Analysis.free_variables ~include_functions:false ~ctx initial_term)
-         ~f:(fun v -> Option.is_some (Analysis.is_expandable_var ~ctx v)))
+  let aux () =
+    let vars_to_expand =
+      Set.to_list
+        (Set.filter
+           (Analysis.free_variables ~include_functions:false ~ctx initial_term)
+           ~f:(fun v -> Option.is_some (Analysis.is_expandable_var ~ctx v)))
+    in
+    let n =
+      let l = List.length vars_to_expand in
+      if l > 1
+      then
+        Int.of_float
+          Float.(of_int !Config.Optims.num_expansions_check ** (1.0 /. Float.of_int l))
+        + 1
+      else !Config.Optims.num_expansions_check
+    in
+    let subs =
+      List.map vars_to_expand ~f:(fun v ->
+          List.map
+            ~f:(fun t -> mk_var ctx v, t)
+            (Analysis.DType.gen_terms ~ctx (Variable.vtype_or_new ctx v) n))
+    in
+    List.map ~f:(fun subs -> substitution subs initial_term) (cartesian_nary_product subs)
   in
-  let n =
-    let l = List.length vars_to_expand in
-    if l > 1
-    then
-      Int.of_float
-        Float.(of_int !Config.Optims.num_expansions_check ** (1.0 /. Float.of_int l))
-      + 1
-    else !Config.Optims.num_expansions_check
-  in
-  let subs =
-    List.map vars_to_expand ~f:(fun v ->
-        List.map
-          ~f:(fun t -> mk_var ctx v, t)
-          (Analysis.DType.gen_terms ~ctx (Variable.vtype_or_new ctx v) n))
-  in
-  List.map ~f:(fun subs -> substitution subs initial_term) (cartesian_nary_product subs)
+  if Analysis.is_bounded ~ctx initial_term then [ initial_term ] else aux ()
 ;;
 
 (* ============================================================================================= *)
@@ -567,5 +570,5 @@ let lwt_expand_loop
       else (* Otherwise, it's unknown. *)
         return SmtLib.Unknown
   in
-  aux (Lwt.return (time terms_to_check))
+  aux (Lwt.return (terms_to_check ()))
 ;;
