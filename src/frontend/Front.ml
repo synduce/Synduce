@@ -75,6 +75,12 @@ type definition =
       (** Declares a synthesis objective: SyntObjDecl(loc, decl, f1, f2 ) specifies that the
       function defined by decl must be equivalent to f1 composed with f2. *)
   | EnsuresDef of loc * id * term (** Adds an ensures to a function symbol id. *)
+  | ExtSyntObjDecl of loc * id * term (* Not actually used *)
+      (** for_all (fun id -> term) *)
+
+type psi_def =
+  | PsiComps of string * string * string (* target, refname, reprname *)
+  | PsiExt of id * term (* id, body *)
 
 type program = definition list
 

@@ -8,6 +8,8 @@ open Common.Env
 
 let parse_only = ref false
 
+let psi_comps : (string * string * string) option ref = ref None
+
 let main () =
   let start_time = Unix.gettimeofday () in
   let filename = ref None in
@@ -21,13 +23,14 @@ let main () =
   (* Get problem name from file name, or exit if we don't recognize. *)
   (try
      match Caml.Filename.extension !filename with
-     | ".ml" | ".pmrs" ->
+     (* PMRS input support suspended *)
+     | ".ml" ->
        Config.problem_name
          := Caml.Filename.basename (Caml.Filename.chop_extension !filename)
      | _ -> raise (Invalid_argument "wrong extension")
    with
   | Invalid_argument _ ->
-    Log.error_msg "Filename must end with extension .ml or .pmrs";
+    Log.error_msg "Filename must end with extension .ml";
     Caml.exit (-1));
   set_style_renderer stdout `Ansi_tty;
   Caml.Format.set_margin 100;
@@ -37,11 +40,14 @@ let main () =
   | DryadSynth -> Syguslib.Sygus.use_v1 := true);
   Lib.Utils.Stats.glob_start ();
   (* Parse input file. *)
+  (* PMRS input support suspended *)
   let is_ocaml_syntax = Caml.Filename.check_suffix !filename ".ml" in
   ToolMessages.start_message !filename is_ocaml_syntax;
-  let prog, psi_comps =
-    if is_ocaml_syntax then parse_ocaml !filename else parse_pmrs !filename
-  in
+  let prog, psi = Parsers.parse_ocaml !filename in
+  (match psi with
+  | Some (PsiExt (_, _)) -> Utils.Log.error_msg "To be implemented in main"; Caml.exit (-1)
+  | Some (PsiComps (target, refname, reprname)) -> psi_comps := Some (target, refname, reprname)
+  | _ -> ());
   (* Main context *)
   let ctx = group (Term.Context.create ()) (PMRS.Functions.create ()) in
   (* Populate types.  *)
@@ -56,7 +62,7 @@ let main () =
   if !parse_only then Caml.exit 1;
   (* Solve the problem proper. *)
   let multi_soln_result =
-    ctx >>> Many.find_and_solve_problem ~filename:!filename psi_comps all_pmrs
+    ctx >>> Many.find_and_solve_problem ~filename:!filename !psi_comps all_pmrs
   in
   let n_out = List.length multi_soln_result.r_all in
   let print_unrealizable = !Config.print_unrealizable_configs || n_out < 2 in

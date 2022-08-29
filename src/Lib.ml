@@ -11,6 +11,10 @@ open Lang
 open Codegen.Commons
 open Env
 
+type psi_def = Frontend.Front.psi_def
+
+let psi_comps : (string * string * string) option ref = ref None
+
 let solve_file ?(print_info = false) (filename : string)
     : (env * problem_descr * (soln option, unrealizability_witness list) Either.t) list
     Lwt.t
@@ -19,14 +23,16 @@ let solve_file ?(print_info = false) (filename : string)
     := Caml.Filename.basename (Caml.Filename.chop_extension filename);
   Utils.Config.info := print_info;
   Utils.Config.timings := false;
-  let is_ocaml_syntax = Caml.Filename.check_suffix filename ".ml" in
-  let prog, psi_comps =
-    if is_ocaml_syntax then Parsers.parse_ocaml filename else Parsers.parse_pmrs filename
-  in
+  (* PMRS input support suspended *)
+  let prog, psi = Parsers.parse_ocaml filename in
+  (match psi with
+  | Some (PsiExt (_, _)) -> Utils.Log.error_msg "To be implemented in Lib.solve_file"; Caml.exit (-1)
+  | Some (PsiComps (target, refname, reprname)) -> psi_comps := Some (target, refname, reprname)
+  | _ -> ());
   let pb_env = Env.group (Term.Context.create ()) (PMRS.Functions.create ()) in
   pb_env >- Parsers.seek_types prog;
   let all_pmrs = pb_env >>- Parsers.translate prog in
-  let outputs = Single.find_and_solve_problem ~filename ~ctx:pb_env psi_comps all_pmrs in
+  let outputs = Single.find_and_solve_problem ~filename ~ctx:pb_env !psi_comps all_pmrs in
   let final_step l =
     List.map l ~f:(fun (problem, result) ->
         let pd = pb_env >- problem_descr_of_psi_def problem in
@@ -42,10 +48,8 @@ let load_ctx_of_file (filename : string) : env =
   Utils.Config.problem_name
     := Caml.Filename.basename (Caml.Filename.chop_extension filename);
   Utils.Config.timings := false;
-  let is_ocaml_syntax = Caml.Filename.check_suffix filename ".ml" in
-  let prog, _ =
-    if is_ocaml_syntax then Parsers.parse_ocaml filename else Parsers.parse_pmrs filename
-  in
+  (* PMRS input support suspended *)
+  let prog, _ = Parsers.parse_ocaml filename in
   let pb_env = Env.group (Term.Context.create ()) (PMRS.Functions.create ()) in
   pb_env >- Parsers.seek_types prog;
   let _ = pb_env >>- Parsers.translate prog in

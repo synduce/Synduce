@@ -5,7 +5,7 @@ open Utils
 open Front
 open Lang.RType
 
-let psi_comps : (string * string * string) option ref = ref None
+let psi : psi_def option ref = ref None
 
 (* ============================================================================================= *)
 (*                 IN-FILE OPTION PARSING                                                        *)
@@ -518,12 +518,17 @@ let declare_synt_obj (assert_expr : expression) =
   | FTBin (T.Binop.Eq, target, { kind = FTApp (_, [ repr; reference ]); _ }) ->
     (match target.kind, repr.kind, reference.kind with
     | FTVar target, FTVar reprname, FTVar refname ->
-      psi_comps := Some (target, refname, reprname)
+      psi := Some (PsiComps (target, refname, reprname))
     | _ -> ())
   (* assert (target = reference)  (repr is identity) *)
   | FTBin (T.Binop.Eq, target, reference) ->
     (match target.kind, reference.kind with
-    | FTVar target, FTVar refname -> psi_comps := Some (target, refname, "repr")
+    | FTVar target, FTVar refname -> psi := Some (PsiComps (target, refname, "repr"))
+    | _ -> ())
+  (* assert (for_all (fun id -> body)) *)
+  | FTApp ({ kind = FTVar ("for_all"); _ }, [{ kind = FTFun ([param], body); _ }]) ->
+    (match param.kind with
+    | FTVar id -> psi := Some (PsiExt (id, body))
     | _ -> ())
   | _ ->
     Log.debug_msg Fmt.(str "Ignore (assert %a)" pp_fterm t);
@@ -531,7 +536,7 @@ let declare_synt_obj (assert_expr : expression) =
 ;;
 
 let parse_ocaml (input_file_name : string)
-    : definition list * (string * string * string) option
+    : definition list * Front.psi_def option
   =
   let input_folder_name = FilePath.dirname input_file_name in
   let definitions = read_sig input_file_name in
@@ -570,5 +575,8 @@ let parse_ocaml (input_file_name : string)
     | _ -> []
   in
   let defs = List.concat (List.map ~f:seek_defs (pre_definitions @ definitions)) in
-  defs, !psi_comps
+  (match !psi with
+  | Some PsiExt (param, body) -> Log.debug_msg Fmt.(str "assert (for_all (fun %s -> %a))" param pp_fterm body)
+  | _ -> ());
+  defs, !psi
 ;;
