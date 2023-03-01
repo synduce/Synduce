@@ -1,0 +1,23 @@
+type 'a zipclist = CNil | Single of 'a * 'a | Concat of 'a zipclist * 'a zipclist
+
+type 'a ziplist = Nil | Cons of 'a * 'a * 'a ziplist
+
+pmrs spec l =
+    main l -> f l
+    | f Nil -> 0
+    | f Cons(hd1, hd2, tl) -> (hd1 = hd2 ? 0 : 1) + (f tl)
+
+pmrs (odot,f0, s0) target t =
+    target t           -> h t
+    | h CNil          -> s0
+    | h Single(a1, a2)  -> f0 a1 a2
+    | h Concat(x, y) -> odot (h x) (h y)
+
+pmrs repr l =
+    repr l -> c l
+    | c CNil -> Nil
+    | c Single(a,b) -> Cons(a, b, Nil)
+    | c Concat(x, y) -> dec y x
+    | dec l CNil -> repr l
+    | dec l Single(a,b) -> Cons(a, b, repr l)
+    | dec l Concat(x, y) -> dec (Concat(l, y)) x

@@ -1,21 +1,31 @@
-type nat =
-  | Zero
-  | Succ of nat
+(** @synduce --no-lifting -NB -n 20 -I incomplete/bst/bst.ml *)
 
-let rec f = function
-  | Zero -> g Zero
-  | Succ n -> f n + g (Succ n)
+(* This skeleton has erros and is unrealizable, but allowing for different configuations
+  allows to find solutions that are variations of the configuration given here.
+  This skeleton has 262144 possible configurations.
+*)
 
-and g = function
-  | Zero -> 1
-  | Succ n -> [%synt h] (g n)
+open Bst
+
+let spec hi lo t =
+  let rec f = function
+    | Leaf a -> if hi > a && a > lo then 1 else 0
+    | Node (a, l, r) -> if hi > a && a > lo then 1 + f l + f r else f l + f r
+  in
+  f t
+  [@@ensures fun x -> x >= 0]
 ;;
 
-let rec t = function
-  | Zero -> 1
-  | Succ n -> (2 * t n) + 1
+let target hi lo t =
+  let rec g = function
+    | Leaf a -> [%synt xi_0] hi lo a
+    | Node (a, l, r) ->
+      if a < lo
+      then [%synt f_a_lt_lo] a (g r)
+      else if a > hi
+      then [%synt f_a_gt_hi] hi lo a (g l) (g r)
+      else [%synt f_else] hi lo a (g l) (g r)
+  in
+  g t
+  [@@requires is_bst]
 ;;
-
-let id a = a;;
-
-assert (f = id @@ t)

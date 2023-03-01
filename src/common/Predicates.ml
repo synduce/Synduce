@@ -37,7 +37,7 @@ let cond_lemma_to_term
 
 let key_of_term (t : term) = Expression.(Option.map ~f:nameless_normal_form (of_term t))
 
-let get ~(ctx : env) ~(p : PsiDef.t) (t : term) =
+let get ?(count_reuse = true) ~(ctx : env) ~(p : PsiDef.t) (t : term) =
   match key_of_term t with
   | None -> None
   | Some e_key ->
@@ -48,7 +48,9 @@ let get ~(ctx : env) ~(p : PsiDef.t) (t : term) =
       if (not same_psi) && not !Config.Optims.reuse_predicates
       then None
       else (
-        if same_psi then () else Int.incr Utils.Stats.num_foreign_lemma_uses;
+        if same_psi || not count_reuse
+        then ()
+        else Int.incr Utils.Stats.num_foreign_lemma_uses;
         match List.filter_opt (List.map ~f:(cond_lemma_to_term ~ctx ~p ~t ti) cls) with
         | [] -> None
         | [ a ] -> Some a

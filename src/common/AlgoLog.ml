@@ -39,7 +39,7 @@ let single_configuration_json
     ~(is_ocaml_syntax : bool)
     ~(ctx : env)
     (pb : PsiDef.t)
-    (soln : (soln, unrealizability_witness list) Either.t option)
+    (soln : Syguslib.Sygus.solver_response segis_response)
     (elapsed : float)
     (verif : float)
     : Yojson.t
@@ -59,7 +59,7 @@ let single_configuration_json
   in
   let soln_or_refutation =
     match soln with
-    | Some (Either.First soln) ->
+    | Realizable soln ->
       [ ( "solution"
         , `String
             (Fmt.str
@@ -68,8 +68,8 @@ let single_configuration_json
                soln) )
       ; "unrealizable", `Bool false
       ]
-    | Some (Either.Second _) -> [ "unrealizable", `Bool true ]
-    | None -> [ "failure", `Bool true ]
+    | Unrealizable _ -> [ "unrealizable", `Bool true ]
+    | _ -> [ "failure", `Bool true ]
   in
   `Assoc
     ([ "algorithm", `String algo
@@ -82,42 +82,88 @@ let single_configuration_json
     @ soln_or_refutation)
 ;;
 
+let single_configuration_csv_string
+    (soln : Syguslib.Sygus.solver_response segis_response)
+    ~(elapsed : float)
+    ~(verif : float)
+    : string
+  =
+  let algo =
+    if !Config.Optims.use_segis
+    then "SEGIS"
+    else if !Config.Optims.use_cegis
+    then "CEGIS"
+    else if !Config.Optims.use_se2gis
+    then "SE2GIS"
+    else "PORTFOLIO"
+  in
+  let kind =
+    match soln with
+    | Realizable _ -> 0
+    | Unrealizable _ -> 1
+    | _ -> 2
+  in
+  Fmt.str "algo:%s,elapsed:%f,verif:%f,kind:%i" algo elapsed verif kind
+;;
+
 let show_stat_intermediate_solution
     ~(ctx : env)
     (pb : PsiDef.t)
-    (soln : (soln, unrealizability_witness list) Either.t option)
+    (soln : Syguslib.Sygus.solver_response segis_response)
     (elapsed : float)
     (verif : float)
     (total_configurations : int)
+    (_ : float)
     : unit
   =
   (* *)
   let () =
     match soln with
-    | Some (Either.First soln) ->
+    | Realizable soln ->
       Log.info
         Fmt.(
           fun fmt () ->
             pf fmt "%a" (box (ctx >- Pretty.pp_soln ~use_ocaml_syntax:true)) soln)
-    | Some (Either.Second _) -> Log.info Fmt.(fun fmt () -> pf fmt "Unrealizable.")
-    | None -> Log.info Fmt.(fun fmt () -> pf fmt "Failure.")
+    | Unrealizable (r, _) ->
+      Log.info Fmt.(fun fmt () -> pf fmt "Unrealizable.");
+      Log.info Fmt.(fun fmt () -> pf fmt "Possible repair: %s" (Pretty.str_of_repair r))
+    | Failed (s, r) ->
+      Log.info
+        Fmt.(fun fmt () -> pf fmt "Failure: %s - %a" s SygusInterface.pp_response r)
   in
-  (* Json output *)
+  let json =
+    `Assoc
+      [ ( "intermediate-result"
+        , single_configuration_json ~is_ocaml_syntax:true ~ctx pb soln elapsed verif )
+      ; "id", `Int pb.id
+      ; "total-configurations", `Int total_configurations
+      ; "unr-cache-hits", `Int !Stats.num_unr_cache_hits
+      ; "orig-conf-hit", `Bool !Stats.orig_solution_hit
+      ; "foreign-lemma-uses", `Int !Stats.num_foreign_lemma_uses
+      ]
+  in
+  (* Json output to stdout?  *)
   if !Config.json_progressive && !Config.json_out
-  then (
-    let json =
-      `Assoc
-        [ ( "intermediate-result"
-          , single_configuration_json ~is_ocaml_syntax:true ~ctx pb soln elapsed verif )
-        ; "id", `Int pb.id
-        ; "total-configurations", `Int total_configurations
-        ; "unr-cache-hits", `Int !Stats.num_unr_cache_hits
-        ; "orig-conf-hit", `Bool !Stats.orig_solution_hit
-        ; "foreign-lemma-uses", `Int !Stats.num_foreign_lemma_uses
-        ]
-    in
-    pf stdout "%s@." (Yojson.to_string ~std:false json))
-  else ()
+  then pf stdout "%s@." (Yojson.to_string ~std:false json);
+  (* Log to file? *)
+  let info_line =
+    Fmt.str
+      "id:%i,rstar-hits:%i,lemma-reuse:%i,%s,found-best:%b"
+      pb.id
+      !Stats.num_unr_cache_hits
+      !Stats.num_foreign_lemma_uses
+      (single_configuration_csv_string soln ~elapsed ~verif)
+      !Stats.orig_solution_hit
+  in
+  match !Config.output_log with
+  | Some filename ->
+    (try
+       let chan = Stdio.Out_channel.create ~append:true filename in
+       Stdio.Out_channel.output_lines chan [ info_line ];
+       Stdio.Out_channel.close_no_err chan
+     with
+    | _ -> ())
+  | None -> ()
 ;;
 
 let show_steps algo env tsize usize =
@@ -504,4 +550,65 @@ let requires_witness_class
             tinv.PMRS.pvar.vname
             (box (pp_witness ~ctx))
             witness))
+;;
+
+(* ============================================================================================= *)
+(*                  Logging into files                                                           *)
+(* ============================================================================================= *)
+
+let log_confsearch_problem ~(ctx : env) ~(p : PsiDef.t) (n : int) =
+  let f folder_name =
+    let filename = FilePath.make_filename [ folder_name; "summary.txt" ] in
+    FileUtil.touch ~create:true filename;
+    let out = Stdio.Out_channel.create filename in
+    let frmt = Caml.Format.formatter_of_out_channel out in
+    Fmt.pf frmt "configurations:%i@." n;
+    Fmt.pf frmt "%a@." (ctx >- PMRS.pp ~short:false) p.target;
+    Stdio.Out_channel.close out
+  in
+  match !Config.output_folder with
+  | Some folder_name -> f folder_name
+  | None ->
+    ();
+    (* Log into output log? *)
+    let l = Fmt.str "problem-file:%s,total-configurations:%i" p.filename n in
+    (match !Config.output_log with
+    | Some filename ->
+      (try
+         let chan = Stdio.Out_channel.create ~append:true filename in
+         Stdio.Out_channel.output_lines chan [ l ];
+         Stdio.Out_channel.close_no_err chan
+       with
+      | _ -> ())
+    | None -> ())
+;;
+
+let log_solution
+    ~(ctx : env)
+    ~(p : PsiDef.t)
+    (resp : Syguslib.Sygus.solver_response segis_response)
+  =
+  let f folder_name =
+    let filename_s = Fmt.str "configuration_%i.txt" p.id in
+    let filename = FilePath.make_filename [ folder_name; filename_s ] in
+    FileUtil.touch ~create:true filename;
+    let out = Stdio.Out_channel.create filename in
+    let frmt = Caml.Format.formatter_of_out_channel out in
+    let () =
+      match resp with
+      | Realizable soln ->
+        Fmt.pf frmt "REALIZABLE@.";
+        Fmt.(pf frmt "%a@." (box (ctx >- Pretty.pp_soln ~use_ocaml_syntax:true)) soln)
+      | Unrealizable _ ->
+        Fmt.(pf frmt "UNREALIZABLE@.");
+        Fmt.pf frmt "%a@." (ctx >- PMRS.pp ~short:false) p.target
+      | _ ->
+        Fmt.(pf frmt "FAILURE@.");
+        Fmt.pf frmt "%a@." (ctx >- PMRS.pp ~short:false) p.target
+    in
+    Stdio.Out_channel.close out
+  in
+  match !Config.output_folder with
+  | Some folder_name -> f folder_name
+  | None -> ()
 ;;

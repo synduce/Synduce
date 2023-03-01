@@ -61,6 +61,12 @@ let get_output_file s =
       Caml.Filename.concat o_f base)
 ;;
 
+(** Optional output file for logging.
+*)
+let output_log : string option ref = ref None
+
+let set_output_log s = output_log := Some s
+
 (** Turn of all output except json. *)
 let set_json_out () =
   verbose := false;
@@ -78,7 +84,8 @@ let pp_eqn_count = ref 20
 (* ============================================================================================= *)
 
 (**
-  Prompt user to input a precondition (lemma) for each equation, while the equations are being generated from a set of terms in Equations.make.
+  Prompt user to input a precondition (lemma) for each equation, while the equations are being
+  generated from a set of terms in Equations.make.
 *)
 let interactive_lemmas = ref false
 
@@ -107,6 +114,13 @@ let check_unrealizable_smt_unsatisfiable = ref false
 let no_bounded_sat_as_unsat = ref false
 
 let bounded_lemma_check = ref false
+let only_bounded_check = ref false
+
+let set_bounded_only () =
+  no_bounded_sat_as_unsat := true;
+  bounded_lemma_check := true;
+  only_bounded_check := true
+;;
 
 (**
   Run with the optimizations used to synthesize solutions for systems of equations.
@@ -125,7 +139,7 @@ let force_nonlinear = ref false
   not be refined further. If `node_failure_behaviour` is set to `false`, the failure will only
   interpreted as realizable: subconfigurations will be explored.
 *)
-let node_failure_behavior = ref true
+let node_failure_behavior = ref false
 
 (** Use DFS or BFS when searching for next configuration (true for BFS, false for DFS)*)
 let next_algo_bfs = ref true
@@ -254,17 +268,10 @@ let set_included_files (s : string) =
 ;;
 
 (** A set of options to search for multiple solutions. *)
-let set_default_config_confsearch (s : string) =
-  try
-    let i = Float.of_string s in
-    if Float.(i > 0. && i <= 3200.) then Optims.wait_parallel_tlimit := i;
-    Optims.max_solutions := 2;
-    Optims.attempt_lifting := false;
-    no_bounded_sat_as_unsat := true;
-    bounded_lemma_check := true;
-    Optims.num_expansions_check := 20
-  with
-  | _ -> ()
+let set_default_config_confsearch () =
+  Optims.max_solutions := 2;
+  Optims.attempt_lifting := false;
+  set_bounded_only () (* Optims.num_expansions_check := 20 *)
 ;;
 
 (* ============================================================================================= *)
@@ -279,7 +286,8 @@ open Optims
 (* ============================================================================================= *)
 
 let options print_usage parse_only =
-  [ 'b', "bmc", None, Some set_check_depth
+  [ 'A', "all-solutions-config", Some set_default_config_confsearch, None
+  ; 'b', "bmc", None, Some set_check_depth
   ; 'B', "bounded-lemma-check", set bounded_lemma_check true, None
   ; 'c', "simple-init", set simple_init true, None
   ; 'C', "check-smt-unrealizable", set check_unrealizable_smt_unsatisfiable true, None
@@ -299,15 +307,15 @@ let options print_usage parse_only =
   ; 'n', "verification", None, Some set_num_expansions_check
   ; 'N', "no-sat-as-unsat", set no_bounded_sat_as_unsat true, None
   ; 'o', "output", None, Some set_output_folder
-  ; 'O', "multi-shuffle-configs", set shuffle_configurations true, None
+  ; 'O', "log-output", None, Some set_output_log
   ; 'p', "num-threads", None, Some set_num_threads
   ; 'P', "reuse-predicates-off", set reuse_predicates false, None
   ; 's', "multi-max-solutions", None, Some set_max_solutions
-  ; 'S', "all-solutions-config", None, Some set_default_config_confsearch
   ; 't', "solve-timeout", None, Some set_wait_parallel_tlimit
   ; 'v', "verbose", set verbose true, None
   ; 'W', "verif-with", None, Some set_verification_solver
   ; 'X', "classify-witness", set classify_witness true, None
+  ; 'Z', "multi-shuffle-configs", set shuffle_configurations true, None
   ; '\000', "segis", set use_segis true, None
   ; '\000', "se2gis", set use_se2gis true, None
   ; '\000', "cegis", set use_cegis true, None
@@ -327,7 +335,9 @@ let options print_usage parse_only =
   ; '\000', "multi-use-dfs", set next_algo_bfs false, None
   ; '\000', "multi-rstar-limit", None, Some set_rstar_limit
   ; '\000', "multi-no-rstar", set use_rstar_caching false, None
+  ; '\000', "multi-no-rc", set use_root_causing false, None
   ; '\000', "multi-strategy", None, Some set_exploration_strategy
+  ; '\000', "multi-reconly", set search_constant_variations false, None
   ; '\000', "no-assumptions", set make_partial_correctness_assumption false, None
   ; '\000', "no-detupling", set detupling_on false, None
   ; '\000', "no-gropt", set optimize_grammars 0, None

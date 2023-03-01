@@ -18,6 +18,7 @@ module Subconf : sig
     *)
   type t = int list Utils.IntMap.t
 
+  val to_string : t -> string
   val sexp_of_t : t -> Sexplib0.Sexp.t
   val equal : t -> t -> bool
   val compare : t -> t -> int
@@ -29,18 +30,55 @@ module Subconf : sig
   (** Create the minimum sub-configuration: a map where all argument lists are empty. *)
   val zero_of_conf : conf -> t
 
+  (** Create the largest subconfiguration that has no recursive call in it.  *)
+  val largest_ctime_conf : conf -> t
+
+  (** Create the subconfiguration mapping to the ids of function calls.  *)
+  val rec_calls_conf : conf -> t
+
   (** Create a configuration from a sup-configuration and a subconfiguration by
       filtering the unused arguments in the sup-configuration. *)
   val to_conf : sup:conf -> t -> conf
 
   (** `drop_arg x` creates the list of all the sub-configurations than can be obtained
         by dropping an argument for one of the unknowns. *)
-  val drop_arg : t -> ((int * int) * t) list
+  val drop_arg : ?filter:t option -> t -> ((int * int) * t) list
 
-  (** `add_arg x` creates the list of all the sub-configurations than can be obtained
+  (** [add_arg x] creates the list of all the sub-configurations than can be obtained
         by adding an argument for one of the unknowns. This requires having acess to the
         sup-configuration. *)
   val add_arg : sup:t -> t -> ((int * int) * t) list
+
+  (** [appply_diff diff c] applies the difference [diff] to [c] and returns a new
+      configuration. The [diff] is a triple as returned by [diff c c'] for another
+      [c']. If [diff] is not a well-formed triple, this functions returns [c].
+  *)
+  val apply_diff : bool * int * int -> t -> t
+
+  (** [diff c1 c2] eturns a list that represents the differences between the
+    configurations [c1] and [c2]. Each element of the list is a triple of a boolean,
+    a key that is the id of the unknown (location) and the id of the argument. If the
+    boolean is [true] it means the argument id needs to be added to the location id to
+    get from [c1] to [c2]. If the boolean is [false] then it means the argument id needs to
+    be removed from [c1] at the location to get to [c2].
+  *)
+  val diff : t -> t -> (bool * int * int) list
+
+  module Lattice : sig
+    (** Count the number of sub-configurations of a given configuration. *)
+    val count_subs : t -> int
+
+    (** Count the number of sup-configurations of a given configuration. The sup of
+      the lattice needs to be given in order to count this.
+    *)
+    val count_sups : sup:t -> t -> int
+
+    (** Returns the join of two configuration in the configuration lattice. *)
+    val join : t -> t -> t
+
+    (** Returns the meet of two configuration in the configuration lattice. *)
+    val meet : t -> t -> t
+  end
 end
 
 module SubconfEdge : sig
@@ -55,8 +93,12 @@ end
 val of_varset : Variables.VarSet.t -> 'a list Term.VarMap.t
 val check_pmrs : Lang.PMRS.t -> bool
 
+(** Generate the base type arguments given a set of variables and
+  a PMRS that defines a set of recursive functions (nonterminals).
+*)
 val base_type_args
   :  Env.env
+  -> rule:PMRS.rewrite_rule
   -> PMRS.t
   -> Variables.VarSet.t
   -> (term, Term.Terms.comparator_witness) Base.Set.t
@@ -67,9 +109,6 @@ val max_configuration : Env.env -> PMRS.t -> conf
 
 (** Returns the number of subconfigurations of a given configuration. *)
 val subconf_count : conf -> int
-
-(** Return the current configuration of a PMRS. *)
-val configuration_of : PMRS.t -> conf
 
 (** `same_conf p1 p2` is `true` iff `p1` and `p2` are in the same configuration:
     they have the same set of unknowns and the unknowns have the same set of arguments. *)
@@ -86,4 +125,7 @@ val apply_configuration : ctx:Env.env -> conf -> PMRS.t -> PMRS.t * Env.env
 (** Count the number of recursive calls in a configuration.  *)
 val num_rec_calls : ctx:Env.env -> conf -> int
 
-val get_rstar : Env.env -> Psi.t -> int -> TermSet.t * TermSet.t
+(** [get_rstar e p k] returns a pair [t,u] where [t] is the set of maximally reducible
+    terms after [k] rounds of R*.
+*)
+val get_rstar : fuel:float -> Env.env -> Psi.t -> int -> TermSet.t * TermSet.t

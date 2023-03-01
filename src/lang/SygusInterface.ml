@@ -713,3 +713,21 @@ module HLSolver = struct
     Syguslib.Solvers.commands_to_file (all_commands ~ctx solver) filename
   ;;
 end
+
+let pp_response (frmt : Formatter.t) (r : solver_response) =
+  let p_binding frmt (fname, args, _, body) =
+    Fmt.pf
+      frmt
+      "%s(%a) = %a"
+      fname
+      (Fmt.list Sexp.pp_hum)
+      (List.map ~f:Serializer.sexp_of_sorted_var args)
+      Sexp.pp_hum
+      (Serializer.sexp_of_sygus_term body)
+  in
+  match r with
+  | RFail -> Fmt.pf frmt "failed"
+  | RInfeasible -> Fmt.pf frmt "infeasible"
+  | RUnknown -> Fmt.pf frmt "unknown"
+  | RSuccess soln -> Fmt.(pf frmt "Solution %a" (list ~sep:sp p_binding) soln)
+;;

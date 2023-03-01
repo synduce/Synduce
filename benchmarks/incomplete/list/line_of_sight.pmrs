@@ -1,0 +1,20 @@
+type 'a clist = CSingle of 'a | Concat of 'a clist * 'a clist
+
+type 'a list = Single of 'a | Cons of 'a * 'a list
+
+pmrs spec l =
+    main l -> f l
+    | f Single(a) -> a, a, true
+    | f Cons(hd,tl) -> (fun (last, amax, visible) -> hd, max amax hd, hd > amax) (f tl)
+
+pmrs (odot,f_0) target t =
+    target t           -> h t
+    | h CSingle(a)    -> f_0 a
+    | h Concat(x, y) -> odot (h x) (h y)
+
+pmrs repr l =
+    repr l -> c l
+    | c CSingle(a) -> Single(a)
+    | c Concat(x, y) -> dec y x
+    | dec l CSingle(a) -> Cons(a, repr l)
+    | dec l Concat(x, y) -> dec (Concat(l, y)) x

@@ -49,7 +49,13 @@ let rec segis_loop ~(ctx : env) (p : PsiDef.t) (t_set : TermSet.t)
     Fmt.(str "<SEGIS> Start refinement loop with %i terms in T." (Set.length t_set));
   (* Start of the algorithm. *)
   let eqns, _ =
-    Equations.make ~ctx ~force_replace_off:true ~p ~lifting:Lifting.empty_lifting t_set
+    Equations.make
+      ~count_reused_predicates:false
+      ~ctx
+      ~force_replace_off:true
+      ~p
+      ~lifting:Lifting.empty_lifting
+      t_set
   in
   let%lwt synth_time, (s_resp, solution) =
     Stats.lwt_timed (fun a -> Lwt.bind a (fun _ -> Equations.solve ctx ~p eqns))
@@ -84,15 +90,16 @@ let rec segis_loop ~(ctx : env) (p : PsiDef.t) (t_set : TermSet.t)
             "@[<hov 2><SEGIS> This problem has no solution. Counterexample set:@;%a@]"
             (list ~sep:sp (pp_term ctx.ctx))
             (Set.elements t_set));
-    Lwt.return (Unrealizable witnesss)
+    Lwt.return (Unrealizable (NoRepair, witnesss))
   | RFail, _ ->
     Log.error_msg "<SEGIS> SyGuS solver failed to find a solution.";
-    Lwt.return (Failed RFail)
+    Lwt.return (Failed ("segis", RFail))
   | RUnknown, _ ->
     Log.error_msg "<SEGIS> SyGuS solver returned unknown.";
-    Lwt.return (Failed RUnknown)
-  | _ -> Lwt.return (Failed s_resp)
-;;
+    failure_case "segis" RUnknown
+  | _ -> failure_case "segis" s_resp
+
+and failure_case s r = Lwt.return (Failed (s, r))
 
 let algo_segis ~(ctx : env) (p : PsiDef.t) =
   let t_set =
@@ -135,7 +142,13 @@ let rec cegis_loop ~(ctx : Env.env) (p : PsiDef.t) (t_set : TermSet.t)
     Fmt.(str "<CEGIS> Start refinement loop with %i terms in T." (Set.length t_set));
   (* Start of the algorithm. *)
   let eqns, _ =
-    Equations.make ~ctx ~force_replace_off:true ~p ~lifting:Lifting.empty_lifting t_set
+    Equations.make
+      ~count_reused_predicates:false
+      ~ctx
+      ~force_replace_off:true
+      ~p
+      ~lifting:Lifting.empty_lifting
+      t_set
   in
   let%lwt synth_time, (s_resp, solution) =
     Stats.lwt_timed (fun a -> Lwt.bind a (fun () -> Equations.solve ctx ~p eqns))
@@ -172,14 +185,14 @@ let rec cegis_loop ~(ctx : Env.env) (p : PsiDef.t) (t_set : TermSet.t)
             "@[<hov 2><CEGIS> This problem has no solution. Counterexample set:@;%a@]"
             (list ~sep:sp (pp_term ctx.ctx))
             (Set.elements t_set));
-    Lwt.return (Unrealizable witnesss)
+    Lwt.return (Unrealizable (NoRepair, witnesss))
   | RFail, _ ->
     Log.error_msg "<CEGIS> SyGuS solver failed to find a solution.";
-    Lwt.return (Failed RFail)
+    Lwt.return (Failed ("cegis", RFail))
   | RUnknown, _ ->
     Log.error_msg "<CEGIS> SyGuS solver returned unknown.";
-    Lwt.return (Failed RUnknown)
-  | _ -> Lwt.return (Failed s_resp)
+    Lwt.return (Failed ("cegis", RUnknown))
+  | _ -> Lwt.return (Failed ("cegis", s_resp))
 ;;
 
 let algo_cegis ~(ctx : Env.env) (p : PsiDef.t) : solver_response segis_response Lwt.t =

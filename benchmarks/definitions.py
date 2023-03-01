@@ -3,7 +3,7 @@ import sys
 
 # Timeout for all experiments.
 global timeout_value
-timeout_value = 30
+timeout_value = 1200
 timestamp_definition = "%d-%m-%y-%H:%M:%S"
 experimental_setup = "a machine with an AMD® Ryzen 7 3700x 8-core processor and 32GB Ram running Ubuntu 20.04"
 experimental_setup_2 = "a laptop with an Intel Core i7-8750H 6-core processor and 32GB Ram running Ubuntu 21.04"
@@ -44,7 +44,8 @@ kick_the_tires_set = [
     ["tree/sum.ml", ""],
     ["tailopt/sum.ml", ""],
     ["treepaths/sum.ml", ""],
-    ["treepaths/height.ml", ""],
+    # output reading fails without the option
+    ["treepaths/height.ml", "--se2gis"],
     ["treepaths/maxPathWeight.ml", ""],
     ["ptree/mul.ml", ""],
     ["tree/max.ml", ""],

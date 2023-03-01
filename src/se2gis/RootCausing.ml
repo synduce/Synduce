@@ -6,23 +6,10 @@ open Env
 open Term
 open Utils
 
-type repair =
-  | Lift
-  | AddRecursiveCall of (variable * term) list
-  | NoRepair
-[@@deriving sexp]
-
-let str_of_repair repair =
-  match repair with
-  | Lift -> "lift"
-  | AddRecursiveCall _ -> "add recursive call"
-  | NoRepair -> "no repair"
-;;
-
-let join_repair r1 r2 =
+let join_repair (r1 : repair) (r2 : repair) =
   match r1, r2 with
-  | AddRecursiveCall tl1, AddRecursiveCall tl2 -> AddRecursiveCall (tl1 @ tl2)
-  | AddRecursiveCall tl, _ | _, AddRecursiveCall tl -> AddRecursiveCall tl
+  | AddRecursiveCalls tl1, AddRecursiveCalls tl2 -> AddRecursiveCalls (tl1 @ tl2)
+  | AddRecursiveCalls tl, _ | _, AddRecursiveCalls tl -> AddRecursiveCalls tl
   | Lift, _ | _, Lift -> Lift
   | NoRepair, NoRepair -> NoRepair
 ;;
@@ -87,15 +74,16 @@ let find_repair ~(ctx : env) ~(p : PsiDef.t) (witness : unrealizability_witness 
       in
       if not (Set.mem rhs_args v) (* Argument is not in function args. *)
       then (
+        let t0 = uw.ci.witness_eqn.eterm in
         match
           ( List.find uw.ci.witness_eqn.eelim ~f:(fun (_, tscalar) ->
                 Set.mem (ctx >- Analysis.free_variables tscalar) v)
           , xi )
         with
         | Some (trec, _), Some xi ->
-          AddRecursiveCall
-            [ xi, mk_app (mk_var ctx.ctx p.PsiDef.target.pmain_symb) [ trec ] ]
-        | _, Some xi -> AddRecursiveCall [ xi, mk_var ctx.ctx v ]
+          AddRecursiveCalls
+            [ t0, xi, mk_app (mk_var ctx.ctx p.PsiDef.target.pmain_symb) [ trec ] ]
+        | _, Some xi -> AddRecursiveCalls [ t0, xi, mk_var ctx.ctx v ]
         | _ -> NoRepair)
       else Lift
     in
@@ -117,6 +105,7 @@ let find_repair ~(ctx : env) ~(p : PsiDef.t) (witness : unrealizability_witness 
     let all_repairs = List.concat_map ~f:per_pair witness in
     List.fold_left ~init:NoRepair ~f:join_repair all_repairs
   in
-  Log.verbose Fmt.(fun fmt () -> pf fmt "Repair proposed: %s" (str_of_repair cause));
+  Log.verbose
+    Fmt.(fun fmt () -> pf fmt "Repair proposed: %s" (Pretty.str_of_repair cause));
   cause
 ;;

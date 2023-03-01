@@ -244,14 +244,11 @@ let expand_once ~(ctx : Context.t) (t : term) : term list =
       let cstr_args =
         List.map cstr_arg_types ~f:(fun ty -> mk_composite_base_type ~ctx ty)
       in
-      let t, _ =
-        infer_type ctx (substitution [ mk_var ctx v, mk_data ctx cstr_name cstr_args ] t)
-      in
-      t
+      Terms.typed ctx (substitution [ mk_var ctx v, mk_data ctx cstr_name cstr_args ] t)
     in
     List.map ~f v_constrs
   in
-  List.rev (List.concat (List.map ~f:aux expandables))
+  List.concat (List.map ~f:aux expandables)
 ;;
 
 (**
@@ -300,88 +297,88 @@ let terms_of_max_depth ~(ctx : Context.t) (depth : int) (typ : RType.t) : term l
   constr_t 1 typ
 ;;
 
-type virtual_term =
-  | VConstr of string * virtual_term list
-  | VChoice of virtual_term list
-  | VVarLeaf of Variable.t
+module DType = struct
+  module K = struct
+    type t = int * RType.t [@@deriving sexp, hash, ord, show, eq]
+  end
 
-let rec pp_virtual_term ~(ctx : Context.t) (f : Formatter.t) (v : virtual_term) : unit =
-  match v with
-  | VConstr (cname, args) ->
-    Fmt.(pf f "%s(%a)" cname (list ~sep:comma (pp_virtual_term ~ctx)) args)
-  | VChoice args ->
-    Fmt.(pf f "(choose %a)" (list ~sep:sp (parens (pp_virtual_term ~ctx))) args)
-  | VVarLeaf v -> Variable.pp ctx f v
-;;
+  include K
 
-let virtual_variant_no_recurse
-    ~(ctx : Context.t)
-    (variants : (string * RType.t list) list)
-    : virtual_term
-  =
-  let inst_or_none t =
-    match RType.get_variants ctx.types t with
-    | [] -> Some (VVarLeaf (Variable.mk ctx ~t:(Some t) (Alpha.fresh ctx.names ~s:"l")))
-    | _ -> None
-  in
-  let f (variant, targs) =
-    match targs with
-    | [] -> Some (VConstr (variant, []))
-    | targs ->
-      let l = List.map ~f:inst_or_none targs in
-      if List.for_all ~f:Option.is_some l
-      then Some (VConstr (variant, List.filter_opt l))
-      else None
-  in
-  VChoice (List.filter_opt (List.map ~f variants))
-;;
+  type type_constr =
+    | Rec of string * type_constr list
+    | Scalar of int * RType.t
+  [@@deriving show, ord, eq]
 
-let virtual_term_of_max_depth ~(ctx : Context.t) (depth : int) (typ : RType.t)
-    : virtual_term
-  =
-  let rec for_each_variant d (constrname, tl) =
-    VConstr (constrname, List.map ~f:(constr (d + 1)) tl)
-  and constr d t =
-    match RType.get_variants ctx.types t with
-    | [] -> VVarLeaf (Variable.mk ctx ~t:(Some t) (Alpha.fresh ctx.names))
-    | variants ->
-      if d >= depth
-      then virtual_variant_no_recurse ~ctx variants
-      else VChoice (List.map ~f:(for_each_variant d) variants)
-  in
-  constr 0 typ
-;;
+  let term_of_type_constr ~(ctx : Context.t) (tc : type_constr) : term =
+    let rec f t =
+      match t with
+      | Scalar (_, typ) ->
+        mk_var ctx (Variable.mk ~t:(Some typ) ctx (Alpha.fresh ctx.names))
+      | Rec (s, args) -> mk_data ctx s (List.map ~f args)
+    in
+    f tc
+  ;;
 
-(** Pick some term in a vitual term, removing the choices made from the virtual term. *)
-let pick_some ~(ctx : Context.t) (virt : virtual_term) : term option * virtual_term option
-  =
-  let rec aux vt =
-    match vt with
-    | VVarLeaf x -> Some (mk_var ctx x), None
-    | VChoice choices ->
-      let n = List.length choices in
-      if n = 0
-      then None, None
-      else (
-        let i = Random.int n in
-        match List.split_n choices i with
-        | l, hd :: tl ->
-          let t, new_hd = aux hd in
-          (match new_hd with
-          | Some hd' -> t, Some (VChoice (l @ (hd' :: tl)))
-          | None -> t, Some (VChoice (l @ tl)))
-        | _, _ -> failwith "Unexpected failure in pick_some.")
-    | VConstr (cname, args) ->
-      (match args with
-      | [] -> Some (mk_data ctx cname []), None
+  let size t =
+    let rec aux t =
+      match t with
+      | Rec (_, l) -> 1 + List.sum (module Int) ~f:aux l
+      | Scalar _ -> 1
+    in
+    aux t
+  ;;
+
+  let size_comp a b = Int.compare (size a) (size b)
+  let _terms_of_type : (K.t, type_constr list) Hashtbl.t = Hashtbl.create (module K)
+
+  let compare_variants (_, l) (_, l') =
+    let l0 = List.length (List.filter l ~f:(fun t -> not (RType.is_base t)))
+    and l0' = List.length (List.filter l' ~f:(fun t -> not (RType.is_base t))) in
+    if l0 = l0' then Int.compare (List.length l) (List.length l') else Int.compare l0 l0'
+  ;;
+
+  let rec get_t ~(ctx : Context.t) (n : int) (typ : RType.t) =
+    let for_variant (cstr_name, arg_types) =
+      match arg_types with
+      | [] -> [ Rec (cstr_name, []) ]
+      | _ when List.for_all ~f:RType.is_base arg_types ->
+        [ Rec (cstr_name, List.map ~f:(fun t -> Scalar (0, t)) arg_types) ]
       | _ ->
-        let tl, vl = List.unzip (List.map ~f:aux args) in
-        let t = Option.map (all_or_none tl) ~f:(fun args' -> mk_data ctx cname args') in
-        let v = Option.map (all_or_none vl) ~f:(fun args' -> VConstr (cname, args')) in
-        t, v)
-  in
-  aux virt
-;;
+        if n <= 0
+        then []
+        else (
+          let f typ' = get_t ~ctx (n - 1) typ' in
+          let args_dts = List.map ~f arg_types in
+          List.map ~f:(fun x -> Rec (cstr_name, x)) (cartesian_nary_product args_dts))
+    in
+    let gen () =
+      match List.sort ~compare:compare_variants (RType.get_variants ctx.types typ) with
+      | [] ->
+        let x = Scalar (0, typ) in
+        Hashtbl.set _terms_of_type ~key:(n, typ) ~data:[ x ];
+        [ x ]
+      | _ :: _ as variants ->
+        let l = List.concat_map ~f:for_variant variants in
+        Hashtbl.set _terms_of_type ~key:(n, typ) ~data:l;
+        l
+    in
+    match Hashtbl.find _terms_of_type (n, typ) with
+    | Some l -> l
+    | None -> gen ()
+  ;;
+
+  let gen_terms ~(ctx : Context.t) (typ : RType.t) (n : int) =
+    let limit = !Config.Optims.expand_cut in
+    let rec find_level i =
+      let pre_terms = get_t ~ctx i typ in
+      if List.length pre_terms < n && i < limit
+      then find_level (i + 1)
+      else List.take pre_terms n
+    in
+    let pre_terms = find_level 0 in
+    List.map ~f:(term_of_type_constr ~ctx) pre_terms
+  ;;
+end
 
 (* ============================================================================================= *)
 (*                                  TERM CONCRETIZATION                                          *)

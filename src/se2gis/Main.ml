@@ -36,7 +36,14 @@ let rec refinement_loop
     else ()
   in
   (* First, generate the set of constraints corresponding to the set of terms t_set. *)
-  let eqns, lifting = Equations.make ~ctx ~p ~lifting:lstate_in.lifting lstate_in.t_set in
+  let eqns, lifting =
+    Equations.make
+      ~count_reused_predicates:true
+      ~ctx
+      ~p
+      ~lifting:lstate_in.lifting
+      lstate_in.t_set
+  in
   (* The solve the set of constraints with the assumption equations. *)
   let%lwt synth_time, (s_resp, solution) =
     Stats.lwt_timed (fun a ->
@@ -50,12 +57,16 @@ let rec refinement_loop
     | Failure s ->
       Log.error_msg Fmt.(str "Failure: %s" s);
       Log.error_msg "Solution cannot be proved correct, solver failed.";
-      Lwt.return (Failed RFail)
+      failure_case "proving step" RFail
     | e -> raise e)
   (* Synthesis returned unknown, which is interpreted as failure. *)
-  | RUnknown, _ -> Lwt.return (Failed RUnknown)
+  | RUnknown, _ ->
+    Log.error_msg Fmt.(str "Unknown");
+    failure_case "candidate solution synthesis" RUnknown
   (* Synthesis failed, the loop returns failure. *)
-  | RFail, Second [] -> Lwt.return (Failed RFail)
+  | RFail, Second [] ->
+    Log.error_msg Fmt.(str "Failure.");
+    failure_case "candidate solution synthesis" RFail
   (* Synthesis returns some information about unrealizability. *)
   | _ as synt_failure_info ->
     (* On synthesis failure, start by trying to synthesize lemmas. *)
@@ -70,10 +81,11 @@ let rec refinement_loop
       Stats.log_minor_step ~synth_time ~auxtime:lsynt_time false;
       refinement_loop ~ctx ~major:false p (Lwt.return new_lstate)
     (* The witnesses were not spurious, so the problem is unrealizable. We can attempt lifting.
+        First, we root cause why the problem is unrealizable.
       *)
     | lsynt_time, Ok (Second witnesses) ->
       (match RootCausing.find_repair ~ctx ~p witnesses with
-      | RootCausing.Lift
+      | Lift
         when !Config.Optims.attempt_lifting
              && Lifting.lifting_count ~ctx p < !Config.Optims.max_lifting_attempts ->
         (match Lifting.scalar ~ctx ~p lstate_in synt_failure_info with
@@ -85,21 +97,23 @@ let rec refinement_loop
           (* Infeasible is not a failure! *)
           (match r' with
           | RInfeasible ->
-            infeasible_w_witnesses_case (synth_time, 0.) (tsize, usize) witnesses
-          | _ -> failure_case r'))
-      | _ ->
-        (* The problem is infeasible, and we have witnesses for it. *)
-        infeasible_w_witnesses_case (synth_time, 0.) (tsize, usize) witnesses)
+            unrealizable_w_witnesses_case (synth_time, 0.) (tsize, usize) Lift witnesses
+          | _ -> failure_case "lifting" r'))
+      | repair ->
+        (* The problem is infeasible, and we have witnesses for it (and possiblt a repair) *)
+        unrealizable_w_witnesses_case (synth_time, 0.) (tsize, usize) repair witnesses)
+    | _ ->
       (* The problem is infeasible. When the sygus solver answers infeasible,
         we do not have witnesses of unrealizability.
        *)
-    | _ -> failure_case RFail)
+      failure_case "lemma synthesis" RFail)
 
-and failure_case r = Lwt.return (Failed r)
+and failure_case s r = Lwt.return (Failed (s, r))
 
-and infeasible_w_witnesses_case (synth_time, verif_time) (tsize, usize) witnesses =
+and unrealizable_w_witnesses_case (synth_time, verif_time) (tsize, usize) repair witnesses
+  =
   Stats.log_major_step_end ~synth_time ~verif_time ~t:tsize ~u:usize false;
-  Lwt.return (Unrealizable witnesses)
+  Lwt.return (Unrealizable (repair, witnesses))
 
 and success_case ~ctx ~p ~synth_time lstate_in (tsize, usize) lifting (eqns, sol) =
   (* The solution is verified with a bounded check.  *)
@@ -137,7 +151,7 @@ and success_case ~ctx ~p ~synth_time lstate_in (tsize, usize) lifting (eqns, sol
         false;
       Config.Optims.turn_off_eager_optims ();
       refinement_loop ~ctx ~major:true p (Lwt.return lstate_in))
-    else Lwt.return (Failed RFail)
+    else failure_case "candidate solution verification" RFail
   | `Correct ->
     (* This case happens when verification succeeded.
                   Store the equation system, return the solution. *)
@@ -163,11 +177,11 @@ let se2gis ~(ctx : env) (p : PsiDef.t) : solver_response segis_response Lwt.t =
           (Variable.mk ctx.ctx ~t:(Some (get_theta ctx)) (Alpha.fresh ctx.ctx.names))
       in
       let s = TermSet.of_list (ctx >- Analysis.expand_once x0) in
-      Set.partition_tf ~f:(ctx >>- Expand.is_mr_all p) s)
+      Set.partition_tf ~f:(Expand.is_mr_all ~ctx p) s)
     else (
       let init_set = MGT.most_general_terms ctx p.PsiDef.target in
       Set.fold init_set ~init:(TermSet.empty, TermSet.empty) ~f:(fun (t, u) mgt ->
-          let t', u' = ctx >>- Expand.to_maximally_reducible p mgt in
+          let t', u' = Expand.to_maximally_reducible ~ctx p mgt in
           Set.union t t', Set.union u u'))
   in
   Log.debug (fun frmt () ->
@@ -180,7 +194,7 @@ let se2gis ~(ctx : env) (p : PsiDef.t) : solver_response segis_response Lwt.t =
   if Set.is_empty t_set
   then (
     Log.error_msg "Empty set of terms for equation system.";
-    Lwt.return (Failed RFail))
+    Lwt.return (Failed ("empty set of terms", RFail)))
   else (
     ctx.refinement_steps := 0;
     refinement_loop
@@ -202,6 +216,7 @@ let solve_problem ~(ctx : env) (synthesis_problem : PsiDef.t)
 
 let find_and_solve_problem
     ~(ctx : env)
+    ~(filename : string)
     (psi_comps : (string * string * string) option)
     (pmrs : (string, PMRS.t, Base.String.comparator_witness) Map.t)
     : (PsiDef.t * Syguslib.Sygus.solver_response segis_response) list Lwt.t
@@ -216,6 +231,7 @@ let find_and_solve_problem
   in
   let top_userdef_problem =
     Common.ProblemFinder.find_problem_components
+      ~filename
       ~ctx
       (target_fname, spec_fname, repr_fname)
       pmrs

@@ -216,6 +216,8 @@ let set_rstar_limit (s : string) =
   | _ -> ()
 ;;
 
+let rstar_fuel = ref 300.
+
 (** Use the deterministic algorithm to precompute sets of equations that might have unrealizable
     sets.
 *)
@@ -241,6 +243,12 @@ let set_exploration_strategy (s : string) =
     failwith
       "Did not recognize exploration strategy, should be top-down (td) or bottom-up (bu)"
 ;;
+
+(** Set to false if solution with only variying constants are not wanted. *)
+let search_constant_variations = ref true
+
+(** Set to [true] to use the root-causing algorithm during the search. *)
+let use_root_causing = ref true
 
 (* ============================================================================================= *)
 (*                        OTHER                                                                  *)

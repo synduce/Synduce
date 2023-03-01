@@ -7,9 +7,7 @@ val on_success
   -> ctx:Common.Env.env
   -> string ref
   -> Common.ProblemDefs.PsiDef.t
-  -> ( Common.ProblemDefs.soln
-     , Common.ProblemDefs.unrealizability_witness list )
-     Base.Either.t
+  -> Syguslib.Sygus.solver_response Common.ProblemDefs.segis_response
   -> Yojson.t
 
 val on_failure
@@ -18,4 +16,5 @@ val on_failure
   -> Common.ProblemDefs.PsiDef.t
   -> Yojson.t
 
+val print_stats_coverage : Confsearch.Main.multi_soln_result -> int * int * int -> unit
 val print_usage : unit -> 'a

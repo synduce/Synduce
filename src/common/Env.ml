@@ -23,6 +23,20 @@ type env =
         (** The type θ in the paper, input type of the target recursion skeleton.  *)
   }
 
+and term_info =
+  { ti_context : env (** The context in which the term info was created. *)
+  ; ti_psi_id : int (** The id of the problem for which the term_info was introduced. *)
+  ; ti_flag : bool
+        (** Set to false if the info needs refinement (i.e. the
+        set of witnesses and the lemmas are not in sync). *)
+  ; ti_term : Term.term (** The term the info is about. *)
+  ; ti_elim : (Term.term * Term.term) list
+        (** The recursion elimination map for that term. *)
+  ; ti_func : Term.variable (** A variable to model the lemma as a function. *)
+  ; ti_formals : Term.variable list
+        (** The argument list of the predicate, as a function.*)
+  }
+
 let group (ctx : Term.Context.t) (functions : PMRS.Functions.ctx) =
   { functions
   ; ctx

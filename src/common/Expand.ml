@@ -230,7 +230,7 @@ let replace_rhs_of_mains ~(ctx : Context.t) (p : PsiDef.t) (t0 : term) : term =
 ;;
 
 (* ============================================================================================= *)
-(*                                   segis TERM EXPANSION                                       *)
+(*                                   segis TERM EXPANSION                                        *)
 (* ============================================================================================= *)
 
 let simple
@@ -349,43 +349,36 @@ let expand_max
 ;;
 
 let composed_reduction_sequence
-    ~(fctx : PMRS.Functions.ctx)
-    ~(ctx : Context.t)
+    ~(ctx : Env.env)
     (p : PsiDef.t)
     (f : PMRS.t)
     (g : PMRS.t)
     (t0 : term)
   =
-  let _t0 = Reduce.reduce_pmrs ~ctx ~fctx g t0 in
-  let _t1 = Reduce.reduce_pmrs ~ctx ~fctx f _t0 in
-  let _t2 = replace_rhs_of_main ~ctx ~for_mr:true p g _t1 in
-  replace_rhs_of_main ~ctx p f _t2
+  let _t0 = ctx >>- Reduce.reduce_pmrs g t0 in
+  let _t1 = ctx >>- Reduce.reduce_pmrs f _t0 in
+  let _t2 = ctx >- replace_rhs_of_main ~for_mr:true p g _t1 in
+  ctx >- replace_rhs_of_main p f _t2
 ;;
 
-let check_max_exp ~(fctx : PMRS.Functions.ctx) ~(ctx : Context.t) p f g t =
-  let t3 = composed_reduction_sequence ~fctx ~ctx p f g t in
+let check_max_exp ~(ctx : Env.env) p f g t =
+  let t3 = composed_reduction_sequence ~ctx p f g t in
   match nonreduced_terms p (Set.union f.pnon_terminals g.pnon_terminals) t3 with
   | [] -> First (t, t3)
   | _ -> Second t
 ;;
 
-let expand_max_main
-    ~(ctx : Context.t)
-    ~(fctx : PMRS.Functions.ctx)
-    (p : PsiDef.t)
-    (f : PMRS.t)
-    (g : PMRS.t)
-    (t0 : term)
+let expand_max_main ~(ctx : Env.env) (p : PsiDef.t) (f : PMRS.t) (g : PMRS.t) (t0 : term)
     : (term * term) list * term list
   =
   let non_terminals = Set.union f.pnon_terminals g.pnon_terminals in
-  let t3 = composed_reduction_sequence ~fctx ~ctx p f g t0 in
+  let t3 = composed_reduction_sequence ~ctx p f g t0 in
   let nr = nonreduced_terms p non_terminals t3 in
   (* Collect all the variables that need to be expanded. *)
   let expand_reqs =
     let collect c (_, args) =
       match List.last args with
-      | Some arg -> Set.union c (Analysis.free_variables ~ctx arg)
+      | Some arg -> Set.union c (ctx >- Analysis.free_variables arg)
       | None -> c
     in
     List.fold ~f:collect ~init:VarSet.empty nr
@@ -395,23 +388,23 @@ let expand_max_main
       List.map
         ~f:(fun x ->
           List.cartesian_product
-            [ mk_var ctx x ]
-            (Analysis.expand_once ~ctx (mk_var ctx x)))
+            [ mk_var ctx.ctx x ]
+            (ctx >- Analysis.expand_once (mk_var ctx.ctx x)))
         (Set.to_list expand_reqs)
     in
     cartesian_nary_product (List.filter ~f:(not <| List.is_empty) expansions)
   in
   let all_ts = List.map substs ~f:(fun s -> substitution s t0) in
-  let mr_terms, rest = List.partition_map all_ts ~f:(check_max_exp ~fctx ~ctx p f g) in
+  let mr_terms, rest = List.partition_map all_ts ~f:(check_max_exp ~ctx p f g) in
   mr_terms, rest
 ;;
 
-let expand_driver ~(fctx : PMRS.Functions.ctx) ~(ctx : Context.t) p f g t =
-  match expand_max_main ~fctx ~ctx p f g t with
+let expand_driver ~(ctx : Env.env) p f g t =
+  match expand_max_main ~ctx p f g t with
   | [], rest ->
     (match rest with
     | hd :: tl ->
-      let expanded_ts, rest' = expand_max_main ~fctx ~ctx p f g hd in
+      let expanded_ts, rest' = expand_max_main ~ctx p f g hd in
       expanded_ts, tl @ rest'
     | [] -> [], [])
   | mr_terms, rest -> mr_terms, rest
@@ -421,37 +414,28 @@ let expand_driver ~(fctx : PMRS.Functions.ctx) ~(ctx : Context.t) p f g t =
   Expand so that terms are MR-terms for f @ g.
 *)
 let expand_max2
-    ~(ctx : Context.t)
-    ~(fctx : PMRS.Functions.ctx)
+    ~(ctx : Env.env)
     (p : PsiDef.t)
     ~refr:(f : PMRS.t)
     ~target:(g : PMRS.t)
     (t0 : term)
     : (term * term) list * term list
   =
-  match check_max_exp ~fctx ~ctx p f g t0 with
+  match check_max_exp ~ctx p f g t0 with
   | First x -> [ x ], []
-  | _ -> expand_driver ~fctx ~ctx p f g t0
+  | _ -> expand_driver ~ctx p f g t0
 ;;
 
-let is_mr
-    ~(fctx : PMRS.Functions.ctx)
-    ~(ctx : Context.t)
-    (p : PsiDef.t)
-    (f : PMRS.t)
-    (t0 : term)
-    nt
-    : bool
-  =
-  let f_t0 = Reduce.reduce_pmrs ~fctx ~ctx f t0 in
-  let f_t0 = replace_rhs_of_main ~ctx p f f_t0 in
+let is_mr ~(ctx : Env.env) (p : PsiDef.t) (f : PMRS.t) (t0 : term) nt : bool =
+  let f_t0 = ctx >>- Reduce.reduce_pmrs f t0 in
+  let f_t0 = ctx >- replace_rhs_of_main p f f_t0 in
   let nr = nonreduced_terms p nt f_t0 in
   match nr with
   | [] -> true
   | _ -> false
 ;;
 
-let is_mr_all ~(fctx : PMRS.Functions.ctx) ~(ctx : Context.t) (p : PsiDef.t) (t0 : term) =
+let is_mr_all ~(ctx : Env.env) (p : PsiDef.t) (t0 : term) =
   let nonterminals =
     VarSet.union_list
       [ p.PsiDef.target.pnon_terminals
@@ -459,18 +443,14 @@ let is_mr_all ~(fctx : PMRS.Functions.ctx) ~(ctx : Context.t) (p : PsiDef.t) (t0
       ; p.PsiDef.reference.pnon_terminals
       ]
   in
-  is_mr ~fctx ~ctx p p.PsiDef.target t0 nonterminals
-  && Either.is_first (check_max_exp ~fctx ~ctx p p.PsiDef.reference p.PsiDef.repr t0)
+  is_mr ~ctx p p.PsiDef.target t0 nonterminals
+  && Either.is_first (check_max_exp ~ctx p p.PsiDef.reference p.PsiDef.repr t0)
 ;;
 
 (** `maximal p t0 ` expands the term `t0 ` into T, U such that all terms in T are MR-terms
   for (p.PsiDef.reference (p.PsiDef.repr)) and p.PsiDef.target and T,U is a boundary.
 *)
-let to_maximally_reducible
-    ~(fctx : PMRS.Functions.ctx)
-    ~(ctx : Context.t)
-    (p : PsiDef.t)
-    (t0 : term)
+let to_maximally_reducible ~(ctx : Env.env) (p : PsiDef.t) (t0 : term)
     : TermSet.t * TermSet.t
   =
   let nonterminals =
@@ -483,14 +463,12 @@ let to_maximally_reducible
   let tset0, uset0 =
     let g = p.PsiDef.target in
     (* Expand only if there are non-reduced terms *)
-    if is_mr ~fctx ~ctx p g t0 nonterminals
-    then [ t0, t0 ], []
-    else expand_max ~fctx ~ctx p g t0
+    if is_mr ~ctx p g t0 nonterminals then [ t0, t0 ], [] else ctx >>- expand_max p g t0
   in
   (* Expand with orig (f) *)
   let f (tset, uset) (t_theta, _) =
     let new_ts, new_us =
-      expand_max2 ~fctx ~ctx p ~refr:p.PsiDef.reference ~target:p.PsiDef.repr t_theta
+      expand_max2 ~ctx p ~refr:p.PsiDef.reference ~target:p.PsiDef.repr t_theta
     in
     tset @ List.map ~f:first new_ts, uset @ new_us
   in
@@ -503,21 +481,57 @@ let to_maximally_reducible
     `p`. If the pair (t,u) is a boundary then the pair of sets returned will also be a boundary.
 *)
 let expand_all
-    ~(fctx : PMRS.Functions.ctx)
-    ~(ctx : Context.t)
+    ?(fuel = 0.0)
+    ~(ctx : Env.env)
     (p : PsiDef.t)
     ((t, u) : TermSet.t * TermSet.t)
-    : TermSet.t * TermSet.t
+    : (TermSet.t * TermSet.t, unit) Result.t
   =
-  List.fold (VarSet.elements u) ~init:(t, TermSet.empty) ~f:(fun (t', u') t0 ->
-      let t'', u'' = to_maximally_reducible ~fctx ~ctx p t0 in
-      Set.union t' t'', Set.union u' u'')
+  let t0 = Unix.gettimeofday () in
+  let fuel_left () = Float.((100.0 * (Unix.gettimeofday () - t0)) - fuel) in
+  try
+    Ok
+      (List.fold (VarSet.elements u) ~init:(t, TermSet.empty) ~f:(fun (t', u') t0 ->
+           if Float.(fuel_left () < 0.)
+           then failwith "no fuel"
+           else (
+             let t'', u'' = to_maximally_reducible ~ctx p t0 in
+             Set.union t' t'', Set.union u' u'')))
+  with
+  | _ -> (* No fuel left. *) Error ()
+;;
+
+let expand_fast ~(ctx : Context.t) (initial_term : term) =
+  let aux () =
+    let vars_to_expand =
+      Set.to_list
+        (Set.filter
+           (Analysis.free_variables ~include_functions:false ~ctx initial_term)
+           ~f:(fun v -> Option.is_some (Analysis.is_expandable_var ~ctx v)))
+    in
+    let n =
+      let l = List.length vars_to_expand in
+      if l > 1
+      then
+        Int.of_float
+          Float.(of_int !Config.Optims.num_expansions_check ** (1.0 /. Float.of_int l))
+        + 1
+      else !Config.Optims.num_expansions_check
+    in
+    let subs =
+      List.map vars_to_expand ~f:(fun v ->
+          List.map
+            ~f:(fun t -> mk_var ctx v, t)
+            (Analysis.DType.gen_terms ~ctx (Variable.vtype_or_new ctx v) n))
+    in
+    List.map ~f:(fun subs -> substitution subs initial_term) (cartesian_nary_product subs)
+  in
+  if Analysis.is_bounded ~ctx initial_term then [ initial_term ] else aux ()
 ;;
 
 (* ============================================================================================= *)
 (*                                   EXPAND TERM UTILS                                           *)
 (* ============================================================================================= *)
-open Lwt
 open Smtlib
 open SmtInterface
 
@@ -530,28 +544,21 @@ let lwt_expand_loop
       | _ -> false)
     ?(r_complete = SmtLib.Unsat)
     ~(ctx : Context.t)
-    (u : TermSet.t Lwt.t)
+    (u : term Lwt.t)
   =
-  let rec tlist_check accum terms =
-    match terms with
-    | [] -> accum
-    | t0 :: tl ->
-      let%lwt accum' = t_check accum t0 in
-      (match accum' with
-      | Sat -> return SmtLib.Sat
-      | _ -> tlist_check (return accum') tl)
-  in
+  let open Lwt in
+  let%lwt initial_term = u in
+  let terms_to_check () = expand_fast ~ctx initial_term in
   let rec aux u =
     let%lwt u = u in
-    match Set.min_elt u, !counter < !Config.Optims.num_expansions_check with
-    | Some t0, true ->
-      let tset, u' = simple ~ctx t0 in
-      let%lwt check_result = tlist_check (return SmtLib.Unknown) (Set.elements tset) in
-      counter := !counter + Set.length tset;
-      if r_stop check_result
-      then return check_result
-      else aux (return (Set.union (Set.remove u t0) u'))
-    | None, true ->
+    match u, !counter < !Config.Optims.num_expansions_check with
+    | t0 :: rest, true ->
+      (match%lwt t_check (return SmtLib.Unknown) t0 with
+      | Sat -> return SmtLib.Sat
+      | _ as check_result ->
+        Int.incr counter;
+        if r_stop check_result then return check_result else aux (return rest))
+    | [], true ->
       Log.verbose_msg "Bounded checking is complete.";
       (* All expansions have been checked. *)
       return r_complete
@@ -563,5 +570,5 @@ let lwt_expand_loop
       else (* Otherwise, it's unknown. *)
         return SmtLib.Unknown
   in
-  aux u
+  aux (Lwt.return (terms_to_check ()))
 ;;

@@ -165,12 +165,12 @@ fi
 sep "Installing Ocaml dependencies"
 opam update
 # Initialize and update submodules
-git submodule init
-git submodule update
+#git submodule init
+# git submodule update
 # Install first the largest dependency
 opam install -y core
 # Pin the syguslib-utils module
-opam pin syguslib-utils -y
+# opam pin syguslib-utils -y
 # Install the rest of the dependencies
 opam install -y . --deps-only
 

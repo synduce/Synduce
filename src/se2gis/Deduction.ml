@@ -372,7 +372,7 @@ module Solver = struct
                 then
                   [ Option.map (guess_application ~ctx ~xi guess rhs) ~f:(fun rhs' ->
                         let constr = Terms.(lhs == rhs') in
-                        pre, Terms.(~!constr))
+                        pre, Terms.(not constr))
                   ]
                 else [])
           in

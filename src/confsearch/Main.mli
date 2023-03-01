@@ -3,9 +3,10 @@ open ProblemDefs
 open Env
 
 type multi_soln_result =
-  { r_best : env * PsiDef.t * Syguslib.Sygus.solver_response segis_response
+  { r_best : (env * PsiDef.t * Syguslib.Sygus.solver_response segis_response) option
   ; r_all : (env * PsiDef.t * Syguslib.Sygus.solver_response segis_response) list
   ; r_subconf_count : int
+  ; r_final_state : ConfGraph.state
   }
 
 (** [find_and_solver_problem (target,spec,repr) globals] finds the PMRS
@@ -18,6 +19,7 @@ type multi_soln_result =
 *)
 val find_and_solve_problem
   :  ctx:env
+  -> filename:string
   -> (string * string * string) option
   -> (string, Lang.PMRS.t, Base.String.comparator_witness) Base.Map.t
-  -> multi_soln_result Lwt.t
+  -> multi_soln_result

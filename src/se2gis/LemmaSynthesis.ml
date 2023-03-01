@@ -1,6 +1,6 @@
 open Base
 open Common
-open Counterexamples
+open Witnesses
 open Env
 open Lang
 open LemmaVerif
@@ -19,25 +19,33 @@ module Sm = Syguslib.Semantic
 
 let term_info_of_witness
     ~(id : int)
-    ~(ctx : Context.t)
+    ~(ctx : env)
     ~(is_pos_witness : bool)
     (witness : witness)
     : term_info * cond_lemma
   =
   let scalar_vars = Map.keys witness.witness_model in
-  let input_args_t = List.map ~f:(Variable.vtype_or_new ctx) scalar_vars in
+  let input_args_t = List.map ~f:(Variable.vtype_or_new ctx.ctx) scalar_vars in
   let lemma_f =
     Variable.mk
-      ctx
+      ctx.ctx
       ~t:(Some (RType.fun_typ_pack input_args_t TBool))
-      (Alpha.fresh ~s:"lemma" ctx.names)
+      (Alpha.fresh ~s:"lemma" ctx.ctx.names)
   in
-  ( { ti_psi_id = id
+  let ti_formals =
+    let formals = Map.keys witness.witness_model in
+    if List.exists formals ~f:(fun v ->
+           RType.is_recursive ctx.ctx.types (Variable.vtype_or_new ctx.ctx v))
+    then failwith "Formal args of lemmas must be scalars!"
+    else formals
+  in
+  ( { ti_context = ctx
+    ; ti_psi_id = id
     ; ti_flag = false
     ; ti_term = witness.witness_eqn.eterm
     ; ti_elim = witness.witness_eqn.eelim
     ; ti_func = lemma_f
-    ; ti_formals = Map.keys witness.witness_model
+    ; ti_formals
     }
   , { cl_flag = false
     ; cl_cond = witness.witness_eqn.esplitter
@@ -184,13 +192,9 @@ let skeleton_of_tinv
   objective (SyGuS command).
   All strategies should be executed in order to find a solution efficiently.
  *)
-let synthfun_of_det
-    ~(fctx : PMRS.Functions.ctx)
-    ~(ctx : Context.t)
-    ~(p : PsiDef.t)
-    (det : term_info)
-    : (Sy.command * string) list
-  =
+let synthfun_of_ti ~(p : PsiDef.t) (ti : term_info) : (Sy.command * string) list =
+  let ctx = ti.ti_context.ctx in
+  let fctx = ti.ti_context.functions in
   let opset =
     List.fold
       ~init:OpSet.empty
@@ -204,7 +208,7 @@ let synthfun_of_det
   in
   let gen_of_guess t guess =
     let lemma_requires_set_theory =
-      List.exists det.ti_formals ~f:(fun v ->
+      List.exists ti.ti_formals ~f:(fun v ->
           requires_set_theory ~ctx (Variable.vtype_or_new ctx v))
     in
     let grammar =
@@ -217,18 +221,21 @@ let synthfun_of_det
           ~guess
           ~bools:true
           opset
-          det.ti_formals
+          ti.ti_formals
           RType.TBool
     in
     let logic = if lemma_requires_set_theory then "ALL" else logic_of_operators opset in
-    mk_synthinv ~ctx det.ti_func.vname det.ti_formals grammar, logic
+    if List.exists ti.ti_formals ~f:(fun v ->
+           RType.is_recursive ctx.types (Variable.vtype_or_new ctx v))
+    then failwith "Formal args of lemmas must be scalars!"
+    else mk_synthinv ~ctx ti.ti_func.vname ti.ti_formals grammar, logic
   in
   if !Config.Optims.make_partial_lemma_sketches
   then (
     let skeleton_guess =
       match p.tinv with
       | Some tinv ->
-        skeleton_of_tinv ~fctx ~ctx det (Reduce.reduce_pmrs ~ctx ~fctx tinv det.ti_term)
+        skeleton_of_tinv ~fctx ~ctx ti (Reduce.reduce_pmrs ~ctx ~fctx tinv ti.ti_term)
       | _ -> None
     in
     [ gen_of_guess true skeleton_guess; gen_of_guess false skeleton_guess ])
@@ -432,16 +439,16 @@ let parse_positive_example_solver_model
       "Parse model failure: Positive example cannot be found during lemma refinement."
 ;;
 
-let synthesize_new_lemma ~(ctx : env) ~(p : PsiDef.t) (det : term_info) (cl : cond_lemma)
+let synthesize_new_lemma ~(p : PsiDef.t) (ti : term_info) (cl : cond_lemma)
     : term option Lwt.t
   =
   let with_synth_obj i synth_obj logic =
-    ctx >- AlgoLog.announce_new_lemma_synthesis i det cl;
+    ti.ti_context >- AlgoLog.announce_new_lemma_synthesis i ti cl;
     let neg_constraints =
-      List.map ~f:(ctx >- constraint_of_neg_witness det) cl.cl_negatives
+      List.map ~f:(ti.ti_context >- constraint_of_neg_witness ti) cl.cl_negatives
     in
     let pos_constraints =
-      List.map ~f:(ctx >- constraint_of_pos_witness det) cl.cl_positives
+      List.map ~f:(ti.ti_context >- constraint_of_pos_witness ti) cl.cl_positives
     in
     let extra_defs = Sm.[ max_definition; min_definition ] in
     let commands =
@@ -453,9 +460,9 @@ let synthesize_new_lemma ~(ctx : env) ~(p : PsiDef.t) (det : term_info) (cl : co
          @ [ Sy.mk_c_check_synth () ])
     in
     match%lwt
-      ctx
+      ti.ti_context
       >>- handle_lemma_synth_response
-            det
+            ti
             (SygusInterface.SygusSolver.solve_commands
                ~timeout:(Some !Config.Optims.wait_parallel_tlimit)
                commands)
@@ -463,7 +470,7 @@ let synthesize_new_lemma ~(ctx : env) ~(p : PsiDef.t) (det : term_info) (cl : co
     | None -> Lwt.return None
     | Some solns -> Lwt.return (List.nth solns 0)
   in
-  match ctx >>- synthfun_of_det ~p det with
+  match synthfun_of_ti ~p ti with
   | [ (synth_obj, logic) ] -> with_synth_obj 0 synth_obj logic
   | obj_choices ->
     let lwt_tasks =
@@ -486,11 +493,11 @@ let synthesize_new_lemma ~(ctx : env) ~(p : PsiDef.t) (det : term_info) (cl : co
 let rec lemma_refinement_loop
     ~(ctx : env)
     ~(p : PsiDef.t)
-    (det : term_info)
+    (ti : term_info)
     (cl : cond_lemma)
     : cond_lemma option Lwt.t
   =
-  match%lwt synthesize_new_lemma ~ctx ~p det cl with
+  match%lwt synthesize_new_lemma ~p ti cl with
   | None ->
     Log.debug_msg "Lemma synthesis failure.";
     Lwt.return None
@@ -499,14 +506,14 @@ let rec lemma_refinement_loop
     then
       ctx
       >- LemmasInteractive.interactive_check_lemma
-           (lemma_refinement_loop ~ctx ~p det)
-           det.ti_func.vname
-           det.ti_formals
-           det
+           (lemma_refinement_loop ~ctx ~p ti)
+           ti.ti_func.vname
+           ti.ti_formals
+           ti
            cl
            lemma_term
     else (
-      match%lwt ctx >>- verify_lemma_candidate ~p det cl lemma_term with
+      match%lwt verify_lemma_candidate ~p ti cl lemma_term with
       (* The candidate lemma has been proved correct. *)
       | vmethod, Unsat ->
         let lemma =
@@ -514,13 +521,13 @@ let rec lemma_refinement_loop
           | None -> lemma_term
           | Some pre -> Terms.(pre => lemma_term)
         in
-        ctx >- AlgoLog.lemma_proved_correct vmethod det lemma;
+        ctx >- AlgoLog.lemma_proved_correct vmethod ti lemma;
         Lwt.return (Some { cl with cl_flag = true; cl_lemmas = lemma :: cl.cl_lemmas })
       (* The candidate lemmas has not been proved correct. *)
       | vmethod, S.SExps x ->
         AlgoLog.lemma_not_proved_correct vmethod;
         let new_positive_witnesss =
-          ctx >>- parse_positive_example_solver_model det (S.SExps x)
+          ctx >>- parse_positive_example_solver_model ti (S.SExps x)
         in
         List.iter
           ~f:(fun witness ->
@@ -535,7 +542,7 @@ let rec lemma_refinement_loop
         lemma_refinement_loop
           ~ctx
           ~p
-          det
+          ti
           { cl with cl_positives = cl.cl_positives @ new_positive_witnesss }
       | _, Sat ->
         Log.error_msg "Lemma verification returned Sat. This is unexpected.";
@@ -633,7 +640,7 @@ let create_or_update_lemmas_with_witness
   with
   | None ->
     ctx >- AlgoLog.announce_new_lemmas witness;
-    let det, cl = ctx >- term_info_of_witness ~id:p.id ~is_pos_witness witness in
+    let det, cl = term_info_of_witness ~ctx ~id:p.id ~is_pos_witness witness in
     let%lwt det' =
       if is_pos_witness
       then Lwt.return (det, cl)
@@ -650,7 +657,7 @@ let create_or_update_lemmas_with_witness
     let det, cl =
       match ctx >- cond_lemma_of_witness ~pos:is_pos_witness det witness with
       | Some cl -> det, cl
-      | None -> ctx >- term_info_of_witness ~id:p.id ~is_pos_witness witness
+      | None -> term_info_of_witness ~ctx ~id:p.id ~is_pos_witness witness
     in
     let%lwt det' =
       if is_pos_witness

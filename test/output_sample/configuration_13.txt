@@ -1,0 +1,14 @@
+REALIZABLE
+
+let xi_0 x15 x16 = x16 = x15 ? 1 : 0
+
+let xi_1 x17 x18 = x17 = x17 ? x18 : x17
+
+let xi_2 _auto3 _auto4 _auto5 _auto6 =
+  _auto3 = _auto4 ? 1 : 1 = _auto5 ? 1 : 1 = _auto6 ? 1 : 0
+
+let rec g =
+  function Leaf(a) -> xi_0 x a
+  | Node(a, l, r) -> x < a ? xi_1 a (g l) : xi_2 x a (g l) (g r)
+
+

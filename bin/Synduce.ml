@@ -9,6 +9,7 @@ open Common.Env
 let parse_only = ref false
 
 let main () =
+  let start_time = Unix.gettimeofday () in
   let filename = ref None in
   let options = Config.options ToolMessages.print_usage parse_only in
   Getopt.parse_cmdline options (fun s -> filename := Some s);
@@ -55,7 +56,7 @@ let main () =
   if !parse_only then Caml.exit 1;
   (* Solve the problem proper. *)
   let multi_soln_result =
-    Lwt_main.run (ctx >>> Many.find_and_solve_problem psi_comps all_pmrs)
+    ctx >>> Many.find_and_solve_problem ~filename:!filename psi_comps all_pmrs
   in
   let n_out = List.length multi_soln_result.r_all in
   let print_unrealizable = !Config.print_unrealizable_configs || n_out < 2 in
@@ -65,9 +66,8 @@ let main () =
       match pb, soln with
       | pb, Realizable soln ->
         ( pb.PsiDef.id
-        , ctx >>> ToolMessages.on_success ~is_ocaml_syntax filename pb (Either.First soln)
-        )
-      | pb, Unrealizable witnesss ->
+        , ctx >>> ToolMessages.on_success ~is_ocaml_syntax filename pb (Realizable soln) )
+      | pb, Unrealizable (r, witnesses) ->
         Int.incr u_count;
         ( pb.PsiDef.id
         , ctx
@@ -76,13 +76,16 @@ let main () =
                 ~is_ocaml_syntax
                 filename
                 pb
-                (Either.Second witnesss) )
+                (Unrealizable (r, witnesses)) )
       | _, Failed _ ->
         Int.incr f_count;
         Log.error_msg "Failed to find a solution or a witness of unrealizability";
         pb.PsiDef.id, ctx >>> ToolMessages.on_failure pb)
   in
-  let json_out =
+  let cov_ratio =
+    Confsearch.ConfGraph.get_coverage_percentage multi_soln_result.r_final_state
+  in
+  let json_out, u_count, f_count =
     let u_count = ref 0
     and f_count = ref 0 in
     let json =
@@ -93,9 +96,12 @@ let main () =
         let subproblem_jsons =
           List.map ~f:(check_output (u_count, f_count)) multi_soln_result.r_all
         in
-        let _ =
-          Log.info Fmt.(fun fmt () -> pf fmt "Best solution:");
-          check_output (ref 0, ref 0) multi_soln_result.r_best
+        let () =
+          match multi_soln_result.r_best with
+          | Some best_solution ->
+            Log.info Fmt.(fun fmt () -> pf fmt "Best solution:");
+            ignore (check_output (ref 0, ref 0) best_solution)
+          | _ -> ()
         in
         let results =
           List.map subproblem_jsons ~f:(fun (psi_id, json) ->
@@ -106,23 +112,35 @@ let main () =
            ; "unr-cache-hits", `Int !Stats.num_unr_cache_hits
            ; "orig-conf-hit", `Bool !Stats.orig_solution_hit
            ; "foreign-lemma-uses", `Int !Stats.num_foreign_lemma_uses
+           ; "coverage", `Float cov_ratio
            ]
           @ results)
     in
-    if n_out > 1
-    then
-      Log.info
-        Fmt.(
-          fun fmt () ->
-            pf
-              fmt
-              "%i configurations solved, %i solutions, %i unrealizable (%i failed)."
-              n_out
-              (n_out - !u_count)
-              !u_count
-              !f_count);
-    json
+    ToolMessages.print_stats_coverage multi_soln_result (n_out, !u_count, !f_count);
+    json, !u_count, !f_count
   in
+  (* Write to log if defined. *)
+  (match !Config.output_log with
+  | Some filename ->
+    let info_line =
+      Fmt.str
+        "finished:%f,solutions:%i,unrealizable:%i,failure:%i,rstar-hits:%i,lemma-reuse:%i,found-best:%b"
+        (Unix.gettimeofday () -. start_time)
+        (n_out - u_count)
+        u_count
+        f_count
+        !Stats.num_unr_cache_hits
+        !Stats.num_foreign_lemma_uses
+        !Stats.orig_solution_hit
+    in
+    (try
+       let chan = Stdio.Out_channel.create ~append:true filename in
+       Stdio.Out_channel.output_lines chan [ info_line ];
+       Stdio.Out_channel.close_no_err chan
+     with
+    | _ -> ())
+  | None -> ());
+  (* Write json messages to stdout if set. *)
   (if !Config.json_out
   then
     if !Config.compact

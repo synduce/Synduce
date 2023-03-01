@@ -10,7 +10,7 @@
   ppx_let
   sexplib
   smtlib
-  syguslib-utils
+  syguslib
   unix
   utils)
  (preprocess

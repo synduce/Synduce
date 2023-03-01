@@ -62,24 +62,17 @@ val simple
 val make_bounded : ctx:Term.Context.t -> Term.term -> Term.term
 
 val is_mr
-  :  fctx:PMRS.Functions.ctx
-  -> ctx:Term.Context.t
+  :  ctx:Env.env
   -> ProblemDefs.PsiDef.t
   -> PMRS.t
   -> Term.term
   -> Term.VarSet.t
   -> bool
 
-val is_mr_all
-  :  fctx:PMRS.Functions.ctx
-  -> ctx:Term.Context.t
-  -> ProblemDefs.PsiDef.t
-  -> Term.term
-  -> bool
+val is_mr_all : ctx:Env.env -> ProblemDefs.PsiDef.t -> Term.term -> bool
 
 val to_maximally_reducible
-  :  fctx:PMRS.Functions.ctx
-  -> ctx:Term.Context.t
+  :  ctx:Env.env
   -> ProblemDefs.PsiDef.t
   -> Term.term
   -> TermSet.t * TermSet.t
@@ -89,11 +82,13 @@ val to_maximally_reducible
     `p`. If the pair (t,u) is a boundary then the pair of sets returned will also be a boundary.
 *)
 val expand_all
-  :  fctx:PMRS.Functions.ctx
-  -> ctx:Term.Context.t
+  :  ?fuel:float
+  -> ctx:Env.env
   -> ProblemDefs.PsiDef.t
   -> TermSet.t * TermSet.t
-  -> TermSet.t * TermSet.t
+  -> (TermSet.t * TermSet.t, unit) Result.t
+
+val expand_fast : ctx:Term.Context.t -> Term.term -> Term.term list
 
 (** [lwt_expand_loop] provides basic functionality for bounded checking.
     [lwt_expand_loop steps f start] will run a bounded checking loop, starting with the term
@@ -123,5 +118,5 @@ val lwt_expand_loop
   -> ?r_stop:(Smtlib.SmtLib.solver_response -> bool)
   -> ?r_complete:Smtlib.SmtLib.solver_response
   -> ctx:Term.Context.t
-  -> TermSet.t Lwt.t
+  -> Term.term Lwt.t
   -> AsyncSmt.response

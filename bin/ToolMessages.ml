@@ -35,7 +35,7 @@ let on_success
     ~(ctx : env)
     (source_filename : string ref)
     (pb : PsiDef.t)
-    (result : (soln, unrealizability_witness list) Either.t)
+    (result : Syguslib.Sygus.solver_response segis_response)
     : Yojson.t
   =
   let elapsed, verif_time =
@@ -46,7 +46,7 @@ let on_success
   let verif_ratio = 100.0 *. (verif_time /. elapsed) in
   (* Print the solution. *)
   (match result with
-  | Either.First soln ->
+  | Realizable soln ->
     Log.(
       info (print_solvers_summary pb.id);
       info (fun frmt () ->
@@ -57,7 +57,7 @@ let on_success
             verif_ratio
             (box (ctx >- Common.Pretty.pp_soln ~use_ocaml_syntax:is_ocaml_syntax))
             soln))
-  | Either.Second witnesss ->
+  | Unrealizable (_repair, witnesses) ->
     if print_unrealizable
     then (
       Log.(
@@ -69,11 +69,12 @@ let on_success
               elapsed));
       Log.(
         info (fun frmt () -> pf frmt "%a" (ctx >- Lang.PMRS.pp ~short:false) pb.target));
-      ctx >>> ToolExplain.when_unrealizable pb witnesss)
-    else ());
+      ctx >>> ToolExplain.when_unrealizable pb witnesses)
+    else ()
+  | _ -> ());
   (* If output specified, write the solution in file. *)
   (match result with
-  | Either.First soln ->
+  | Realizable soln ->
     (match Config.get_output_file !source_filename with
     | Some out_file ->
       Utils.Log.to_file out_file (fun frmt () ->
@@ -98,7 +99,7 @@ let on_success
   >>> Common.AlgoLog.single_configuration_json
         ~is_ocaml_syntax
         pb
-        (Some result)
+        result
         elapsed
         !Stats.verif_time
 ;;
@@ -129,9 +130,41 @@ let on_failure ?(is_ocaml_syntax = true) ~(ctx : env) (pb : PsiDef.t) : Yojson.t
   >>> Common.AlgoLog.single_configuration_json
         ~is_ocaml_syntax
         pb
-        None
+        (Failed ("unknown", Syguslib.Sygus.RFail))
         elapsed
         !Stats.verif_time
+;;
+
+let print_stats_coverage multi_soln_result (n_out, u_count, f_count) =
+  let open Confsearch.Main in
+  let open Confsearch.ConfGraph in
+  let total_confs = multi_soln_result.r_final_state.st_total_confs in
+  if n_out > 1
+  then (
+    Log.info
+      Fmt.(
+        fun fmt () ->
+          pf fmt "%i configurations inspected (%i possible configs)" n_out total_confs);
+    Log.info
+      Fmt.(fun fmt () -> pf fmt "Found best known solution: %b" !Stats.orig_solution_hit);
+    Log.info
+      Fmt.(
+        fun fmt () ->
+          pf
+            fmt
+            "%i solutions | %i unrealizable  | %i failed"
+            (n_out - u_count)
+            u_count
+            f_count);
+    Log.info
+      Fmt.(
+        fun fmt () ->
+          pf
+            fmt
+            "R* cache hits: %i | Orig. config solved: %b | Reused lemmas: %i"
+            !Stats.num_unr_cache_hits
+            !Stats.orig_solution_hit
+            !Stats.num_foreign_lemma_uses))
 ;;
 
 (** Print a summary of the options available. The options are in the Lib.Utils.Config module.  *)
@@ -181,6 +214,8 @@ let print_usage () =
     \       --multi-rstar-limit=NUM     Set the limit of rstar rounds to use in cache.\n\
     \       --multi-no-rstar            Do not use rstar to check for unrelizability \
      cache.\n\
+    \       --multi-reconly            Only search solution that vary in number of \n\
+    \                                   recursive calls, use all constant args always.\n\
     \       --multi-strategy=(td|bu)    Set top-down (td) or bottom-up (bu) strategy.\n\n\
     \      Bounded checking:\n\
     \       --use-bmc                   Use segis bounded model checking (bmc mode).\n\
@@ -209,7 +244,6 @@ let print_usage () =
     \       --interactive-check-lemma   Manually set if a lemma is true and, if not, \
      give counterexample.\n\
     \       --parse-only                Just parse the input.\n\
-    \       --rstar-limit               Set the rstar limit.\n\
     \       --show-vars                 Print variables and their types at the end.\n\
     \       --generate-benchmarks=DIR   Save SyGuS problems in DIR, including problems \
      that are provably unrealizable.\n\

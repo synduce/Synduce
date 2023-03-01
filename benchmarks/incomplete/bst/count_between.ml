@@ -1,4 +1,4 @@
-(** @synduce --no-lifting -NB -n 20 -I bst.ml -s 2 *)
+(** @synduce -A --no-lifting -n 20 -I bst.ml *)
 
 (* This skeleton has erros and is unrealizable, but allowing for different configuations
   allows to find solutions that are variations of the configuration given here.

@@ -81,13 +81,9 @@ let gen_pmrs_positive_examples ~(ctx : env) (p : PMRS.t) =
            ~r_stop:(fun _ -> !iterations > _NUM_POSIIVE_EXAMPLES_)
            mk_ex
            (Lwt.return
-              (TermSet.singleton
-                 (mk_var
-                    ctx.ctx
-                    (Variable.mk
-                       ctx.ctx
-                       ~t:(Some ref_typ_out)
-                       (Alpha.fresh ctx.ctx.names)))))
+              (mk_var
+                 ctx.ctx
+                 (Variable.mk ctx.ctx ~t:(Some ref_typ_out) (Alpha.fresh ctx.ctx.names))))
     in
     close_solver z3
   in
@@ -291,14 +287,15 @@ let set_up_ensures_solver
     (ensures : term)
     : unit Lwt.t
   =
+  let open SmtInterface.AsyncSmt in
   ignore ensures;
-  let loc_smt = SmtInterface.smt_of_pmrs ~ctx ~fctx in
+  let loc_smt = smt_of_pmrs ~ctx ~fctx in
   let preamble = Commands.mk_preamble ~logic:Logics.ALL ~induction:true ~models:true () in
-  let%lwt () = SmtInterface.AsyncSmt.exec_all solver preamble in
+  let%lwt () = exec_all solver preamble in
   let%lwt () =
     Lwt_list.iter_p
       (fun x ->
-        let%lwt _ = SmtInterface.AsyncSmt.exec_command solver x in
+        let%lwt _ = exec_command solver x in
         return ())
       ((match p.tinv with
        | None -> []
@@ -355,6 +352,7 @@ let verify_ensures_bounded
     (var : variable)
     : SmtInterface.AsyncSmt.response * int Lwt.u
   =
+  let open SmtInterface.AsyncSmt in
   let loc_red = Reduce.reduce_term ~fctx ~ctx in
   let loc_pmrs_red = Reduce.reduce_pmrs ~fctx ~ctx in
   let base_term =
@@ -377,20 +375,18 @@ let verify_ensures_bounded
           loc_red (loc_pmrs_red p.PsiDef.reference repr_of_v)
         in
         let%lwt _ =
-          SmtInterface.(
-            AsyncSmt.exec_all solver (Commands.decls_of_vars ~ctx (VarSet.singleton var)))
+          exec_all solver (Commands.decls_of_vars ~ctx (VarSet.singleton var))
         in
-        let%lwt () = SmtInterface.AsyncSmt.spush solver in
+        let%lwt () = spush solver in
         let%lwt _ =
-          SmtInterface.(
-            AsyncSmt.exec_all
-              solver
-              (Commands.decls_of_vars
-                 ~ctx
-                 (VarSet.of_list
-                    (List.concat_map
-                       ~f:(fun t -> Set.to_list (Analysis.free_variables ~ctx t))
-                       (Map.data rec_instantation)))))
+          exec_all
+            solver
+            (Commands.decls_of_vars
+               ~ctx
+               (VarSet.of_list
+                  (List.concat_map
+                     ~f:(fun t -> Set.to_list (Analysis.free_variables ~ctx t))
+                     (Map.data rec_instantation))))
         in
         let instance_equals =
           let t' = loc_red (f_compose_r t) in
@@ -404,16 +400,11 @@ let verify_ensures_bounded
           | Some tinv ->
             let tinv_t = loc_pmrs_red tinv t in
             let%lwt _ =
-              SmtInterface.(
-                AsyncSmt.exec_all
-                  solver
-                  (Commands.decls_of_vars ~ctx (Analysis.free_variables ~ctx tinv_t)))
-            in
-            let%lwt _ =
-              SmtInterface.AsyncSmt.smt_assert
+              exec_all
                 solver
-                (SmtInterface.smt_of_term ~ctx tinv_t)
+                (Commands.decls_of_vars ~ctx (Analysis.free_variables ~ctx tinv_t))
             in
+            let%lwt _ = smt_assert solver (smt_of_term ~ctx tinv_t) in
             return ()
         in
         (* Assert that ensures is false for this concrete term t  *)
@@ -423,20 +414,18 @@ let verify_ensures_bounded
                (SmtInterface.decls_of_vars (Analysis.free_variables ensures_reduc))
            in *)
         let%lwt _ =
-          SmtInterface.AsyncSmt.exec_command
-            solver
-            (S.mk_assert (S.mk_not (SmtInterface.smt_of_term ~ctx ensures_reduc)))
+          exec_command solver (S.mk_assert (S.mk_not (smt_of_term ~ctx ensures_reduc)))
         in
-        let%lwt resp = SmtInterface.AsyncSmt.check_sat solver in
+        let%lwt resp = check_sat solver in
         (* Note that I am getting a model after check-sat unknown response. This may not halt.  *)
         let%lwt result =
           match resp with
           | SmtLib.Sat | SmtLib.Unknown ->
-            let%lwt model = SmtInterface.AsyncSmt.get_model solver in
+            let%lwt model = get_model solver in
             return (Some model)
           | _ -> return None
         in
-        let%lwt () = SmtInterface.AsyncSmt.spop solver in
+        let%lwt () = spop solver in
         return (resp, result)
       in
       match terms with
@@ -471,9 +460,10 @@ let verify_ensures_bounded
         if !Config.bounded_lemma_check then return SmtLib.Unsat else return SmtLib.Unknown
     in
     let%lwt res = expand_loop (TermSet.singleton base_term) in
+    let%lwt () = close_solver solver in
     return res
   in
-  SmtInterface.AsyncSmt.(cancellable_task (make_solver "cvc") task)
+  cancellable_task (make_solver "cvc") task
 ;;
 
 let verify_ensures_candidate
@@ -535,12 +525,19 @@ let constraint_of_neg ~(ctx : Context.t) (id : int) ~(p : PsiDef.t) (witness : w
     : term
   =
   ignore p;
-  let params =
-    List.concat_map
-      ~f:(fun (_, elimv) -> [ Eval.in_model ~ctx witness.witness_model elimv ])
+  let conjs =
+    List.map
+      ~f:(fun (_, elimv) ->
+        mk_un
+          Unop.Not
+          (mk_app
+             (mk_var ctx (Variable.mk ctx (make_ensures_name id)))
+             [ Eval.in_model ~ctx witness.witness_model elimv ]))
       witness.witness_eqn.eelim
   in
-  mk_un Unop.Not (mk_app (mk_var ctx (Variable.mk ctx (make_ensures_name id))) params)
+  match mk_assoc Binop.And conjs with
+  | Some _constraint -> _constraint
+  | None -> Terms.bool true
 ;;
 
 let constraint_of_pos ~(ctx : Context.t) (id : int) (term : term) : term =

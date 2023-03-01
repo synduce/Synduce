@@ -31,7 +31,9 @@ let constr_eqn ~(ctx : env) (eqn : equation) =
   ctx
   >-
   match eqn.eprecond with
-  | Some inv -> smt_of_term Terms.(~!inv || equality)
+  | Some inv ->
+    let inv = Terms.typed ctx.ctx inv in
+    smt_of_term Terms.((not inv) || equality)
   | None -> smt_of_term equality
 ;;
 
@@ -72,7 +74,7 @@ let partial_bounding_checker
   let f (acc_tset, acc_lstate) t =
     match ctx >- Specifications.get_requires p.PsiDef.target.pvar with
     | Some req ->
-      (match Predicates.get ~ctx ~p t with
+      (match Predicates.get ~count_reuse:false ~ctx ~p t with
       | Some _ ->
         (* Everything ok, a lemma has been computed *)
         acc_tset @ [ t, t ], acc_lstate
@@ -129,13 +131,14 @@ let check_solution
     (* Execute the preamble. *)
     let%lwt () = exec_all solver preamble in
     let expand_and_check i (t0 : term) =
-      let t_set, u_set = ctx >>- Expand.to_maximally_reducible p t0 in
+      let t_set, u_set = Expand.to_maximally_reducible ~ctx p t0 in
       let t_set, _ = partial_bounding_checker ~ctx ~p lstate t_set in
       let num_terms_to_check = List.length t_set in
       if num_terms_to_check > 0
       then (
         let sys_eqns, _ =
           Equations.make
+            ~count_reused_predicates:false
             ~ctx
             ~force_replace_off:true
             ~p:{ p with target = target_inst }
@@ -278,6 +281,7 @@ let bounded_check
     let check term =
       let sys_eqns, _ =
         Equations.make
+          ~count_reused_predicates:false
           ~ctx
           ~force_replace_off:true
           ~p:{ p with target = target_inst }

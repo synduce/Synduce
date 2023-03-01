@@ -7,7 +7,6 @@ let timed (f : unit -> 'a) : float * 'a =
 ;;
 
 let lwt_timed (f : unit Lwt.t -> 'a Lwt.t) : (float * 'a) Lwt.t =
-  (* TODO: better time measurement method. *)
   let t0 = Unix.gettimeofday () in
   Lwt.map (fun res -> Unix.gettimeofday () -. t0, res) (f (Lwt.return ()))
 ;;

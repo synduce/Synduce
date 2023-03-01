@@ -1,4 +1,4 @@
-(** @synduce --no-lifting -N *)
+(** @synduce -s 2 --no-lifting -NB --se2gis *)
 
 type itree =
   | Null

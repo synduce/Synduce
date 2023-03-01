@@ -21,6 +21,7 @@ val solve_problem : ctx:Env.env -> PsiDef.t -> Sygus.solver_response segis_respo
 *)
 val find_and_solve_problem
   :  ctx:Env.env
+  -> filename:string
   -> (string * string * string) option
   -> (string, PMRS.t, Base.String.comparator_witness) Base.Map.t
   -> (PsiDef.t * Syguslib.Sygus.solver_response segis_response) list Lwt.t

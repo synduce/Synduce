@@ -8,8 +8,16 @@
   sexplib
   ppx_let
   utils
-  syguslib-utils
+  syguslib
   smtlib
+  ppx_deriving
   compiler-libs)
  (preprocess
-  (pps lwt_ppx ppx_hash ppx_let ppx_sexp_conv)))
+  (pps
+   lwt_ppx
+   ppx_hash
+   ppx_let
+   ppx_sexp_conv
+   ppx_deriving.ord
+   ppx_deriving.eq
+   ppx_deriving.show)))

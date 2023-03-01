@@ -1,0 +1,4 @@
+UNREALIZABLE
+ target⟨xi_2, xi_1, xi_0⟩(x): int tree -> int «requires is_bst» = 
+{‣ g  Leaf(a)  ⟹  xi_0 x a
+ ‣ g  Node(a, l, r)  ⟹  x < a ? xi_1 (g r) : xi_2 x a (g l) (g r) }

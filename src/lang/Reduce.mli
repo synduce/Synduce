@@ -1,5 +1,28 @@
 open Term
 
+module CondTree : sig
+  type 'a t =
+    | CBr of 'a
+    | CIf of term * 'a t * 'a t
+
+  val to_term : term t -> term
+  val of_term : term -> term t
+  val map : 'a t -> f:('a -> 'b) -> 'b t
+  val all_or_none : 'a option t -> 'a t option
+end
+
+type func_resolution =
+  | FRFun of fpattern list * term
+  | FRPmrs of PMRS.t
+  | FRNonT of PMRS.t
+  | FRUnknown
+
+(** Resolve the funcion definiton of a term in an environment. *)
+val resolve_func : PMRS.Functions.ctx -> Context.t -> term -> func_resolution
+
+(** Project irreducible terms into tuples. *)
+val project_irreducible_terms : Context.t -> term -> term
+
 (**
   [until_irreducible f t] applies [f] to [t] until [t] is unchanged by application of [f] or we have
   reached the limit of rewrites Reduce._MAX.

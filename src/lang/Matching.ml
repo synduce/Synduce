@@ -13,6 +13,11 @@ let unify (terms : term list) : term option =
   | hd :: tl -> if List.for_all ~f:(fun x -> Terms.equal x hd) tl then Some hd else None
 ;;
 
+let is_simple_subterm ~(sub : term) (t : term) =
+  let case _ t' = if Terms.equal sub t' then Some true else None in
+  reduce ~init:false ~join:( || ) ~case t
+;;
+
 (**
    [matches ~boundvars ~pattern t] returns a map from variables in [pattern] to subterms of [t]
    if the term [t] matches the [pattern].
