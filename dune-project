@@ -53,6 +53,8 @@
    (>= 2.0.0))
   (parsexp
    (>= v0.14.0))
+  (parsexp_io
+   (>= v0.14.0))
   (ppx_hash
    (>= v0.14.0))
   (ppx_let
