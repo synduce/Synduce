@@ -30,7 +30,7 @@ let placeholder_witness ?(pre = None) (det : term_info) : witness =
 
 (** Generates a set of smt equations that correspond to the recursion elimination. *)
 let smt_of_recurs_elim_eqns ~(ctx : Context.t) (elim : (term * term) list) ~(p : PsiDef.t)
-    : S.smtTerm
+  : S.smtTerm
   =
   let lst =
     List.map
@@ -44,7 +44,7 @@ let smt_of_recurs_elim_eqns ~(ctx : Context.t) (elim : (term * term) list) ~(p :
 (** Returns a set of smt constraints that assert the know invariants on the functions in
     the problem. *)
 let smt_of_ensures ~(fctx : PMRS.Functions.ctx) ~(ctx : Context.t) ~(p : PsiDef.t)
-    : S.smtTerm list
+  : S.smtTerm list
   =
   let mk_sort maybe_rtype =
     match maybe_rtype with
@@ -229,11 +229,11 @@ let set_up_to_get_model ~(p : PsiDef.t) solver (ti : term_info) (cl : cond_lemma
 ;;
 
 let mk_model_sat_asserts
-    ~(fctx : PMRS.Functions.ctx)
-    ~(ctx : Context.t)
-    det
-    f_o_r
-    instantiate
+  ~(fctx : PMRS.Functions.ctx)
+  ~(ctx : Context.t)
+  det
+  f_o_r
+  instantiate
   =
   let f v =
     let v_val =
@@ -242,29 +242,31 @@ let mk_model_sat_asserts
     match List.find_map ~f:(find_original_var_and_proj v) det.ti_elim with
     | Some (original_recursion_var, proj) ->
       (match original_recursion_var.tkind with
-      | TVar ov when Option.is_some (instantiate ov) ->
-        let instantiation = Option.value_exn (instantiate ov) in
-        if proj >= 0
-        then (
-          let t = Reduce.reduce_term ~fctx ~ctx (mk_sel ctx (f_o_r instantiation) proj) in
-          smt_of_term ~ctx Terms.(t == v_val))
-        else smt_of_term ~ctx Terms.(f_o_r instantiation == v_val)
-      | _ ->
-        Log.error_msg
-          Fmt.(
-            str "Warning: skipped instantiating %a." (pp_term ctx) original_recursion_var);
-        S.mk_true)
+       | TVar ov when Option.is_some (instantiate ov) ->
+         let instantiation = Option.value_exn (instantiate ov) in
+         if proj >= 0
+         then (
+           let t =
+             Reduce.reduce_term ~fctx ~ctx (mk_sel ctx (f_o_r instantiation) proj)
+           in
+           smt_of_term ~ctx Terms.(t == v_val))
+         else smt_of_term ~ctx Terms.(f_o_r instantiation == v_val)
+       | _ ->
+         Log.error_msg
+           Fmt.(
+             str "Warning: skipped instantiating %a." (pp_term ctx) original_recursion_var);
+         S.mk_true)
     | None -> smt_of_term ~ctx Terms.(mk_var ctx v == v_val)
   in
   List.map ~f det.ti_formals
 ;;
 
 let verify_lemma_bounded
-    ~(p : PsiDef.t)
-    (ti : term_info)
-    (cl : cond_lemma)
-    (candidate : term)
-    : (Utils.Stats.verif_method * S.solver_response) Lwt.t * int Lwt.u
+  ~(p : PsiDef.t)
+  (ti : term_info)
+  (cl : cond_lemma)
+  (candidate : term)
+  : (Utils.Stats.verif_method * S.solver_response) Lwt.t * int Lwt.u
   =
   let ctx = ti.ti_context.ctx in
   let fctx = ti.ti_context.functions in
@@ -374,12 +376,12 @@ let verify_lemma_bounded
         let%lwt check_result = check_bounded_sol (return (S.Unknown, None)) t0 in
         Int.incr steps;
         (match check_result with
-        | _, Some model ->
-          Log.debug_msg
-            "Bounded lemma verification has found a counterexample to the lemma \
-             candidate.";
-          return model
-        | _ -> expand_loop t_rest)
+         | _, Some model ->
+           Log.debug_msg
+             "Bounded lemma verification has found a counterexample to the lemma \
+              candidate.";
+           return model
+         | _ -> expand_loop t_rest)
       | [], true ->
         (* All expansions have been checked. *)
         return S.Unsat
@@ -396,19 +398,19 @@ let verify_lemma_bounded
 ;;
 
 let verify_lemma_unbounded
-    ~(p : PsiDef.t)
-    (ti : term_info)
-    (cl : cond_lemma)
-    (candidate : term)
-    : (Utils.Stats.verif_method * S.solver_response) Lwt.t * int Lwt.u
+  ~(p : PsiDef.t)
+  (ti : term_info)
+  (cl : cond_lemma)
+  (candidate : term)
+  : (Utils.Stats.verif_method * S.solver_response) Lwt.t * int Lwt.u
   =
   let build_task (cvc4_instance, task_start) =
     let%lwt _ = task_start in
     let%lwt () = inductive_solver_preamble cvc4_instance ~p ti candidate in
     let%lwt () =
       (Lwt_list.iter_p (fun x ->
-           let%lwt _ = AsyncSmt.exec_command cvc4_instance x in
-           return ()))
+         let%lwt _ = AsyncSmt.exec_command cvc4_instance x in
+         return ()))
         (smt_of_lemma_validity ~p ti cl)
     in
     let%lwt resp = AsyncSmt.check_sat cvc4_instance in
@@ -418,8 +420,8 @@ let verify_lemma_unbounded
         let%lwt _ = set_up_to_get_model cvc4_instance ~p ti cl in
         let%lwt resp' = AsyncSmt.check_sat cvc4_instance in
         (match resp' with
-        | Sat | Unknown -> AsyncSmt.get_model cvc4_instance
-        | _ -> return resp')
+         | Sat | Unknown -> AsyncSmt.get_model cvc4_instance
+         | _ -> return resp')
       | _ -> return resp
     in
     let%lwt () = AsyncSmt.close_solver cvc4_instance in
@@ -434,11 +436,11 @@ let verify_lemma_unbounded
   is correct while the smt solver attempt to find a counterexample.
 *)
 let verify_lemma_candidate
-    ~(p : PsiDef.t)
-    (det : term_info)
-    (cl : cond_lemma)
-    (candidate : term)
-    : (Stats.verif_method * S.solver_response) Lwt.t
+  ~(p : PsiDef.t)
+  (det : term_info)
+  (cl : cond_lemma)
+  (candidate : term)
+  : (Stats.verif_method * S.solver_response) Lwt.t
   =
   Log.verbose (fun f () -> Fmt.(pf f "Checking lemma candidate..."));
   let parallel_checks () =

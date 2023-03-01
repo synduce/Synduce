@@ -9,7 +9,7 @@ on:
 
   # Allows you to run this workflow manually from the Actions tab
   workflow_dispatch:
-          
+
 
 # A workflow run is made up of one or more jobs that can run sequentially or in parallel
 jobs:
@@ -21,6 +21,7 @@ jobs:
         os:
           - ubuntu-latest
         ocaml-compiler:
+          - 5.0.0
           - 4.12.0
           - 4.08.1
     # The type of runner that the job will run on
@@ -30,15 +31,15 @@ jobs:
     steps:
       # Checks-out your repository under $GITHUB_WORKSPACE, so your job can access it
       - uses: actions/checkout@v2
-      
+
       - name: submodules-init
         uses: snickerbockers/submodules-init@v4
-        
+
       - name: Set up OCaml
         uses: ocaml/setup-ocaml@v1.1.11
         with:
           ocaml-version: ${{ matrix.ocaml-compiler }}
-          
+
       - name: Include (and create) .local/bin in the PATH
         run: |
           mkdir -p $HOME/.local/bin
@@ -48,22 +49,21 @@ jobs:
       # Install core
       - name: Install core
         run: opam install -y core
-        
+
       - name: Install Ocaml Project dependencies
         run: opam install -y . --deps-only
-        
-      - name: Installing CVC4 
+
+      - name: Installing CVC4
         run: |
           wget -q https://github.com/CVC4/CVC4/releases/download/1.8/cvc4-1.8-x86_64-linux-opt;
           sudo chmod u+x cvc4-1.8-x86_64-linux-opt;
           mv cvc4-1.8-x86_64-linux-opt $HOME/.local/bin/cvc4
-          
+
       - name: Install z3 and python3 from package distribution
         run: sudo apt install z3 python3
 
       - name: Build Synduce
         run: opam exec -- dune build bin/Synduce.exe
-        
+
       - name: Run basic tests
         run: python3 benchmarks/test.py -b small -n 2
-

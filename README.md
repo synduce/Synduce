@@ -46,7 +46,7 @@ You can run the set of benchmarks of Synduce by executing the following command:
 ```
 This can take up to an hour depending on your computer. If you just want to perform a quick check that everything is running properly, you can use a smaller set of benchmarks:
 ```
-./benchmarks/test.py -b simple
+./benchmarks/test.py -b small
 ```
 You can also benchmark a single file. For example, if you want to run `benchmarks/list/mss.ml` 10 times, using cvc5 as backend solver instead of cvc4, run:
 ```
