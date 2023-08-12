@@ -22,8 +22,6 @@ jobs:
           - ubuntu-latest
         ocaml-compiler:
           - 5.0.0
-          - 4.12.0
-          - 4.08.1
     # The type of runner that the job will run on
     runs-on: ${{ matrix.os }}
 
