@@ -17,7 +17,7 @@ and sum = function
 and mps = function
   | Nil -> 0
   | Cons (hd, tl) -> max (mps tl + hd) 0
-  [@@ensures fun (x, y, z) -> y >= 0 && z >= 0]
+[@@ensures fun (x, y, z) -> y >= 0 && z >= 0]
 ;;
 
 let rec target = function

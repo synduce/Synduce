@@ -50,7 +50,7 @@ let rec g = function
   | UNil -> [%synt s0]
   | UElt a -> [%synt f0] a
   | USplit (x, a, b, y) -> [%synt join] a b (g x) (g y)
-  [@@requires is_unimodal_ulist]
+[@@requires is_unimodal_ulist]
 ;;
 
 assert (g = r @@ f)

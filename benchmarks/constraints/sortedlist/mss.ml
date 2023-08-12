@@ -17,7 +17,7 @@ and dec l1 = function
   | Concat (a, x, y) -> dec (Concat (a, y, l1)) x
 ;;
 
-(** Predicate asserting that a concat-list is partitioned.  *)
+(** Predicate asserting that a concat-list is partitioned. *)
 let rec is_partitioned = function
   | Single x -> true
   | Concat (a, x, y) -> lmax x < a && a < lmin y && is_partitioned x && is_partitioned y
@@ -36,23 +36,23 @@ let rec f = function
   | Cons (hd, tl) ->
     let sum, mts, mps, mss = f tl in
     sum + hd, max mts (sum + hd), max (mps + hd) 0, max mss (max (mps + hd) 0)
-  [@@ensures
-    fun (sum, mts, mps, mss) ->
-      mts >= 0
-      && mps >= 0
-      && mps >= sum
-      && mts >= sum
-      && mss >= 0
-      && mss >= mts
-      && mss >= sum
-      && mss >= mps]
+[@@ensures
+  fun (sum, mts, mps, mss) ->
+    mts >= 0
+    && mps >= 0
+    && mps >= sum
+    && mts >= sum
+    && mss >= 0
+    && mss >= mts
+    && mss >= sum
+    && mss >= mps]
 ;;
 
 let rec h = function
   | Single a -> [%synt f0] a
   | Concat (a, y, z) ->
     if a < 0 then [%synt f1] (asum y) (h z) else [%synt odot] (h y) (h z)
-  [@@requires is_partitioned]
+[@@requires is_partitioned]
 
 and asum = function
   | Single a -> a

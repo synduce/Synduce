@@ -35,11 +35,11 @@ let rec repr = function
 let rec spec = function
   | Leaf a -> 1
   | Node (a, l, r) -> 1 + spec l + spec r
-  [@@ensures fun x -> x >= 1]
+[@@ensures fun x -> x >= 1]
 ;;
 
 let rec target = function
   | MLeaf a -> [%synt xi_0]
   | MNode (n, a, l, r) -> [%synt xi_1] n
-  [@@requires is_memo]
+[@@requires is_memo]
 ;;

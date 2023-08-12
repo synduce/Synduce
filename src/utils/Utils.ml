@@ -68,7 +68,7 @@ let sub_list (l : 'a list) (il : int list) =
 let trim (s : string) = Str.global_replace (Str.regexp "[\r\n\t ]") "" s
 
 (* ============================================================================================= *)
-(*                  PRETTY PRINTING HELPERS                                                      *)
+(*                  PRETTY PRINTING HELPERS *)
 (* ============================================================================================= *)
 let ast frmt () = Fmt.(pf frmt "@;*@;")
 let colon frmt () = Fmt.(pf frmt "@;:@;")
@@ -80,9 +80,8 @@ let sep_and : Formatter.t -> unit -> unit = Fmt.any "@;and@;"
 let pp_link frmt target = Fmt.pf frmt "file://%s" target
 
 (** list_or_space prints the list using f for each element, and sep for the separator.
-  If the list is empty, prints a space.
-  If the list is not empty, the printed list is surrounded by two spaces.
-*)
+    If the list is empty, prints a space.
+    If the list is not empty, the printed list is surrounded by two spaces. *)
 let list_or_space ~sep ~f frmt li =
   match li with
   | [] -> Fmt.pf frmt " "
@@ -90,9 +89,8 @@ let list_or_space ~sep ~f frmt li =
 ;;
 
 (** option_or_space prints the option using f for the data, and sep for the separator.
-  If the option is None, prints a space.
-  If the option is not None, the printed data is surrounded by two spaces.
-*)
+    If the option is None, prints a space.
+    If the option is not None, the printed data is surrounded by two spaces. *)
 let option_or_space ~f frmt o =
   match o with
   | Some x -> Fmt.(pf frmt "%a" f x)
@@ -118,7 +116,7 @@ let to_subscript_unicode (i : int) =
 ;;
 
 (* ============================================================================================= *)
-(*                  LISTS HELPERS                                                                *)
+(*                  LISTS HELPERS *)
 (* ============================================================================================= *)
 let list_map_snd (l : ('a * 'b) list) ~(f : 'b -> 'c) : ('a * 'c) list =
   List.map ~f:(fun (a, b) -> a, f b) l
@@ -162,27 +160,27 @@ type 'a continue_or_stop =
   | Stop of 'a
 
 let lwt_until
-    ~(f : 'a -> 'b -> 'a continue_or_stop Lwt.t)
-    ~(init : 'a Lwt.t)
-    (l : 'b list)
-    : 'a Lwt.t
+  ~(f : 'a -> 'b -> 'a continue_or_stop Lwt.t)
+  ~(init : 'a Lwt.t)
+  (l : 'b list)
+  : 'a Lwt.t
   =
   let rec aux c = function
     | hd :: tl ->
       let c' = Lwt.bind c (fun x -> f x hd) in
       Lwt.bind c' (function
-          | Continue x -> aux (Lwt.return x) tl
-          | Stop x -> Lwt.return x)
+        | Continue x -> aux (Lwt.return x) tl
+        | Stop x -> Lwt.return x)
     | [] -> c
   in
   aux init l
 ;;
 
 (* ============================================================================================= *)
-(*                  FILE MANAGEMENT HELPERS                                                      *)
+(*                  FILE MANAGEMENT HELPERS *)
 (* ============================================================================================= *)
 
 let relative_to_root (filename : string) =
-  let curdir = Caml.Filename.current_dir_name in
+  let curdir = Stdlib.Filename.current_dir_name in
   Str.string_after filename (String.length curdir)
 ;;

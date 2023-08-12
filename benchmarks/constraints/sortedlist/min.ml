@@ -19,5 +19,5 @@ let rec spec = function
 let rec target = function
   | Elt x -> [%synt xi_0] x
   | Cons (hd, tl) -> [%synt xi_1] hd
-  [@@requires is_sorted]
+[@@requires is_sorted]
 ;;

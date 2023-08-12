@@ -49,5 +49,5 @@ let rec target = function
   | UElt a -> [%synt f0] a
   | USplit (l, a, b, r) ->
     if a > b then [%synt joina] a (target l) else [%synt joinb] b (target r)
-  [@@requires is_unimodal_ulist]
+[@@requires is_unimodal_ulist]
 ;;

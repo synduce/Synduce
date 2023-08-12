@@ -1,18 +1,15 @@
-(**
-    This module contains functions to interface with syntax-guided synthesis solvers using
+(** This module contains functions to interface with syntax-guided synthesis solvers using
     the SyGuS Language Standard Version 2 or 1 defined in {!module-Sygus}.
     The synchronous and asynchronous solvers defined here are functors parametric on Logger and
     Statistics modules to automate logging on some output and collecting statistics
-    on solver usage.
-*)
+    on solver usage. *)
 
-(** {1 Log and Stats modules } *)
+(** {1 Log and Stats modules} *)
 
 (** The Logger module must provide some basic logging functionality,
     including error, debug and verbose messages. One can also set
     log_queries to true with a file, which allows the solver to write
-    queries to a separate file.
- *)
+    queries to a separate file. *)
 module type Logger = sig
   val error : (Format.formatter -> unit -> unit) -> unit
   val debug : (Format.formatter -> unit -> unit) -> unit
@@ -28,8 +25,7 @@ module EmptyLog : Logger
 
 (** The statistics modules allows logging start/termination time of subprocesses used
     to solve the syntax-guided synthesis instances. It should also provide a function that
-    returns the time elapsed in the program.
-*)
+    returns the time elapsed in the program. *)
 module type Statistics = sig
   val log_proc_start : int -> unit
   val log_solver_start : int -> string -> unit
@@ -45,8 +41,7 @@ module NoStat : Statistics
 (** A module to provide the system configuration for syntax-guided synthesis solver.
     It indicates the path to the solver executables on the system.
     CVC4 and CVC5 are treted as one solver, with the boolean [use_cvc5 ()] setting
-    which version of CVC to use.
-*)
+    which version of CVC to use. *)
 module type SolverSystemConfig = sig
   val cvc_binary_path : unit -> string
   val dryadsynth_binary_path : unit -> string
@@ -67,11 +62,7 @@ val online_solvers : (int * solver_instance) list ref
 val mk_tmp_sl : string -> string
 val commands_to_file : Sygus.program -> string -> unit
 
-module SygusSolver : functor
-  (Stats : Statistics)
-  (Log : Logger)
-  (Config : SolverSystemConfig)
-  -> sig
+module SygusSolver : functor (_ : Statistics) (_ : Logger) (_ : SolverSystemConfig) -> sig
   type t =
     | CVC
     | DryadSynth
@@ -85,13 +76,12 @@ module SygusSolver : functor
   val fetch_solution : int -> string -> Sygus.solver_response
 end
 
-(** A module encapsulating function to execute SyGuS solvers asynchronously using Lwt.
-  *)
+(** A module encapsulating function to execute SyGuS solvers asynchronously using Lwt. *)
 module LwtSolver : functor
-  (Stats : Statistics)
-  (Log : Logger)
-  (Config : SolverSystemConfig)
-  -> sig
+    (Stats : Statistics)
+    (Log : Logger)
+    (Config : SolverSystemConfig)
+    -> sig
   module CoreSolver : sig
     type t = SygusSolver(Stats)(Log)(Config).t =
       | CVC
@@ -117,13 +107,12 @@ module LwtSolver : functor
     -> Sygus.solver_response option Lwt.t * int Lwt.u
 end
 
-(** A module encapsulating function to execute SyGuS solvers synchronously.
-  *)
+(** A module encapsulating function to execute SyGuS solvers synchronously. *)
 module SyncSolver : functor
-  (Stats : Statistics)
-  (Log : Logger)
-  (Config : SolverSystemConfig)
-  -> sig
+    (Stats : Statistics)
+    (Log : Logger)
+    (Config : SolverSystemConfig)
+    -> sig
   module CoreSolver : sig
     type t = SygusSolver(Stats)(Log)(Config).t =
       | CVC
@@ -133,15 +122,14 @@ module SyncSolver : functor
     val default_solver : t ref
   end
 
-  (** Kill a solver, given its process id. Ignores errors.  *)
+  (** Kill a solver, given its process id. Ignores errors. *)
   val kill_solver : int -> unit
 
   (** Execute a solver on a given sygus set of commands. [exec_solver ~solver_kind ~options ~pid
       ~error_log (inputfile, outputfile)] executes the solver [~solver_kind] (defaults to CVC) with
       options [~options] and stores the process id of the solver process in [~pid] as soon as the
       process is started. The solver is executed by printing the commands in [inputfile] and
-      outputting the solver response in [outputfile].
-  *)
+      outputting the solver response in [outputfile]. *)
   val exec_solver
     :  ?solver_kind:CoreSolver.t
     -> ?options:string list
@@ -151,9 +139,8 @@ module SyncSolver : functor
     -> Sygus.solver_response
 
   (** [solve_commands ~solver_kind ~pid program] solvers the set of commands in [program] using the
-    solver [solver_kind] (default to CVC) and stores the process id of the solver in [pid]. The user
-    can use [pid] as a handle to kill the process if necessary.
-  *)
+      solver [solver_kind] (default to CVC) and stores the process id of the solver in [pid]. The user
+      can use [pid] as a handle to kill the process if necessary. *)
   val solve_commands
     :  ?solver_kind:CoreSolver.t
     -> ?pid:int ref

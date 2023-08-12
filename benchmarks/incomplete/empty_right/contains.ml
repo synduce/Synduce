@@ -14,7 +14,7 @@ and size = function
   | Nil x -> 0
   | Leaf x -> 1
   | Node (a, l, r) -> 1 + size l + size r
-  [@@ensures fun x -> x >= 0]
+[@@ensures fun x -> x >= 0]
 ;;
 
 let repr x = x
@@ -27,7 +27,7 @@ let spec x t =
       if a = x then 1 else if f l = 1 then 1 else if f r = 1 then 1 else 0
   in
   f t
-  [@@ensures fun x -> x >= 0 && x <= 1]
+[@@ensures fun x -> x >= 0 && x <= 1]
 ;;
 
 let target y t =
@@ -37,5 +37,5 @@ let target y t =
     | Node (a, l, r) -> [%synt xi_2] y a (g l)
   in
   g t
-  [@@requires empty_right]
+[@@requires empty_right]
 ;;

@@ -43,5 +43,5 @@ and alldif hd = function
 let rec target = function
   | Nil -> [%synt base_case]
   | Cons (hd, tl) -> [%synt oplus] hd (target tl)
-  [@@requires allneg]
+[@@requires allneg]
 ;;

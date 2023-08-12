@@ -29,11 +29,11 @@ let rec repr = function
 let rec spec = function
   | Leaf a -> if a < 2 then 1 else 0
   | Node (a, l, r) -> if a < 2 then 1 + spec l + spec r else spec l + spec r
-  [@@ensures fun x -> x >= 0]
+[@@ensures fun x -> x >= 0]
 ;;
 
 let rec target = function
   | MLeaf (n, a) -> if a < 2 then [%synt c0] else [%synt c1]
   | MNode (n, a, l, r) -> if a < 2 then [%synt f1] n else [%synt f2] n
-  [@@requires is_memo_count_lt_2]
+[@@requires is_memo_count_lt_2]
 ;;

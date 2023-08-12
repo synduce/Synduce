@@ -26,11 +26,11 @@ let rec amin = function
   | Node (a, l, r) -> min a (min (amin l) (amin r))
 ;;
 
-(* In a symmetric tree we should only need to compute the min for half the tree.  *)
+(* In a symmetric tree we should only need to compute the min for half the tree. *)
 let rec amin2 = function
   | Leaf x -> [%synt s0] x
   | Node (a, l, r) -> [%synt f0] a (amin2 l)
-  [@@requires is_symmetric]
+[@@requires is_symmetric]
 ;;
 
 assert (amin2 = amin)

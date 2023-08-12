@@ -1,7 +1,5 @@
-(**
-   This implementation is based on the SyGuS Language Standard Version 2.0.
-   Documentation can be found at https://sygus.org/language/
-*)
+(** This implementation is based on the SyGuS Language Standard Version 2.0.
+    Documentation can be found at https://sygus.org/language/ *)
 open Base
 
 let use_v1 = ref false
@@ -22,7 +20,7 @@ let pp_loc (frmt : Formatter.t) (loc : location) =
 ;;
 
 (* ============================================================================================= *)
-(*                               TYPES FOR SYGUS SYNTAX                                          *)
+(*                               TYPES FOR SYGUS SYNTAX *)
 (* ============================================================================================= *)
 
 type symbol = string
@@ -146,10 +144,8 @@ let reserved_words : string list =
 
 let digits = [ '0'; '1'; '2'; '3'; '4'; '5'; '6'; '7'; '8'; '9' ]
 
-(**
-   `valid_ident name` is `true` whenever `name` is not a reserved word, and does not contain
-   any special character.
-*)
+(** `valid_ident name` is `true` whenever `name` is not a reserved word, and does not contain
+    any special character. *)
 let valid_ident (name : string) =
   (not (List.mem ~equal:String.equal reserved_words name))
   &&
@@ -162,14 +158,14 @@ let char_to_bool (c : char) = if Char.(c = '0') then false else true
 
 let has_standard_extension (s : string) =
   try
-    let ext = Caml.Filename.extension s in
+    let ext = Stdlib.Filename.extension s in
     String.equal ext ".sl"
   with
   | _ -> false
 ;;
 
 (* ============================================================================================= *)
-(*                                      CONSTRUCTING TERMS                                       *)
+(*                                      CONSTRUCTING TERMS *)
 (* ============================================================================================= *)
 
 let mk_symbol s = s
@@ -249,10 +245,10 @@ let mk_c_assume ?(loc = dummy_loc) (t : sygus_term) = CAssume (loc, t)
 let mk_c_constraint ?(loc = dummy_loc) (t : sygus_term) = CConstraint (loc, t)
 
 let mk_c_chc_constraint
-    ?(loc = dummy_loc)
-    (args : sorted_var list)
-    (pre : sygus_term)
-    (post : sygus_term)
+  ?(loc = dummy_loc)
+  (args : sorted_var list)
+  (pre : sygus_term)
+  (post : sygus_term)
   =
   CChcConstraint (loc, args, pre, post)
 ;;
@@ -266,11 +262,11 @@ let mk_c_declare_weight ?(loc = dummy_loc) (name : symbol) (attrs : attribute li
 ;;
 
 let mk_c_inv_constraint
-    ?(loc = dummy_loc)
-    (s : symbol)
-    (spre : symbol)
-    (strans : symbol)
-    (spost : symbol)
+  ?(loc = dummy_loc)
+  (s : symbol)
+  (spre : symbol)
+  (strans : symbol)
+  (spost : symbol)
   =
   CInvConstraint (loc, s, spre, strans, spost)
 ;;
@@ -280,28 +276,28 @@ let mk_c_set_feature ?(loc = dummy_loc) (f : feature) (flag : bool) =
 ;;
 
 let mk_c_synth_fun
-    ?(loc = dummy_loc)
-    ?(g = None)
-    (name : symbol)
-    (fargs : sorted_var list)
-    (res : sygus_sort)
+  ?(loc = dummy_loc)
+  ?(g = None)
+  (name : symbol)
+  (fargs : sorted_var list)
+  (res : sygus_sort)
   =
   CSynthFun (loc, name, fargs, res, g)
 ;;
 
 let mk_c_synth_inv
-    ?(loc = dummy_loc)
-    ?(g = None)
-    (name : symbol)
-    (fargs : sorted_var list)
+  ?(loc = dummy_loc)
+  ?(g = None)
+  (name : symbol)
+  (fargs : sorted_var list)
   =
   mk_c_synth_fun ~loc ~g name fargs (mk_sort ~loc (mk_id_simple ~loc "Bool"))
 ;;
 
 let mk_c_optimize_synth
-    ?(loc = dummy_loc)
-    (args : sygus_term list)
-    (attrs : attribute list)
+  ?(loc = dummy_loc)
+  (args : sygus_term list)
+  (attrs : attribute list)
   =
   COptimizeSynth (loc, args, attrs)
 ;;
@@ -311,9 +307,9 @@ let mk_c_declare_datatype ?(loc = dummy_loc) (name : string) (constrs : dt_cons_
 ;;
 
 let mk_c_declare_datatypes
-    ?(loc = dummy_loc)
-    (types : sygus_sort_decl list)
-    (constrs : dt_cons_dec list list)
+  ?(loc = dummy_loc)
+  (types : sygus_sort_decl list)
+  (constrs : dt_cons_dec list list)
   =
   CDeclareDataTypes (loc, types, constrs)
 ;;
@@ -323,11 +319,11 @@ let mk_c_declare_sort ?(loc = dummy_loc) (name : symbol) (index : int) =
 ;;
 
 let mk_c_define_fun
-    ?(loc = dummy_loc)
-    (name : symbol)
-    (args : sorted_var list)
-    (ret : sygus_sort)
-    (body : sygus_term)
+  ?(loc = dummy_loc)
+  (name : symbol)
+  (args : sorted_var list)
+  (ret : sygus_sort)
+  (body : sygus_term)
   =
   CDefineFun (loc, name, args, ret, body)
 ;;
@@ -354,7 +350,7 @@ let mk_g_term ?(loc = dummy_loc) (term : sygus_term) = GTerm (loc, term)
 let mk_g_var ?(loc = dummy_loc) (sort : sygus_sort) = GVar (loc, sort)
 
 (* ============================================================================================= *)
-(*                                      SOLVER RESPONSES                                         *)
+(*                                      SOLVER RESPONSES *)
 (* ============================================================================================= *)
 
 type solver_response =

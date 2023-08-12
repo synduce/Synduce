@@ -57,7 +57,7 @@ let rec target = function
   | Sglt x -> [%synt s0] (inner x)
   | Cat (l, piv, r) ->
     if piv <= 0 then [%synt f1] (target r) else [%synt f2] (target r) (target l)
-  [@@requires sorted]
+[@@requires sorted]
 
 and inner = function
   | Elt x -> [%synt inner0] x

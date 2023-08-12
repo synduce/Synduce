@@ -1,6 +1,13 @@
-type arithop = APlus | AMinus | AGt
+type arithop =
+  | APlus
+  | AMinus
+  | AGt
 
-type boolop = BNot | BAnd | BOr | BEq
+type boolop =
+  | BNot
+  | BAnd
+  | BOr
+  | BEq
 
 type term =
   | TArithBin of arithop * term * term
@@ -11,7 +18,14 @@ type term =
   | TCInt of int
   | TCBool of bool
 
-type op = Plus | Minus | Not | And | Or | Gt | Eq
+type op =
+  | Plus
+  | Minus
+  | Not
+  | And
+  | Or
+  | Gt
+  | Eq
 
 type term2 =
   | Bin of op * term2 * term2
@@ -44,6 +58,7 @@ and mk_un a = function
   | Or -> TBoolUn (BOr, repr a)
   | Gt -> TArithUn (AGt, repr a)
   | Eq -> TBoolUn (BEq, repr a)
+;;
 
 let rec spec = function
   | TArithBin (a, b, c) -> max (spec c) (spec b)
@@ -53,6 +68,7 @@ let rec spec = function
   | TVar i -> 1
   | TCInt i -> 1
   | TCBool b -> 1
+;;
 
 let rec target = function
   | Bin (op, a, b) -> [%synt hbin] (target a) (target b)
@@ -60,3 +76,4 @@ let rec target = function
   | Var i -> [%synt var]
   | CInt i -> [%synt const]
   | CBool b -> [%synt boolconst]
+;;

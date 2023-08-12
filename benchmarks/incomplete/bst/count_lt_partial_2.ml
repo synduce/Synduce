@@ -8,7 +8,7 @@ let spec x t =
     | Node (a, l, r) -> if a < x then 1 + f l + f r else f l + f r
   in
   f t
-  [@@ensures fun x -> x >= 0]
+[@@ensures fun x -> x >= 0]
 ;;
 
 let target y t =
@@ -18,5 +18,5 @@ let target y t =
     | Node (a, l, r) -> if a < y then [%synt fthen] (g l) (g r) else [%synt felse] (g l)
   in
   g t
-  [@@requires is_bst]
+[@@requires is_bst]
 ;;

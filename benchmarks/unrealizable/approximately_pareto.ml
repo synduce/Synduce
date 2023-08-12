@@ -33,5 +33,5 @@ let rec target = function
   | Leaf (x, y) -> [%synt xi_0] y x
   | Node (a, l, r) ->
     if a >= 0 then [%synt xi_1] (target l) else [%synt xi_2] a (target r)
-  [@@requires is_bst]
+[@@requires is_bst]
 ;;

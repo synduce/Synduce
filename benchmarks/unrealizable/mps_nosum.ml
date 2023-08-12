@@ -10,17 +10,17 @@ type 'a list =
   | Cons of 'a * 'a list
 
 (*
-  The maximum prefix sum without the sum auxiliary.
-  The function needs to be lifted for the problem to
-  be solvable.
-  See list/mps.ml for the version that includes the lifting.
+   The maximum prefix sum without the sum auxiliary.
+   The function needs to be lifted for the problem to
+   be solvable.
+   See list/mps.ml for the version that includes the lifting.
 *)
 let rec mps = function
   | Nil -> 0
   | Cons (hd, tl) ->
     let _mps = mps tl in
     max (_mps + hd) 0
-  [@@ensures fun x -> x >= 0]
+[@@ensures fun x -> x >= 0]
 ;;
 
 let rec clist_to_list = function

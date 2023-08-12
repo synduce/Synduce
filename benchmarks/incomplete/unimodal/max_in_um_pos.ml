@@ -52,5 +52,5 @@ let rec target = function
   | UNil -> [%synt s0]
   | UElt a -> [%synt f0] a
   | USplit (l, a, b, r) -> [%synt join] a b (target l) (target r)
-  [@@requires is_unimodal_ulist]
+[@@requires is_unimodal_ulist]
 ;;

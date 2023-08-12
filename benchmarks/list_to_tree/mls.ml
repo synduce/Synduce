@@ -10,10 +10,10 @@ type 'a list =
 
 (* Representation function from tree to list *)
 (* pmrs repr =
-    repr Empty -> Nil
-    | repr Node(a, l, r) ->  dec Cons(a, repr l) r
-    | dec li Empty ->  li
-    | dec li Node(a, ll, lr) -> dec Cons(a, dec li ll) lr *)
+   repr Empty -> Nil
+   | repr Node(a, l, r) ->  dec Cons(a, repr l) r
+   | dec li Empty ->  li
+   | dec li Node(a, ll, lr) -> dec Cons(a, dec li ll) lr *)
 let rec repr = function
   | Empty -> Nil
   | Node (a, l, r) -> Cons (a, dec (repr l) r)
@@ -35,5 +35,5 @@ let rec spec = function
   | Cons (hd, tl) ->
     let x, y = spec tl in
     x + hd, max (x + hd) y
-  [@@ensures fun (x, y) -> y > x && y > 0]
+[@@ensures fun (x, y) -> y > x && y > 0]
 ;;

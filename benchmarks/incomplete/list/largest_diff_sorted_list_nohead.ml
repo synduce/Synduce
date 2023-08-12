@@ -27,7 +27,7 @@ and max_diff_with x = function
 let rec amax = function
   | Elt x -> [%synt g0] x
   | Cons (hd, tl) -> [%synt join] hd (amax tl)
-  [@@requires is_sorted]
+[@@requires is_sorted]
 ;;
 
 assert (amax = ldiff)

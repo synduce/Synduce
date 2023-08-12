@@ -26,11 +26,11 @@ let rec height = function
   | Node (a, l, r) -> 1 + height l + height r
 ;;
 
-(* In a symmetric tree we should only need to compute the sum for half the tree.  *)
+(* In a symmetric tree we should only need to compute the sum for half the tree. *)
 let rec height2 = function
   | Null -> [%synt s0]
   | Node (a, l, r) -> [%synt f0] a (height2 l)
-  [@@requires is_symmetric]
+[@@requires is_symmetric]
 ;;
 
 assert (height2 = height)

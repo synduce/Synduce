@@ -22,8 +22,7 @@ and aux = function
   | Node' (_a, n, _l, _r) -> n
 ;;
 
-(** Reference function : contains.
-  *)
+(** Reference function : contains. *)
 let spec x t =
   let rec aux = function
     | Leaf a -> a = x

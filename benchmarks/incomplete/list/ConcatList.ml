@@ -1,6 +1,5 @@
 (** This module contains definitions  for the Concat-List type, with variants
-    depending on the base case.
-*)
+    depending on the base case. *)
 
 open ConsList
 
@@ -14,8 +13,8 @@ type 'a eclist =
   | ECat of 'a eclist * 'a eclist
 
 (* This is the representation function. Remark that it is the same as the one
-  defined in the mpshom.pmrs or sumhom.pmrs files!
- *)
+   defined in the mpshom.pmrs or sumhom.pmrs files!
+*)
 let rec clist_to_conslist = function
   | CNil -> Nil
   | Single a -> Cons (a, Nil)
@@ -28,8 +27,8 @@ and dec l1 = function
 ;;
 
 (* This is the representation function. Remark that it is the same as the one
-  defined in the mpshom.pmrs or sumhom.pmrs files!
- *)
+   defined in the mpshom.pmrs or sumhom.pmrs files!
+*)
 let rec eclist_to_eltlist = function
   | ESingle a -> Elt a
   | ECat (x, y) -> dec y x

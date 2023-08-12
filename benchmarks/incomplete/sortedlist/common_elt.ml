@@ -34,7 +34,7 @@ and head = function
 let rec target = function
   | Elt (a, b) -> [%synt f0] a b
   | Zip (a, b, x) -> [%synt f1] a b (target x)
-  [@@requires sorted]
+[@@requires sorted]
 ;;
 
 assert (target = common_elt)

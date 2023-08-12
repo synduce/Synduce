@@ -3,7 +3,7 @@ open Lexing
 open Base
 
 (* ============================================================================================= *)
-(*        Printing errors in the input program, with some context on where the error appears.    *)
+(*        Printing errors in the input program, with some context on where the error appears. *)
 (* ============================================================================================= *)
 
 let reference_text = ref ""
@@ -68,11 +68,11 @@ let range text (loc : position * position) : string =
 ;;
 
 let log_with_excerpt
-    (frmt : Formatter.t)
-    (ttext : string)
-    (location : position * position)
-    s
-    x
+  (frmt : Formatter.t)
+  (ttext : string)
+  (location : position * position)
+  s
+  x
   =
   let _start, _end = location in
   let start_col = _start.pos_cnum - _start.pos_bol
@@ -94,7 +94,7 @@ let log_with_excerpt
 ;;
 
 (* ============================================================================================= *)
-(*                            General purpose printing functions with helpers.                   *)
+(*                            General purpose printing functions with helpers. *)
 (* ============================================================================================= *)
 
 let wrap (s : string) fmt () = string fmt s
@@ -126,7 +126,7 @@ let loc_fatal_errmsg loc msg =
   fatal ()
 ;;
 
-(** Info messaging is the lowest verbose output, activated by default.  *)
+(** Info messaging is the lowest verbose output, activated by default. *)
 let info (msg : Formatter.t -> unit -> unit) : unit =
   if !Config.info
   then
@@ -155,7 +155,7 @@ let sep ?(i = None) () =
   else ()
 ;;
 
-(** Debug messaging is used mostly for printing status of interactions with external solvers.  *)
+(** Debug messaging is used mostly for printing status of interactions with external solvers. *)
 let debug (msg : Formatter.t -> unit -> unit) : unit =
   if !Config.debug
   then
@@ -180,7 +180,7 @@ let print_ok () =
   else ()
 ;;
 
-(** Verbose output for printing status of internal methods.  *)
+(** Verbose output for printing status of internal methods. *)
 let verb msg =
   if !Config.verbose
   then
@@ -205,7 +205,7 @@ let start_section s =
 let end_section () = Int.decr indent
 
 (* ============================================================================================= *)
-(*                            Printing info on solver sub-processes                              *)
+(*                            Printing info on solver sub-processes *)
 (* ============================================================================================= *)
 let status_printer () =
   while true do
@@ -215,22 +215,22 @@ let status_printer () =
       String.concat
         ~sep:" "
         (List.map ids ~f:(fun (sname, sid) ->
-             "(" ^ sname ^ " : " ^ Int.to_string sid ^ ")"))
+           "(" ^ sname ^ " : " ^ Int.to_string sid ^ ")"))
     in
-    Caml.Format.printf "Running: %s\r" s;
-    Caml.flush Caml.stdout;
-    ()
+    Stdlib.(
+      Format.printf "Running: %s\r" s;
+      flush stdout)
   done
 ;;
 
 (* ============================================================================================= *)
-(*                            Miscelleanous                                                      *)
+(*                            Miscelleanous *)
 (* ============================================================================================= *)
 
 (** Print a message function to a file. *)
 let to_file (file : string) (msg : Formatter.t -> unit -> unit) : unit =
   let oc = Stdio.Out_channel.create file in
-  let frmt = Caml.Format.formatter_of_out_channel oc in
+  let frmt = Stdlib.Format.formatter_of_out_channel oc in
   msg frmt ();
   Stdio.Out_channel.close oc
 ;;
@@ -241,30 +241,30 @@ let print_solvers_summary (i : int) (frmt : Formatter.t) () : unit =
   match json_data with
   | Some data ->
     (match data with
-    | `Assoc solver_stats ->
-      let total_solvers_time = ref 0.0 in
-      let total_instances = ref 0 in
-      let f (key, data) =
-        match data with
-        | `Assoc [ ("total-time", `Float total_time); ("num-instances", `Int instances) ]
-          ->
-          total_solvers_time := !total_solvers_time +. total_time;
-          total_instances := !total_instances + instances;
-          key, total_time, instances
-        | _ -> key, -1.0, -1
-      in
-      let l = List.map ~f solver_stats in
-      let pp frmt (key, time, instances) =
-        Fmt.(pf frmt "@[<v 0>%-10s [%4i instances] %.3fs @]" key instances time)
-      in
-      pf
-        frmt
-        "@[<v 0>Total time spent in solvers:@;@[%a@]@;> %-8s [%4i instances]: %.3fs@]@;"
-        (list ~sep:(fun fmt () -> pf fmt "@;<80 0>") pp)
-        l
-        "TOTAL"
-        !total_instances
-        !total_solvers_time
-    | _ -> ())
+     | `Assoc solver_stats ->
+       let total_solvers_time = ref 0.0 in
+       let total_instances = ref 0 in
+       let f (key, data) =
+         match data with
+         | `Assoc [ ("total-time", `Float total_time); ("num-instances", `Int instances) ]
+           ->
+           total_solvers_time := !total_solvers_time +. total_time;
+           total_instances := !total_instances + instances;
+           key, total_time, instances
+         | _ -> key, -1.0, -1
+       in
+       let l = List.map ~f solver_stats in
+       let pp frmt (key, time, instances) =
+         Fmt.(pf frmt "@[<v 0>%-10s [%4i instances] %.3fs @]" key instances time)
+       in
+       pf
+         frmt
+         "@[<v 0>Total time spent in solvers:@;@[%a@]@;> %-8s [%4i instances]: %.3fs@]@;"
+         (list ~sep:(fun fmt () -> pf fmt "@;<80 0>") pp)
+         l
+         "TOTAL"
+         !total_instances
+         !total_solvers_time
+     | _ -> ())
   | _ -> ()
 ;;

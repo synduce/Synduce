@@ -50,19 +50,19 @@ let rec spec = function
     let cnt, v = spec tl in
     let cnt2 = count hd tl in
     if cnt2 + 1 > cnt then cnt2 + 1, hd else cnt, v
-  [@@ensures fun (x, y) -> x > 0]
+[@@ensures fun (x, y) -> x > 0]
 
 and count x = function
   | Elt v -> if v = x then 1 else 0
   | Cons (hd, tl) -> count x tl + if hd = x then 1 else 0
-  [@@ensures fun x -> x > 0]
+[@@ensures fun x -> x > 0]
 ;;
 
 (* Synthesize a parallel version that is also linear time. *)
 let rec target = function
   | KeyValue (k, v) -> [%synt s0] k (int_of v)
   | Node (hd_key, l, r) -> [%synt join] hd_key (target l) (target r)
-  [@@requires is_imap]
+[@@requires is_imap]
 
 and int_of = function
   | S n -> [%synt int_succ] (int_of n)

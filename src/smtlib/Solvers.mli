@@ -1,18 +1,15 @@
-(**
-    This module contains functions to interface with syntax-guided synthesis solvers using
+(** This module contains functions to interface with syntax-guided synthesis solvers using
     the SMTLIB language defined in
     The synchronous and asynchronous solvers defined here are functors parametric on Logger and
     Statistics modules to automate logging on some output and collecting statistics
-    on solver usage.
-*)
+    on solver usage. *)
 
-(** {1 Log and Stats modules } *)
+(** {1 Log and Stats modules} *)
 
 (** The Logger module must provide some basic logging functionality,
     including error, debug and verbose messages. One can also set
     log_queries to true with a file, which allows the solver to write
-    queries to a separate file.
- *)
+    queries to a separate file. *)
 module type Logger = sig
   val error : (Format.formatter -> unit -> unit) -> unit
   val debug : (Format.formatter -> unit -> unit) -> unit
@@ -28,8 +25,7 @@ module EmptyLog : Logger
 
 (** The statistics modules allows logging start/termination time of subprocesses used
     to solve the syntax-guided synthesis instances. It should also provide a function that
-    returns the time elapsed in the program.
-*)
+    returns the time elapsed in the program. *)
 module type Statistics = sig
   val log_proc_start : int -> unit
   val log_solver_start : int -> string -> unit
@@ -43,7 +39,7 @@ end
 module NoStat : Statistics
 
 (** {1 Blocking solver} *)
-module Synchronous : functor (Log : Logger) (Stats : Statistics) -> sig
+module Synchronous : functor (_ : Logger) (_ : Statistics) -> sig
   type solver_response = SmtLib.solver_response
 
   val is_sat : solver_response -> bool
@@ -85,7 +81,7 @@ module Synchronous : functor (Log : Logger) (Stats : Statistics) -> sig
   val spush : online_solver -> unit
 end
 
-module Asyncs : functor (Log : Logger) (Stats : Statistics) -> sig
+module Asyncs : functor (_ : Logger) (_ : Statistics) -> sig
   type response = SmtLib.solver_response Lwt.t
 
   type solver =

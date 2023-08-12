@@ -27,5 +27,5 @@ and interwith a b = function
 let rec target = function
   | Elt (a, b) -> [%synt f0] a b
   | Cons (a, b, l) -> [%synt f1] a b (target l)
-  [@@requires sorted_by_start]
+[@@requires sorted_by_start]
 ;;

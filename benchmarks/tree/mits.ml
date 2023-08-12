@@ -9,7 +9,7 @@ and f s = function
   | Node (a, l, r) ->
     let sum1, m1 = f s l in
     f (sum1 + a, max (m1 + a) 0) r
-  [@@ensures fun (x, y) -> y >= x && y >= 0]
+[@@ensures fun (x, y) -> y >= x && y >= 0]
 ;;
 
 let rec mits = function

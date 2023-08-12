@@ -29,14 +29,14 @@ let rec minmax = function
     let aminl, amaxl = minmax l in
     let aminr, amaxr = minmax r in
     min val_ (min aminl aminr), max val_ (max amaxl amaxr)
-  [@@ensures fun (x, y) -> x <= y]
+[@@ensures fun (x, y) -> x <= y]
 ;;
 
 (* A small variation of height. *)
 let rec target = function
   | Leaf x -> [%synt f0] x
   | Node (lmin, lmax, rmin, rmax, val_, l, r) -> [%synt join] val_ lmin lmax rmin rmax
-  [@@requires is_memo]
+[@@requires is_memo]
 ;;
 
 assert (target = minmax)

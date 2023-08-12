@@ -57,8 +57,8 @@ let set_output_folder s = output_folder := Some s
 
 let get_output_file s =
   Option.map !output_folder ~f:(fun o_f ->
-      let base = Caml.Filename.basename s in
-      Caml.Filename.concat o_f base)
+      let base = Stdlib.Filename.basename s in
+      Stdlib.Filename.concat o_f base)
 ;;
 
 (** Optional output file for logging.
@@ -148,9 +148,9 @@ let next_algo_bfs = ref true
 (*                                STORAGE AND BINARY PATHS                                       *)
 (* ============================================================================================= *)
 
-let tmp_folder = Caml.Filename.get_temp_dir_name ()
-let root_folder = Caml.Filename.current_dir_name
-let base s = Caml.Filename.concat root_folder s
+let tmp_folder = Stdlib.Filename.get_temp_dir_name ()
+let root_folder = Stdlib.Filename.current_dir_name
+let base s = Stdlib.Filename.concat root_folder s
 
 (* Set to true to force using cvc4 even if cvc5 is available. *)
 (* There are still bugs with CVC5, leave true for now. *)
@@ -246,7 +246,7 @@ let set_benchmark_generation_dir (s : string) =
 ;;
 
 let new_benchmark_file ?(hint = "") suffix =
-  Caml.Filename.temp_file
+  Stdlib.Filename.temp_file
     ~temp_dir:!benchmark_generation_dir
     ("bench_" ^ hint ^ !problem_name)
     suffix

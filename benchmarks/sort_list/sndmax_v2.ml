@@ -34,5 +34,5 @@ and alldif hd = function
 let rec target = function
   | Elt x -> [%synt base_case] x
   | Cons (hd, tl) -> [%synt oplus] hd (target tl)
-  [@@requires allpos]
+[@@requires allpos]
 ;;

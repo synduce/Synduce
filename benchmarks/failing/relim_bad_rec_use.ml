@@ -17,7 +17,7 @@ and dec l1 = function
   | Cons (x, y) -> Cons (x, dec l1 y)
 ;;
 
-(** Predicate asserting that a concat-list is partitioned.  *)
+(** Predicate asserting that a concat-list is partitioned. *)
 let rec is_partitioned = function
   | Single x -> true
   | Concat (x, y) -> lmin x > lmax y
@@ -39,5 +39,5 @@ let rec spec = function
 let rec target = function
   | Single x -> [%synt s0] x
   | Concat (l, r) -> [%synt s1] (spec l)
-  [@@requires is_partitioned]
+[@@requires is_partitioned]
 ;;

@@ -52,7 +52,7 @@ let rec ldiff = function
 let rec amax = function
   | Single x -> [%synt g0] x
   | Concat (x, y) -> [%synt join] (amax x) (amax y)
-  [@@requires is_concat_sorted]
+[@@requires is_concat_sorted]
 ;;
 
 assert (amax = repr @@ ldiff)

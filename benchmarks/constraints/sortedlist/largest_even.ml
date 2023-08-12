@@ -23,7 +23,7 @@ let rec lpen = function
 let rec amax = function
   | Elt x -> x
   | Cons (hd, tl) -> if hd mod 2 = 0 then [%synt f0] hd else [%synt f1] (lpen tl)
-  [@@requires is_sorted]
+[@@requires is_sorted]
 ;;
 
 assert (amax = lpen)

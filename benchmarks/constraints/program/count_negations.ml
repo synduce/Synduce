@@ -2,9 +2,16 @@
 
 (* When using args in comments, they must be separated by at least one line from the declarations. *)
 
-type arithop = APlus | AMinus | AGt
+type arithop =
+  | APlus
+  | AMinus
+  | AGt
 
-type boolop = BNot | BAnd | BOr | BEq
+type boolop =
+  | BNot
+  | BAnd
+  | BOr
+  | BEq
 
 type term =
   | TArithBin of arithop * term * term
@@ -15,7 +22,14 @@ type term =
   | TCInt of int
   | TCBool of bool
 
-type op = Plus | Minus | Not | And | Or | Gt | Eq
+type op =
+  | Plus
+  | Minus
+  | Not
+  | And
+  | Or
+  | Gt
+  | Eq
 
 type term2 =
   | Bin of op * term2 * term2
@@ -48,6 +62,7 @@ and mk_un a = function
   | Or -> TBoolUn (BOr, repr a)
   | Gt -> TArithUn (AGt, repr a)
   | Eq -> TBoolUn (BEq, repr a)
+;;
 
 let rec well_formed_term = function
   | Bin (op, a, b) -> well_formed_term a && well_formed_term b && is_binary op
@@ -73,6 +88,7 @@ and is_unary = function
   | Gt -> false
   | Eq -> false
   | Not -> true
+;;
 
 let rec spec = function
   | TArithBin (a, b, c) -> spec c + spec b
@@ -83,7 +99,12 @@ let rec spec = function
   | TCInt i -> 0
   | TCBool b -> 0
 
-and count = function BNot -> 1 | BAnd -> 0 | BOr -> 0 | BEq -> 0
+and count = function
+  | BNot -> 1
+  | BAnd -> 0
+  | BOr -> 0
+  | BEq -> 0
+;;
 
 (* The constraint on well formedness does nothing in this example. *)
 let rec target = function
@@ -92,7 +113,7 @@ let rec target = function
   | Var i -> [%synt var]
   | CInt i -> [%synt const]
   | CBool b -> [%synt boolconst]
-  [@@requires well_formed_term]
+[@@requires well_formed_term]
 
 and bcount = function
   | Plus -> [%synt f_op_plus]
@@ -102,3 +123,4 @@ and bcount = function
   | Gt -> [%synt f_op_gt]
   | Eq -> [%synt f_op_eq]
   | Not -> [%synt f_op_not]
+;;

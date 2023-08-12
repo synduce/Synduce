@@ -18,7 +18,7 @@ module SygusSolver =
       let verb = Log.verbose
       let verbose = false
       let log_queries = true
-      let log_file = Caml.Filename.temp_file "synt" ".sl"
+      let log_file = Stdlib.Filename.temp_file "synt" ".sl"
     end)
     (* Solvers config. *)
     (struct
@@ -32,18 +32,18 @@ let rec rtype_of_sort ~(ctx : Context.t) (s : sygus_sort) : RType.t option =
   match s with
   | SId (_, IdSimple (_, sname)) ->
     (match RType.get_type ctx.types sname with
-    | Some x ->
-      (match x with
-      | RType.TParam (_, maint) -> Some maint
-      | _ -> Some x)
-    | None ->
-      (match Tuples.types_of_tuple_name sname with
-      | Some tl -> Some (RType.TTup tl)
-      | None -> None))
+     | Some x ->
+       (match x with
+        | RType.TParam (_, maint) -> Some maint
+        | _ -> Some x)
+     | None ->
+       (match Tuples.types_of_tuple_name sname with
+        | Some tl -> Some (RType.TTup tl)
+        | None -> None))
   | SApp (_, IdSimple (_, "Tuple"), sorts) ->
     (match all_or_none (List.map ~f:(rtype_of_sort ~ctx) sorts) with
-    | Some l -> Some (RType.TTup l)
-    | _ -> None)
+     | Some l -> Some (RType.TTup l)
+     | _ -> None)
   | SApp (_, IdSimple (_, "Set"), [ sort ]) ->
     let%bind t = rtype_of_sort ~ctx sort in
     Some (RType.TSet t)
@@ -51,11 +51,11 @@ let rec rtype_of_sort ~(ctx : Context.t) (s : sygus_sort) : RType.t option =
     let%bind x = RType.get_type ctx.types sname in
     let%bind y = all_or_none (List.map ~f:(rtype_of_sort ~ctx) sort_params) in
     (match x with
-    | RType.TParam (params, maint) ->
-      (match List.zip params y with
-      | Ok l -> Some (RType.TParam (y, RType.sub_all l maint))
-      | _ -> None)
-    | _ -> None)
+     | RType.TParam (params, maint) ->
+       (match List.zip params y with
+        | Ok l -> Some (RType.TParam (y, RType.sub_all l maint))
+        | _ -> None)
+     | _ -> None)
   | SId _ ->
     Log.error_msg "Indexed / qualified sorts not implemented.";
     None
@@ -170,16 +170,16 @@ let rec sygus_of_term ~(ctx : Context.t) (t : term) : sygus_term =
       | _ -> failwith "Sygus: converting a tuple projection on a non-tuple term.")
   | TData (cstr, args) ->
     (match args with
-    | [] -> E.var cstr
-    | _ -> mk_t_app (mk_id_simple cstr) (List.map ~f:(sygus_of_term ~ctx) args))
+     | [] -> E.var cstr
+     | _ -> mk_t_app (mk_id_simple cstr) (List.map ~f:(sygus_of_term ~ctx) args))
   | TApp ({ tkind = TFun (formal_args, fun_body); _ }, args) ->
     (match List.zip formal_args args with
-    | Ok pre_bindings ->
-      let bindings, subs = make_bindings ~ctx pre_bindings in
-      let fbody' = sygus_of_term ~ctx (substitution subs fun_body) in
-      mk_t_let bindings fbody'
-    | Unequal_lengths ->
-      failwith "Sygus: cannot translate application with wrong number of arguments.")
+     | Ok pre_bindings ->
+       let bindings, subs = make_bindings ~ctx pre_bindings in
+       let fbody' = sygus_of_term ~ctx (substitution subs fun_body) in
+       mk_t_let bindings fbody'
+     | Unequal_lengths ->
+       failwith "Sygus: cannot translate application with wrong number of arguments.")
   | TApp (t, []) -> (sygus_of_term ~ctx) t
   | TApp ({ tkind = TVar v; _ }, args) ->
     mk_t_app (mk_id_simple v.vname) (List.map ~f:(sygus_of_term ~ctx) args)
@@ -202,31 +202,31 @@ and make_bindings ~ctx pre_bindings =
     | Some varmap -> bindings_of_varmap varmap, []
     | None ->
       (match Matching.matches ~ctx ~pattern:tto bdg with
-      | Some varmap -> bindings_of_varmap varmap, []
-      | None ->
-        (match tto.tkind with
-        | TTup tl ->
-          (* Replace tuple parts that are bound by a single variable. *)
-          let tl_typ = RType.TTup (List.map ~f:type_of tl) in
-          let tup_var =
-            Variable.mk ctx ~t:(Some tl_typ) (Alpha.fresh ~s:"tup" ctx.names)
-          in
-          ( [ mk_binding tup_var.vname ((sygus_of_term ~ctx) bdg) ]
-          , List.mapi ~f:(fun i t -> t, mk_sel ctx (Term.mk_var ctx tup_var) i) tl )
-        | _ ->
-          failwith
-            (Fmt.str
-               "%a cannot match %a or %a in sygus conversion."
-               (pp_term ctx)
-               (fpat_to_term bto)
-               (pp_term ctx)
-               (tuplify ctx bdg)
-               (pp_term ctx)
-               bdg)))
+       | Some varmap -> bindings_of_varmap varmap, []
+       | None ->
+         (match tto.tkind with
+          | TTup tl ->
+            (* Replace tuple parts that are bound by a single variable. *)
+            let tl_typ = RType.TTup (List.map ~f:type_of tl) in
+            let tup_var =
+              Variable.mk ctx ~t:(Some tl_typ) (Alpha.fresh ~s:"tup" ctx.names)
+            in
+            ( [ mk_binding tup_var.vname ((sygus_of_term ~ctx) bdg) ]
+            , List.mapi ~f:(fun i t -> t, mk_sel ctx (Term.mk_var ctx tup_var) i) tl )
+          | _ ->
+            failwith
+              (Fmt.str
+                 "%a cannot match %a or %a in sygus conversion."
+                 (pp_term ctx)
+                 (fpat_to_term bto)
+                 (pp_term ctx)
+                 (tuplify ctx bdg)
+                 (pp_term ctx)
+                 bdg)))
   in
   List.fold ~init:([], []) pre_bindings ~f:(fun (binds, subs) (bto, bdg) ->
-      let new_binds, new_subs = make_one_binding bto bdg in
-      binds @ new_binds, subs @ new_subs)
+    let new_binds, new_subs = make_one_binding bto bdg in
+    binds @ new_binds, subs @ new_subs)
 ;;
 
 let constant_of_literal (l : literal) : Constant.t =
@@ -261,39 +261,39 @@ let id_kind_of_s ?(typ_param = None) ~ctx env s =
     | _ when Tuples.is_constr_name s -> ITupleCstr
     | _ ->
       (match Tuples.proj_of_proj_name s with
-      | Some (_, i) -> ITupleAccessor i
-      | None -> INotDef)
+       | Some (_, i) -> ITupleAccessor i
+       | None -> INotDef)
   in
   match Map.find env s with
   | Some v -> IVar v
   | None ->
     (match Binop.of_string ~typ_param s with
-    | Some bop -> IBinop bop
-    | None ->
-      (match Unop.of_string ~typ_param s with
-      | Some unop -> IUnop unop
-      | None ->
-        (match RType.type_of_variant ctx s with
-        | Some _ -> ICstr s
-        | None -> string_case s)))
+     | Some bop -> IBinop bop
+     | None ->
+       (match Unop.of_string ~typ_param s with
+        | Some unop -> IUnop unop
+        | None ->
+          (match RType.type_of_variant ctx s with
+           | Some _ -> ICstr s
+           | None -> string_case s)))
 ;;
 
 let rec term_of_sygus
-    ~(fctx : PMRS.Functions.ctx)
-    ~(ctx : Context.t)
-    (env : (string, variable, String.comparator_witness) Map.t)
-    (st : sygus_term)
-    : term
+  ~(fctx : PMRS.Functions.ctx)
+  ~(ctx : Context.t)
+  (env : (string, variable, String.comparator_witness) Map.t)
+  (st : sygus_term)
+  : term
   =
   match st with
   | SyId (_, IdSimple (_, s)) ->
     (match Map.find env s with
-    | Some v -> mk_var ctx v
-    | None -> failwith Fmt.(str "term_of_sygus: variable %s not found." s))
+     | Some v -> mk_var ctx v
+     | None -> failwith Fmt.(str "term_of_sygus: variable %s not found." s))
   | SyId (_, IdQual (_, "emptyset", sort)) ->
     (match rtype_of_sort ~ctx sort with
-    | Some RType.(TSet telt) -> mk_const (CEmptySet telt)
-    | _ -> failwith Fmt.(str "emptyset type not recognized"))
+     | Some RType.(TSet telt) -> mk_const (CEmptySet telt)
+     | _ -> failwith Fmt.(str "emptyset type not recognized"))
   | SyLit (_, l) -> mk_const (constant_of_literal l)
   | SyApp (_, IdSimple (_, s), args) ->
     let args' = List.map ~f:(term_of_sygus ~fctx ~ctx env) args in
@@ -301,37 +301,38 @@ let rec term_of_sygus
       match args' with
       | hd :: _ ->
         (match type_of (fst (infer_type ctx hd)) with
-        | RType.TSet t -> Some t
-        | t' -> Some t')
+         | RType.TSet t -> Some t
+         | t' -> Some t')
       | _ -> None
     in
     (match id_kind_of_s ~typ_param ~ctx:ctx.types env s with
-    | ICstr c -> mk_data ctx c args'
-    | IVar v -> mk_app (mk_var ctx v) args'
-    | IBinop op ->
-      (match args' with
-      | [ t1; t2 ] -> mk_bin op t1 t2
-      | [ t1 ] when Operator.(equal (Binary op) (Binary Minus)) -> mk_un Unop.Neg t1
-      | _ ->
-        (match mk_assoc op args' with
-        | Some t -> t
-        | None ->
-          Log.error_msg Fmt.(str "%a with %i arguments?" Binop.pp op (List.length args'));
-          failwith Fmt.(str "Sygus: %a with more than two arguments." Binop.pp op)))
-    | IUnop op ->
-      (match args' with
-      | [ t1 ] -> mk_un op t1
-      | _ -> failwith "Sygus: a unary operator with more than one argument.")
-    | IIte ->
-      (match args' with
-      | [ t1; t2; t3 ] -> mk_ite t1 t2 t3
-      | _ -> failwith "Sygus: if-then-else should have three arguments.")
-    | ITupleAccessor i ->
-      (match args' with
-      | [ arg ] -> mk_sel ctx arg i
-      | _ -> failwith "Sygus: a tuple acessor with wrong number of arguments")
-    | ITupleCstr -> mk_tup ctx args'
-    | INotDef -> failwith Fmt.(str "Sygus: Undefined variable %s" s))
+     | ICstr c -> mk_data ctx c args'
+     | IVar v -> mk_app (mk_var ctx v) args'
+     | IBinop op ->
+       (match args' with
+        | [ t1; t2 ] -> mk_bin op t1 t2
+        | [ t1 ] when Operator.(equal (Binary op) (Binary Minus)) -> mk_un Unop.Neg t1
+        | _ ->
+          (match mk_assoc op args' with
+           | Some t -> t
+           | None ->
+             Log.error_msg
+               Fmt.(str "%a with %i arguments?" Binop.pp op (List.length args'));
+             failwith Fmt.(str "Sygus: %a with more than two arguments." Binop.pp op)))
+     | IUnop op ->
+       (match args' with
+        | [ t1 ] -> mk_un op t1
+        | _ -> failwith "Sygus: a unary operator with more than one argument.")
+     | IIte ->
+       (match args' with
+        | [ t1; t2; t3 ] -> mk_ite t1 t2 t3
+        | _ -> failwith "Sygus: if-then-else should have three arguments.")
+     | ITupleAccessor i ->
+       (match args' with
+        | [ arg ] -> mk_sel ctx arg i
+        | _ -> failwith "Sygus: a tuple acessor with wrong number of arguments")
+     | ITupleCstr -> mk_tup ctx args'
+     | INotDef -> failwith Fmt.(str "Sygus: Undefined variable %s" s))
   | SyApp (_, IdIndexed (_, "tupSel", [ INum (_, i) ]), [ arg ]) ->
     let arg' = term_of_sygus ~fctx ~ctx env arg in
     mk_sel ctx arg' i
@@ -345,11 +346,11 @@ let rec term_of_sygus
     failwith Fmt.(str "Sygus term %a not supported." Sexp.pp_hum se)
 
 and let_bindings_of_sygus
-    ~(ctx : Context.t)
-    ~(fctx : PMRS.Functions.ctx)
-    (env : (string, variable, String.comparator_witness) Map.t)
-    (bindings : binding list)
-    (body : sygus_term)
+  ~(ctx : Context.t)
+  ~(fctx : PMRS.Functions.ctx)
+  (env : (string, variable, String.comparator_witness) Map.t)
+  (bindings : binding list)
+  (body : sygus_term)
   =
   let f (_, bsymb, bterm) =
     (* Create a fresh name and then replace every occurence of the original symbol
@@ -376,31 +377,31 @@ and let_bindings_of_sygus
 ;;
 
 let grammar_production_of_skeleton
-    (skel : Skeleton.t)
-    ~(ints : sygus_term)
-    ~(bools : sygus_term)
-    (locals : (sygus_term * sygus_sort) list)
-    : sygus_term list
+  (skel : Skeleton.t)
+  ~(ints : sygus_term)
+  ~(bools : sygus_term)
+  (locals : (sygus_term * sygus_sort) list)
+  : sygus_term list
   =
   let rec build_prods =
     Skeleton.(
       function
       | SType t ->
         (match t with
-        | TInt -> [ ints ]
-        | TBool -> [ bools ]
-        | TParam _ -> [ ints ]
-        | _ -> [])
+         | TInt -> [ ints ]
+         | TBool -> [ bools ]
+         | TParam _ -> [ ints ]
+         | _ -> [])
       | SUn (u, g) ->
         let g_prods = build_prods g in
         List.map g_prods ~f:(fun prod ->
-            mk_t_app (mk_id_simple (Unop.to_string u)) [ prod ])
+          mk_t_app (mk_id_simple (Unop.to_string u)) [ prod ])
       | SBin (b, ta, tb) ->
         let prods_a = build_prods ta
         and prods_b = build_prods tb in
         let a_x_b = List.cartesian_product prods_a prods_b in
         List.map a_x_b ~f:(fun (proda, prodb) ->
-            mk_t_app (mk_id_simple (Binop.to_string b)) [ proda; prodb ])
+          mk_t_app (mk_id_simple (Binop.to_string b)) [ proda; prodb ])
       | SIte (a, b, c) ->
         let prods_a = build_prods a
         and prods_b = build_prods b
@@ -412,8 +413,8 @@ let grammar_production_of_skeleton
       | SChoice c -> List.concat_map ~f:build_prods c
       | SArg arg_num ->
         (match List.nth locals arg_num with
-        | Some (arg_term, _) -> [ arg_term ]
-        | None -> [])
+         | Some (arg_term, _) -> [ arg_term ]
+         | None -> [])
       | STuple elts ->
         let prods = Utils.cartesian_nary_product (List.map ~f:build_prods elts) in
         List.map ~f:(fun tuple_args -> mk_t_app (mk_id_simple "mkTuple") tuple_args) prods
@@ -424,20 +425,20 @@ let grammar_production_of_skeleton
 ;;
 
 (* ============================================================================================= *)
-(*                           COMMANDS                                                            *)
+(*                           COMMANDS *)
 (* ============================================================================================= *)
 
 let declare_sort_of_rtype
-    ~(ctx : Context.t)
-    (sname : string)
-    (variants : (string * RType.t list) list)
-    : command
+  ~(ctx : Context.t)
+  (sname : string)
+  (variants : (string * RType.t list) list)
+  : command
   =
   let dt_cons_decs =
     let f (variantname, variantargs) =
       ( variantname
       , List.mapi variantargs ~f:(fun i t ->
-            mk_sorted_var (variantname ^ "_" ^ Int.to_string i) (sort_of_rtype ~ctx t)) )
+          mk_sorted_var (variantname ^ "_" ^ Int.to_string i) (sort_of_rtype ~ctx t)) )
     in
     List.map ~f variants
   in
@@ -470,8 +471,8 @@ let declare_sorts_of_var ~(ctx : Context.t) (v : variable) =
         Map.set sort_decls' ~key:tuple_name ~data:tuple_decl
       | TNamed tname ->
         (match get_variants ctx.types t with
-        | [] -> sort_decls
-        | l -> Map.set sort_decls ~key:tname ~data:(declare_sort_of_rtype ~ctx tname l))
+         | [] -> sort_decls
+         | l -> Map.set sort_decls ~key:tname ~data:(declare_sort_of_rtype ~ctx tname l))
       | _ -> sort_decls)
   in
   Map.to_alist (f sort_decls (Variable.vtype_or_new ctx v))
@@ -493,12 +494,12 @@ let sorted_vars_of_vars ~(ctx : Context.t) (vars : variable list) : sorted_var l
 ;;
 
 let mk_synthfun
-    ~(ctx : Context.t)
-    (name : string)
-    (args : variable list)
-    (ret_type : RType.t)
-    (grammar : grammar_def option)
-    : command
+  ~(ctx : Context.t)
+  (name : string)
+  (args : variable list)
+  (ret_type : RType.t)
+  (grammar : grammar_def option)
+  : command
   =
   mk_c_synth_fun
     name
@@ -508,43 +509,43 @@ let mk_synthfun
 ;;
 
 let mk_synthinv
-    ~(ctx : Context.t)
-    (name : string)
-    (args : variable list)
-    (grammar : grammar_def option)
-    : command
+  ~(ctx : Context.t)
+  (name : string)
+  (args : variable list)
+  (grammar : grammar_def option)
+  : command
   =
   mk_c_synth_fun name (sorted_vars_of_vars ~ctx args) E.bool_sort ~g:grammar
 ;;
 
 let wait_on_failure (counter : int ref) (t : (solver_response * 'a) Lwt.t)
-    : (solver_response * 'a) Lwt.t
+  : (solver_response * 'a) Lwt.t
   =
   Lwt.bind t (fun t ->
-      match t with
-      (* Wait on failure. *)
-      | (RFail | RUnknown | RInfeasible), _ ->
-        let rec wait_and_check t =
-          Lwt.bind (Lwt_unix.sleep 1.0) (fun _ ->
-              if !counter > 1 || Float.(t < 0.)
-              then wait_and_check (t -. 1.0)
-              else Lwt.return ())
-        in
-        Lwt.map
-          (fun _ -> t)
-          (if !counter > 1
-          then (
-            Int.decr counter;
-            wait_and_check !Config.Optims.wait_parallel_tlimit)
+    match t with
+    (* Wait on failure. *)
+    | (RFail | RUnknown | RInfeasible), _ ->
+      let rec wait_and_check t =
+        Lwt.bind (Lwt_unix.sleep 1.0) (fun _ ->
+          if !counter > 1 || Float.(t < 0.)
+          then wait_and_check (t -. 1.0)
           else Lwt.return ())
-      (* Continue on success. *)
-      | _ ->
-        Int.decr counter;
-        Lwt.return t)
+      in
+      Lwt.map
+        (fun _ -> t)
+        (if !counter > 1
+         then (
+           Int.decr counter;
+           wait_and_check !Config.Optims.wait_parallel_tlimit)
+         else Lwt.return ())
+    (* Continue on success. *)
+    | _ ->
+      Int.decr counter;
+      Lwt.return t)
 ;;
 
 (* ============================================================================================= *)
-(*                       ABSTRACTION: SOLVER CLASS                                               *)
+(*                       ABSTRACTION: SOLVER CLASS *)
 (* ============================================================================================= *)
 
 let collect_tuple_decls (commands : command list) =
@@ -552,14 +553,14 @@ let collect_tuple_decls (commands : command list) =
     match s with
     | SyApp (_, id, tl) ->
       (match id with
-      | IdSimple (_, s) ->
-        (match Tuples.type_name_of_constr s with
-        | Some tname -> [ tname ]
-        | None ->
-          (match Tuples.type_name_of_proj_name s with
+       | IdSimple (_, s) ->
+         (match Tuples.type_name_of_constr s with
           | Some tname -> [ tname ]
-          | None -> []))
-      | _ -> [])
+          | None ->
+            (match Tuples.type_name_of_proj_name s with
+             | Some tname -> [ tname ]
+             | None -> []))
+       | _ -> [])
       @ List.concat_map ~f:of_sygus_term tl
     | SyForall (_, sortedvs, body) | SyExists (_, sortedvs, body) ->
       List.filter_map ~f:(fun (_, _, s) -> of_sort s) sortedvs @ of_sygus_term body
@@ -574,7 +575,7 @@ let collect_tuple_decls (commands : command list) =
   in
   let of_dt_cons (_, arg_sorts) =
     List.filter_map arg_sorts ~f:(fun ((_, _, sort) : 'a * 'b * sygus_sort) ->
-        of_sort sort)
+      of_sort sort)
   in
   let of_command (c : command) =
     match c with

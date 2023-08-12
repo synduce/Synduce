@@ -7,7 +7,7 @@ open Common.ProblemDefs
 open Common.Env
 
 (* ============================================================================================= *)
-(*                              TOOL MESSAGESAND JSON OUTPUT                                     *)
+(*                              TOOL MESSAGESAND JSON OUTPUT *)
 (* ============================================================================================= *)
 
 let cvc_message () =
@@ -30,13 +30,13 @@ let start_message filename is_ocaml_syntax =
 ;;
 
 let on_success
-    ?(print_unrealizable = false)
-    ~(is_ocaml_syntax : bool)
-    ~(ctx : env)
-    (source_filename : string ref)
-    (pb : PsiDef.t)
-    (result : Syguslib.Sygus.solver_response segis_response)
-    : Yojson.t
+  ?(print_unrealizable = false)
+  ~(is_ocaml_syntax : bool)
+  ~(ctx : env)
+  (source_filename : string ref)
+  (pb : PsiDef.t)
+  (result : Syguslib.Sygus.solver_response segis_response)
+  : Yojson.t
   =
   let elapsed, verif_time =
     Option.value
@@ -46,50 +46,50 @@ let on_success
   let verif_ratio = 100.0 *. (verif_time /. elapsed) in
   (* Print the solution. *)
   (match result with
-  | Realizable soln ->
-    Log.(
-      info (print_solvers_summary pb.id);
-      info (fun frmt () ->
-          pf
-            frmt
-            "Solution found in %4.4fs (%3.1f%% verifying):@.%a@]"
-            elapsed
-            verif_ratio
-            (box (ctx >- Common.Pretty.pp_soln ~use_ocaml_syntax:is_ocaml_syntax))
-            soln))
-  | Unrealizable (_repair, witnesses) ->
-    if print_unrealizable
-    then (
-      Log.(
-        info (print_solvers_summary pb.id);
-        info (fun frmt () ->
-            pf
-              frmt
-              "No solution: problem is unrealizable (found answer in %4.4fs)."
-              elapsed));
-      Log.(
-        info (fun frmt () -> pf frmt "%a" (ctx >- Lang.PMRS.pp ~short:false) pb.target));
-      ctx >>> ToolExplain.when_unrealizable pb witnesses)
-    else ()
-  | _ -> ());
+   | Realizable soln ->
+     Log.(
+       info (print_solvers_summary pb.id);
+       info (fun frmt () ->
+         pf
+           frmt
+           "Solution found in %4.4fs (%3.1f%% verifying):@.%a@]"
+           elapsed
+           verif_ratio
+           (box (ctx >- Common.Pretty.pp_soln ~use_ocaml_syntax:is_ocaml_syntax))
+           soln))
+   | Unrealizable (_repair, witnesses) ->
+     if print_unrealizable
+     then (
+       Log.(
+         info (print_solvers_summary pb.id);
+         info (fun frmt () ->
+           pf
+             frmt
+             "No solution: problem is unrealizable (found answer in %4.4fs)."
+             elapsed));
+       Log.(
+         info (fun frmt () -> pf frmt "%a" (ctx >- Lang.PMRS.pp ~short:false) pb.target));
+       ctx >>> ToolExplain.when_unrealizable pb witnesses)
+     else ()
+   | _ -> ());
   (* If output specified, write the solution in file. *)
   (match result with
-  | Realizable soln ->
-    (match Config.get_output_file !source_filename with
-    | Some out_file ->
-      Utils.Log.to_file out_file (fun frmt () ->
+   | Realizable soln ->
+     (match Config.get_output_file !source_filename with
+      | Some out_file ->
+        Utils.Log.to_file out_file (fun frmt () ->
           (box (ctx >- Common.Pretty.pp_soln ~use_ocaml_syntax:is_ocaml_syntax)) frmt soln)
-    | None -> ());
-    (* If specified, output a Dafny proof skeleton. *)
-    if !Config.generate_proof
-    then
-      Codegen.(
-        Generation.gen_proof
-          ~ctx
-          (ctx >- Commons.problem_descr_of_psi_def pb, Some soln)
-          !Config.proof_generation_file)
-    else ()
-  | _ -> ());
+      | None -> ());
+     (* If specified, output a Dafny proof skeleton. *)
+     if !Config.generate_proof
+     then
+       Codegen.(
+         Generation.gen_proof
+           ~ctx
+           (ctx >- Commons.problem_descr_of_psi_def pb, Some soln)
+           !Config.proof_generation_file)
+     else ()
+   | _ -> ());
   (* If no info required, output timing information. *)
   if (not !Config.info) && !Config.timings
   then (
@@ -114,13 +114,13 @@ let on_failure ?(is_ocaml_syntax = true) ~(ctx : env) (pb : PsiDef.t) : Yojson.t
   (* Print the solution. *)
   Log.(
     info (fun frmt () ->
-        pf
-          frmt
-          "Failed to find solution %4.4fs (%3.1f%% verifying):@.%a@]"
-          elapsed
-          verif_ratio
-          (box (ctx >- Lang.PMRS.pp_ocaml ~short:false))
-          pb.target));
+      pf
+        frmt
+        "Failed to find solution %4.4fs (%3.1f%% verifying):@.%a@]"
+        elapsed
+        verif_ratio
+        (box (ctx >- Lang.PMRS.pp_ocaml ~short:false))
+        pb.target));
   (* If no info required, output timing information. *)
   if (not !Config.info) && !Config.timings
   then (
@@ -167,7 +167,7 @@ let print_stats_coverage multi_soln_result (n_out, u_count, f_count) =
             !Stats.num_foreign_lemma_uses))
 ;;
 
-(** Print a summary of the options available. The options are in the Lib.Utils.Config module.  *)
+(** Print a summary of the options available. The options are in the Lib.Utils.Config module. *)
 let print_usage () =
   pf stdout "Usage : Synduce [options] input_file@.";
   pf
@@ -252,5 +252,5 @@ let print_usage () =
     \  -C   --check-smt-unrealizable    Check unrealizability using a SMT query directly.\n\
     \     -> Try:\n\
      ./Synduce benchmarks/list/mps.ml@.";
-  Caml.exit 0
+  Stdlib.exit 0
 ;;

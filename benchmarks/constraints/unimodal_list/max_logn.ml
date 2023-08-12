@@ -46,7 +46,7 @@ and aux_down pr = function
 let rec spec = function
   | Nil -> 0
   | Cons (hd, tl) -> max hd (spec tl)
-  [@@ensures fun x -> x >= 0]
+[@@ensures fun x -> x >= 0]
 ;;
 
 let rec target = function
@@ -54,5 +54,5 @@ let rec target = function
   | UElt a -> [%synt f0] a
   | USplit (l, a, b, r) ->
     if a > b then [%synt joina] a b (target l) else [%synt joinb] a b (target r)
-  [@@requires is_unimodal_ulist]
+[@@requires is_unimodal_ulist]
 ;;

@@ -40,7 +40,7 @@ and interval = function
 let rec target = function
   | Line x -> [%synt s0] (inter x) true
   | NCons (hd, tl) -> [%synt s1] (plmin hd) (target tl)
-  [@@requires is_sorted]
+[@@requires is_sorted]
 
 and inter = function
   | Elt x -> x, x

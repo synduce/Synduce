@@ -38,5 +38,5 @@ let target x t =
     | MNode (n, a, l, r) -> if x > n then [%synt c0] x a else [%synt f1] x a (g l) (g r)
   in
   g t
-  [@@requires is_memo]
+[@@requires is_memo]
 ;;

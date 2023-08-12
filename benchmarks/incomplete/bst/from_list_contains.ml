@@ -48,5 +48,5 @@ let target y t =
     | Node (a, l, r) -> if y < a then [%synt xi_1] (g l) else [%synt xi_2] y a (g r)
   in
   g t
-  [@@requires is_bst]
+[@@requires is_bst]
 ;;

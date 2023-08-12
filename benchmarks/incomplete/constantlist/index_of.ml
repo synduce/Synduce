@@ -21,7 +21,7 @@ let spec x t =
     | Cons (hd, tl) -> if hd = x then 1 else if f tl = 0 then 0 else 1 + f tl
   in
   f t
-  [@@ensures fun x -> x >= 0]
+[@@ensures fun x -> x >= 0]
 ;;
 
 let target y t =
@@ -30,5 +30,5 @@ let target y t =
     | Cons (hd, tl) -> [%synt xi_1] y hd
   in
   g t
-  [@@requires constant_list]
+[@@requires constant_list]
 ;;

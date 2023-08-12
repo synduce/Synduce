@@ -32,12 +32,12 @@ let rec spec = function
   | SCons (hd, tl) ->
     let amax, sec_max = spec tl in
     max hd amax, max sec_max (min hd amax)
-  [@@ensures fun (x, y) -> x >= y]
+[@@ensures fun (x, y) -> x >= y]
 ;;
 
 (* Target function. *)
 let rec target = function
   | Nil -> [%synt init]
   | Cons2 (hd1, hd2, tl) -> [%synt odot] hd1 hd2
-  [@@requires is_sorted]
+[@@requires is_sorted]
 ;;

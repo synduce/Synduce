@@ -53,5 +53,5 @@ let target key t =
       else [%synt join2] key hd_key (g r)
   in
   g t
-  [@@requires is_imap]
+[@@requires is_imap]
 ;;

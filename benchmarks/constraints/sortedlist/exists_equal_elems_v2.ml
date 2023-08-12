@@ -35,7 +35,7 @@ and find a = function
 (* Target assumes that lsits are sorted and takes advantage of it. *)
 let rec target = function
   | TwoLists (x, y) -> seek x y
-  [@@requires is_sorted]
+[@@requires is_sorted]
 
 and seek x = function
   | Elt a -> find2 a x

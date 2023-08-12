@@ -20,31 +20,31 @@ let main () =
   in
   (* Get problem name from file name, or exit if we don't recognize. *)
   (try
-     match Caml.Filename.extension !filename with
+     match Stdlib.Filename.extension !filename with
      | ".ml" | ".pmrs" ->
        Config.problem_name
-         := Caml.Filename.basename (Caml.Filename.chop_extension !filename)
+         := Stdlib.Filename.basename (Stdlib.Filename.chop_extension !filename)
      | _ -> raise (Invalid_argument "wrong extension")
    with
-  | Invalid_argument _ ->
-    Log.error_msg "Filename must end with extension .ml or .pmrs";
-    Caml.exit (-1));
+   | Invalid_argument _ ->
+     Log.error_msg "Filename must end with extension .ml or .pmrs";
+     Stdlib.exit (-1));
   set_style_renderer stdout `Ansi_tty;
-  Caml.Format.set_margin 100;
+  Stdlib.Format.set_margin 100;
   (match !SygusInterface.SygusSolver.CoreSolver.default_solver with
-  | CVC -> ToolMessages.cvc_message ()
-  | EUSolver -> failwith "EUSolver unsupported."
-  | DryadSynth -> Syguslib.Sygus.use_v1 := true);
+   | CVC -> ToolMessages.cvc_message ()
+   | EUSolver -> failwith "EUSolver unsupported."
+   | DryadSynth -> Syguslib.Sygus.use_v1 := true);
   Lib.Utils.Stats.glob_start ();
   (* Parse input file. *)
-  let is_ocaml_syntax = Caml.Filename.check_suffix !filename ".ml" in
+  let is_ocaml_syntax = Stdlib.Filename.check_suffix !filename ".ml" in
   ToolMessages.start_message !filename is_ocaml_syntax;
   let prog, psi_comps =
     if is_ocaml_syntax then parse_ocaml !filename else parse_pmrs !filename
   in
   (* Main context *)
   let ctx = group (Term.Context.create ()) (PMRS.Functions.create ()) in
-  (* Populate types.  *)
+  (* Populate types. *)
   let _ = ctx >- seek_types prog in
   (* Translate the Caml or PRMS file into pmrs representation. *)
   let all_pmrs =
@@ -53,7 +53,7 @@ let main () =
       if !Config.show_vars then Term.Variable.print_summary stdout ctx.ctx;
       raise e
   in
-  if !parse_only then Caml.exit 1;
+  if !parse_only then Stdlib.exit 1;
   (* Solve the problem proper. *)
   let multi_soln_result =
     ctx >>> Many.find_and_solve_problem ~filename:!filename psi_comps all_pmrs
@@ -105,7 +105,7 @@ let main () =
         in
         let results =
           List.map subproblem_jsons ~f:(fun (psi_id, json) ->
-              Fmt.(str "problem_%i" psi_id), json)
+            Fmt.(str "problem_%i" psi_id), json)
         in
         `Assoc
           ([ "total-configurations", `Int multi_soln_result.r_subconf_count
@@ -114,40 +114,40 @@ let main () =
            ; "foreign-lemma-uses", `Int !Stats.num_foreign_lemma_uses
            ; "coverage", `Float cov_ratio
            ]
-          @ results)
+           @ results)
     in
     ToolMessages.print_stats_coverage multi_soln_result (n_out, !u_count, !f_count);
     json, !u_count, !f_count
   in
   (* Write to log if defined. *)
   (match !Config.output_log with
-  | Some filename ->
-    let info_line =
-      Fmt.str
-        "finished:%f,solutions:%i,unrealizable:%i,failure:%i,rstar-hits:%i,lemma-reuse:%i,found-best:%b"
-        (Unix.gettimeofday () -. start_time)
-        (n_out - u_count)
-        u_count
-        f_count
-        !Stats.num_unr_cache_hits
-        !Stats.num_foreign_lemma_uses
-        !Stats.orig_solution_hit
-    in
-    (try
-       let chan = Stdio.Out_channel.create ~append:true filename in
-       Stdio.Out_channel.output_lines chan [ info_line ];
-       Stdio.Out_channel.close_no_err chan
-     with
-    | _ -> ())
-  | None -> ());
+   | Some filename ->
+     let info_line =
+       Fmt.str
+         "finished:%f,solutions:%i,unrealizable:%i,failure:%i,rstar-hits:%i,lemma-reuse:%i,found-best:%b"
+         (Unix.gettimeofday () -. start_time)
+         (n_out - u_count)
+         u_count
+         f_count
+         !Stats.num_unr_cache_hits
+         !Stats.num_foreign_lemma_uses
+         !Stats.orig_solution_hit
+     in
+     (try
+        let chan = Stdio.Out_channel.create ~append:true filename in
+        Stdio.Out_channel.output_lines chan [ info_line ];
+        Stdio.Out_channel.close_no_err chan
+      with
+      | _ -> ())
+   | None -> ());
   (* Write json messages to stdout if set. *)
   (if !Config.json_out
-  then
-    if !Config.compact
-    then (
-      Yojson.to_channel ~std:true Stdio.stdout json_out;
-      Stdio.(Out_channel.flush stdout))
-    else Fmt.(pf stdout "%a@." (Yojson.pretty_print ~std:false) json_out));
+   then
+     if !Config.compact
+     then (
+       Yojson.to_channel ~std:true Stdio.stdout json_out;
+       Stdio.(Out_channel.flush stdout))
+     else Fmt.(pf stdout "%a@." (Yojson.pretty_print ~std:false) json_out));
   if !Config.show_vars then Term.Variable.print_summary stdout ctx.ctx
 ;;
 

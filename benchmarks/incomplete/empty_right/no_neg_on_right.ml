@@ -27,7 +27,7 @@ let rec spec = function
   | Leaf a -> if is_neg a then 1 else 0
   | Node (a, l, r) ->
     if size r >= 0 && is_neg a then 1 + spec l + spec r else spec l + spec r
-  [@@ensures fun x -> x >= 0]
+[@@ensures fun x -> x >= 0]
 
 and size = function
   | Leaf x -> 1
@@ -41,5 +41,5 @@ and is_neg = function
 let rec target = function
   | Leaf a -> [%synt xi_1] a
   | Node (a, l, r) -> [%synt xi_2] a (target l)
-  [@@requires no_neg_right]
+[@@requires no_neg_right]
 ;;

@@ -28,5 +28,5 @@ let target a l =
     | Cons (hd, tl) -> if hd < a then [%synt xi_1] else [%synt c0]
   in
   g l
-  [@@requires is_sorted]
+[@@requires is_sorted]
 ;;

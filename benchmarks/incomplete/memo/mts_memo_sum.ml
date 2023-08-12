@@ -36,7 +36,7 @@ and hsum = function
 let rec target = function
   | IElt x -> [%synt base_case] x
   | ICons (hd, idx, tl) -> [%synt oplus] hd idx (target tl)
-  [@@requires is_memo_sum]
+[@@requires is_memo_sum]
 ;;
 
 assert (target = drop_sum_list @@ mts)

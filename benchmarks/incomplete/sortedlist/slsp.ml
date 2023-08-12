@@ -39,14 +39,14 @@ let rec spec = function
     let mtss, cond = spec tl in
     let new_cond = hd >= 0 && cond in
     (if new_cond then mtss + hd else mtss), new_cond
-  [@@ensures fun (x, b) -> x >= 0]
+[@@ensures fun (x, b) -> x >= 0]
 ;;
 
 let rec target = function
   | Sglt x -> [%synt s0] x
   | Cat (l, piv, r) ->
     if piv <= 0 then [%synt f1] (target r) else [%synt f2] piv (target r) (target l)
-  [@@requires sorted]
+[@@requires sorted]
 ;;
 
 assert (target = clist_to_list @@ spec)

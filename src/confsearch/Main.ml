@@ -39,7 +39,7 @@ let log_step ctx p resp (elapsed, verif) s =
 ;;
 
 (* ============================================================================================= *)
-(*                            SINGLE NODE (CONFIGURATION) SOLVERS                                *)
+(*                            SINGLE NODE (CONFIGURATION) SOLVERS *)
 (* ============================================================================================= *)
 
 let portfolio_solver ~(ctx : env) (p : PsiDef.t) =
@@ -57,7 +57,7 @@ let portfolio_solver ~(ctx : env) (p : PsiDef.t) =
 ;;
 
 let single_configuration_solver ~(ctx : env) (p : PsiDef.t)
-    : env * float * float * Syguslib.Sygus.solver_response segis_response
+  : env * float * float * Syguslib.Sygus.solver_response segis_response
   =
   let ctx, resp =
     if !CO.use_segis (* Symbolic CEGIS. *)
@@ -78,15 +78,15 @@ let single_configuration_solver ~(ctx : env) (p : PsiDef.t)
 ;;
 
 (* ============================================================================================= *)
-(*                            MAIN CONFIGURATION GRAPH SOLVING ALGORITHM                         *)
+(*                            MAIN CONFIGURATION GRAPH SOLVING ALGORITHM *)
 (* ============================================================================================= *)
 
 let find_multiple_solutions
-    ~(ctx : env)
-    ~score:(score_func : Env.env -> PsiDef.t -> soln -> Configuration.conf -> int)
-    (top_userdef_problem : PsiDef.t)
-    (sup : Configuration.conf)
-    : multi_soln_result
+  ~(ctx : env)
+  ~score:(score_func : Env.env -> PsiDef.t -> soln -> Configuration.conf -> int)
+  (top_userdef_problem : PsiDef.t)
+  (sup : Configuration.conf)
+  : multi_soln_result
   =
   let num_attempts = ref 0 in
   let best_score = ref 1000 in
@@ -194,11 +194,11 @@ let find_multiple_solutions
 ;;
 
 let find_and_solve_problem
-    ~(ctx : env)
-    ~(filename : string)
-    (psi_comps : (string * string * string) option)
-    (pmrs : (string, PMRS.t, Base.String.comparator_witness) Map.t)
-    : multi_soln_result
+  ~(ctx : env)
+  ~(filename : string)
+  (psi_comps : (string * string * string) option)
+  (pmrs : (string, PMRS.t, Base.String.comparator_witness) Map.t)
+  : multi_soln_result
   =
   (*  Find problem components *)
   let target_fname, spec_fname, repr_fname =
@@ -216,8 +216,8 @@ let find_and_solve_problem
       pmrs
   in
   (* Check that the user want more than one solution, and that the problem defined
-        is well-formed. Otherwise, just try to solve the user-defined configuration.
-     *)
+     is well-formed. Otherwise, just try to solve the user-defined configuration.
+  *)
   if !Config.Optims.max_solutions >= 0
      && Configuration.check_pmrs top_userdef_problem.target
   then (
@@ -226,7 +226,7 @@ let find_and_solve_problem
       Configuration.max_configuration ctx top_userdef_problem.target
     in
     Utils.Log.verbose (fun fmt () ->
-        Fmt.pf fmt "Max configuration:@;%a" (Configuration.ppm ctx) max_configuration);
+      Fmt.pf fmt "Max configuration:@;%a" (Configuration.ppm ctx) max_configuration);
     let subconf_count =
       Configuration.Subconf.(Lattice.count_subs (of_conf max_configuration))
     in

@@ -26,11 +26,11 @@ let spec hi lo t =
     | Node (a, l, r) -> if hi > a && a > lo then 1 + f l + f r else f l + f r
   in
   f t
-  [@@ensures fun x -> x >= 0]
+[@@ensures fun x -> x >= 0]
 ;;
 
 (* This problem is unrealizable,
-  and illustrates how Synduce can "help" by quickly answering UNSAT.
+   and illustrates how Synduce can "help" by quickly answering UNSAT.
 *)
 let target hi lo t =
   let rec g = function
@@ -43,5 +43,5 @@ let target hi lo t =
       else [%synt f_else] a hi lo (g r) (g l)
   in
   g t
-  [@@requires is_bst]
+[@@requires is_bst]
 ;;

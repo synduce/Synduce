@@ -1,8 +1,8 @@
 (** @synduce --no-lifting  *)
 
 (*
-  In this example, CVC4 fails on an almost syntactic definition.
-  I have no idea why.
+   In this example, CVC4 fails on an almost syntactic definition.
+   I have no idea why.
 *)
 
 type 'a clist =
@@ -18,7 +18,7 @@ let rec spec = function
   | Cons (hd, tl) ->
     let n, avg = spec tl in
     n + 1, ((n * avg) + hd) / (n + 1)
-  [@@ensures fun (i, _) -> i > 0]
+[@@ensures fun (i, _) -> i > 0]
 ;;
 
 let rec target = function

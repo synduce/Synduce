@@ -40,5 +40,5 @@ let rec target = function
   | MLeaf a -> [%synt s0] a
   | MNode (n, a, l, r) ->
     if n < 0 then [%synt c0] else [%synt join] a (target l) (target r)
-  [@@requires is_memo]
+[@@requires is_memo]
 ;;

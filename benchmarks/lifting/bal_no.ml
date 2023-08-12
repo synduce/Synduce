@@ -15,7 +15,7 @@ let rec fbal = function
     let cnt, bal = fbal tl in
     let cnt = if hd then cnt + 1 else cnt - 1 in
     cnt, bal && cnt >= 0
-  [@@ensures fun (cnt, _) -> cnt >= 0]
+[@@ensures fun (cnt, _) -> cnt >= 0]
 ;;
 
 let rec target = function

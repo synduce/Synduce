@@ -12,11 +12,11 @@ let rec is_even = function
 let rec spec = function
   | Elt a -> a mod 2
   | Node (a, l, r) -> (a mod 2) + spec l + spec r
-  [@@ensures fun x -> x >= 0]
+[@@ensures fun x -> x >= 0]
 ;;
 
 let rec target = function
   | Elt a -> [%synt c0]
   | Node (a, l, r) -> [%synt c1]
-  [@@requires is_even]
+[@@requires is_even]
 ;;

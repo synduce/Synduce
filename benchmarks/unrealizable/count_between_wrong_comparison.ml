@@ -40,5 +40,5 @@ let target hi lo t =
       else [%synt f_else] a hi lo (g r) (g l)
   in
   g t
-  [@@requires is_bst]
+[@@requires is_bst]
 ;;

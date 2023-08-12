@@ -10,9 +10,9 @@ type 'a list =
   | Cons of 'a * 'a list
 
 (*
-  This is our reference function. It is not named spec and we will need to
-  declare our synthesis objective using an assert statement at the end of
-  the file.
+   This is our reference function. It is not named spec and we will need to
+   declare our synthesis objective using an assert statement at the end of
+   the file.
 *)
 let rec sum = function
   | Nil -> 0
@@ -20,8 +20,8 @@ let rec sum = function
 ;;
 
 (* This is the representation function. Remark that it is the same as the one
-  defined in the mpshom.pmrs or sumhom.pmrs files!
- *)
+   defined in the mpshom.pmrs or sumhom.pmrs files!
+*)
 let rec clist_to_list = function
   | CNil -> Nil
   | Single a -> Cons (a, Nil)
@@ -34,8 +34,8 @@ and dec l1 = function
 ;;
 
 (* This is the target function. There are three unknown components:
-  s0, f0 and join
-  *)
+   s0, f0 and join
+*)
 let rec hsum = function
   | CNil -> [%synt s0]
   | Single a -> [%synt f0]

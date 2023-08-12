@@ -16,8 +16,8 @@ and tmin = function
 ;;
 
 (*
-  We can formulate the problem of synthesizing a more efficient check that a tree is a binary tree.
-  However, the problem is that we cannot reason about min_int and max_int ...
+   We can formulate the problem of synthesizing a more efficient check that a tree is a binary tree.
+   However, the problem is that we cannot reason about min_int and max_int ...
 *)
 let rec target t = f (Int.min_int, Int.max_int) t
 

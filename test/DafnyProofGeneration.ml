@@ -2,7 +2,7 @@ open Codegen.Dafny
 open Lang.Term
 open Common.Env
 
-let test () =
+let _test () =
   let ctx = env_create () in
   let list_datatype_decl : d_toplevel =
     let list_type = mk_named_type "list" in

@@ -37,5 +37,5 @@ let rec target = function
   | NInt i -> [%synt f0] i
   | NPlus (s, a, b) -> [%synt f1] s
   | NMinus (s, a, b) -> [%synt f2] s
-  [@@requires is_memo_psum]
+[@@requires is_memo_psum]
 ;;

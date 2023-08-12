@@ -9,6 +9,7 @@ let rec eval = function
   | FAnd (x, y) -> eval x && eval y
   | FOr (x, y) -> eval x || eval y
   | FNot x -> not (eval x)
+;;
 
 type nnf_formula =
   | NFNegLit of bool
@@ -21,6 +22,7 @@ let rec repr = function
   | NFNegLit b -> FNot (FLit b)
   | NFAnd (x, y) -> FAnd (repr x, repr y)
   | NFOr (x, y) -> FOr (repr x, repr y)
+;;
 
 let rec eval2 = function
   | NFLit b -> [%synt elit] b

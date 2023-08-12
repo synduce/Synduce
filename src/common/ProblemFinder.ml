@@ -8,7 +8,7 @@ open Option.Let_syntax
 
 let no_synth () =
   Log.info (fun fmt () -> Fmt.pf fmt "No synthesis objective found, nothing to do!");
-  Caml.exit 0
+  Stdlib.exit 0
 ;;
 
 let sync_args ~(ctx : Context.t) p : PsiDef.t =
@@ -29,11 +29,11 @@ let sync_args ~(ctx : Context.t) p : PsiDef.t =
 ;;
 
 let find_problem_components
-    ~(ctx : env)
-    ~(filename : string)
-    ((target_fname, spec_fname, repr_fname) : string * string * string)
-    (pmrs_map : (string, PMRS.t, String.comparator_witness) Map.t)
-    : PsiDef.t
+  ~(ctx : env)
+  ~(filename : string)
+  ((target_fname, spec_fname, repr_fname) : string * string * string)
+  (pmrs_map : (string, PMRS.t, String.comparator_witness) Map.t)
+  : PsiDef.t
   =
   (* Representation function. *)
   let repr, theta_to_tau =
@@ -46,23 +46,23 @@ let find_problem_components
           ctx.ctx.globals
       in
       (match Hashtbl.choose reprs with
-      | Some (_, (f, a, _, b)) -> Either.Second (f, a, b), var_type ctx f
-      (* No repr specified: assume identity. *)
-      | None ->
-        let x = Variable.mk ctx.ctx "x" in
-        let xt = var_type ctx x in
-        let repr_fun = Variable.mk ctx.ctx ~t:(Some (TFun (xt, xt))) repr_fname in
-        Either.Second (repr_fun, [ FPatVar x ], mk_var ctx.ctx x), RType.TFun (xt, xt))
+       | Some (_, (f, a, _, b)) -> Either.Second (f, a, b), var_type ctx f
+       (* No repr specified: assume identity. *)
+       | None ->
+         let x = Variable.mk ctx.ctx "x" in
+         let xt = var_type ctx x in
+         let repr_fun = Variable.mk ctx.ctx ~t:(Some (TFun (xt, xt))) repr_fname in
+         Either.Second (repr_fun, [ FPatVar x ], mk_var ctx.ctx x), RType.TFun (xt, xt))
   in
   (* Reference function. *)
   let reference_f, tau =
     match Map.find pmrs_map spec_fname with
     | Some pmrs ->
       (try pmrs, PMRS.extract_rec_input_typ pmrs with
-      | _ ->
-        Log.error_msg
-          Fmt.(str "Reference function should have at least one input argument.");
-        no_synth ())
+       | _ ->
+         Log.error_msg
+           Fmt.(str "Reference function should have at least one input argument.");
+         no_synth ())
     | None ->
       Log.error_msg Fmt.(str "No spec named %s found." spec_fname);
       no_synth ()
@@ -99,11 +99,11 @@ let find_problem_components
     match reference_out, target_out with
     | TFun (_, tout), TFun (_, tout') ->
       (match RType.unify_one tout tout' with
-      | Ok subs -> Variable.update_var_types ctx.ctx (RType.mkv subs)
-      | Error e ->
-        Log.error_msg Fmt.(str "Error: %a" Sexp.pp_hum e);
-        Log.error_msg "Failed to unify output types.";
-        no_synth ())
+       | Ok subs -> Variable.update_var_types ctx.ctx (RType.mkv subs)
+       | Error e ->
+         Log.error_msg Fmt.(str "Error: %a" Sexp.pp_hum e);
+         Log.error_msg "Failed to unify output types.";
+         no_synth ())
     | _ ->
       Log.error_msg "Original or target is not a function.";
       no_synth ());
@@ -168,8 +168,8 @@ let find_problem_components
   Log.verbose (ctx >- Specifications.dump_all);
   (* Print the condition on the reference function's input, if there is one. *)
   (match problem.tinv with
-  | Some tinv -> ctx >- AlgoLog.show_pmrs tinv
-  | None -> ());
+   | Some tinv -> ctx >- AlgoLog.show_pmrs tinv
+   | None -> ());
   (* Set global information. *)
   ctx.tau := tau;
   ctx.theta := theta;

@@ -17,7 +17,7 @@ let rec spec = function
     let new_mps = max (mps + hd) 0 in
     let new_mts = max mts new_sum in
     new_sum, new_mps, new_mts
-  [@@ensures fun (sum, mps, mts) -> mts >= 0 && mps >= 0 && mps >= sum && mts >= sum]
+[@@ensures fun (sum, mps, mts) -> mts >= 0 && mps >= 0 && mps >= sum && mts >= sum]
 ;;
 
 let rec target = function

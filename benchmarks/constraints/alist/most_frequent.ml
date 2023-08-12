@@ -39,18 +39,18 @@ let rec spec = function
     let cnt, v = spec tl in
     let cnt2 = count hd tl in
     if cnt2 + 1 > cnt then cnt2 + 1, hd else cnt, v
-  [@@ensures fun (x, y) -> x > 0]
+[@@ensures fun (x, y) -> x > 0]
 
 and count x = function
   | Elt v -> if v = x then 1 else 0
   | Cons (hd, tl) -> count x tl + if hd = x then 1 else 0
-  [@@ensures fun x -> x > 0]
+[@@ensures fun x -> x > 0]
 ;;
 
 let rec target = function
   | AElt (k, v) -> [%synt s0] k (int_of v)
   | ACons (hd_key, hdv, tl) -> [%synt join] hd_key (int_of hdv) (target tl)
-  [@@requires is_alist]
+[@@requires is_alist]
 
 and int_of = function
   | S n -> 1 + int_of n

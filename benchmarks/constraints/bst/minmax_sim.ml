@@ -30,7 +30,7 @@ let rec spec = function
 let rec target = function
   | Leaf a -> [%synt xi_0] a
   | Node (a, l, r) -> [%synt xi_2] a (amin l) (amax r)
-  [@@requires is_bst]
+[@@requires is_bst]
 
 and amin = function
   | Leaf a -> a

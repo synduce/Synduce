@@ -90,7 +90,7 @@ let element checkpoint i : element =
     (* [i] is out of range. This could happen if the handwritten error
        messages are out of sync with the grammar, or if a mistake was
        made. We fail in a non-fatal way. *)
-    raise Caml.Not_found
+    raise Stdlib.Not_found
   | S.Cons (e, _) -> e
 ;;
 
@@ -127,7 +127,7 @@ let fragment text checkpoint message =
     (* In principle, this should not happen, but if it does, let's cover up
        for our internal error. *)
     if debug then assert false else "???"
-  | Caml.Not_found ->
+  | Stdlib.Not_found ->
     (* In principle, this should not happen, but if it does, let's cover up
        for our internal error. *)
     if debug then assert false else "???"
@@ -143,7 +143,7 @@ let report text checkpoint : string =
      Then, customize it, based on dynamic information. *)
   let message =
     try Syntax_messages.message s |> fragments text checkpoint with
-    | Caml.Not_found ->
+    | Stdlib.Not_found ->
       (* If the state number cannot be found -- which, in principle,
          should not happen, since our list of erroneous states is
          supposed to be complete! -- produce a generic message. *)

@@ -3,10 +3,10 @@
 open ConsList
 
 (*
-  This benchmark has two solutions:
-  - the naive one, which doesn't take advantage of the list being sorted.
-  - the optimal one, which only takes contant time.
-  The algorithm reduces the search space from 8 configurations to 4.
+   This benchmark has two solutions:
+   - the naive one, which doesn't take advantage of the list being sorted.
+   - the optimal one, which only takes contant time.
+     The algorithm reduces the search space from 8 configurations to 4.
 *)
 
 let rec spec = function
@@ -17,5 +17,5 @@ let rec spec = function
 let rec target = function
   | Elt x -> [%synt xi_0]
   | ECons (hd, tl) -> [%synt xi_1]
-  [@@requires eltlist_is_sorted_increasing]
+[@@requires eltlist_is_sorted_increasing]
 ;;

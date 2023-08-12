@@ -56,5 +56,5 @@ let target x l =
     | USplit (l, a, b, r) -> [%synt join] (x = a) (x = b) (g l) (g r)
   in
   g l
-  [@@requires is_unimodal_ulist]
+[@@requires is_unimodal_ulist]
 ;;

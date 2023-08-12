@@ -1,8 +1,8 @@
 (** @synduce --no-lifting -NB -n 20 -I incomplete/bst/bst.ml *)
 
 (* This skeleton has erros and is unrealizable, but allowing for different configuations
-  allows to find solutions that are variations of the configuration given here.
-  This skeleton has 262144 possible configurations.
+   allows to find solutions that are variations of the configuration given here.
+   This skeleton has 262144 possible configurations.
 *)
 
 open Bst
@@ -13,7 +13,7 @@ let spec hi lo t =
     | Node (a, l, r) -> if hi > a && a > lo then 1 + f l + f r else f l + f r
   in
   f t
-  [@@ensures fun x -> x >= 0]
+[@@ensures fun x -> x >= 0]
 ;;
 
 let target hi lo t =
@@ -27,5 +27,5 @@ let target hi lo t =
       else [%synt f_else] hi lo a (g l) (g r)
   in
   g t
-  [@@requires is_bst]
+[@@requires is_bst]
 ;;

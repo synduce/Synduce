@@ -59,7 +59,7 @@ let target param l =
       if hd < param then [%synt rec_stop] idx else [%synt rec_cont] (h tl)
   in
   h l
-  [@@requires is_sorted_and_indexed]
+[@@requires is_sorted_and_indexed]
 ;;
 
 assert (target = drop_index_list @@ count_lt)

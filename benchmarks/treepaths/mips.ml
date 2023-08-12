@@ -17,7 +17,7 @@ and mips s = function
   | Node (a, l, r) ->
     let sum1, m1 = mips s l in
     mips (sum1 + a, max (sum1 + a) m1) r
-  [@@ensures fun (x, y) -> y >= 0 && y >= x]
+[@@ensures fun (x, y) -> y >= 0 && y >= x]
 ;;
 
 let rec target = function

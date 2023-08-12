@@ -51,5 +51,5 @@ let target key t =
       if hd_key > key then [%synt join1] (g l) (g r) else [%synt join2] hd_key key (g r)
   in
   g t
-  [@@requires is_imap]
+[@@requires is_imap]
 ;;

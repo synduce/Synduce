@@ -57,7 +57,7 @@ let rec h = function
   | IElt x -> [%synt base_case] x
   | ICons (hd, idx, tl) ->
     if hd < 0 then [%synt rec_stop] hd idx else [%synt rec_cont] hd (h tl)
-  [@@requires is_sorted_and_indexed]
+[@@requires is_sorted_and_indexed]
 ;;
 
 assert (h = drop_index_list @@ count_lt0)

@@ -34,5 +34,5 @@ let target a l =
       if hd_key = a then [%synt f0] hd_key else [%synt f1] hd_key (g tl)
   in
   g l
-  [@@requires is_unique_list]
+[@@requires is_unique_list]
 ;;

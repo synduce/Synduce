@@ -27,7 +27,7 @@ let rec spec = function
     let mbs, csum = spec tl in
     let line_sum = bsum hd in
     max (line_sum + mbs) 0, csum + line_sum
-  [@@ensures fun (x, y) -> x >= 0]
+[@@ensures fun (x, y) -> x >= 0]
 
 and bsum = function
   | Elt x -> x

@@ -14,7 +14,7 @@ let rec f = function
   | Cons (hd, tl) ->
     let mps, mss = f tl in
     max (mps + hd) 0, max mss (max (mps + hd) 0)
-  [@@ensures fun (mps, mss) -> mps >= 0 && mss >= 0 && mss >= mps]
+[@@ensures fun (mps, mss) -> mps >= 0 && mss >= 0 && mss >= mps]
 ;;
 
 let rec target t = h t

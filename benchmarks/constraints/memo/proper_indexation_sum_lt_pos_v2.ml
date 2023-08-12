@@ -36,7 +36,7 @@ and length = function
 let rec target = function
   | CNil -> [%synt s0]
   | CCons (hdv, hdi, tl) -> [%synt f] hdv hdi (target tl)
-  [@@requires is_proper_indexed]
+[@@requires is_proper_indexed]
 ;;
 
 assert (target = project @@ polynome)

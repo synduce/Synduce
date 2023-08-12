@@ -27,7 +27,7 @@ let rec ldiff = function
 let rec ldiff2 = function
   | Elt x -> [%synt g0] x
   | Cons (hd, tl) -> [%synt join] hd (last tl)
-  [@@requires is_sorted]
+[@@requires is_sorted]
 
 and last = function
   | Elt x -> x

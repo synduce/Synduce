@@ -15,7 +15,7 @@ and f s = function
   | Node (a, l, r) ->
     let sum1, m1 = s in
     f (f (sum1 + a, max m1 (sum1 + a)) l) r
-  [@@ensures fun (x, y) -> y >= 0 && y >= x]
+[@@ensures fun (x, y) -> y >= 0 && y >= x]
 ;;
 
 let rec mpps = function

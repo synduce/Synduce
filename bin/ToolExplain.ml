@@ -29,10 +29,10 @@ let is_shallow_value (t : term) (shallow : term) =
 ;;
 
 let find_missing_argument
-    ~ctx
-    (pb : PsiDef.t)
-    (diff : (variable * (term * term)) list)
-    (c : witness)
+  ~ctx
+  (pb : PsiDef.t)
+  (diff : (variable * (term * term)) list)
+  (c : witness)
   =
   let msg_missing_arg rec_case u t =
     let msg =
@@ -41,17 +41,17 @@ let find_missing_argument
       else "It may help to add the recursive call having access to that value."
     in
     Log.info (fun fmt () ->
-        pf
-          fmt
-          "@[On input %a, %a should have access to %a@;%a"
-          (ctx @>- pp_term)
-          c.witness_eqn.eterm
-          (ctx @>- VarSet.pp_var_names)
-          u
-          (ctx @>- pp_term)
-          t
-          string
-          msg)
+      pf
+        fmt
+        "@[On input %a, %a should have access to %a@;%a"
+        (ctx @>- pp_term)
+        c.witness_eqn.eterm
+        (ctx @>- VarSet.pp_var_names)
+        u
+        (ctx @>- pp_term)
+        t
+        string
+        msg)
   in
   let fv = ctx >- Analysis.free_variables c.witness_eqn.erhs in
   let rhs_args = Set.diff fv pb.PsiDef.target.psyntobjs in
@@ -63,7 +63,7 @@ let find_missing_argument
     then (
       match
         List.find c.witness_eqn.eelim ~f:(fun (_, tscalar) ->
-            Set.mem (ctx >- Analysis.free_variables tscalar) v)
+          Set.mem (ctx >- Analysis.free_variables tscalar) v)
       with
       | Some (trec, _) ->
         msg_missing_arg
@@ -75,7 +75,7 @@ let find_missing_argument
   in
   let pargs_diffs, pnonargs_diff =
     List.partition_tf diff ~f:(fun (v, _) ->
-        Variable.(List.mem ~equal pb.PsiDef.target.pargs v))
+      Variable.(List.mem ~equal pb.PsiDef.target.pargs v))
   in
   match pnonargs_diff with
   | [] -> List.iter pargs_diffs ~f:say_diff
@@ -90,27 +90,27 @@ let find_missing_delta ~ctx (pb : PsiDef.t) (witness : unrealizability_witness) 
     let celim_str =
       let conc_elims =
         List.map c.witness_eqn.eelim ~f:(fun (trec, telims) ->
-            Terms.(mk_app g [ trec ] == (ctx >- Eval.in_model c.witness_model telims)))
+          Terms.(mk_app g [ trec ] == (ctx >- Eval.in_model c.witness_model telims)))
       in
       match conc_elims with
       | [] -> ""
       | _ -> Fmt.str " with %a" (list ~sep:comma (ctx @>- pp_term)) conc_elims
     in
     Log.info (fun fmt () ->
-        pf
-          fmt
-          "@[On input %a%s, the constraint@;@[(%a = %a)@]@;states@;@[%a = %a@]@]"
-          (styled `Italic (ctx @>- pp_term))
-          cinput
-          celim_str
-          (ctx @>- pp_term)
-          (f true c.witness_eqn.erhs)
-          (ctx @>- pp_term)
-          (f true c.witness_eqn.elhs)
-          (ctx @>- pp_term)
-          (f false c.witness_eqn.erhs)
-          (ctx @>- pp_term)
-          (f false c.witness_eqn.elhs))
+      pf
+        fmt
+        "@[On input %a%s, the constraint@;@[(%a = %a)@]@;states@;@[%a = %a@]@]"
+        (styled `Italic (ctx @>- pp_term))
+        cinput
+        celim_str
+        (ctx @>- pp_term)
+        (f true c.witness_eqn.erhs)
+        (ctx @>- pp_term)
+        (f true c.witness_eqn.elhs)
+        (ctx @>- pp_term)
+        (f false c.witness_eqn.erhs)
+        (ctx @>- pp_term)
+        (f false c.witness_eqn.elhs))
   in
   let fv =
     Set.union
@@ -123,16 +123,15 @@ let find_missing_delta ~ctx (pb : PsiDef.t) (witness : unrealizability_witness) 
   summ witness.ci;
   summ witness.cj;
   Log.info (fun fmt () ->
-      pf
-        fmt
-        "There is no function %a that can satisfy these constraints."
-        (styled (`Fg `Blue) (styled `Italic (ctx @>- VarSet.pp_var_names)))
-        unknowns_in_use)
+    pf
+      fmt
+      "There is no function %a that can satisfy these constraints."
+      (styled (`Fg `Blue) (styled `Italic (ctx @>- VarSet.pp_var_names)))
+      unknowns_in_use)
 ;;
 
 (** When we get a witness of unrealizability, we need to explain why the problem is unrealizable.
-  This function contains heuristics to root cause th problem an guide the user.
-*)
+    This function contains heuristics to root cause th problem an guide the user. *)
 let when_unrealizable ~ctx pb (witnesss : unrealizability_witness list) : unit =
   Log.(info (wrap "💡 Explanation: "));
   let f witness =
@@ -143,9 +142,9 @@ let when_unrealizable ~ctx pb (witnesss : unrealizability_witness list) : unit =
     in
     let diff =
       Set.fold common_vars ~init:[] ~f:(fun accum key ->
-          let vi = Map.find_exn witness.ci.witness_model key in
-          let vj = Map.find_exn witness.cj.witness_model key in
-          if Terms.equal vi vj then accum else (key, (vi, vj)) :: accum)
+        let vi = Map.find_exn witness.ci.witness_model key in
+        let vj = Map.find_exn witness.cj.witness_model key in
+        if Terms.equal vi vj then accum else (key, (vi, vj)) :: accum)
     in
     let ti = substitution witness.ci.witness_eqn.eelim witness.ci.witness_eqn.eterm
     and tj = substitution witness.cj.witness_eqn.eelim witness.cj.witness_eqn.eterm in
@@ -161,27 +160,27 @@ let when_unrealizable ~ctx pb (witnesss : unrealizability_witness list) : unit =
           let pp_term = ctx @>- pp_term
           and pp_equation = ctx >- Pretty.pp_equation in
           info (fun fmt () ->
-              pf
-                fmt
-                "@[@[Terms: %a vs %a@].@;\
-                 [@Equations: %a vs %a]@;\
-                 @[witness differs in %a.@]@]"
-                pp_term
-                ti
-                pp_term
-                tj
-                pp_equation
-                witness.ci.witness_eqn
-                pp_equation
-                witness.cj.witness_eqn
-                Fmt.(
-                  list
-                    (parens
-                       (pair
-                          (ctx @>- Variable.pp)
-                          ~sep:colon
-                          (pair pp_term ~sep:comma pp_term))))
-                diff)))
+            pf
+              fmt
+              "@[@[Terms: %a vs %a@].@;\
+               [@Equations: %a vs %a]@;\
+               @[witness differs in %a.@]@]"
+              pp_term
+              ti
+              pp_term
+              tj
+              pp_equation
+              witness.ci.witness_eqn
+              pp_equation
+              witness.cj.witness_eqn
+              Fmt.(
+                list
+                  (parens
+                     (pair
+                        (ctx @>- Variable.pp)
+                        ~sep:colon
+                        (pair pp_term ~sep:comma pp_term))))
+              diff)))
   in
   List.iter ~f witnesss
 ;;

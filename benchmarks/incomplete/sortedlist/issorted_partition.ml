@@ -17,7 +17,7 @@ and dec l1 = function
   | Concat (x, y) -> dec (Concat (y, l1)) x
 ;;
 
-(** Predicate asserting that a concat-list is partitioned.  *)
+(** Predicate asserting that a concat-list is partitioned. *)
 let rec is_partitioned = function
   | Single x -> true
   | Concat (x, y) -> lmax x < lmin y && is_partitioned x && is_partitioned y
@@ -44,12 +44,11 @@ and head = function
 ;;
 
 (** s0 and s1 should just be true here. If the inputs are "partitioned",
-    they are effectively sorted.
- *)
+    they are effectively sorted. *)
 let rec target = function
   | Single x -> [%synt s0]
   | Concat (hd, tl) -> [%synt s1]
-  [@@requires is_partitioned]
+[@@requires is_partitioned]
 ;;
 
 assert (target = clist_to_list @@ spec)

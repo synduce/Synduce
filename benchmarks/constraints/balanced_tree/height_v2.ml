@@ -22,7 +22,7 @@ let rec height = function
 let rec target = function
   | Nil -> [%synt s0]
   | Node (a, l, r) -> [%synt f0] a (target l)
-  [@@requires is_balanced]
+[@@requires is_balanced]
 ;;
 
 assert (target = height)

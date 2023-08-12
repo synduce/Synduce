@@ -14,15 +14,15 @@ module Sy = Syguslib.Sygus
 module Sm = Syguslib.Semantic
 
 (* ============================================================================================= *)
-(*                                  Creating and updating term states                            *)
+(*                                  Creating and updating term states *)
 (* ============================================================================================= *)
 
 let term_info_of_witness
-    ~(id : int)
-    ~(ctx : env)
-    ~(is_pos_witness : bool)
-    (witness : witness)
-    : term_info * cond_lemma
+  ~(id : int)
+  ~(ctx : env)
+  ~(is_pos_witness : bool)
+  (witness : witness)
+  : term_info * cond_lemma
   =
   let scalar_vars = Map.keys witness.witness_model in
   let input_args_t = List.map ~f:(Variable.vtype_or_new ctx.ctx) scalar_vars in
@@ -35,7 +35,7 @@ let term_info_of_witness
   let ti_formals =
     let formals = Map.keys witness.witness_model in
     if List.exists formals ~f:(fun v ->
-           RType.is_recursive ctx.ctx.types (Variable.vtype_or_new ctx.ctx v))
+         RType.is_recursive ctx.ctx.types (Variable.vtype_or_new ctx.ctx v))
     then failwith "Formal args of lemmas must be scalars!"
     else formals
   in
@@ -55,11 +55,9 @@ let term_info_of_witness
     } )
 ;;
 
-(**
-  Returns a map from the variables in the witness to the variables in the term_info.
-*)
+(** Returns a map from the variables in the witness to the variables in the term_info. *)
 let remap_witness ~(ctx : Context.t) (det : term_info) (wit : witness)
-    : variable VarMap.t option
+  : variable VarMap.t option
   =
   match Matching.alpha_equal ~ctx ~pattern:wit.witness_eqn.eterm det.ti_term with
   | Some wit_to_det ->
@@ -113,18 +111,17 @@ let cond_lemma_of_witness ~(ctx : Context.t) ~(pos : bool) (ti : term_info) (wi 
 ;;
 
 (* ============================================================================================= *)
-(*                                  Lemma synthesis functions                                    *)
+(*                                  Lemma synthesis functions *)
 (* ============================================================================================= *)
 
 (** Applying tinv to the term of a term info can help in findiing a good lemma.
-  This function extract a skeleton for the lemma when the input is the application of
-  tinv to the term of the term detail.
- *)
+    This function extract a skeleton for the lemma when the input is the application of
+    tinv to the term of the term detail. *)
 let skeleton_of_tinv
-    ~(fctx : PMRS.Functions.ctx)
-    ~(ctx : Context.t)
-    (det : term_info)
-    (tinv_of_t : term)
+  ~(fctx : PMRS.Functions.ctx)
+  ~(ctx : Context.t)
+  (det : term_info)
+  (tinv_of_t : term)
   =
   let arg_num var =
     Option.(List.findi ~f:(fun _ a -> Variable.equal a var) det.ti_formals >>| fst)
@@ -145,18 +142,18 @@ let skeleton_of_tinv
     | TSel ({ tkind = TApp (f, _); _ }, i) ->
       let _, tout = RType.fun_typ_unpack (type_of f) in
       (match tout with
-      | RType.TTup tl ->
-        (match List.nth tl i with
-        | Some RType.TBool -> Some (mk_const (Constant.of_bool true))
-        | Some RType.TInt -> Some (mk_const (Constant.of_int 0))
-        | _ -> None)
-      | _ -> None)
+       | RType.TTup tl ->
+         (match List.nth tl i with
+          | Some RType.TBool -> Some (mk_const (Constant.of_bool true))
+          | Some RType.TInt -> Some (mk_const (Constant.of_int 0))
+          | _ -> None)
+       | _ -> None)
     | TApp (f, _) ->
       let _, tout = RType.fun_typ_unpack (type_of f) in
       (match tout with
-      | RType.TBool -> Some (mk_const (Constant.of_bool true))
-      | RType.TInt -> Some (mk_const (Constant.of_int 0))
-      | _ -> None)
+       | RType.TBool -> Some (mk_const (Constant.of_bool true))
+       | RType.TInt -> Some (mk_const (Constant.of_int 0))
+       | _ -> None)
     | _ -> None
   in
   let tinv_of_t'' =
@@ -188,10 +185,9 @@ let skeleton_of_tinv
 ;;
 
 (** Construct the synthesis objective corresponding to the lemma of the term state detail.
-  For each synthesis strategy implemented, return a command that defines the synthesis
-  objective (SyGuS command).
-  All strategies should be executed in order to find a solution efficiently.
- *)
+    For each synthesis strategy implemented, return a command that defines the synthesis
+    objective (SyGuS command).
+    All strategies should be executed in order to find a solution efficiently. *)
 let synthfun_of_ti ~(p : PsiDef.t) (ti : term_info) : (Sy.command * string) list =
   let ctx = ti.ti_context.ctx in
   let fctx = ti.ti_context.functions in
@@ -200,16 +196,16 @@ let synthfun_of_ti ~(p : PsiDef.t) (ti : term_info) : (Sy.command * string) list
       ~init:OpSet.empty
       ~f:(fun acc func -> Set.union acc (Analysis.operators_of func.f_body))
       (PMRS.func_of_pmrs ~ctx p.PsiDef.reference
-      @ PMRS.func_of_pmrs ~ctx p.PsiDef.repr
-      @
-      match p.tinv with
-      | None -> []
-      | Some pmrs -> PMRS.func_of_pmrs ~ctx pmrs)
+       @ PMRS.func_of_pmrs ~ctx p.PsiDef.repr
+       @
+       match p.tinv with
+       | None -> []
+       | Some pmrs -> PMRS.func_of_pmrs ~ctx pmrs)
   in
   let gen_of_guess t guess =
     let lemma_requires_set_theory =
       List.exists ti.ti_formals ~f:(fun v ->
-          requires_set_theory ~ctx (Variable.vtype_or_new ctx v))
+        requires_set_theory ~ctx (Variable.vtype_or_new ctx v))
     in
     let grammar =
       if lemma_requires_set_theory
@@ -226,7 +222,7 @@ let synthfun_of_ti ~(p : PsiDef.t) (ti : term_info) : (Sy.command * string) list
     in
     let logic = if lemma_requires_set_theory then "ALL" else logic_of_operators opset in
     if List.exists ti.ti_formals ~f:(fun v ->
-           RType.is_recursive ctx.types (Variable.vtype_or_new ctx v))
+         RType.is_recursive ctx.types (Variable.vtype_or_new ctx v))
     then failwith "Formal args of lemmas must be scalars!"
     else mk_synthinv ~ctx ti.ti_func.vname ti.ti_formals grammar, logic
   in
@@ -251,12 +247,12 @@ let term_var_string ~ctx term : string =
 ;;
 
 let convert_term_rec_to_witness_rec
-    ~(ctx : Context.t)
-    ~(p : PsiDef.t)
-    (det : term_info)
-    (witness : witness)
-    (name : string)
-    : string
+  ~(ctx : Context.t)
+  ~(p : PsiDef.t)
+  (det : term_info)
+  (witness : witness)
+  (name : string)
+  : string
   =
   let rec g recvar lst =
     match lst with
@@ -295,21 +291,21 @@ let convert_term_rec_to_witness_rec
         (Fmt.str "Could not find name %s in this term's recursion elimination." name)
     | (a, b) :: tl ->
       (match b.tkind with
-      | TTup vars ->
-        (match
-           List.find_mapi vars ~f:(fun n x ->
-               let l = term_var_string ~ctx a in
-               let i = term_var_string ~ctx x in
-               if String.(equal i name)
-               then Some (h l n witness.witness_eqn.eelim)
-               else None)
-         with
-        | Some s -> s
-        | None -> f tl)
-      | _ ->
-        let i = term_var_string ~ctx b in
-        let l = term_var_string ~ctx a in
-        if String.(equal i name) then g l witness.witness_eqn.eelim else f tl)
+       | TTup vars ->
+         (match
+            List.find_mapi vars ~f:(fun n x ->
+              let l = term_var_string ~ctx a in
+              let i = term_var_string ~ctx x in
+              if String.(equal i name)
+              then Some (h l n witness.witness_eqn.eelim)
+              else None)
+          with
+          | Some s -> s
+          | None -> f tl)
+       | _ ->
+         let i = term_var_string ~ctx b in
+         let l = term_var_string ~ctx a in
+         if String.(equal i name) then g l witness.witness_eqn.eelim else f tl)
   in
   match
     VarSet.find_by_name
@@ -323,41 +319,39 @@ let convert_term_rec_to_witness_rec
 ;;
 
 let witness_model_to_args
-    ~(ctx : Context.t)
-    ~(p : PsiDef.t)
-    (det : term_info)
-    (params : (string * Sy.sygus_sort) list)
-    witness
-    : Sy.sygus_term list
+  ~(ctx : Context.t)
+  ~(p : PsiDef.t)
+  (det : term_info)
+  (params : (string * Sy.sygus_sort) list)
+  witness
+  : Sy.sygus_term list
   =
   List.map params ~f:(fun (param_name, _) ->
-      match
-        let name = convert_term_rec_to_witness_rec ~ctx ~p det witness param_name in
-        Map.find
-          witness.witness_model
-          (match
-             VarSet.find_by_name
-               (Set.union
-                  (* Don't include functions, we won't get a model for them in CVC5. *)
-                  (Analysis.free_variables ~ctx ~include_functions:false det.ti_term)
-                  (Set.union
-                     (VarSet.of_list p.PsiDef.reference.pargs)
-                     witness.witness_vars))
-               name
-           with
-          | None ->
-            failwith
-              (Fmt.str
-                 "Failed to extract argument list from witness model (%s unknown)."
-                 name)
-          | Some v -> v)
-      with
-      | None ->
-        Log.error Fmt.(fun fmt () -> pf fmt "I was looking for %s" param_name);
-        Log.error
-          Fmt.(fun fmt () -> pf fmt "The witness: %a" (Pretty.pp_witness ~ctx) witness);
-        failwith "Failed to extract argument list from witness model."
-      | Some t -> sygus_of_term ~ctx t)
+    match
+      let name = convert_term_rec_to_witness_rec ~ctx ~p det witness param_name in
+      Map.find
+        witness.witness_model
+        (match
+           VarSet.find_by_name
+             (Set.union
+                (* Don't include functions, we won't get a model for them in CVC5. *)
+                (Analysis.free_variables ~ctx ~include_functions:false det.ti_term)
+                (Set.union (VarSet.of_list p.PsiDef.reference.pargs) witness.witness_vars))
+             name
+         with
+         | None ->
+           failwith
+             (Fmt.str
+                "Failed to extract argument list from witness model (%s unknown)."
+                name)
+         | Some v -> v)
+    with
+    | None ->
+      Log.error Fmt.(fun fmt () -> pf fmt "I was looking for %s" param_name);
+      Log.error
+        Fmt.(fun fmt () -> pf fmt "The witness: %a" (Pretty.pp_witness ~ctx) witness);
+      failwith "Failed to extract argument list from witness model."
+    | Some t -> sygus_of_term ~ctx t)
 ;;
 
 let constraint_of_neg_witness ~ctx (det : term_info) witness =
@@ -372,21 +366,21 @@ let constraint_of_pos_witness ~ctx (det : term_info) witness =
 
 let log_soln ~ctx s vs t =
   Log.verbose (fun frmt () ->
-      Fmt.pf
-        frmt
-        "Lemma candidate: \"%s %s = @[%a@]\"."
-        s
-        (String.concat ~sep:" " (List.map ~f:(fun v -> v.vname) vs))
-        (pp_term ctx)
-        t)
+    Fmt.pf
+      frmt
+      "Lemma candidate: \"%s %s = @[%a@]\"."
+      s
+      (String.concat ~sep:" " (List.map ~f:(fun v -> v.vname) vs))
+      (pp_term ctx)
+      t)
 ;;
 
 let handle_lemma_synth_response
-    ~(fctx : PMRS.Functions.ctx)
-    ~(ctx : Context.t)
-    (ti : term_info)
-    ((task, resolver) : Sy.solver_response option Lwt.t * int Lwt.u)
-    : term list option Lwt.t
+  ~(fctx : PMRS.Functions.ctx)
+  ~(ctx : Context.t)
+  (ti : term_info)
+  ((task, resolver) : Sy.solver_response option Lwt.t * int Lwt.u)
+  : term list option Lwt.t
   =
   let parse_synth_fun (_, _, _, fbody) =
     let body, _ =
@@ -408,11 +402,11 @@ let handle_lemma_synth_response
 ;;
 
 let parse_positive_example_solver_model
-    ~(fctx : PMRS.Functions.ctx)
-    ~(ctx : Context.t)
-    (det : term_info)
-    (response : S.solver_response)
-    : term VarMap.t list
+  ~(fctx : PMRS.Functions.ctx)
+  ~(ctx : Context.t)
+  (det : term_info)
+  (response : S.solver_response)
+  : term VarMap.t list
   =
   match response with
   | S.SExps s ->
@@ -440,7 +434,7 @@ let parse_positive_example_solver_model
 ;;
 
 let synthesize_new_lemma ~(p : PsiDef.t) (ti : term_info) (cl : cond_lemma)
-    : term option Lwt.t
+  : term option Lwt.t
   =
   let with_synth_obj i synth_obj logic =
     ti.ti_context >- AlgoLog.announce_new_lemma_synthesis i ti cl;
@@ -454,10 +448,10 @@ let synthesize_new_lemma ~(p : PsiDef.t) (ti : term_info) (cl : cond_lemma)
     let commands =
       Sy.mk_c_set_logic logic
       :: (extra_defs
-         @ [ synth_obj ]
-         @ neg_constraints
-         @ pos_constraints
-         @ [ Sy.mk_c_check_synth () ])
+          @ [ synth_obj ]
+          @ neg_constraints
+          @ pos_constraints
+          @ [ Sy.mk_c_check_synth () ])
     in
     match%lwt
       ti.ti_context
@@ -475,8 +469,8 @@ let synthesize_new_lemma ~(p : PsiDef.t) (ti : term_info) (cl : cond_lemma)
   | obj_choices ->
     let lwt_tasks =
       List.mapi obj_choices ~f:(fun i (synth_obj, logic) ->
-          Lwt.task ()
-          |> fun (t, r) -> Lwt.bind t (fun _ -> with_synth_obj i synth_obj logic), r)
+        Lwt.task ()
+        |> fun (t, r) -> Lwt.bind t (fun _ -> with_synth_obj i synth_obj logic), r)
     in
     Lwt.pick
       (List.map
@@ -487,15 +481,15 @@ let synthesize_new_lemma ~(p : PsiDef.t) (ti : term_info) (cl : cond_lemma)
 ;;
 
 (* ============================================================================================= *)
-(*                                  Main entry points                                            *)
+(*                                  Main entry points *)
 (* ============================================================================================= *)
 
 let rec lemma_refinement_loop
-    ~(ctx : env)
-    ~(p : PsiDef.t)
-    (ti : term_info)
-    (cl : cond_lemma)
-    : cond_lemma option Lwt.t
+  ~(ctx : env)
+  ~(p : PsiDef.t)
+  (ti : term_info)
+  (cl : cond_lemma)
+  : cond_lemma option Lwt.t
   =
   match%lwt synthesize_new_lemma ~p ti cl with
   | None ->
@@ -532,12 +526,12 @@ let rec lemma_refinement_loop
         List.iter
           ~f:(fun witness ->
             Log.verbose (fun f () ->
-                Fmt.(
-                  pf
-                    f
-                    "Found a positive example: %a"
-                    (box (ctx @>- pp_subs))
-                    (VarMap.to_subst ctx.ctx witness))))
+              Fmt.(
+                pf
+                  f
+                  "Found a positive example: %a"
+                  (box (ctx @>- pp_subs))
+                  (VarMap.to_subst ctx.ctx witness))))
           new_positive_witnesss;
         lemma_refinement_loop
           ~ctx
@@ -556,37 +550,39 @@ let rec lemma_refinement_loop
 ;;
 
 (** Partitioning function to partitiion a list into (a,b,c) where a are
-  examples that satisfy the invariant,
-  b are examples that do not satisfy the invariant,
-  c are examples that are spurious for other reasons.
-*)
+    examples that satisfy the invariant,
+    b are examples that do not satisfy the invariant,
+    c are examples that are spurious for other reasons. *)
 let witnesss_for_lemma_synt witness =
   match witness.witness_stat with
   | Valid -> `Fst witness
   | Spurious causes ->
-    if Caml.List.mem ViolatesTargetRequires causes then `Snd witness else `Trd witness
+    if List.mem ~equal:equal_spurious_cause causes ViolatesTargetRequires
+    then `Snd witness
+    else `Trd witness
   | _ -> `Trd witness
 ;;
 
 (** Partitioning function to partitiion a list into (a,b,c) where a are
-  examples that are not in the reference function's image,
-  b are examples that are in the reference function's image,
-  c are examples that are spurious for other reasons.
-*)
+    examples that are not in the reference function's image,
+    b are examples that are in the reference function's image,
+    c are examples that are spurious for other reasons. *)
 let witnesss_for_ensures_synt witness =
   match witness.witness_stat with
   | Valid -> `Fst witness
   | Spurious causes ->
-    if Caml.List.mem NotInReferenceImage causes then `Snd witness else `Trd witness
+    if List.mem ~equal:equal_spurious_cause causes NotInReferenceImage
+    then `Snd witness
+    else `Trd witness
   | _ -> `Trd witness
 ;;
 
 let refine_ensures_predicates
-    ~(ctx : env)
-    ~(p : PsiDef.t)
-    ~(neg_witnesss : witness list)
-    ~(pos_witnesss : witness list)
-    : [ `CoarseningOk | `CoarseningFailure | `Unrealizable ] Lwt.t
+  ~(ctx : env)
+  ~(p : PsiDef.t)
+  ~(neg_witnesss : witness list)
+  ~(pos_witnesss : witness list)
+  : [ `CoarseningOk | `CoarseningFailure | `Unrealizable ] Lwt.t
   =
   Log.info
     Fmt.(
@@ -597,40 +593,39 @@ let refine_ensures_predicates
   | None -> Lwt.return `CoarseningFailure
   | Some ensures ->
     (match ctx >- Specifications.get_ensures p.PsiDef.reference.pvar with
-    | None ->
-      AlgoLog.show_new_ensures_predicate ~ctx p.PsiDef.reference.pvar ensures;
-      ctx >- Specifications.set_ensures p.PsiDef.reference.pvar ensures
-    | Some old_ensures ->
-      let var : variable =
-        Variable.mk
-          ctx.ctx
-          ~t:(Some p.PsiDef.reference.poutput_typ)
-          (Alpha.fresh ctx.ctx.names)
-      in
-      let new_pred =
-        mk_fun
-          ctx.ctx
-          [ FPatVar var ]
-          (mk_bin
-             Binop.And
-             (mk_app old_ensures [ mk_var ctx.ctx var ])
-             (mk_app ensures [ mk_var ctx.ctx var ]))
-      in
-      AlgoLog.show_new_ensures_predicate ~ctx p.PsiDef.reference.pvar new_pred;
-      ctx >- Specifications.set_ensures p.PsiDef.reference.pvar new_pred);
+     | None ->
+       AlgoLog.show_new_ensures_predicate ~ctx p.PsiDef.reference.pvar ensures;
+       ctx >- Specifications.set_ensures p.PsiDef.reference.pvar ensures
+     | Some old_ensures ->
+       let var : variable =
+         Variable.mk
+           ctx.ctx
+           ~t:(Some p.PsiDef.reference.poutput_typ)
+           (Alpha.fresh ctx.ctx.names)
+       in
+       let new_pred =
+         mk_fun
+           ctx.ctx
+           [ FPatVar var ]
+           (mk_bin
+              Binop.And
+              (mk_app old_ensures [ mk_var ctx.ctx var ])
+              (mk_app ensures [ mk_var ctx.ctx var ]))
+       in
+       AlgoLog.show_new_ensures_predicate ~ctx p.PsiDef.reference.pvar new_pred;
+       ctx >- Specifications.set_ensures p.PsiDef.reference.pvar new_pred);
     Lwt.return `CoarseningOk
 ;;
 
 (** Given a counterexample, create a new term state that contains that counterexample,
-  or if a term state exists for the term associated with that counterexample,
-  update the term state by adding the counterexample's models.
-*)
+    or if a term state exists for the term associated with that counterexample,
+    update the term state by adding the counterexample's models. *)
 let create_or_update_lemmas_with_witness
-    ~(p : PsiDef.t)
-    ~(ctx : Env.env)
-    ~(is_pos_witness : bool)
-    (witness : witness)
-    : bool Lwt.t
+  ~(p : PsiDef.t)
+  ~(ctx : Env.env)
+  ~(is_pos_witness : bool)
+  (witness : witness)
+  : bool Lwt.t
   =
   let update_flag = ref true in
   match
@@ -701,14 +696,14 @@ let create_or_update_lemmas_with_witness
 ;;
 
 let synthesize_lemmas
-    ~(ctx : env)
-    ~(p : PsiDef.t)
-    synt_failure_info
-    (lstate : refinement_loop_state)
-    : ( (refinement_loop_state, unrealizability_witness list) Either.t
-      , Sy.solver_response )
-      Result.t
-    Lwt.t
+  ~(ctx : env)
+  ~(p : PsiDef.t)
+  synt_failure_info
+  (lstate : refinement_loop_state)
+  : ( (refinement_loop_state, unrealizability_witness list) Either.t
+    , Sy.solver_response )
+    Result.t
+  Lwt.t
   =
   let _interactive_synthesis () =
     !Config.interactive_lemmas_loop
@@ -730,12 +725,12 @@ let synthesize_lemmas
       witness
   in
   (*
-    Example: the synt_failure_info should be a list of unrealizability counterexamples, which
-    are pairs of counterexamples.
-    Each counterexample can be classified as positive or negative w.r.t to the predicate p.psi_tinv.
-    The lemma corresponding to a particular term should be refined to eliminate the counterexample
-    (a counterexample cex is also associated to a particular term through cex.witness_eqn.eterm)
-   *)
+     Example: the synt_failure_info should be a list of unrealizability counterexamples, which
+     are pairs of counterexamples.
+     Each counterexample can be classified as positive or negative w.r.t to the predicate p.psi_tinv.
+     The lemma corresponding to a particular term should be refined to eliminate the counterexample
+     (a counterexample cex is also associated to a particular term through cex.witness_eqn.eterm)
+  *)
   let%lwt ( (ensures_positives, ensures_negatives)
           , (lemma_synt_positives, lemma_synt_negatives)
           , classif_failures
@@ -792,31 +787,31 @@ let synthesize_lemmas
       Lwt.return (if upd_flag_1 && upd_flag_2 then `CoarseningOk else `CoarseningFailure)
     | [], [] ->
       (match classif_failures with
-      | [] ->
-        let%lwt _ = update ~is_positive:true lemma_synt_positives in
-        (* lemma_synt_negatives and ensures_negatives are empty; all witnesss non spurious! *)
-        AlgoLog.no_spurious_witness ();
-        Lwt.return `Unrealizable
-      | _ :: _ ->
-        AlgoLog.witness_classification_failure ();
-        Lwt.return `CoarseningFailure)
+       | [] ->
+         let%lwt _ = update ~is_positive:true lemma_synt_positives in
+         (* lemma_synt_negatives and ensures_negatives are empty; all witnesss non spurious! *)
+         AlgoLog.no_spurious_witness ();
+         Lwt.return `Unrealizable
+       | _ :: _ ->
+         AlgoLog.witness_classification_failure ();
+         Lwt.return `CoarseningFailure)
   in
   Lwt.return
     (match lemma_synthesis_success with
-    | `CoarseningOk -> Ok (Either.First lstate)
-    | `Unrealizable -> Ok (Either.Second unr_witnesss)
-    | `CoarseningFailure ->
-      (match synt_failure_info with
-      | Sy.RFail, _ ->
-        Log.error_msg "SyGuS solver failed to find a solution.";
-        Error Sy.RFail
-      | RInfeasible, _ ->
-        (* The synthesis solver had answered infeasible but we couln not generate a predicate. *)
-        Error Sy.RFail
-      | RUnknown, _ ->
-        (* In most cases if the synthesis solver does not find a solution and terminates, it will
+     | `CoarseningOk -> Ok (Either.First lstate)
+     | `Unrealizable -> Ok (Either.Second unr_witnesss)
+     | `CoarseningFailure ->
+       (match synt_failure_info with
+        | Sy.RFail, _ ->
+          Log.error_msg "SyGuS solver failed to find a solution.";
+          Error Sy.RFail
+        | RInfeasible, _ ->
+          (* The synthesis solver had answered infeasible but we couln not generate a predicate. *)
+          Error Sy.RFail
+        | RUnknown, _ ->
+          (* In most cases if the synthesis solver does not find a solution and terminates, it will
              answer unknowns. We interpret it as "no solution can be found". *)
-        Log.error_msg "SyGuS solver returned unknown.";
-        Error Sy.RUnknown
-      | s_resp, _ -> Error s_resp))
+          Log.error_msg "SyGuS solver returned unknown.";
+          Error Sy.RUnknown
+        | s_resp, _ -> Error s_resp))
 ;;

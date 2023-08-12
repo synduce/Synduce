@@ -12,7 +12,7 @@ let rec mps = function
   | Cons (hd, tl) ->
     let new_mps = mps tl in
     max (new_mps + hd) 0
-  [@@ensures fun x -> x >= 0]
+[@@ensures fun x -> x >= 0]
 ;;
 
 let rec clist_to_list = function

@@ -36,12 +36,12 @@ let spec input t =
 let target x t =
   let rec g = function
     | MLeaf a -> [%synt s0] x a
-    (* Can we take advantage of the memoized value?  *)
+    (* Can we take advantage of the memoized value? *)
     (* Note that if you try to synthesize the condition now it will break the ability of
        synduce to find counterexamples.
     *)
     | MNode (n, a, l, r) -> if x > n then [%synt c0] else [%synt f1] x a (g l) (g r)
   in
   g t
-  [@@requires is_memo]
+[@@requires is_memo]
 ;;

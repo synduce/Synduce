@@ -2,12 +2,10 @@ open Base
 open Lexing
 module O = Option
 
-(**
-   Variables have unique integer ids but two variables can have the same name.
-   Additional information can be added via variable attributes.
-   For example, a variable can be a Terminal or a NonTerminal in the context of a
-   pattern matching recursion scheme.
-*)
+(** Variables have unique integer ids but two variables can have the same name.
+    Additional information can be added via variable attributes.
+    For example, a variable can be a Terminal or a NonTerminal in the context of a
+    pattern matching recursion scheme. *)
 module Attributes = struct
   module Elt = struct
     module T = struct
@@ -57,9 +55,7 @@ let dummy_loc : position * position = dummy_pos, dummy_pos
 let pp_nice = ref true
 
 (* ----------------------------------------------------- *)
-(**
-   Terms.
-*)
+(** Terms. *)
 
 module Binop = struct
   type t =
@@ -211,7 +207,7 @@ module Unop = struct
     | Neg
     | Not
     | Abs
-    | SetCard of RType.t (** Set cardinality.  *)
+    | SetCard of RType.t (** Set cardinality. *)
     | SetComplement of RType.t (** Set complement. *)
     | SetSingleton of RType.t (** Set singleton *)
   [@@deriving hash]
@@ -295,11 +291,11 @@ module Operator = struct
       match s with
       | Sexp.Atom s ->
         (match Unop.of_string s with
-        | Some op -> Unary op
-        | None ->
-          (match Binop.of_string s with
-          | Some op -> Binary op
-          | None -> failwith "Not an operator."))
+         | Some op -> Unary op
+         | None ->
+           (match Binop.of_string s with
+            | Some op -> Binary op
+            | None -> failwith "Not an operator."))
       | _ -> failwith "Not an operator."
     ;;
   end
@@ -404,7 +400,7 @@ module Constant = struct
   ;;
 end
 
-(** Simple patterns for function arguments: a fpattern is either a variable or a tuple of patterns.  *)
+(** Simple patterns for function arguments: a fpattern is either a variable or a tuple of patterns. *)
 type fpattern =
   | FPatAny
   | FPatVar of variable
@@ -412,9 +408,8 @@ type fpattern =
 [@@deriving hash]
 
 (** More complex patterns are used in match-cases.
-  In the current implementation, this is only used as a way to translate a PMRS back to
-  a set of mutually recursive functions.
-*)
+    In the current implementation, this is only used as a way to translate a PMRS back to
+    a set of mutually recursive functions. *)
 type pattern =
   | PatAny
   | PatVar of variable
@@ -491,9 +486,9 @@ module Context = struct
   ;;
 
   let add_global
-      (ctx : t)
-      ~(key : string)
-      ~(data : variable * fpattern list * term option * term)
+    (ctx : t)
+    ~(key : string)
+    ~(data : variable * fpattern list * term option * term)
     =
     Hashtbl.add ctx.globals ~key ~data
   ;;

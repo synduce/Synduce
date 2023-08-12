@@ -12,16 +12,16 @@ let rec f = function
   | Cons (hd, tl) ->
     let sum, mts, mps, mss = f tl in
     sum + hd, max mts (sum + hd), max (mps + hd) 0, max mss (max (mps + hd) 0)
-  [@@ensures
-    fun (sum, mts, mps, mss) ->
-      mts >= 0
-      && mps >= 0
-      && mps >= sum
-      && mts >= sum
-      && mss >= 0
-      && mss >= mts
-      && mss >= sum
-      && mss >= mps]
+[@@ensures
+  fun (sum, mts, mps, mss) ->
+    mts >= 0
+    && mps >= 0
+    && mps >= sum
+    && mts >= sum
+    && mss >= 0
+    && mss >= mts
+    && mss >= sum
+    && mss >= mps]
 ;;
 
 let rec target = function

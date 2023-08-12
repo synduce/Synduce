@@ -10,7 +10,7 @@ type 'a list =
 let rec sum = function
   | Nil -> 0
   | Cons (hd, tl) -> hd + sum tl
-  [@@ensures fun x -> x > 0]
+[@@ensures fun x -> x > 0]
 ;;
 
 let rec clist_to_list = function
@@ -35,5 +35,5 @@ let rec hsum = function
   | CNil -> [%synt s0]
   | Single a -> [%synt f0] a
   | Concat (x, y) -> [%synt odot] (hsum x) (hsum y)
-  [@@requires allpos]
+[@@requires allpos]
 ;;

@@ -21,7 +21,7 @@ let rec maxs = function
 let rec amax = function
   | Elt x -> [%synt base]
   | Cons (hd, tl) -> [%synt join]
-  [@@requires is_sorted]
+[@@requires is_sorted]
 ;;
 
 assert (amax = maxs)

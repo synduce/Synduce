@@ -40,7 +40,7 @@ let rec h = function
   | CNil -> [%synt base_case]
   | Single x -> [%synt init] x
   | Concat (x, y) -> [%synt join] (h x) (h y)
-  [@@requires all_positive]
+[@@requires all_positive]
 ;;
 
 assert (h = clist_to_list @@ mps_list)

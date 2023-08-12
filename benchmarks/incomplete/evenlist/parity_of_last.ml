@@ -17,5 +17,5 @@ let rec spec = function
 let rec target = function
   | Elt x -> [%synt s0]
   | Cons (a, l) -> [%synt f0]
-  [@@requires even_list]
+[@@requires even_list]
 ;;

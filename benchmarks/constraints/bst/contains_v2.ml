@@ -28,7 +28,7 @@ let spec x t =
       if a = x then 1 else if f l = 1 then 1 else if f r = 1 then 1 else 0
   in
   f t
-  [@@ensures fun x -> x >= 0 && x <= 1]
+[@@ensures fun x -> x >= 0 && x <= 1]
 ;;
 
 let target y t =
@@ -38,5 +38,5 @@ let target y t =
       if y = a then 1 else if y < a then [%synt xi_1] (g l) else [%synt xi_2] (g r)
   in
   g t
-  [@@requires is_bst]
+[@@requires is_bst]
 ;;

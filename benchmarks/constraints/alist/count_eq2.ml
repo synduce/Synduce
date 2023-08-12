@@ -49,5 +49,5 @@ let target a l =
     | Z -> 0
   in
   g l
-  [@@requires is_alist]
+[@@requires is_alist]
 ;;

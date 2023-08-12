@@ -10,7 +10,7 @@ open Utils
 let next_lifing_type : RType.t list ref = ref [ RType.TInt ]
 
 (* ============================================================================================= *)
-(*                      LIFTING UTILS                                                            *)
+(*                      LIFTING UTILS *)
 (* ============================================================================================= *)
 
 let msg_lifting () =
@@ -35,9 +35,9 @@ module LiftingMap = struct
 
   let get ~ctx (map : t) ((i, t0) : int * term) =
     List.find_map map ~f:(fun ((i1, t1), tr) ->
-        match key_match ~ctx ~key:(i1, t1) i t0 with
-        | Some sub -> Some (substitution (VarMap.to_subst ctx sub) tr)
-        | None -> None)
+      match key_match ~ctx ~key:(i1, t1) i t0 with
+      | Some sub -> Some (substitution (VarMap.to_subst ctx sub) tr)
+      | None -> None)
   ;;
 
   let is_empty (a : t) = List.is_empty a
@@ -72,29 +72,25 @@ let recompose_t ~(ctx : Context.t) (p : PsiDef.t) (t : term) (i : int) : term =
   mk_sel ctx (mk_app (mk_var ctx g) [ t ]) i
 ;;
 
-(**
-  Find the expression of the lifting for an input term.
-*)
+(** Find the expression of the lifting for an input term. *)
 let get_mapped_value ~(ctx : env) ~(p : PsiDef.t) (l : lifting) (t : term) =
   Option.(decompose_t ~ctx p t >>= (ctx >- LiftingMap.get l.tmap))
 ;;
 
-(**
-  Interactively add an expression for the lifting.
-*)
+(** Interactively add an expression for the lifting. *)
 let interactive_add_lifting_expression
-    ~(ctx : env)
-    ~(p : PsiDef.t)
-    (l : lifting)
-    (a : term)
-    (i : int)
-    : lifting * term option
+  ~(ctx : env)
+  ~(p : PsiDef.t)
+  (l : lifting)
+  (a : term)
+  (i : int)
+  : lifting * term option
   =
   let env = VarSet.to_env (ctx >- Analysis.free_variables a) in
   let g = p.PsiDef.target.pmain_symb in
   (* Prompt the user to add lemmas. *)
   Log.info (fun frmt () ->
-      Fmt.(pf frmt "Please provide a value for (%s %a).%i:" g.vname (pp_term ctx.ctx) a i));
+    Fmt.(pf frmt "Please provide a value for (%s %a).%i:" g.vname (pp_term ctx.ctx) a i));
   match Stdio.In_channel.input_line Stdio.stdin with
   | None | Some "" ->
     Log.info (fun frmt () -> Fmt.pf frmt "No lifting provided.");
@@ -109,11 +105,11 @@ let interactive_add_lifting_expression
     in
     let l_term = Option.map ~f:(ctx >>- SmtInterface.term_of_smt env) smtterm in
     (match l_term with
-    | None -> l, None
-    | Some x ->
-      (match ctx >- LiftingMap.get l.tmap (i, a) with
-      | Some _ -> l, Some x
-      | None -> { tmap = LiftingMap.set l.tmap (i, a) x }, Some x))
+     | None -> l, None
+     | Some x ->
+       (match ctx >- LiftingMap.get l.tmap (i, a) with
+        | Some _ -> l, Some x
+        | None -> { tmap = LiftingMap.set l.tmap (i, a) x }, Some x))
 ;;
 
 let replace_boxed_expressions ~(ctx : env) ~(p : PsiDef.t) (l : lifting) =
@@ -126,9 +122,8 @@ let replace_boxed_expressions ~(ctx : env) ~(p : PsiDef.t) (l : lifting) =
 ;;
 
 (** A problem definition is lifted if the ouput type of the target recursion skeleton
-  is different from the output type of the reference function (which is unchanged
-  and stored in Common.ProblemDefs._alpha)
-*)
+    is different from the output type of the reference function (which is unchanged
+    and stored in Common.ProblemDefs._alpha) *)
 let is_lifted ~(ctx : env) (p : PsiDef.t) : bool =
   let _, tout = RType.fun_typ_unpack (var_type ctx p.PsiDef.target.pvar) in
   not (Result.is_ok (RType.unify_one tout (get_alpha ctx)))
@@ -146,12 +141,10 @@ let lifting_types ~(ctx : env) (p : PsiDef.t) : RType.t list =
 let lifting_count ~(ctx : env) (p : PsiDef.t) : int = List.length (lifting_types ~ctx p)
 
 (* ============================================================================================= *)
-(*                       PROJECTIONS TO AND FROM LIFTING                                         *)
+(*                       PROJECTIONS TO AND FROM LIFTING *)
 (* ============================================================================================= *)
 
-(**
-  Return a projection function that can be symbolically evaluated.
-*)
+(** Return a projection function that can be symbolically evaluated. *)
 let proj_to_non_lifting ~(ctx : env) (p : PsiDef.t) : term option =
   if not (is_lifted ~ctx p)
   then None
@@ -186,21 +179,19 @@ let is_proj_function ~(ctx : env) (p : PsiDef.t) (t : term) : bool =
   match t.tkind with
   | TFun ([ tuple_arg_pattern ], tuple_body) ->
     (match tuple_arg_pattern with
-    | FPatTup t ->
-      if List.length t = lifting_count ~ctx p + alpha_component_count ctx
-      then (
-        match tuple_body.tkind with
-        | TTup tl -> List.length tl = alpha_component_count ctx
-        | _ -> alpha_component_count ctx = 1)
-      else false
-    | _ -> false)
+     | FPatTup t ->
+       if List.length t = lifting_count ~ctx p + alpha_component_count ctx
+       then (
+         match tuple_body.tkind with
+         | TTup tl -> List.length tl = alpha_component_count ctx
+         | _ -> alpha_component_count ctx = 1)
+       else false
+     | _ -> false)
   | _ -> false
 ;;
 
-(**
-    Return function f such that f(a) = a.i, .. a.i + n if i, .. i+n where
-    i, ..., i+n are the components of the lifting.
-*)
+(** Return function f such that f(a) = a.i, .. a.i + n if i, .. i+n where
+    i, ..., i+n are the components of the lifting. *)
 let proj_to_lifting ~(ctx : env) (p : PsiDef.t) : (term -> term) option =
   if not (is_lifted ~ctx p)
   then None
@@ -235,11 +226,9 @@ let proj_to_lifting ~(ctx : env) (p : PsiDef.t) : (term -> term) option =
       None)
 ;;
 
-(**
-  Returns a symbolic function [f] such that [f original_part lifting_part]
-  computes the tuple that corresponds to the lifted function from the original components
-  of the function in [oringal_part] and the components of the lifting only in [lifting_part]
-*)
+(** Returns a symbolic function [f] such that [f original_part lifting_part]
+    computes the tuple that corresponds to the lifted function from the original components
+    of the function in [oringal_part] and the components of the lifting only in [lifting_part] *)
 let compose_parts ~(ctx : env) (p : PsiDef.t) : term option =
   if not (is_lifted ~ctx p)
   then None
@@ -286,10 +275,9 @@ let compose_parts ~(ctx : env) (p : PsiDef.t) : term option =
 
 (** [nth_output_type p n] eturn the nth type in the output type of the PMRS.
     If the output type is a tuple, the nth element of the tuple is returned if it
-      exists, otherwise [None] is returned.
+    exists, otherwise [None] is returned.
     If the output type is not a tuple and [n] is not [0] then [None] is returned.
-      If [n = 0] then the output type is returned.
- *)
+    If [n = 0] then the output type is returned. *)
 let nth_output_type ~(ctx : Context.t) (p : PsiDef.t) (i : int) : RType.t option =
   let _, tout = RType.fun_typ_unpack (Variable.vtype_or_new ctx p.PsiDef.target.pvar) in
   match tout with
@@ -298,7 +286,7 @@ let nth_output_type ~(ctx : Context.t) (p : PsiDef.t) (i : int) : RType.t option
 ;;
 
 (* ============================================================================================= *)
-(*                     HELPERS                                                                   *)
+(*                     HELPERS *)
 (* ============================================================================================= *)
 let analyze_leftover ~(ctx : EProps.RContext.t) (expr : Expression.t) : unit =
   Log.verbose Fmt.(fun fmt () -> pf fmt "Analyzing leftover expression...@.");
@@ -316,12 +304,10 @@ let analyze_leftover ~(ctx : EProps.RContext.t) (expr : Expression.t) : unit =
 ;;
 
 (* ============================================================================================= *)
-(*                      LIFTING FUNCTIONS                                                        *)
+(*                      LIFTING FUNCTIONS *)
 (* ============================================================================================= *)
 
-(**
-  [apply_lifting ~ctx ~p l] lifts [p.PsiDef.target] by extending the output with [l].
-*)
+(** [apply_lifting ~ctx ~p l] lifts [p.PsiDef.target] by extending the output with [l]. *)
 let apply_lifting ~(ctx : env) ~(p : PsiDef.t) (new_lifting : RType.t list) : PsiDef.t =
   (* Type inference on p.target to update types *)
   let target' =
@@ -343,15 +329,15 @@ let apply_lifting ~(ctx : env) ~(p : PsiDef.t) (new_lifting : RType.t list) : Ps
          (snd (RType.fun_typ_unpack (var_type ctx target'.pmain_symb)))
          new_out_type
      with
-    | Ok subs -> Variable.update_var_types ctx.ctx (RType.mkv subs)
-    | Error e ->
-      Log.error_msg Fmt.(str "Error: %a" Sexp.pp_hum e);
-      Log.error_msg "Failed to unify output types in lifting.");
+     | Ok subs -> Variable.update_var_types ctx.ctx (RType.mkv subs)
+     | Error e ->
+       Log.error_msg Fmt.(str "Error: %a" Sexp.pp_hum e);
+       Log.error_msg "Failed to unify output types in lifting.");
     ctx >- PMRS.infer_pmrs_types target'
   in
   (* ⚠️ !TODO! : updates all the "ensures" *)
   Log.debug (fun ft () ->
-      Fmt.(pf ft "@[After lifting:@;%a@]" (box (ctx >- PMRS.pp ~short:true)) target'));
+    Fmt.(pf ft "@[After lifting:@;%a@]" (box (ctx >- PMRS.pp ~short:true)) target'));
   PsiDef.{ p with target = target'; lifting = p.lifting @ new_lifting }
 ;;
 
@@ -366,13 +352,13 @@ let lift_interactive ~(ctx : env) ~p lifting boxes =
 ;;
 
 let deduce_lifting_expressions
-    ~(ctx : env)
-    ~(p : PsiDef.t)
-    (lifting : lifting)
-    (lemma : term option)
-    ~(lhs : term)
-    ~(rhs : term)
-    : lifting
+  ~(ctx : env)
+  ~(p : PsiDef.t)
+  (lifting : lifting)
+  (lemma : term option)
+  ~(lhs : term)
+  ~(rhs : term)
+  : lifting
   =
   (* Put every recursive call to the lifting part into a "box" *)
   let boxes =
@@ -392,17 +378,16 @@ let deduce_lifting_expressions
       (* Create fresh variables for boxes and a map from var id to box argument. *)
       boxes
       |> List.map ~f:(fun (i, box_input) ->
-             match ctx >- LiftingMap.get lifting.tmap (i, box_input) with
-             | Some e -> (ctx >- recompose_t p box_input i, e), None
-             | None ->
-               let x =
-                 Variable.mk
-                   ctx.ctx
-                   (Alpha.fresh ctx.ctx.names ~s:(Fmt.str "_L_%i" i))
-                   ~t:(ctx >- nth_output_type p i)
-               in
-               ( (ctx >- recompose_t p box_input i, mk_var ctx.ctx x)
-               , Some (x, (i, box_input)) ))
+        match ctx >- LiftingMap.get lifting.tmap (i, box_input) with
+        | Some e -> (ctx >- recompose_t p box_input i, e), None
+        | None ->
+          let x =
+            Variable.mk
+              ctx.ctx
+              (Alpha.fresh ctx.ctx.names ~s:(Fmt.str "_L_%i" i))
+              ~t:(ctx >- nth_output_type p i)
+          in
+          (ctx >- recompose_t p box_input i, mk_var ctx.ctx x), Some (x, (i, box_input)))
       |> List.unzip
     in
     let boxvar_to_linput = List.filter_opt boxvar_to_linput in
@@ -428,27 +413,25 @@ let deduce_lifting_expressions
       in
       let _ = Option.map ~f:(analyze_leftover ~ctx:sol_ctx) maybe_leftover_expr in
       List.fold var_to_lifting_expr ~init:lifting ~f:(fun l (v, t) ->
-          let i, t0 = List.Assoc.find_exn ~equal:Variable.equal boxvar_to_linput v in
-          { tmap = LiftingMap.set l.tmap (i, t0) t })
+        let i, t0 = List.Assoc.find_exn ~equal:Variable.equal boxvar_to_linput v in
+        { tmap = LiftingMap.set l.tmap (i, t0) t })
     | None -> lifting)
 ;;
 
 (* ============================================================================================= *)
-(*                       MAIN ENTRY POINT                                                        *)
+(*                       MAIN ENTRY POINT *)
 (* ============================================================================================= *)
 
-(**
-  Perform a scalar lifting.
-*)
+(** Perform a scalar lifting. *)
 let scalar
-    ~(ctx : env)
-    ~(p : PsiDef.t)
-    (l : refinement_loop_state)
-    ((_s_resp, synt_failure_info) :
-      solver_response * ('a, unrealizability_witness list) Either.t)
-    : (PsiDef.t * refinement_loop_state, solver_response) Result.t
+  ~(ctx : env)
+  ~(p : PsiDef.t)
+  (l : refinement_loop_state)
+  ((_s_resp, synt_failure_info) :
+    solver_response * ('a, unrealizability_witness list) Either.t)
+  : (PsiDef.t * refinement_loop_state, solver_response) Result.t
   =
-  (* Select the type of lifting from the synt_failure_info.  *)
+  (* Select the type of lifting from the synt_failure_info. *)
   let lifting_type =
     let m uc =
       let hint_1 =
@@ -468,7 +451,7 @@ let scalar
       Option.value ~default:RType.TInt hint_1
     in
     let join l type_candidate =
-      if Caml.List.mem type_candidate l then l else type_candidate :: l
+      if Stdlib.List.mem type_candidate l then l else type_candidate :: l
     in
     let f a uc = join a (m uc) in
     match synt_failure_info with
@@ -480,8 +463,8 @@ let scalar
       fun fmt () ->
         pf fmt "Lifting with components %a" (list ~sep:comma RType.pp) lifting_type);
   (* Change the type of the functions. The actual lifting expressions will be computed when solving
-    for the equation systems.
-   *)
+     for the equation systems.
+  *)
   let p' = apply_lifting ~ctx ~p lifting_type in
   Ok (p', { l with assumptions = [] })
 ;;

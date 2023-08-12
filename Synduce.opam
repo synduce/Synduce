@@ -10,30 +10,30 @@ license: "MIT"
 homepage: "https://github.com/victornicolet/Synduce"
 bug-reports: "https://github.com/victornicolet/Synduce/issues"
 depends: [
-  "dune" {>= "2.9"}
+  "dune" {>= "3.10"}
   "alcotest" {>= "1.5"}
-  "base" {>= "v0.14.0"}
-  "core" {>= "v0.14.0"}
-  "core_unix" {>= "v0.14.0"}
-  "extlib" {>= "1.7.7"}
-  "fileutils" {>= "0.6.0"}
-  "fmt" {>= "0.8.8"}
-  "getopt" {>= "20120615"}
-  "lwt" {>= "5.4.0"}
-  "lwt_ppx" {>= "2.0.0"}
-  "menhir" {>= "20220210"}
-  "odoc" {>= "1.5.0"}
+  "base" {>= "v0.16.0"}
+  "core" {>= "v0.16.0"}
+  "core_unix" {>= "v0.16.0"}
+  "extlib" {>= "1.7.9"}
+  "fileutils" {>= "0.6.4"}
+  "fmt" {>= "0.9.0"}
+  "getopt" {>= "20230213"}
+  "lwt" {>= "5.6.0"}
+  "lwt_ppx" {>= "2.1.0"}
+  "menhir" {>= "20230608"}
+  "odoc" {>= "2.2.0"}
   "ocamlgraph" {>= "2.0.0"}
-  "parsexp" {>= "v0.14.0"}
-  "parsexp_io" {>= "v0.14.0"}
-  "ppx_hash" {>= "v0.14.0"}
-  "ppx_let" {>= "v0.14.0"}
-  "stdio" {>= "v0.14.0"}
+  "parsexp" {>= "v0.16.0"}
+  "parsexp_io" {>= "v0.16.0"}
+  "ppx_hash" {>= "v0.16.0"}
+  "ppx_let" {>= "v0.16.0"}
+  "stdio" {>= "v0.16.0"}
   "ppx_deriving" {>= "5.2"}
-  "ppx_sexp_conv" {>= "v0.14.0"}
-  "ppx_optcomp" {>= "v0.14.0"}
-  "sexplib" {>= "v0.14.0"}
-  "yojson" {>= "1.6.0"}
+  "ppx_sexp_conv" {>= "v0.16.0"}
+  "ppx_optcomp" {>= "v0.16.0"}
+  "sexplib" {>= "v0.16.0"}
+  "yojson" {>= "2.1.0"}
 ]
 build: [
   ["dune" "subst"] {dev}
@@ -44,10 +44,8 @@ build: [
     name
     "-j"
     jobs
-    "--promote-install-files=false"
     "@install"
     "@runtest" {with-test}
     "@doc" {with-doc}
   ]
-  ["dune" "install" "-p" name "--create-install-files" name]
 ]

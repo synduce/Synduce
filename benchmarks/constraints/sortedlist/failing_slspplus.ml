@@ -47,7 +47,7 @@ let rec spec = function
     let mtss, pos = spec tl in
     let line_sum = bsum hd in
     (if line_sum >= 0 && pos then mtss + line_sum else 0), pos && line_sum >= 0
-  [@@ensures fun (x, y) -> x >= 0 && y = (x = 0)]
+[@@ensures fun (x, y) -> x >= 0 && y = (x = 0)]
 
 and bsum = function
   | Elt x -> x
@@ -58,7 +58,7 @@ let rec target = function
   | Sglt x -> [%synt s0] (inner x)
   | Cat (l, piv, r) ->
     if piv <= 0 then [%synt f1] (target r) else [%synt f2] (target r) (target l)
-  [@@requires sorted]
+[@@requires sorted]
 
 and inner = function
   | Elt x -> x

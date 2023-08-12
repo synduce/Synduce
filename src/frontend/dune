@@ -6,7 +6,8 @@
 
 (rule
  (target syntax.messages)
- (mode promote-until-clean)
+ (mode
+  (promote (until-clean)))
  (deps
   (:parser pmrs_parser.mly))
  (action
@@ -33,7 +34,8 @@
 
 (rule
  (target updated.messages)
- (mode promote-until-clean)
+ (mode
+  (promote (until-clean)))
  (deps
   (:parser pmrs_parser.mly)
   (:msg syntax.messages))

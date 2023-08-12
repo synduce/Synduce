@@ -30,5 +30,5 @@ let rec spec = function
 let rec target = function
   | MLeaf a -> 1
   | MNode (n, a, l, r) -> if n < 0 then 2 else [%synt xi_1] n
-  [@@requires is_memo]
+[@@requires is_memo]
 ;;

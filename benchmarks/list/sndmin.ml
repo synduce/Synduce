@@ -12,7 +12,7 @@ and f = function
   | Two (a, b) -> min a b, max a b
   | Cons (hd, tl) ->
     (fun (amin, sec_min) -> min hd amin, min sec_min (max hd amin)) (f tl)
-  [@@ensures fun (x, y) -> x <= y]
+[@@ensures fun (x, y) -> x <= y]
 ;;
 
 let rec target t = h t

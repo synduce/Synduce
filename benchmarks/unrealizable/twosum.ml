@@ -44,7 +44,7 @@ let target x t =
     | Cons (hd, tl) -> [%synt join] hd (h tl)
   in
   h t
-  [@@requires list_all_positive]
+[@@requires list_all_positive]
 ;;
 
 assert (target = twosum)

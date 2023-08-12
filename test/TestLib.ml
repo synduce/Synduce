@@ -6,7 +6,7 @@ open Term
 
 let env = Lib.load_ctx_of_file "/home/victorn/repos/Synduce/benchmarks/list/sum.ml"
 
-let dtype_test =
+let _dtype_test =
   Alcotest.testable
     (fun fmt x -> Fmt.pf fmt "%s" (Analysis.DType.show_type_constr x))
     Analysis.DType.equal_type_constr
@@ -136,9 +136,9 @@ let test_looping () =
     let n = 60 in
     let subs =
       List.map vars_to_expand ~f:(fun v ->
-          List.map
-            ~f:(fun t -> mk_var env.ctx v, t)
-            (Analysis.DType.gen_terms ~ctx:env.ctx (Variable.vtype_or_new env.ctx v) n))
+        List.map
+          ~f:(fun t -> mk_var env.ctx v, t)
+          (Analysis.DType.gen_terms ~ctx:env.ctx (Variable.vtype_or_new env.ctx v) n))
     in
     List.map
       ~f:(fun subs -> substitution subs initial_term)

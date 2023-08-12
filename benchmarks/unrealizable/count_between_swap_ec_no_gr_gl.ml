@@ -27,7 +27,7 @@ let spec hi lo t =
     | Node (a, l, r) -> if hi > a && a > lo then 1 + f l + f r else f l + f r
   in
   f t
-  [@@ensures fun x -> x >= 0]
+[@@ensures fun x -> x >= 0]
 ;;
 
 let target hi lo t =
@@ -41,5 +41,5 @@ let target hi lo t =
       else [%synt f_else] a hi lo
   in
   g t
-  [@@requires is_bst]
+[@@requires is_bst]
 ;;

@@ -1,9 +1,9 @@
 (** @synduce -I ConsList.ml,ConcatList.ml *)
 
 (* Using ConsList and ConcatList Synduce cannot use open directives, so the path to the source file
-  of the module has to be used, like in the comment above.
-  The path is relative to the file being synthesized.
- *)
+   of the module has to be used, like in the comment above.
+   The path is relative to the file being synthesized.
+*)
 open ConsList
 open ConcatList
 
@@ -24,7 +24,7 @@ let rec hmbo = function
 
 (* The assertion should be of the form:
      assert (recursion skeleton = representation function @@ reference function)
- *)
+*)
 ;;
 
 assert (hmbo = clist_to_conslist @@ mbo)

@@ -1,8 +1,8 @@
 (** @synduce -s 2 -NB *)
 
 (* This example is adapted from:
-The third homomorphism theorem on trees: upwards and downwards
- lead to divide-and-conquer *)
+   The third homomorphism theorem on trees: upwards and downwards
+   lead to divide-and-conquer *)
 type 'a tree =
   | Node of 'a * 'a tree * 'a tree
   | Nil

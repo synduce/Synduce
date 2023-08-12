@@ -11,7 +11,7 @@ let rec balanced = function
 and height = function
   | Nil -> 0
   | Node (a, b, c) -> 1 + max (height b) (height c)
-  [@@ensures fun x -> x >= 0]
+[@@ensures fun x -> x >= 0]
 ;;
 
 let rec count = function
@@ -22,7 +22,7 @@ let rec count = function
 let rec target = function
   | Nil -> [%synt s0]
   | Node (a, l, r) -> [%synt f0] a (target l)
-  [@@requires balanced]
+[@@requires balanced]
 ;;
 
 assert (target = count)

@@ -55,5 +55,5 @@ let rec target = function
   | Empty -> [%synt init]
   | E a -> [%synt base_case] a
   | Cat (x, y) -> [%synt odot] (target x) (target y)
-  [@@requires concat_list_sorted]
+[@@requires concat_list_sorted]
 ;;

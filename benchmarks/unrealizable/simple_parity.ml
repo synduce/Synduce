@@ -27,7 +27,7 @@ let rec height = function
 let rec target = function
   | Leaf x -> [%synt f0] x
   | Node (parity, val_, l, r) -> [%synt join] val_
-  [@@requires is_memo]
+[@@requires is_memo]
 ;;
 
 assert (target = height)

@@ -36,7 +36,7 @@ let rec spec = function
 let rec target = function
   | Single (a, b) -> [%synt s0]
   | Concat (l, r) -> [%synt s1]
-  [@@requires csorted]
+[@@requires csorted]
 ;;
 
 assert (target = repr @@ spec)

@@ -27,14 +27,14 @@ let rec spec = function
     let mpss, csum = spec tl in
     let line_sum = bsum hd in
     max (csum + line_sum) mpss, csum + line_sum
-  [@@ensures fun (x, y) -> x >= y]
+[@@ensures fun (x, y) -> x >= y]
 
 and bsum = function
   | Elt x -> x
   | Cons (hd, tl) -> hd + bsum tl
 ;;
 
-(** Skeleton: parallel on nested lists.  *)
+(** Skeleton: parallel on nested lists. *)
 let rec target = function
   | Sglt x -> [%synt s0] (tsum x)
   | Cat (l, r) -> [%synt s1] (target r) (target l)

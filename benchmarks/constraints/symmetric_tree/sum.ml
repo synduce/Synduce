@@ -26,11 +26,11 @@ let rec sum = function
   | Node (a, l, r) -> a + sum l + sum r
 ;;
 
-(* In a symmetric tree we should only need to compute the sum for half the tree.  *)
+(* In a symmetric tree we should only need to compute the sum for half the tree. *)
 let rec sum2 = function
   | Null -> [%synt s0]
   | Node (a, l, r) -> [%synt f0] a (sum2 l)
-  [@@requires is_symmetric]
+[@@requires is_symmetric]
 ;;
 
 assert (sum2 = sum)

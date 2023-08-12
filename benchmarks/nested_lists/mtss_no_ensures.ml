@@ -21,7 +21,7 @@ and dec l1 = function
   | Cat (x, y) -> dec (Cat (y, l1)) x
 ;;
 
-(** Predicate asserting that a concat-list is partitioned.  *)
+(** Predicate asserting that a concat-list is partitioned. *)
 let rec is_partitioned = function
   | Sglt x -> true
   | Cat (x, y) -> nlmax x < nlmin y && is_partitioned x && is_partitioned y

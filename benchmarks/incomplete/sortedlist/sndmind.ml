@@ -25,7 +25,7 @@ and f = function
   | Two (a, b) -> min a b, max a b
   | Cons (hd, tl) ->
     (fun (amin, sec_min) -> min hd amin, min sec_min (max hd amin)) (f tl)
-  [@@ensures fun (x, y) -> x <= y]
+[@@ensures fun (x, y) -> x <= y]
 ;;
 
 let rec is_sorted l = (fun (a, b) -> b) (sorted (repr l))
@@ -40,5 +40,5 @@ and sorted = function
 let rec target = function
   | CTwo (a, b) -> [%synt f0] a b
   | Concat (x, y) -> [%synt odot] (target y)
-  [@@requires is_sorted]
+[@@requires is_sorted]
 ;;

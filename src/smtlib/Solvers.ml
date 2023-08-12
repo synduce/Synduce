@@ -26,7 +26,7 @@ module EmptyLog : Logger = struct
   let error _ = ()
   let debug _ = ()
   let verb _ = ()
-  let log_file = Caml.Filename.temp_file "tmp" ".log"
+  let log_file = Stdlib.Filename.temp_file "tmp" ".log"
   let verbose = false
   let log_queries = false
 end
@@ -259,7 +259,7 @@ module Synchronous (Log : Logger) (Stats : Statistics) = struct
       | None -> ())
   ;;
 
-  let () = Caml.Sys.set_signal Caml.Sys.sigchld (Caml.Sys.Signal_handle handle_sigchild)
+  let () = Stdlib.Sys.set_signal Stdlib.Sys.sigchld (Stdlib.Sys.Signal_handle handle_sigchild)
 
   let make_solver ?(hint = "") ~(name : string) (path : string) (options : string list)
       : online_solver
@@ -277,7 +277,7 @@ module Synchronous (Log : Logger) (Stats : Statistics) = struct
     let out_chan = out_channel_of_descr pinfo.stdin in
     OC.set_binary_mode out_chan false;
     IC.set_binary_mode in_chan false;
-    let log_file = Caml.Filename.temp_file (name ^ "_") ".smt2" in
+    let log_file = Stdlib.Filename.temp_file (name ^ "_") ".smt2" in
     let solver =
       { s_name = name
       ; s_pid = Pid.to_int pinfo.pid
@@ -335,10 +335,10 @@ module Synchronous (Log : Logger) (Stats : Statistics) = struct
       match sexp with
       | Sexp.Atom _ -> []
       | List (Atom "error" :: _) -> [ sexp ]
-      | List ls -> Caml.List.flatten (List.map ~f:is_error_sexp ls)
+      | List ls -> Stdlib.List.flatten (List.map ~f:is_error_sexp ls)
     in
     match response with
-    | SExps l -> Caml.List.flatten (List.map ~f:is_error_sexp l)
+    | SExps l -> Stdlib.List.flatten (List.map ~f:is_error_sexp l)
     | _ -> []
   ;;
 
@@ -552,7 +552,7 @@ module Asyncs (Log : Logger) (Stats : Statistics) = struct
     let pinfo = Lwt_process.open_process (path, Array.of_list options) in
     (* Lwt_unix.set_close_on_exec;
     Lwt_unix.set_close_on_exec pinfo#stderr; *)
-    let log_file = Caml.Filename.temp_file (name ^ "_") ".smt2" in
+    let log_file = Stdlib.Filename.temp_file (name ^ "_") ".smt2" in
     let solver =
       { s_name = name
       ; s_pinfo = pinfo

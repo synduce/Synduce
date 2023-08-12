@@ -19,7 +19,7 @@ let spec x t =
     | Cons (hd, tl) -> if hd = x then 1 else if f tl = 0 then 0 else 1 + f tl
   in
   f t
-  [@@ensures fun x -> x >= 0]
+[@@ensures fun x -> x >= 0]
 ;;
 
 let target x t =
@@ -28,5 +28,5 @@ let target x t =
     | Cons (hd, tl) -> if hd >= x then [%synt xi_1] x hd else [%synt xi_2] x hd (g tl)
   in
   g t
-  [@@requires is_sorted]
+[@@requires is_sorted]
 ;;

@@ -54,5 +54,5 @@ let rec target = function
     if a > 2
     then [%synt c0], [%synt xi_1] s a
     else [%synt xi_3] s a (target l) (target r), [%synt xi_2] s
-  [@@requires is_bst]
+[@@requires is_bst]
 ;;

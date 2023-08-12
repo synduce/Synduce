@@ -40,5 +40,5 @@ and amin = function
 and amax = function
   | Leaf a -> a
   | Node (a, l, r) -> min a (min (amax l) (amax r))
-  [@@requires is_bst]
+[@@requires is_bst]
 ;;

@@ -26,5 +26,5 @@ and tree_max = function
 let rec target = function
   | Elt a -> [%synt c0]
   | Node (a, l, r) -> [%synt c1]
-  [@@requires is_even]
+[@@requires is_even]
 ;;

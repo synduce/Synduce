@@ -21,14 +21,14 @@ let rec spec = function
   | Cons (hd, tl) ->
     let amin, sec_min = spec tl in
     min hd amin, min sec_min (max hd amin)
-  [@@ensures fun (x, y) -> x <= y]
+[@@ensures fun (x, y) -> x <= y]
 ;;
 
 let rec target = function
   | Empty -> [%synt init]
   | Elt a -> [%synt base_case] a
   | Concat (x, y) -> [%synt odot] (target x) (target y)
-  [@@requires allpos]
+[@@requires allpos]
 ;;
 
 let rec repr = function

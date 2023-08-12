@@ -7,7 +7,7 @@ open ConcatList
    This is our reference function. It is not named spec and we will need to
    declare our synthesis objective using an assert statement at the end of
    the file.
- *)
+*)
 let rec mbo = function
   | Nil -> 0, 0, 0, true
   | Cons (hd, tl) ->
@@ -16,12 +16,12 @@ let rec mbo = function
     let nconj = conj && hd in
     let nc = if nconj then c + 1 else c in
     ncl, max ml ncl, nc, nconj
-  [@@ensures fun (cl, ml, c, conj) -> ml >= c && ml >= cl && c >= 0 && cl >= 0]
+[@@ensures fun (cl, ml, c, conj) -> ml >= c && ml >= cl && c >= 0 && cl >= 0]
 ;;
 
 (* This is the target function. There are three unknown components:
    s0, f0 and join
-   *)
+*)
 let rec hmbo = function
   | CNil -> [%synt s0]
   | Single a -> [%synt f0]
@@ -29,7 +29,7 @@ let rec hmbo = function
 
 (* The assertion should be of the form:
      assert (recursion skeleton = representation function @@ reference function)
- *)
+*)
 ;;
 
 assert (hmbo = clist_to_conslist @@ mbo)

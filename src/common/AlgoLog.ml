@@ -1,7 +1,6 @@
 (** All functions in this module have no effect on the flow of the algorithm.
-  Their only purpose is to log or print information about the current state of
-  the algorithm.
-*)
+    Their only purpose is to log or print information about the current state of
+    the algorithm. *)
 
 open ProblemDefs
 open Pretty
@@ -36,13 +35,13 @@ let show_stat_refinement_step env elapsed tsize usize =
 ;;
 
 let single_configuration_json
-    ~(is_ocaml_syntax : bool)
-    ~(ctx : env)
-    (pb : PsiDef.t)
-    (soln : Syguslib.Sygus.solver_response segis_response)
-    (elapsed : float)
-    (verif : float)
-    : Yojson.t
+  ~(is_ocaml_syntax : bool)
+  ~(ctx : env)
+  (pb : PsiDef.t)
+  (soln : Syguslib.Sygus.solver_response segis_response)
+  (elapsed : float)
+  (verif : float)
+  : Yojson.t
   =
   let solvers =
     Option.value ~default:(`String "unknown") (Utils.LogJson.get_solver_stats pb.id)
@@ -79,14 +78,14 @@ let single_configuration_json
      ; "refinement-steps", refinement_steps
      ; "id", `Int pb.id
      ]
-    @ soln_or_refutation)
+     @ soln_or_refutation)
 ;;
 
 let single_configuration_csv_string
-    (soln : Syguslib.Sygus.solver_response segis_response)
-    ~(elapsed : float)
-    ~(verif : float)
-    : string
+  (soln : Syguslib.Sygus.solver_response segis_response)
+  ~(elapsed : float)
+  ~(verif : float)
+  : string
   =
   let algo =
     if !Config.Optims.use_segis
@@ -107,14 +106,14 @@ let single_configuration_csv_string
 ;;
 
 let show_stat_intermediate_solution
-    ~(ctx : env)
-    (pb : PsiDef.t)
-    (soln : Syguslib.Sygus.solver_response segis_response)
-    (elapsed : float)
-    (verif : float)
-    (total_configurations : int)
-    (_ : float)
-    : unit
+  ~(ctx : env)
+  (pb : PsiDef.t)
+  (soln : Syguslib.Sygus.solver_response segis_response)
+  (elapsed : float)
+  (verif : float)
+  (total_configurations : int)
+  (_ : float)
+  : unit
   =
   (* *)
   let () =
@@ -142,7 +141,7 @@ let show_stat_intermediate_solution
       ; "foreign-lemma-uses", `Int !Stats.num_foreign_lemma_uses
       ]
   in
-  (* Json output to stdout?  *)
+  (* Json output to stdout? *)
   if !Config.json_progressive && !Config.json_out
   then pf stdout "%s@." (Yojson.to_string ~std:false json);
   (* Log to file? *)
@@ -162,52 +161,52 @@ let show_stat_intermediate_solution
        Stdio.Out_channel.output_lines chan [ info_line ];
        Stdio.Out_channel.close_no_err chan
      with
-    | _ -> ())
+     | _ -> ())
   | None -> ()
 ;;
 
 let show_steps algo env tsize usize =
   Log.info (fun frmt () ->
-      (styled
-         (`Fg `Black)
-         (styled
-            (`Bg (`Hi `Green))
-            (fun frmt (i, j) -> pf frmt "\t\t %s Refinement step %i:%i " algo i j)))
-        frmt
-        (get_refinement_steps env, get_secondary_refinement_steps env));
+    (styled
+       (`Fg `Black)
+       (styled
+          (`Bg (`Hi `Green))
+          (fun frmt (i, j) -> pf frmt "\t\t %s Refinement step %i:%i " algo i j)))
+      frmt
+      (get_refinement_steps env, get_secondary_refinement_steps env));
   Log.debug_msg
     (str "Start refinement loop with %i terms in T, %i terms in U." tsize usize)
 ;;
 
 let show_counterexamples ~(ctx : Context.t) lstate t_set =
   Log.debug (fun frmt () ->
-      pf
-        frmt
-        "@[<hov 2>Counterexample terms:@;@[<hov 2>%a@]"
-        (list ~sep:comma (Term.pp_term ctx))
-        (Set.elements (Set.diff t_set lstate.t_set)))
+    pf
+      frmt
+      "@[<hov 2>Counterexample terms:@;@[<hov 2>%a@]"
+      (list ~sep:comma (Term.pp_term ctx))
+      (Set.elements (Set.diff t_set lstate.t_set)))
 ;;
 
 let show_summary ~(ctx : Context.t) (spec_fname, repr_fname, target_fname) target_f =
   Log.info (fun fmt () ->
-      pf
-        fmt
-        " Ψ (%a) := ∀ x : %a. (%a o %a)(x) = %a(x)"
-        (list ~sep:comma (Term.Variable.pp ctx))
-        (Set.elements target_f.PMRS.psyntobjs)
-        (styled (`Fg `Yellow) (list ~sep:sp RType.pp))
-        target_f.pinput_typ
-        (styled (`Fg `Blue) string)
-        spec_fname
-        (styled (`Fg `Blue) string)
-        repr_fname
-        (styled (`Fg `Blue) string)
-        target_fname)
+    pf
+      fmt
+      " Ψ (%a) := ∀ x : %a. (%a o %a)(x) = %a(x)"
+      (list ~sep:comma (Term.Variable.pp ctx))
+      (Set.elements target_f.PMRS.psyntobjs)
+      (styled (`Fg `Yellow) (list ~sep:sp RType.pp))
+      target_f.pinput_typ
+      (styled (`Fg `Blue) string)
+      spec_fname
+      (styled (`Fg `Blue) string)
+      repr_fname
+      (styled (`Fg `Blue) string)
+      target_fname)
 ;;
 
 let show_pmrs ~(ctx : Context.t) pmrs =
   Log.info (fun fmt () ->
-      pf fmt "%a" (box (PMRS.pp ~ctx ~short:(not !Config.verbose))) pmrs)
+    pf fmt "%a" (box (PMRS.pp ~ctx ~short:(not !Config.verbose))) pmrs)
 ;;
 
 let show_new_rskel ~(ctx : Context.t) i p =
@@ -215,30 +214,30 @@ let show_new_rskel ~(ctx : Context.t) i p =
   then (
     Log.sep ~i:(Some i) ();
     Log.info (fun fmt () ->
-        pf
-          fmt
-          "💁 Attempting to find solution to skeleton:@;<1 10>%a"
-          (box (PMRS.pp ~ctx ~short:false))
-          p.PsiDef.target))
+      pf
+        fmt
+        "💁 Attempting to find solution to skeleton:@;<1 10>%a"
+        (box (PMRS.pp ~ctx ~short:false))
+        p.PsiDef.target))
 ;;
 
 let msg_too_many_opts () =
   Log.info (fun fmt () ->
-      pf
-        fmt
-        "@[It seems some optimizations caused an error.@;\
-         Turning them off and trying again.@]")
+    pf
+      fmt
+      "@[It seems some optimizations caused an error.@;\
+       Turning them off and trying again.@]")
 ;;
 
 (* ============================================================================================= *)
-(*                           Messages from the Counterexamples                                   *)
+(*                           Messages from the Counterexamples *)
 (* ============================================================================================= *)
 
 let pp_unrealizability_witness
-    ~(ctx : Context.t)
-    (frmt : Formatter.t)
-    (uc : unrealizability_witness)
-    : unit
+  ~(ctx : Context.t)
+  (frmt : Formatter.t)
+  (uc : unrealizability_witness)
+  : unit
   =
   let pp_model frmt model =
     (* Print as comma-separated list of variable -> term *)
@@ -260,43 +259,43 @@ let pp_unrealizability_witness
 
 let show_unrealizability_witnesses ~(ctx : Context.t) unknowns eqns witnesss =
   Log.verbose (fun f () ->
-      match witnesss with
-      | [] ->
-        Fmt.(
-          pf
-            f
-            "(%a) no counterexample to realizability found."
-            (VarSet.pp_var_names ctx)
-            unknowns)
-      | _ :: _ ->
-        Fmt.(
-          pf
-            f
-            "@[%a) Counterexamples found!@;\
-             @[<hov 2>❔ Equations:@;\
-             @[<v>%a@]@]@;\
-             @[<hov 2>❔ Counterexample models:@;\
-             @[<v>%a@]@]@]"
-            (VarSet.pp_var_names ctx)
-            unknowns
-            (list ~sep:sp (box (pair ~sep:colon int (box (pp_equation ~ctx)))))
-            (List.mapi ~f:(fun i eqn -> i, eqn) eqns)
-            (list ~sep:sep_and (pp_unrealizability_witness ~ctx))
-            witnesss))
+    match witnesss with
+    | [] ->
+      Fmt.(
+        pf
+          f
+          "(%a) no counterexample to realizability found."
+          (VarSet.pp_var_names ctx)
+          unknowns)
+    | _ :: _ ->
+      Fmt.(
+        pf
+          f
+          "@[%a) Counterexamples found!@;\
+           @[<hov 2>❔ Equations:@;\
+           @[<v>%a@]@]@;\
+           @[<hov 2>❔ Counterexample models:@;\
+           @[<v>%a@]@]@]"
+          (VarSet.pp_var_names ctx)
+          unknowns
+          (list ~sep:sp (box (pair ~sep:colon int (box (pp_equation ~ctx)))))
+          (List.mapi ~f:(fun i eqn -> i, eqn) eqns)
+          (list ~sep:sep_and (pp_unrealizability_witness ~ctx))
+          witnesss))
 ;;
 
 (* ============================================================================================= *)
-(*                           Messages from the Lemma Synthesis                                   *)
+(*                           Messages from the Lemma Synthesis *)
 (* ============================================================================================= *)
 
 let no_spurious_witness () =
   Log.info (fun fmt () ->
-      pf fmt "All counterexamples are non-spurious: nothing to refine.")
+    pf fmt "All counterexamples are non-spurious: nothing to refine.")
 ;;
 
 let witness_classification_failure () =
   Log.info (fun fmt () ->
-      pf fmt "Some unrealizability witnesses could not be classified ⚠️")
+    pf fmt "Some unrealizability witnesses could not be classified ⚠️")
 ;;
 
 let spurious_violates_requires i =
@@ -305,77 +304,77 @@ let spurious_violates_requires i =
 
 let print_infeasible_message ~ctx t_set =
   Log.info (fun frmt () ->
-      pf
-        frmt
-        "@[<hov 2>This problem has no solution. Counterexample set:@;%a@]"
-        (list ~sep:sp (Term.pp_term ctx))
-        (Set.elements t_set))
+    pf
+      frmt
+      "@[<hov 2>This problem has no solution. Counterexample set:@;%a@]"
+      (list ~sep:sp (Term.pp_term ctx))
+      (Set.elements t_set))
 ;;
 
 let announce_new_lemmas ~(ctx : Context.t) witness =
   Log.debug (fun fmt () ->
-      pf
-        fmt
-        "Creating new lemma for term@;%a@;under condition %a@;"
-        (pp_term ctx)
-        witness.witness_eqn.eterm
-        (option (pp_term ctx))
-        witness.witness_eqn.esplitter)
+    pf
+      fmt
+      "Creating new lemma for term@;%a@;under condition %a@;"
+      (pp_term ctx)
+      witness.witness_eqn.eterm
+      (option (pp_term ctx))
+      witness.witness_eqn.esplitter)
 ;;
 
 let announce_new_lemma_synthesis
-    ~(ctx : Context.t)
-    (thread_no : int)
-    (det : term_info)
-    (cl : cond_lemma)
+  ~(ctx : Context.t)
+  (thread_no : int)
+  (det : term_info)
+  (cl : cond_lemma)
   =
   Log.debug (fun f () ->
-      match cl.cl_cond with
-      | None ->
-        pf
-          f
-          "[%i] Synthesizing a new lemma candidate for term@;@[%a[%a]@]."
-          thread_no
-          (pp_term ctx)
-          det.ti_term
-          (pp_subs ctx)
-          det.ti_elim
-      | Some pre ->
-        pf
-          f
-          "[%i] Synthesizing a new lemma candidate for term@;\
-           @[%a[%a]@]@;\
-           with precondition@;\
-           @[%a@]"
-          thread_no
-          (pp_term ctx)
-          det.ti_term
-          (pp_subs ctx)
-          det.ti_elim
-          (pp_term ctx)
-          pre)
+    match cl.cl_cond with
+    | None ->
+      pf
+        f
+        "[%i] Synthesizing a new lemma candidate for term@;@[%a[%a]@]."
+        thread_no
+        (pp_term ctx)
+        det.ti_term
+        (pp_subs ctx)
+        det.ti_elim
+    | Some pre ->
+      pf
+        f
+        "[%i] Synthesizing a new lemma candidate for term@;\
+         @[%a[%a]@]@;\
+         with precondition@;\
+         @[%a@]"
+        thread_no
+        (pp_term ctx)
+        det.ti_term
+        (pp_subs ctx)
+        det.ti_elim
+        (pp_term ctx)
+        pre)
 ;;
 
 let lemma_not_proved_correct (m : Stats.verif_method) =
   Log.verbose (fun f () ->
-      pf
-        f
-        "This lemma has been proved incorrect by %s. Refining lemma..."
-        (Stats.verif_method_to_str m))
+    pf
+      f
+      "This lemma has been proved incorrect by %s. Refining lemma..."
+      (Stats.verif_method_to_str m))
 ;;
 
 let lemma_proved_correct
-    ~(ctx : Context.t)
-    (proof_method : Stats.verif_method)
-    (det : term_info)
-    (lemma_term : term)
+  ~(ctx : Context.t)
+  (proof_method : Stats.verif_method)
+  (det : term_info)
+  (lemma_term : term)
   =
   let lemma_term = Eval.simplify lemma_term in
   Log.verbose (fun f () ->
-      pf
-        f
-        "This lemma has been proven correct by %s."
-        (Stats.verif_method_to_str proof_method));
+    pf
+      f
+      "This lemma has been proven correct by %s."
+      (Stats.verif_method_to_str proof_method));
   let lemma_str =
     str
       "(%a)[%a]->%s(%s)= %a"
@@ -395,40 +394,40 @@ let lemma_proved_correct
   Stats.set_last_lemma_proof_method proof_method;
   (*  *)
   Log.info (fun frmt () ->
-      pf
-        frmt
-        "Lemma %a:@;\"%s %s =@;@[%a@]\"@;is correct, memorizing."
-        (pp_term ctx)
-        det.ti_term
-        det.ti_func.vname
-        (String.concat ~sep:" " (List.map ~f:(fun v -> v.vname) det.ti_formals))
-        (box (pp_term ctx))
-        lemma_term)
+    pf
+      frmt
+      "Lemma %a:@;\"%s %s =@;@[%a@]\"@;is correct, memorizing."
+      (pp_term ctx)
+      det.ti_term
+      det.ti_func.vname
+      (String.concat ~sep:" " (List.map ~f:(fun v -> v.vname) det.ti_formals))
+      (box (pp_term ctx))
+      lemma_term)
 ;;
 
 (* Messages from ImagePredicates *)
 
 let violates_ensures ~(ctx : Context.t) p witnesss =
   List.iter witnesss ~f:(fun witness ->
-      List.iter witness.witness_eqn.eelim ~f:(fun (_, elimv) ->
-          let tval = Eval.in_model ~ctx witness.witness_model elimv in
-          Log.verbose (fun fmt () ->
-              pf
-                fmt
-                "%a should not be in the image of %s"
-                (pp_term ctx)
-                tval
-                p.PsiDef.reference.pvar.vname)))
+    List.iter witness.witness_eqn.eelim ~f:(fun (_, elimv) ->
+      let tval = Eval.in_model ~ctx witness.witness_model elimv in
+      Log.verbose (fun fmt () ->
+        pf
+          fmt
+          "%a should not be in the image of %s"
+          (pp_term ctx)
+          tval
+          p.PsiDef.reference.pvar.vname)))
 ;;
 
 let positives_ensures ~(ctx : Context.t) p positives =
   Log.verbose (fun fmt () ->
-      pf
-        fmt
-        "@[These examples are in the image of %s:@;%a@]"
-        p.PsiDef.reference.pvar.vname
-        (list ~sep:comma (pp_term ctx))
-        positives)
+    pf
+      fmt
+      "@[These examples are in the image of %s:@;%a@]"
+      p.PsiDef.reference.pvar.vname
+      (list ~sep:comma (pp_term ctx))
+      positives)
 ;;
 
 let show_new_ensures_predicate ~(ctx : env) (f : variable) (ensures : term) =
@@ -457,103 +456,103 @@ let show_new_ensures_predicate ~(ctx : env) (f : variable) (ensures : term) =
 ;;
 
 (* ============================================================================================= *)
-(*                  Messages from the Counterexamples Classification                             *)
+(*                  Messages from the Counterexamples Classification *)
 (* ============================================================================================= *)
 
 let image_witness_class
-    ~(ctx : Context.t)
-    (p : PsiDef.t)
-    (witness : witness)
-    (resp : Smtlib.SmtLib.solver_response)
-    (vmethod : Stats.verif_method)
+  ~(ctx : Context.t)
+  (p : PsiDef.t)
+  (witness : witness)
+  (resp : Smtlib.SmtLib.solver_response)
+  (vmethod : Stats.verif_method)
   =
   Stats.update_counterexample_classification_method vmethod;
   Log.verbose (fun frmt () ->
-      if SmtInterface.is_unsat resp
-      then
-        Fmt.(
-          pf
-            frmt
-            "%s: %a: witness not in the image of reference function \"%s\":@;<1 4>%a."
-            (Stats.verif_method_to_str vmethod)
-            (styled (`Fg `Red) string)
-            "SPURIOUS"
-            p.PsiDef.reference.pvar.vname
-            (box (pp_witness ~ctx))
-            witness)
-      else if SmtInterface.is_sat resp
-      then
-        Fmt.(
-          pf
-            frmt
-            "%s: %a: witness in the image of %s:@;%a"
-            (Stats.verif_method_to_str vmethod)
-            (styled (`Fg `Green) string)
-            "VALID"
-            p.PsiDef.reference.pvar.vname
-            (box (pp_witness ~ctx))
-            witness)
-      else
-        Fmt.(
-          pf
-            frmt
-            "%s: %a: Is the following in the image of %s?@;%a"
-            (Stats.verif_method_to_str vmethod)
-            (styled (`Fg `White) (styled (`Bg `Red) string))
-            "UNKNOWN"
-            p.PsiDef.reference.pvar.vname
-            (box (pp_witness ~ctx))
-            witness))
+    if SmtInterface.is_unsat resp
+    then
+      Fmt.(
+        pf
+          frmt
+          "%s: %a: witness not in the image of reference function \"%s\":@;<1 4>%a."
+          (Stats.verif_method_to_str vmethod)
+          (styled (`Fg `Red) string)
+          "SPURIOUS"
+          p.PsiDef.reference.pvar.vname
+          (box (pp_witness ~ctx))
+          witness)
+    else if SmtInterface.is_sat resp
+    then
+      Fmt.(
+        pf
+          frmt
+          "%s: %a: witness in the image of %s:@;%a"
+          (Stats.verif_method_to_str vmethod)
+          (styled (`Fg `Green) string)
+          "VALID"
+          p.PsiDef.reference.pvar.vname
+          (box (pp_witness ~ctx))
+          witness)
+    else
+      Fmt.(
+        pf
+          frmt
+          "%s: %a: Is the following in the image of %s?@;%a"
+          (Stats.verif_method_to_str vmethod)
+          (styled (`Fg `White) (styled (`Bg `Red) string))
+          "UNKNOWN"
+          p.PsiDef.reference.pvar.vname
+          (box (pp_witness ~ctx))
+          witness))
 ;;
 
 let requires_witness_class
-    ~(ctx : Context.t)
-    (tinv : PMRS.t)
-    (witness : witness)
-    (resp : Smtlib.SmtLib.solver_response)
-    (vmethod : Stats.verif_method)
+  ~(ctx : Context.t)
+  (tinv : PMRS.t)
+  (witness : witness)
+  (resp : Smtlib.SmtLib.solver_response)
+  (vmethod : Stats.verif_method)
   =
   Stats.update_counterexample_classification_method vmethod;
   Log.verbose (fun frmt () ->
-      if SmtInterface.is_unsat resp
-      then
-        Fmt.(
-          pf
-            frmt
-            "%s: %a witness does not satisfy \"%s\":@;<1 4>%a"
-            (Stats.verif_method_to_str vmethod)
-            (styled (`Fg `Red) string)
-            "SPURIOUS"
-            tinv.PMRS.pvar.vname
-            (box (pp_witness ~ctx))
-            witness)
-      else if SmtInterface.is_sat resp
-      then
-        Fmt.(
-          pf
-            frmt
-            "%s: %a witness satisfies %s:@;<1 4>%a"
-            (Stats.verif_method_to_str vmethod)
-            (styled (`Fg `Green) string)
-            "VALID"
-            tinv.PMRS.pvar.vname
-            (box (pp_witness ~ctx))
-            witness)
-      else
-        Fmt.(
-          pf
-            frmt
-            "%s: %a The witness satisfies %s?@;<1 4>%a"
-            (Stats.verif_method_to_str vmethod)
-            (styled (`Fg `White) (styled (`Bg `Red) string))
-            "UNKNOWN"
-            tinv.PMRS.pvar.vname
-            (box (pp_witness ~ctx))
-            witness))
+    if SmtInterface.is_unsat resp
+    then
+      Fmt.(
+        pf
+          frmt
+          "%s: %a witness does not satisfy \"%s\":@;<1 4>%a"
+          (Stats.verif_method_to_str vmethod)
+          (styled (`Fg `Red) string)
+          "SPURIOUS"
+          tinv.PMRS.pvar.vname
+          (box (pp_witness ~ctx))
+          witness)
+    else if SmtInterface.is_sat resp
+    then
+      Fmt.(
+        pf
+          frmt
+          "%s: %a witness satisfies %s:@;<1 4>%a"
+          (Stats.verif_method_to_str vmethod)
+          (styled (`Fg `Green) string)
+          "VALID"
+          tinv.PMRS.pvar.vname
+          (box (pp_witness ~ctx))
+          witness)
+    else
+      Fmt.(
+        pf
+          frmt
+          "%s: %a The witness satisfies %s?@;<1 4>%a"
+          (Stats.verif_method_to_str vmethod)
+          (styled (`Fg `White) (styled (`Bg `Red) string))
+          "UNKNOWN"
+          tinv.PMRS.pvar.vname
+          (box (pp_witness ~ctx))
+          witness))
 ;;
 
 (* ============================================================================================= *)
-(*                  Logging into files                                                           *)
+(*                  Logging into files *)
 (* ============================================================================================= *)
 
 let log_confsearch_problem ~(ctx : env) ~(p : PsiDef.t) (n : int) =
@@ -561,7 +560,7 @@ let log_confsearch_problem ~(ctx : env) ~(p : PsiDef.t) (n : int) =
     let filename = FilePath.make_filename [ folder_name; "summary.txt" ] in
     FileUtil.touch ~create:true filename;
     let out = Stdio.Out_channel.create filename in
-    let frmt = Caml.Format.formatter_of_out_channel out in
+    let frmt = Stdlib.Format.formatter_of_out_channel out in
     Fmt.pf frmt "configurations:%i@." n;
     Fmt.pf frmt "%a@." (ctx >- PMRS.pp ~short:false) p.target;
     Stdio.Out_channel.close out
@@ -573,27 +572,27 @@ let log_confsearch_problem ~(ctx : env) ~(p : PsiDef.t) (n : int) =
     (* Log into output log? *)
     let l = Fmt.str "problem-file:%s,total-configurations:%i" p.filename n in
     (match !Config.output_log with
-    | Some filename ->
-      (try
-         let chan = Stdio.Out_channel.create ~append:true filename in
-         Stdio.Out_channel.output_lines chan [ l ];
-         Stdio.Out_channel.close_no_err chan
-       with
-      | _ -> ())
-    | None -> ())
+     | Some filename ->
+       (try
+          let chan = Stdio.Out_channel.create ~append:true filename in
+          Stdio.Out_channel.output_lines chan [ l ];
+          Stdio.Out_channel.close_no_err chan
+        with
+        | _ -> ())
+     | None -> ())
 ;;
 
 let log_solution
-    ~(ctx : env)
-    ~(p : PsiDef.t)
-    (resp : Syguslib.Sygus.solver_response segis_response)
+  ~(ctx : env)
+  ~(p : PsiDef.t)
+  (resp : Syguslib.Sygus.solver_response segis_response)
   =
   let f folder_name =
     let filename_s = Fmt.str "configuration_%i.txt" p.id in
     let filename = FilePath.make_filename [ folder_name; filename_s ] in
     FileUtil.touch ~create:true filename;
     let out = Stdio.Out_channel.create filename in
-    let frmt = Caml.Format.formatter_of_out_channel out in
+    let frmt = Stdlib.Format.formatter_of_out_channel out in
     let () =
       match resp with
       | Realizable soln ->

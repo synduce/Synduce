@@ -42,5 +42,5 @@ let rec spec = function
 let rec target = function
   | Leaf a -> [%synt xi_0] a
   | Node (a, l, r) -> [%synt xi_1] (target r)
-  [@@requires is_bst]
+[@@requires is_bst]
 ;;
